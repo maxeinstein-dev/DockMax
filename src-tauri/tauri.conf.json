@@ -22,7 +22,8 @@
         "resizable": false,
         "skipTaskbar": true,
         "shadow": false,
-        "visible": false
+        "visible": false,
+        "focus": false
       },
       {
         "label": "panel",
@@ -36,7 +37,8 @@
         "resizable": false,
         "skipTaskbar": true,
         "shadow": false,
-        "visible": false
+        "visible": false,
+        "focus": false
       }
     ],
     "security": {

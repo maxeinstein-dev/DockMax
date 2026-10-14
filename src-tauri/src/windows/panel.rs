@@ -173,7 +173,8 @@ struct ShowPayload {
     panel_id: PanelId,
 }
 
-/// Registers the panel state and hides the panel when it loses focus.
+/// Registers the panel state and hides the panel when it loses focus or is
+/// closed (Alt+F4).
 pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let window = app
         .get_webview_window(LABEL)
@@ -183,11 +184,16 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     app.manage(Mutex::new(PanelState::default()));
     let app = app.clone();
     window.on_window_event(move |event| {
-        if let WindowEvent::Focused(false) = event {
-            let action = lock(&app).blur(Instant::now());
-            if let Err(error) = apply(&app, action, None) {
-                eprintln!("failed to hide the panel: {error}");
+        let action = match event {
+            WindowEvent::Focused(false) => lock(&app).blur(Instant::now()),
+            WindowEvent::CloseRequested { api, .. } => {
+                api.prevent_close();
+                lock(&app).hide()
             }
+            _ => return,
+        };
+        if let Err(error) = apply(&app, action, None) {
+            eprintln!("failed to hide the panel: {error}");
         }
     });
     Ok(())

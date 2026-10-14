@@ -1,6 +1,8 @@
 use std::error::Error;
 
-use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
+use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent};
+
+use super::panel;
 
 pub const LABEL: &str = "dock";
 
@@ -46,15 +48,56 @@ pub fn dock_rect(work_area: Rect, scale_factor: f64, logical_size: (f64, f64), e
     }
 }
 
-/// Positions the dock on the primary monitor and shows it.
+/// Shows the dock on the primary monitor. Closing it (Alt+F4) hides it.
 pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let window = app
         .get_webview_window(LABEL)
         .ok_or("dock window is missing from tauri.conf.json")?;
     #[cfg(windows)]
     super::native::install(&window, Some(reposition))?;
-    place(&window)?;
+    let handle = app.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            if let Err(error) = hide(&handle) {
+                eprintln!("failed to hide the dock: {error}");
+            }
+        }
+    });
+    show(&window)
+}
+
+/// Hides the dock (and its panel) when visible, shows it otherwise.
+pub fn toggle(app: &AppHandle) -> Result<(), Box<dyn Error>> {
+    let window = app
+        .get_webview_window(LABEL)
+        .ok_or("dock window is missing")?;
+    if window.is_visible()? {
+        hide(app)
+    } else {
+        show(&window)
+    }
+}
+
+/// Places the dock and shows it without taking the foreground from the app
+/// in use.
+fn show(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
+    place(window)?;
+    // tao shows windows with SW_SHOW, which activates them unless they
+    // can't take focus.
+    window.set_focusable(false)?;
     window.show()?;
+    window.set_focusable(true)?;
+    Ok(())
+}
+
+/// Hides the dock and the open panel.
+fn hide(app: &AppHandle) -> Result<(), Box<dyn Error>> {
+    let action = panel::lock(app).hide();
+    panel::apply(app, action, None)?;
+    app.get_webview_window(LABEL)
+        .ok_or("dock window is missing")?
+        .hide()?;
     Ok(())
 }
 
