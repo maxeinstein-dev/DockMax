@@ -79,8 +79,8 @@ pnpm build
 
 cd src-tauri
 cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
 ```
 
 ## Princípios
