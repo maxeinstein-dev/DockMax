@@ -16,9 +16,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px;
-  border-radius: 12px;
-  background: rgb(40 40 40 / 70%);
+  /* 7 px + the 1 px border keep the items 8 px from the edge. */
+  padding: 7px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  background: var(--glass-sheen), var(--glass-surface);
+  /* The shadow fits beside and above the bar; below it is the window edge. */
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
 }
 
 .dock-bar button {
@@ -26,7 +30,8 @@
   font: inherit;
   padding: 0 12px;
   border: 0;
-  border-radius: 8px;
+  /* Concentric with the bar: its radius minus the 8 px inset. */
+  border-radius: 12px;
   color: #1f1f1f;
   background: rgb(255 255 255 / 85%);
   cursor: pointer;

@@ -6,6 +6,24 @@
     Roboto,
     sans-serif;
   font-size: 13px;
+
+  /* Simulated glass (spec V2): Windows can't blur what is behind a window
+     with large rounded corners (the DWM backdrop ignores the window region
+     and fills the whole window rect), so surfaces are a tinted translucent
+     layer without blur. Provisional values; the final ones come from the
+     visual mock. */
+  --glass-tint: 30 32 38;
+  /* Translucent; the "Solid" option (Q34) sets it to 100%. */
+  --glass-opacity: 88%;
+  --glass-surface: rgb(var(--glass-tint) / var(--glass-opacity));
+  /* Faint light at the top edge, as if the surface caught some light. */
+  --glass-sheen: linear-gradient(rgb(255 255 255 / 7%), transparent 40%);
+  --glass-border: rgb(255 255 255 / 12%);
+  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 10%);
+  /* Drawn inside the window, so it must fit in the space around the
+     surface. */
+  --glass-shadow: 0 0 12px rgb(0 0 0 / 30%);
+  --glass-radius: 20px;
 }
 
 html,
