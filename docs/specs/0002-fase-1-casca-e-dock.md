@@ -69,6 +69,14 @@ Detalhes e motivos no [ADR 0006](../adr/0006-janelas-do-dock-e-paineis.md).
 - Referências de terceiros são só visuais. Plank, Latte e Cairo-Dock são GPL e o DockMax é MIT: **nenhum código, ícone ou arquivo de tema é copiado**.
 - **Saída**: variante escolhida + tokens de design (cores por tema e opacidade, raios, sombras, tipografia, tamanhos), que alimentam o PR 2. A identidade fica toda nos tokens, para poder mudar depois sem tocar em componentes.
 
+### 2.2.1 Resultado do mock (2026-10-14)
+
+- **Variante escolhida: B1 · Big Sur.** A B2 · Prateleira foi avaliada e descartada.
+- Sistema visual registrado em [`DESIGN.md`](../../DESIGN.md) (tokens em `.impeccable/design.json`); o mock fica em `docs/design/dock-mock.html`, com o estado da tela por parâmetros na URL.
+- Decisões que o mock acrescentou: painel sempre opaco (a opção Translúcido/Sólido vale só para o dock); raio do painel de 8 px, como as janelas do Windows 11; ampliação empurra os vizinhos e congela com painel aberto; cobalto reservado a foco, seleção e indicador ativo; paleta própria dos ícones em classes estáticas (compatível com a CSP).
+- Restrição para o PR 2: no tamanho Grande a B1 ampliada chega a ~105 px acima da base, contra a janela de 104 px; a folga precisa crescer com o tamanho ou a ampliação ser limitada. A janela também precisa de folga lateral, porque a barra cresce na ampliação.
+- O visual provisório do PR 1 (`src/themes/base.css`, vidro com raio de 20 px) é substituído pelo `DESIGN.md` no PR 2.
+
 ### 2.3 PR 2 — Fundação
 
 1. **Testes-guarda**, provados com bite-check:

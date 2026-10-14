@@ -78,7 +78,7 @@ Quase tudo aqui mexe em `src-tauri/src/lib.rs`, `tauri.conf.json` e na capabilit
 
 Depois do J7: revisão completa (`revisor-com-carta`), converge e PR, com push e PR só com aprovação do usuário.
 
-## Mock visual (esboço)
+## Mock visual (concluído: B1 · Big Sur escolhida; ver spec §2.2.1 e `DESIGN.md`)
 
 ### M1 `[sequential]` — Mock B1 × B2
 **Spec:** §2.2. Depende do PR 1 (resultados V1/V2).
