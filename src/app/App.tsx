@@ -2,10 +2,12 @@ import "./App.css";
 
 function App() {
   return (
-    <main className="container">
-      <h1>DockMax</h1>
-      <p>Fase 0 — esqueleto do aplicativo.</p>
-    </main>
+    <div className="dock">
+      <nav className="dock-bar" aria-label="Dock">
+        <button type="button">Configurações</button>
+        <button type="button">Sobre</button>
+      </nav>
+    </div>
   );
 }
 

@@ -12,9 +12,17 @@
   "app": {
     "windows": [
       {
+        "label": "dock",
         "title": "DockMax",
-        "width": 800,
-        "height": 600
+        "width": 240,
+        "height": 64,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false
       }
     ],
     "security": {
