@@ -93,6 +93,13 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     show(&window)
 }
 
+/// Whether the dock window is on screen. `false` when it can't be told.
+pub fn is_visible(app: &AppHandle) -> bool {
+    app.get_webview_window(LABEL)
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false)
+}
+
 /// Hides the dock (and its panel) when visible, shows it otherwise.
 pub fn toggle(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let window = app
@@ -112,8 +119,11 @@ fn show(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
     // tao shows windows with SW_SHOW, which activates them unless they
     // can't take focus.
     window.set_focusable(false)?;
-    window.show()?;
-    window.set_focusable(true)?;
+    let shown = window.show();
+    // Restored even when showing failed.
+    let restored = window.set_focusable(true);
+    shown?;
+    restored?;
     hit_test::tracker(window.app_handle()).set_visible(true);
     Ok(())
 }

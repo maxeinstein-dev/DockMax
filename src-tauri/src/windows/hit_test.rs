@@ -113,8 +113,12 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
         let shared = tracker.lock();
         if !shared.visible && captured {
             drop(shared);
-            set_captured(window, false);
-            captured = false;
+            if set_captured(window, false) {
+                captured = false;
+            } else {
+                // Retry at the sampling rate instead of spinning.
+                thread::sleep(INTERVAL);
+            }
             continue;
         }
         let shared = tracker
@@ -131,8 +135,8 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
 
         if let (Some((rect, bar)), Some(cursor)) = (geometry, cursor_position()) {
             let next = next_captured(captured, cursor, rect, bar);
-            if next != captured {
-                set_captured(window, next);
+            // On failure the window keeps its old state: retry next tick.
+            if next != captured && set_captured(window, next) {
                 captured = next;
             }
         }
@@ -140,10 +144,14 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
     }
 }
 
-/// Tauri forwards the change to the main thread.
-fn set_captured(window: &WebviewWindow, captured: bool) {
-    if let Err(error) = window.set_ignore_cursor_events(!captured) {
-        eprintln!("failed to change the dock's mouse capture: {error}");
+/// Tauri forwards the change to the main thread. Returns whether it worked.
+fn set_captured(window: &WebviewWindow, captured: bool) -> bool {
+    match window.set_ignore_cursor_events(!captured) {
+        Ok(()) => true,
+        Err(error) => {
+            eprintln!("failed to change the dock's mouse capture: {error}");
+            false
+        }
     }
 }
 

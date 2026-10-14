@@ -2,6 +2,7 @@ use std::time::Instant;
 
 use tauri::AppHandle;
 
+use crate::windows::dock;
 use crate::windows::panel::{self, Action, LogicalRect, PanelId};
 
 /// Called by the dock when an item is clicked. `anchor` is the item's
@@ -13,15 +14,29 @@ pub fn toggle_panel(app: AppHandle, panel_id: PanelId, anchor: LogicalRect) -> R
         .validate()
         .map_err(|error| format!("invalid anchor: {error}"))?;
     let action = panel::lock(&app).toggle(panel_id, Instant::now());
+    let show = matches!(action, Action::Show(_));
+    if show && !dock::is_visible(&app) {
+        // A click queued before the dock was hidden from the tray: a panel
+        // anchored to a hidden dock stays closed.
+        close(&app);
+        return Ok(());
+    }
     if let Err(error) = panel::apply(&app, action, Some(anchor)) {
         eprintln!("failed to toggle the panel: {error}");
-        if matches!(action, Action::Show(_)) {
-            let reset = panel::lock(&app).hide();
-            let _ = panel::apply(&app, reset, None);
+        if show {
+            close(&app);
         }
         return Err("could not open the panel".into());
     }
     Ok(())
+}
+
+/// Brings the state back to closed after a `Show` that won't happen.
+fn close(app: &AppHandle) {
+    let reset = panel::lock(app).hide();
+    if let Err(error) = panel::apply(app, reset, None) {
+        eprintln!("failed to hide the panel: {error}");
+    }
 }
 
 /// Called by the panel to close itself (Esc).

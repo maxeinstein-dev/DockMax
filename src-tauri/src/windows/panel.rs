@@ -206,9 +206,10 @@ impl PanelState {
         }
     }
 
-    /// The panel asked to close itself (Esc).
+    /// The panel asked to close itself (Esc), or the dock is hiding. Keeps a
+    /// pending reopen guard: a late hide after a blur-hide must not let the
+    /// click that closed the panel reopen it.
     pub fn hide(&mut self) -> Action {
-        self.blurred = None;
         match self.open.take() {
             Some(_) => Action::Hide,
             None => Action::Nothing,
@@ -866,7 +867,7 @@ mod tests {
     }
 
     #[test]
-    fn hide_closes_the_open_panel_without_the_reopen_guard() {
+    fn hide_closes_the_open_panel_without_arming_the_reopen_guard() {
         let mut state = PanelState::default();
         let t = Instant::now();
         state.toggle(PanelId::Settings, t);
@@ -877,6 +878,22 @@ mod tests {
         assert_eq!(
             state.toggle(PanelId::Settings, at(t, 50)),
             Action::Show(PanelId::Settings)
+        );
+    }
+
+    #[test]
+    fn hide_after_a_blur_hide_keeps_the_reopen_guard() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        state.toggle(PanelId::Settings, t);
+        state.blur(at(t, 1000));
+
+        // A late hide (Esc or the dock hiding) after the blur-hide.
+        assert_eq!(state.hide(), Action::Nothing);
+        // The click that closed the panel must not reopen it.
+        assert_eq!(
+            state.toggle(PanelId::Settings, at(t, 1100)),
+            Action::Nothing
         );
     }
 
