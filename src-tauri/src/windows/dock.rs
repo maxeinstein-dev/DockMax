@@ -42,23 +42,32 @@ impl Rect {
     }
 }
 
+/// Narrows to i32, saturating at its bounds.
+pub fn saturate(value: i64) -> i32 {
+    value.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
+}
+
 /// Physical rectangle of the dock window for a bar of `bar_size` logical
 /// pixels: centered horizontally in the work area, `HEADROOM` taller than
 /// the bar on the side away from the edge, with the bar's outer side
 /// `MARGIN` away from the given edge. Logical values are rounded the same
 /// way Tauri converts logical to physical pixels.
 pub fn dock_rect(work_area: Rect, scale_factor: f64, bar_size: (f64, f64), edge: Edge) -> Rect {
+    // Every term fits in i32/u32 (`as` saturates), so sums in i64 can't
+    // overflow.
     let width = (bar_size.0 * scale_factor).round() as u32;
     let height = ((bar_size.1 + HEADROOM) * scale_factor).round() as u32;
-    let margin = (MARGIN * scale_factor).round() as i32;
-    let x = work_area.x + (work_area.width as i32 - width as i32).div_euclid(2);
+    let margin = i64::from((MARGIN * scale_factor).round() as i32);
+    let x = i64::from(work_area.x) + (i64::from(work_area.width) - i64::from(width)).div_euclid(2);
     let y = match edge {
-        Edge::Bottom => work_area.y + work_area.height as i32 - margin - height as i32,
-        Edge::Top => work_area.y + margin,
+        Edge::Bottom => {
+            i64::from(work_area.y) + i64::from(work_area.height) - margin - i64::from(height)
+        }
+        Edge::Top => i64::from(work_area.y) + margin,
     };
     Rect {
-        x,
-        y,
+        x: saturate(x),
+        y: saturate(y),
         width,
         height,
     }
@@ -290,6 +299,27 @@ mod tests {
         let dock = dock_rect(work_area, 1.0, SIZE, Edge::Bottom);
 
         assert_eq!(dock.x, 380);
+    }
+
+    #[test]
+    fn extreme_work_areas_saturate_instead_of_overflowing() {
+        let cases = [
+            (rect(i32::MAX, i32::MAX, u32::MAX, u32::MAX), 1.0),
+            (rect(i32::MIN, i32::MIN, 0, 0), 3.0),
+            (rect(i32::MAX - 10, 0, 100, 100), 3.0),
+            (rect(0, 0, 1920, 1080), f64::MAX),
+            (rect(0, 0, 1920, 1080), f64::NAN),
+        ];
+        for (work_area, scale_factor) in cases {
+            for edge in [Edge::Bottom, Edge::Top] {
+                // Must not panic.
+                let _ = dock_rect(work_area, scale_factor, SIZE, edge);
+            }
+        }
+        assert_eq!(
+            dock_rect(rect(i32::MAX, 0, u32::MAX, 1000), 1.0, SIZE, Edge::Top).x,
+            i32::MAX
+        );
     }
 
     #[test]

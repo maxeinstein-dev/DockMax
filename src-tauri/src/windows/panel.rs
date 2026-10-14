@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::fmt;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -40,6 +41,11 @@ impl PanelId {
     }
 }
 
+/// Largest coordinate or size accepted from the frontend, in logical pixels.
+/// Far beyond any real monitor layout, small enough that scaling it can't
+/// leave the `i32` range.
+pub const MAX_LOGICAL: f64 = 100_000.0;
+
 /// A rectangle in logical pixels, relative to a window's client area.
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub struct LogicalRect {
@@ -49,18 +55,58 @@ pub struct LogicalRect {
     pub height: f64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RectError {
+    NotFinite,
+    NegativeSize,
+    TooLarge,
+}
+
+impl fmt::Display for RectError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            RectError::NotFinite => "a value is not a finite number",
+            RectError::NegativeSize => "the width or height is negative",
+            RectError::TooLarge => "a value is beyond 100000 logical pixels",
+        })
+    }
+}
+
+impl Error for RectError {}
+
+impl LogicalRect {
+    /// Checks a rectangle received from the frontend: finite values,
+    /// non-negative size and every value within `MAX_LOGICAL`.
+    pub fn validate(&self) -> Result<(), RectError> {
+        let values = [self.x, self.y, self.width, self.height];
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(RectError::NotFinite);
+        }
+        if self.width < 0.0 || self.height < 0.0 {
+            return Err(RectError::NegativeSize);
+        }
+        if values.iter().any(|value| value.abs() > MAX_LOGICAL) {
+            return Err(RectError::TooLarge);
+        }
+        Ok(())
+    }
+}
+
 /// Converts a rectangle relative to a window's client area into physical
-/// screen coordinates. Returns `None` for non-finite or negative values.
+/// screen coordinates. Returns `None` for an invalid rectangle or scale, or
+/// when the result leaves the `i32` range.
 pub fn to_screen(rect: LogicalRect, client_origin: (i32, i32), scale_factor: f64) -> Option<Rect> {
-    let values = [rect.x, rect.y, rect.width, rect.height];
-    if values.iter().any(|value| !value.is_finite()) || rect.width < 0.0 || rect.height < 0.0 {
+    rect.validate().ok()?;
+    if !scale_factor.is_finite() || scale_factor <= 0.0 {
         return None;
     }
+    // `as` saturates; the checked conversions reject what saturated.
+    let scale = |value: f64| (value * scale_factor).round() as i64;
     Some(Rect {
-        x: client_origin.0 + (rect.x * scale_factor).round() as i32,
-        y: client_origin.1 + (rect.y * scale_factor).round() as i32,
-        width: (rect.width * scale_factor).round() as u32,
-        height: (rect.height * scale_factor).round() as u32,
+        x: i32::try_from(i64::from(client_origin.0) + scale(rect.x)).ok()?,
+        y: i32::try_from(i64::from(client_origin.1) + scale(rect.y)).ok()?,
+        width: u32::try_from(scale(rect.width)).ok()?,
+        height: u32::try_from(scale(rect.height)).ok()?,
     })
 }
 
@@ -76,14 +122,16 @@ pub fn panel_rect(
     logical_size: (f64, f64),
     edge: Edge,
 ) -> Rect {
+    // Every term fits in i32/u32 (`as` saturates), so sums in i64 can't
+    // overflow; the result is saturated back into i32.
     let width = (logical_size.0 * scale_factor).round() as u32;
     let height = (logical_size.1 * scale_factor).round() as u32;
-    let margin = (MARGIN * scale_factor).round() as i32;
-    let anchor_center = anchor.x + (anchor.width as i32).div_euclid(2);
-    let x = anchor_center - (width as i32).div_euclid(2);
+    let margin = i64::from((MARGIN * scale_factor).round() as i32);
+    let anchor_center = i64::from(anchor.x) + i64::from(anchor.width).div_euclid(2);
+    let x = anchor_center - i64::from(width).div_euclid(2);
     let y = match edge {
-        Edge::Bottom => bar.y - margin - height as i32,
-        Edge::Top => bar.y + bar.height as i32 + margin,
+        Edge::Bottom => i64::from(bar.y) - margin - i64::from(height),
+        Edge::Top => i64::from(bar.y) + i64::from(bar.height) + margin,
     };
     Rect {
         x: clamp_axis(x, width, work_area.x, work_area.width, margin),
@@ -93,14 +141,14 @@ pub fn panel_rect(
     }
 }
 
-fn clamp_axis(position: i32, size: u32, start: i32, length: u32, margin: i32) -> i32 {
-    let min = start + margin;
-    let max = start + length as i32 - margin - size as i32;
-    if max < min {
+fn clamp_axis(position: i64, size: u32, start: i32, length: u32, margin: i64) -> i32 {
+    let min = i64::from(start) + margin;
+    let max = i64::from(start) + i64::from(length) - margin - i64::from(size);
+    dock::saturate(if max < min {
         min
     } else {
         position.clamp(min, max)
-    }
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -378,6 +426,235 @@ mod tests {
             ),
             None
         );
+    }
+
+    const VALID: LogicalRect = LogicalRect {
+        x: 0.0,
+        y: 0.0,
+        width: 1.0,
+        height: 1.0,
+    };
+
+    #[test]
+    fn validate_accepts_rects_within_the_limit() {
+        let cases = [
+            VALID,
+            LogicalRect {
+                x: -100_000.0,
+                y: 100_000.0,
+                width: 100_000.0,
+                height: 0.0,
+            },
+            LogicalRect {
+                x: 16.5,
+                y: -0.0,
+                width: 104.25,
+                height: 40.0,
+            },
+        ];
+        for rect in cases {
+            assert_eq!(rect.validate(), Ok(()), "{rect:?}");
+        }
+    }
+
+    #[test]
+    fn validate_rejects_bad_rects() {
+        use RectError::*;
+        let cases = [
+            (
+                LogicalRect {
+                    x: f64::NAN,
+                    ..VALID
+                },
+                NotFinite,
+            ),
+            (
+                LogicalRect {
+                    y: f64::INFINITY,
+                    ..VALID
+                },
+                NotFinite,
+            ),
+            (
+                LogicalRect {
+                    width: f64::NEG_INFINITY,
+                    ..VALID
+                },
+                NotFinite,
+            ),
+            (
+                LogicalRect {
+                    height: -1.0,
+                    ..VALID
+                },
+                NegativeSize,
+            ),
+            (
+                LogicalRect {
+                    width: -1e12,
+                    ..VALID
+                },
+                NegativeSize,
+            ),
+            (LogicalRect { x: 1e12, ..VALID }, TooLarge),
+            (LogicalRect { x: -1e12, ..VALID }, TooLarge),
+            (
+                LogicalRect {
+                    y: f64::MAX,
+                    ..VALID
+                },
+                TooLarge,
+            ),
+            (
+                LogicalRect {
+                    y: f64::MIN,
+                    ..VALID
+                },
+                TooLarge,
+            ),
+            (
+                LogicalRect {
+                    width: f64::MAX,
+                    ..VALID
+                },
+                TooLarge,
+            ),
+            (
+                LogicalRect {
+                    height: 1e12,
+                    ..VALID
+                },
+                TooLarge,
+            ),
+            (
+                LogicalRect {
+                    x: 100_000.5,
+                    ..VALID
+                },
+                TooLarge,
+            ),
+        ];
+        for (rect, expected) in cases {
+            assert_eq!(rect.validate(), Err(expected), "{rect:?}");
+        }
+    }
+
+    #[test]
+    fn to_screen_never_panics_and_rejects_what_does_not_fit() {
+        let cases = [
+            (LogicalRect { x: 1e12, ..VALID }, (0, 0), 1.0),
+            (LogicalRect { x: -1e12, ..VALID }, (0, 0), 1.0),
+            (
+                LogicalRect {
+                    y: f64::MAX,
+                    ..VALID
+                },
+                (0, 0),
+                1.0,
+            ),
+            (
+                LogicalRect {
+                    width: f64::MAX,
+                    ..VALID
+                },
+                (0, 0),
+                3.0,
+            ),
+            (
+                LogicalRect {
+                    x: f64::NAN,
+                    ..VALID
+                },
+                (0, 0),
+                1.0,
+            ),
+            // Valid rect, origin near the i32 limits.
+            (
+                LogicalRect {
+                    x: 100_000.0,
+                    ..VALID
+                },
+                (i32::MAX - 10, 0),
+                3.0,
+            ),
+            (
+                LogicalRect {
+                    y: -100_000.0,
+                    ..VALID
+                },
+                (0, i32::MIN + 10),
+                3.0,
+            ),
+            // Valid rect, unusable scale.
+            (VALID, (0, 0), f64::NAN),
+            (VALID, (0, 0), f64::INFINITY),
+            (VALID, (0, 0), 0.0),
+            (VALID, (0, 0), -1.0),
+            (
+                LogicalRect {
+                    width: 100_000.0,
+                    ..VALID
+                },
+                (0, 0),
+                f64::MAX,
+            ),
+        ];
+        for (rect, origin, scale_factor) in cases {
+            assert_eq!(
+                to_screen(rect, origin, scale_factor),
+                None,
+                "{rect:?} {origin:?} {scale_factor}"
+            );
+        }
+    }
+
+    #[test]
+    fn to_screen_converts_the_largest_valid_rect_at_scale_300() {
+        let rect = LogicalRect {
+            x: -100_000.0,
+            y: 100_000.0,
+            width: 100_000.0,
+            height: 100_000.0,
+        };
+
+        assert_eq!(
+            to_screen(rect, (i32::MAX - 300_000, 0), 3.0),
+            Some(Rect {
+                x: i32::MAX - 600_000,
+                y: 300_000,
+                width: 300_000,
+                height: 300_000,
+            })
+        );
+    }
+
+    #[test]
+    fn panel_rect_saturates_instead_of_overflowing() {
+        let max = rect(i32::MAX, i32::MAX, u32::MAX, u32::MAX);
+        let min = rect(i32::MIN, i32::MIN, u32::MAX, u32::MAX);
+        let cases = [
+            (max, BAR, WORK_AREA, 3.0),
+            (min, min, WORK_AREA, 3.0),
+            (BAR, max, max, 1.0),
+            (BAR, min, min, 1.0),
+            (max, max, max, f64::MAX),
+            (min, min, min, f64::NAN),
+        ];
+        for (anchor, bar, work_area, scale_factor) in cases {
+            for edge in [Edge::Bottom, Edge::Top] {
+                // Must not panic.
+                let _ = panel_rect(anchor, bar, work_area, scale_factor, (360.0, 480.0), edge);
+            }
+        }
+        let panel = panel_rect(
+            BAR,
+            BAR,
+            rect(i32::MAX, 0, u32::MAX, 1032),
+            1.0,
+            (360.0, 480.0),
+            Edge::Bottom,
+        );
+        assert_eq!(panel.x, i32::MAX);
     }
 
     #[test]

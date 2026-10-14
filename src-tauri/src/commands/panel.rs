@@ -8,6 +8,10 @@ use crate::windows::panel::{self, Action, LogicalRect, PanelId};
 /// rectangle relative to the dock's client area, in logical pixels.
 #[tauri::command]
 pub fn toggle_panel(app: AppHandle, panel_id: PanelId, anchor: LogicalRect) -> Result<(), String> {
+    // Before touching the panel state: a rejected click changes nothing.
+    anchor
+        .validate()
+        .map_err(|error| format!("invalid anchor: {error}"))?;
     let action = panel::lock(&app).toggle(panel_id, Instant::now());
     if let Err(error) = panel::apply(&app, action, Some(anchor)) {
         eprintln!("failed to toggle the panel: {error}");
