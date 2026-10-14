@@ -15,3 +15,4 @@ ADRs registram decisões técnicas importantes, seu contexto e suas consequênci
 - [0002 — Arquitetura modular](0002-arquitetura-modular.md)
 - [0003 — Persistência local](0003-persistencia-local.md)
 - [0004 — Escopo Windows e barra de tarefas](0004-escopo-windows.md)
+- [0005 — Ferramentas de desenvolvimento](0005-ferramentas-de-desenvolvimento.md)
