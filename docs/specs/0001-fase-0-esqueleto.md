@@ -103,6 +103,7 @@ O build do Vite precisa rodar antes dos passos Rust: `tauri::generate_context!` 
 - **Se a CI gera instalador/artefato**: Fase 5.
 - **Política de atualização de dependências** (Dependabot de versões ou manual): Fase 5.
 - **Estratégia de releases/tags e changelog**: quando houver o primeiro instalador.
+- **Content Security Policy** (`app.security.csp`, hoje `null`, padrão do template): definir no início da Fase 1, antes de qualquer widget renderizar conteúdo dinâmico. Na Fase 0 o risco é baixo: só o bundle local, sem IPC próprio e sem conteúdo remoto. Apontado na revisão da Fase 0.
 
 ## Riscos
 
