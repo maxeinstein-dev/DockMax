@@ -2,12 +2,16 @@ use std::error::Error;
 
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent};
 
-use super::panel;
+use super::{hit_test, panel};
 
 pub const LABEL: &str = "dock";
 
-/// Gap between the dock and the work area edge, in logical pixels.
+/// Gap between the visible bar and the work area edge, in logical pixels.
 const MARGIN: f64 = 8.0;
+
+/// Transparent space added to the window, on the side away from the screen
+/// edge, for a hovered icon to grow into, in logical pixels.
+pub const HEADROOM: f64 = 40.0;
 
 /// Screen edge the dock sits on.
 pub const EDGE: Edge = Edge::Bottom;
@@ -28,12 +32,24 @@ pub struct Rect {
     pub height: u32,
 }
 
-/// Physical rectangle of the dock window: centered horizontally in the work
-/// area and `MARGIN` away from the given edge. Logical values are rounded
-/// the same way Tauri converts logical to physical pixels.
-pub fn dock_rect(work_area: Rect, scale_factor: f64, logical_size: (f64, f64), edge: Edge) -> Rect {
-    let width = (logical_size.0 * scale_factor).round() as u32;
-    let height = (logical_size.1 * scale_factor).round() as u32;
+impl Rect {
+    /// Whether the point lies inside (right and bottom edges excluded).
+    pub fn contains(self, (x, y): (i32, i32)) -> bool {
+        x >= self.x
+            && y >= self.y
+            && i64::from(x) < i64::from(self.x) + i64::from(self.width)
+            && i64::from(y) < i64::from(self.y) + i64::from(self.height)
+    }
+}
+
+/// Physical rectangle of the dock window for a bar of `bar_size` logical
+/// pixels: centered horizontally in the work area, `HEADROOM` taller than
+/// the bar on the side away from the edge, with the bar's outer side
+/// `MARGIN` away from the given edge. Logical values are rounded the same
+/// way Tauri converts logical to physical pixels.
+pub fn dock_rect(work_area: Rect, scale_factor: f64, bar_size: (f64, f64), edge: Edge) -> Rect {
+    let width = (bar_size.0 * scale_factor).round() as u32;
+    let height = ((bar_size.1 + HEADROOM) * scale_factor).round() as u32;
     let margin = (MARGIN * scale_factor).round() as i32;
     let x = work_area.x + (work_area.width as i32 - width as i32).div_euclid(2);
     let y = match edge {
@@ -53,6 +69,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let window = app
         .get_webview_window(LABEL)
         .ok_or("dock window is missing from tauri.conf.json")?;
+    hit_test::start(app, &window)?;
     #[cfg(windows)]
     super::native::install(&window, Some(reposition))?;
     let handle = app.clone();
@@ -88,6 +105,7 @@ fn show(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
     window.set_focusable(false)?;
     window.show()?;
     window.set_focusable(true)?;
+    hit_test::tracker(window.app_handle()).set_visible(true);
     Ok(())
 }
 
@@ -98,6 +116,7 @@ fn hide(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     app.get_webview_window(LABEL)
         .ok_or("dock window is missing")?
         .hide()?;
+    hit_test::tracker(app).set_visible(false);
     Ok(())
 }
 
@@ -114,11 +133,22 @@ fn place(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
     let rect = dock_rect(
         work_area,
         scale_factor,
-        logical_size(window.app_handle())?,
+        bar_size(window.app_handle())?,
         EDGE,
     );
     window.set_size(PhysicalSize::new(rect.width, rect.height))?;
     window.set_position(PhysicalPosition::new(rect.x, rect.y))?;
+    let origin = window.inner_position()?;
+    let size = window.inner_size()?;
+    hit_test::tracker(window.app_handle()).set_window(
+        Rect {
+            x: origin.x,
+            y: origin.y,
+            width: size.width,
+            height: size.height,
+        },
+        window.scale_factor()?,
+    );
     Ok(())
 }
 
@@ -137,8 +167,9 @@ pub fn primary_work_area(window: &WebviewWindow) -> Result<(Rect, f64), Box<dyn 
     Ok((work_area, monitor.scale_factor()))
 }
 
-/// The dock size declared in tauri.conf.json, in logical pixels.
-fn logical_size(app: &AppHandle) -> Result<(f64, f64), Box<dyn Error>> {
+/// The bar size, in logical pixels: the dock size declared in
+/// tauri.conf.json. The window adds `HEADROOM` to it.
+fn bar_size(app: &AppHandle) -> Result<(f64, f64), Box<dyn Error>> {
     let config = app
         .config()
         .app
@@ -165,39 +196,44 @@ mod tests {
     }
 
     #[test]
-    fn bottom_at_100_percent_sits_8px_above_the_work_area() {
+    fn bottom_at_100_percent_keeps_the_bar_8px_above_the_work_area() {
         let work_area = rect(0, 0, 1920, 1032);
 
         let dock = dock_rect(work_area, 1.0, SIZE, Edge::Bottom);
 
-        assert_eq!(dock, rect(840, 1032 - 8 - 64, 240, 64));
+        // 64 px bar + 40 px headroom above it; the bar is the bottom 64 px.
+        assert_eq!(dock, rect(840, 1032 - 8 - 104, 240, 104));
+        assert_eq!(dock.y + dock.height as i32, 1032 - 8);
     }
 
     #[test]
-    fn bottom_at_125_percent_scales_size_and_margin() {
+    fn bottom_at_125_percent_scales_size_headroom_and_margin() {
         let work_area = rect(0, 0, 2560, 1380);
 
         let dock = dock_rect(work_area, 1.25, SIZE, Edge::Bottom);
 
-        assert_eq!(dock, rect(1130, 1380 - 10 - 80, 300, 80));
+        // (64 + 40) * 1.25 = 130, 8 * 1.25 = 10.
+        assert_eq!(dock, rect(1130, 1380 - 10 - 130, 300, 130));
     }
 
     #[test]
-    fn bottom_at_150_percent_scales_size_and_margin() {
+    fn bottom_at_150_percent_scales_size_headroom_and_margin() {
         let work_area = rect(0, 0, 2560, 1368);
 
         let dock = dock_rect(work_area, 1.5, SIZE, Edge::Bottom);
 
-        assert_eq!(dock, rect(1100, 1368 - 12 - 96, 360, 96));
+        // (64 + 40) * 1.5 = 156, 8 * 1.5 = 12.
+        assert_eq!(dock, rect(1100, 1368 - 12 - 156, 360, 156));
     }
 
     #[test]
-    fn top_edge_keeps_the_margin_below_the_work_area_top() {
+    fn top_edge_keeps_the_bar_8px_below_the_work_area_top() {
         let work_area = rect(0, 0, 1920, 1032);
 
         let dock = dock_rect(work_area, 1.5, SIZE, Edge::Top);
 
-        assert_eq!(dock, rect(780, 12, 360, 96));
+        // The bar is the top 96 px; the headroom hangs below it.
+        assert_eq!(dock, rect(780, 12, 360, 156));
     }
 
     #[test]
@@ -205,7 +241,10 @@ mod tests {
         let work_area = rect(0, 48, 1920, 1032);
 
         assert_eq!(dock_rect(work_area, 1.0, SIZE, Edge::Top).y, 56);
-        assert_eq!(dock_rect(work_area, 1.0, SIZE, Edge::Bottom).y, 1008);
+        assert_eq!(
+            dock_rect(work_area, 1.0, SIZE, Edge::Bottom).y,
+            48 + 1032 - 8 - 104
+        );
     }
 
     #[test]
@@ -224,23 +263,24 @@ mod tests {
 
         let dock = dock_rect(work_area, 1.0, SIZE, Edge::Bottom);
 
-        assert_eq!(dock, rect(-1920 + 840, -200 + 1040 - 8 - 64, 240, 64));
+        assert_eq!(dock, rect(-1920 + 840, -200 + 1040 - 8 - 104, 240, 104));
     }
 
     #[test]
     fn fractional_physical_sizes_round_half_away_from_zero() {
         let work_area = rect(0, 0, 1000, 1000);
 
-        // 161 * 1.25 = 201.25 -> 201, 63 * 1.25 = 78.75 -> 79,
-        // 161 * 1.5 = 241.5 -> 242, 63 * 1.5 = 94.5 -> 95, 8 * 1.75 = 14.
+        // 161 * 1.25 = 201.25 -> 201, (63 + 40) * 1.25 = 128.75 -> 129,
+        // 161 * 1.5 = 241.5 -> 242, (63 + 40) * 1.5 = 154.5 -> 155,
+        // 8 * 1.75 = 14, (64 + 40) * 1.75 = 182.
         let dock = dock_rect(work_area, 1.25, (161.0, 63.0), Edge::Bottom);
-        assert_eq!((dock.width, dock.height), (201, 79));
+        assert_eq!((dock.width, dock.height), (201, 129));
 
         let dock = dock_rect(work_area, 1.5, (161.0, 63.0), Edge::Bottom);
-        assert_eq!((dock.width, dock.height), (242, 95));
+        assert_eq!((dock.width, dock.height), (242, 155));
 
         let dock = dock_rect(work_area, 1.75, SIZE, Edge::Bottom);
-        assert_eq!(dock.y, 1000 - 14 - 112);
+        assert_eq!(dock.y, 1000 - 14 - 182);
     }
 
     #[test]
@@ -250,5 +290,17 @@ mod tests {
         let dock = dock_rect(work_area, 1.0, SIZE, Edge::Bottom);
 
         assert_eq!(dock.x, 380);
+    }
+
+    #[test]
+    fn rect_contains_excludes_the_right_and_bottom_edges() {
+        let r = rect(-10, 20, 30, 40);
+
+        assert!(r.contains((-10, 20)));
+        assert!(r.contains((19, 59)));
+        assert!(!r.contains((20, 30)));
+        assert!(!r.contains((0, 60)));
+        assert!(!r.contains((-11, 30)));
+        assert!(!r.contains((0, 19)));
     }
 }

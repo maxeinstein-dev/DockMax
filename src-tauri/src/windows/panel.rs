@@ -8,6 +8,7 @@ use tauri::{
 };
 
 use super::dock::{self, Edge, Rect};
+use super::hit_test;
 
 pub const LABEL: &str = "panel";
 
@@ -64,12 +65,12 @@ pub fn to_screen(rect: LogicalRect, client_origin: (i32, i32), scale_factor: f64
 }
 
 /// Physical rectangle of a panel anchored to a dock item: `MARGIN` away from
-/// the dock on the side facing the screen, horizontally centered on the
-/// anchor, and kept `MARGIN` inside the work area. A panel larger than the
+/// the visible dock bar on the side facing the screen, horizontally centered
+/// on the anchor, and kept `MARGIN` inside the work area. A panel larger than the
 /// work area is pinned to the left (or top) margin.
 pub fn panel_rect(
     anchor: Rect,
-    dock: Rect,
+    bar: Rect,
     work_area: Rect,
     scale_factor: f64,
     logical_size: (f64, f64),
@@ -81,8 +82,8 @@ pub fn panel_rect(
     let anchor_center = anchor.x + (anchor.width as i32).div_euclid(2);
     let x = anchor_center - (width as i32).div_euclid(2);
     let y = match edge {
-        Edge::Bottom => dock.y - margin - height as i32,
-        Edge::Top => dock.y + dock.height as i32 + margin,
+        Edge::Bottom => bar.y - margin - height as i32,
+        Edge::Top => bar.y + bar.height as i32 + margin,
     };
     Rect {
         x: clamp_axis(x, width, work_area.x, work_area.width, margin),
@@ -244,18 +245,15 @@ fn place(
         .ok_or("dock window is missing")?;
     let scale_factor = dock_window.scale_factor()?;
     let origin = dock_window.inner_position()?;
-    let size = dock_window.inner_size()?;
-    let dock_rect = Rect {
-        x: origin.x,
-        y: origin.y,
-        width: size.width,
-        height: size.height,
-    };
+    // The gap is measured from the visible bar, not from the taller window.
+    let bar = hit_test::tracker(app)
+        .bar_on_screen()
+        .ok_or("the dock bar has not been measured yet")?;
     let anchor = to_screen(anchor, (origin.x, origin.y), scale_factor).ok_or("invalid anchor")?;
     let (work_area, _) = dock::primary_work_area(&dock_window)?;
     let rect = panel_rect(
         anchor,
-        dock_rect,
+        bar,
         work_area,
         scale_factor,
         id.logical_size(),
@@ -296,7 +294,7 @@ mod tests {
         width: 2560,
         height: 1032,
     };
-    const DOCK: Rect = Rect {
+    const BAR: Rect = Rect {
         x: 1160,
         y: 960,
         width: 240,
@@ -383,10 +381,10 @@ mod tests {
     }
 
     #[test]
-    fn bottom_panel_is_centered_on_the_anchor_8px_above_the_dock() {
+    fn bottom_panel_is_centered_on_the_anchor_8px_above_the_bar() {
         let anchor = rect(1200, 976, 100, 32);
 
-        let panel = panel_rect(anchor, DOCK, WORK_AREA, 1.0, (360.0, 480.0), Edge::Bottom);
+        let panel = panel_rect(anchor, BAR, WORK_AREA, 1.0, (360.0, 480.0), Edge::Bottom);
 
         assert_eq!(panel, rect(1250 - 180, 960 - 8 - 480, 360, 480));
     }
@@ -395,7 +393,7 @@ mod tests {
     fn panel_near_the_left_edge_is_clamped_to_the_margin() {
         let anchor = rect(20, 976, 40, 32);
 
-        let panel = panel_rect(anchor, DOCK, WORK_AREA, 1.0, (360.0, 480.0), Edge::Bottom);
+        let panel = panel_rect(anchor, BAR, WORK_AREA, 1.0, (360.0, 480.0), Edge::Bottom);
 
         assert_eq!(panel.x, 8);
     }
@@ -404,17 +402,17 @@ mod tests {
     fn panel_near_the_right_edge_is_clamped_to_the_margin() {
         let anchor = rect(2500, 976, 40, 32);
 
-        let panel = panel_rect(anchor, DOCK, WORK_AREA, 1.0, (360.0, 480.0), Edge::Bottom);
+        let panel = panel_rect(anchor, BAR, WORK_AREA, 1.0, (360.0, 480.0), Edge::Bottom);
 
         assert_eq!(panel.x, 2560 - 8 - 360);
     }
 
     #[test]
-    fn top_panel_sits_8px_below_the_dock() {
-        let dock = rect(1160, 8, 240, 64);
+    fn top_panel_sits_8px_below_the_bar() {
+        let bar = rect(1160, 8, 240, 64);
         let anchor = rect(1200, 24, 100, 32);
 
-        let panel = panel_rect(anchor, dock, WORK_AREA, 1.0, (320.0, 240.0), Edge::Top);
+        let panel = panel_rect(anchor, bar, WORK_AREA, 1.0, (320.0, 240.0), Edge::Top);
 
         assert_eq!(panel, rect(1250 - 160, 8 + 64 + 8, 320, 240));
     }
@@ -422,10 +420,10 @@ mod tests {
     #[test]
     fn scale_125_scales_size_gap_and_margin() {
         let work_area = rect(0, 0, 2048, 824);
-        let dock = rect(874, 734, 300, 80);
+        let bar = rect(874, 734, 300, 80);
         let anchor = rect(900, 754, 125, 40);
 
-        let panel = panel_rect(anchor, dock, work_area, 1.25, (360.0, 480.0), Edge::Bottom);
+        let panel = panel_rect(anchor, bar, work_area, 1.25, (360.0, 480.0), Edge::Bottom);
 
         // 360 * 1.25 = 450, 480 * 1.25 = 600, 8 * 1.25 = 10.
         assert_eq!(panel, rect(962 - 225, 734 - 10 - 600, 450, 600));
@@ -434,10 +432,10 @@ mod tests {
     #[test]
     fn scale_150_scales_size_gap_and_margin() {
         let work_area = rect(0, 0, 2560, 1368);
-        let dock = rect(1100, 1260, 360, 96);
+        let bar = rect(1100, 1260, 360, 96);
         let anchor = rect(1130, 1284, 150, 48);
 
-        let panel = panel_rect(anchor, dock, work_area, 1.5, (320.0, 240.0), Edge::Bottom);
+        let panel = panel_rect(anchor, bar, work_area, 1.5, (320.0, 240.0), Edge::Bottom);
 
         // 320 * 1.5 = 480, 240 * 1.5 = 360, 8 * 1.5 = 12.
         assert_eq!(panel, rect(1205 - 240, 1260 - 12 - 360, 480, 360));
@@ -446,10 +444,10 @@ mod tests {
     #[test]
     fn scale_150_clamps_with_the_scaled_margin() {
         let work_area = rect(0, 0, 2560, 1368);
-        let dock = rect(1100, 1260, 360, 96);
+        let bar = rect(1100, 1260, 360, 96);
         let anchor = rect(0, 1284, 20, 48);
 
-        let panel = panel_rect(anchor, dock, work_area, 1.5, (320.0, 240.0), Edge::Bottom);
+        let panel = panel_rect(anchor, bar, work_area, 1.5, (320.0, 240.0), Edge::Bottom);
 
         assert_eq!(panel.x, 12);
     }
@@ -460,7 +458,7 @@ mod tests {
 
         let panel = panel_rect(
             rect(200, 976, 40, 32),
-            DOCK,
+            BAR,
             work_area,
             1.0,
             (360.0, 480.0),
@@ -472,13 +470,13 @@ mod tests {
     }
 
     #[test]
-    fn panel_taller_than_the_space_above_the_dock_stays_inside_the_work_area() {
+    fn panel_taller_than_the_space_above_the_bar_stays_inside_the_work_area() {
         let work_area = rect(0, 40, 2560, 600);
-        let dock = rect(1160, 400, 240, 64);
+        let bar = rect(1160, 400, 240, 64);
 
         let panel = panel_rect(
             rect(1200, 416, 100, 32),
-            dock,
+            bar,
             work_area,
             1.0,
             (360.0, 480.0),

@@ -1,13 +1,20 @@
+/* The window is taller than the bar: the transparent space above it is where
+   a hovered item grows. The bar sits on the screen-edge side (bottom). */
 .dock {
   height: 100%;
   display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   align-items: center;
-  justify-content: center;
   user-select: none;
 }
 
+/* Height matches the dock height in tauri.conf.json. */
 .dock-bar {
+  box-sizing: border-box;
+  height: 64px;
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 8px;
   border-radius: 12px;
@@ -15,11 +22,34 @@
 }
 
 .dock-bar button {
+  height: 48px;
   font: inherit;
-  padding: 6px 12px;
+  padding: 0 12px;
   border: 0;
   border-radius: 8px;
   color: #1f1f1f;
   background: rgb(255 255 255 / 85%);
   cursor: pointer;
+  /* Provisional magnification: grows away from the screen edge. */
+  transform-origin: center bottom;
+  transition: transform 120ms ease-out;
+}
+
+.dock-bar button:hover {
+  transform: translateY(-6px) scale(1.4);
+}
+
+.dock-bar button:has(+ button:hover),
+.dock-bar button:hover + button {
+  transform: scale(1.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-bar button,
+  .dock-bar button:hover,
+  .dock-bar button:has(+ button:hover),
+  .dock-bar button:hover + button {
+    transform: none;
+    transition: none;
+  }
 }
