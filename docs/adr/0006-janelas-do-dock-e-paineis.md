@@ -28,6 +28,7 @@ O dock precisa flutuar acima da barra de tarefas, sem atrapalhar os apps de trá
 - O frontend informa o retângulo da barra pelo comando `set_dock_hit_rect`.
 - Medido: CPU em repouso ~0,03–0,16% de um núcleo; `WindowFromPoint` na folga e na barra, em repouso, devolve o app de trás.
 - Consequência aceita: depois de entrar pela barra, a folga inteira captura cliques até o cursor sair da janela.
+- A janela do dock fica **sempre** com `WS_EX_LAYERED` e atributos definidos uma vez (`SetLayeredWindowAttributes`, alpha 255); só `WS_EX_TRANSPARENT` alterna. Motivo: o tao liga e desliga `WS_EX_LAYERED` junto com `WS_EX_TRANSPARENT` sem nunca definir os atributos, e na primeira vez que a janela deixava de ser layered o Windows pintava a área transparente de branco opaco (achado no teste manual do PR 1).
 
 ### Vidro simulado (V2: desfoque real inviável)
 
