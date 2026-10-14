@@ -24,7 +24,7 @@ DockMax será um dock personalizável para Windows, inspirado em aplicações de
 
 **Estimativa:** 2–4 dias.
 
-- [ ] Criar repositório e configurar Git.
+- [x] Criar repositório e configurar Git.
 - [x] Instalar/verificar Node.js, Rust toolchain e dependências necessárias do Tauri no Windows.
 - [x] Criar esqueleto Tauri 2 + React + TypeScript.
 - [x] Confirmar build e execução local.
