@@ -52,7 +52,7 @@ Detalhes e motivos no [ADR 0006](../adr/0006-janelas-do-dock-e-paineis.md).
 
 | Item | Resultado |
 |---|---|
-| V1 — ampliação | **Viável.** Folga de 40 px com clique atravessando em repouso; captura por histerese guiada por `GetCursorPos` a 60 Hz; CPU em repouso ~0,03–0,16% de um núcleo. |
+| V1 — ampliação | **Viável.** Folga de 40 px com clique atravessando em repouso; captura só onde o dock desenha: entra pela barra e se mantém só sobre a barra ou um ícone ampliado (retângulos informados pelo frontend), guiada por `GetCursorPos` a 60 Hz; CPU em repouso ~0,03–0,16% de um núcleo. |
 | V2 — vidro real com cantos grandes | **Inviável.** O backdrop do DWM ignora a região recortada e cobre a janela inteira. Adotado o vidro simulado em CSS, com opacidade num token. |
 | V3 — fora do Alt+Tab | **Viável** com subclass Win32 que força `WS_EX_TOOLWINDOW` (o `skipTaskbar` do Tauri não basta). |
 | CSP | Restritiva em release; em `tauri dev` no desktop não há CSP. |

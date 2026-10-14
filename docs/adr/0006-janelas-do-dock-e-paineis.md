@@ -24,10 +24,11 @@ O dock precisa flutuar acima da barra de tarefas, sem atrapalhar os apps de trá
 
 ### Ampliação com clique atravessando a folga (V1: viável)
 
-- A janela do dock ignora o mouse por padrão. Uma thread lê `GetCursorPos` a cada 16 ms e alimenta uma função pura com histerese: captura quando o cursor entra na barra; mantém capturado enquanto ele estiver dentro da janela; libera ao sair. `set_ignore_cursor_events` só é chamado nas transições. Com o dock oculto, a thread fica parada.
-- O frontend informa o retângulo da barra pelo comando `set_dock_hit_rect`.
+- A janela do dock ignora o mouse por padrão. Uma thread lê `GetCursorPos` a cada 16 ms e alimenta uma função pura (`next_captured`): captura quando o cursor entra na barra; depois disso, mantém capturado só enquanto ele estiver **onde o dock desenha** (a barra ou um ícone ampliado) e libera em qualquer outro ponto, inclusive no resto transparente da janela. `set_ignore_cursor_events` só é chamado nas transições. Com o dock oculto, a thread fica parada.
+- O frontend controla o hover em JS (não só com `:hover`) e informa, pelo comando `set_dock_hit_region`, o retângulo da barra e os retângulos finais dos ícones ampliados (o do hover, escala 1,4 subindo 6 px a partir do centro da base, e os vizinhos, escala 1,15). Os retângulos são calculados a partir do layout e dos valores de ampliação, sem esperar a transição do CSS; os mesmos valores alimentam o CSS por variáveis. O comando valida cada retângulo e aceita no máximo 16 de ampliação. Com `prefers-reduced-motion: reduce` não há ampliação e a região é só a barra.
+- Ao liberar o mouse, o Rust emite `dock-released` para o dock: com a janela ignorando o mouse, a página pode não receber mais eventos de ponteiro, e o ícone ficaria ampliado. O frontend limpa o hover ao receber o evento.
 - Medido: CPU em repouso ~0,03–0,16% de um núcleo; `WindowFromPoint` na folga e na barra, em repouso, devolve o app de trás.
-- Consequência aceita: depois de entrar pela barra, a folga inteira captura cliques até o cursor sair da janela.
+- Captura só onde o dock desenha. A regra anterior mantinha a captura enquanto o cursor estivesse em qualquer ponto da janela, e no teste manual com mouse real isso fez cliques na folga acima da barra e ao lado dela não chegarem ao app de trás até o cursor se afastar mais de 40 px, o que não é aceitável. Agora, depois do hover, cliques acima das partes não ampliadas da barra, ao lado dela e acima do ícone ampliado passam para o app de trás; clicar no próprio ícone ampliado acerta o ícone.
 - A janela do dock fica **sempre** com `WS_EX_LAYERED` e atributos definidos uma vez (`SetLayeredWindowAttributes`, alpha 255); só `WS_EX_TRANSPARENT` alterna. Motivo: o tao liga e desliga `WS_EX_LAYERED` junto com `WS_EX_TRANSPARENT` sem nunca definir os atributos, e na primeira vez que a janela deixava de ser layered o Windows pintava a área transparente de branco opaco (achado no teste manual do PR 1).
 
 ### Vidro simulado (V2: desfoque real inviável)
@@ -43,7 +44,7 @@ O dock precisa flutuar acima da barra de tarefas, sem atrapalhar os apps de trá
 
   | Janela | Permissões | Uso |
   |---|---|---|
-  | `dock` | `allow-toggle-panel`, `allow-set-dock-hit-rect` | Clique nos itens e retângulo da barra. Só usa `invoke` de comandos do app. |
+  | `dock` | `core:event:allow-listen`, `core:event:allow-unlisten`, `allow-toggle-panel`, `allow-set-dock-hit-region` | Clique nos itens, região de captura (barra e ícones ampliados) e ouvir `dock-released`. |
   | `panel` | `core:event:allow-listen`, `core:event:allow-unlisten`, `allow-hide-panel` | Ouvir `panel-show` e fechar com Esc. |
 
 - **Sem `core:default`.** O conjunto padrão do template libera bandeja, menus, imagens a partir de caminhos, resolução de diretórios, emissão de eventos para qualquer janela e leitura de janelas e monitores, nada disso usado pelas duas janelas. Uma página comprometida poderia, por exemplo, emitir `panel-show` ou mexer na bandeja. Quando uma janela precisar de uma API do núcleo, entra só a permissão específica.
