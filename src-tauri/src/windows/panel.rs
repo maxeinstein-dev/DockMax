@@ -103,8 +103,8 @@ pub fn to_screen(rect: LogicalRect, client_origin: (i32, i32), scale_factor: f64
     // `as` saturates; the checked conversions reject what saturated.
     let scale = |value: f64| (value * scale_factor).round() as i64;
     Some(Rect {
-        x: i32::try_from(i64::from(client_origin.0) + scale(rect.x)).ok()?,
-        y: i32::try_from(i64::from(client_origin.1) + scale(rect.y)).ok()?,
+        x: i32::try_from(i64::from(client_origin.0).checked_add(scale(rect.x))?).ok()?,
+        y: i32::try_from(i64::from(client_origin.1).checked_add(scale(rect.y))?).ok()?,
         width: u32::try_from(scale(rect.width)).ok()?,
         height: u32::try_from(scale(rect.height)).ok()?,
     })
@@ -607,6 +607,15 @@ mod tests {
                 "{rect:?} {origin:?} {scale_factor}"
             );
         }
+    }
+
+    #[test]
+    fn to_screen_rejects_a_huge_finite_scale_without_panicking() {
+        let right = LogicalRect { x: 1.0, ..VALID };
+        let left = LogicalRect { x: -1.0, ..VALID };
+
+        assert_eq!(to_screen(right, (1, 0), f64::MAX), None);
+        assert_eq!(to_screen(left, (-1, 0), f64::MAX), None);
     }
 
     #[test]

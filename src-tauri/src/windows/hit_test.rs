@@ -111,6 +111,9 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
     let mut captured = false;
     loop {
         let shared = tracker.lock();
+        if shared.stopped {
+            return;
+        }
         if !shared.visible && captured {
             drop(shared);
             if set_captured(window, false) {
