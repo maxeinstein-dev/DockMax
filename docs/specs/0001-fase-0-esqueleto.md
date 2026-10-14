@@ -1,6 +1,6 @@
 # Spec 0001 — Fase 0: repositório, toolchain e esqueleto
 
-- **Status:** Proposta (aguardando aprovação)
+- **Status:** Implementada (verificação 10, CI verde no PR, pendente do push)
 - **Data:** 2026-10-14
 - **Roadmap:** [Fase 0 — Preparação e validação técnica](../roadmap.md#fase-0--preparação-e-validação-técnica)
 - **Origem das decisões:** sessão de grill de 2026-10-14 (Q1–Q20), todas registradas abaixo.
