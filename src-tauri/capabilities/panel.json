@@ -3,5 +3,9 @@
   "identifier": "panel",
   "description": "Capability for the panel window",
   "windows": ["panel"],
-  "permissions": ["core:default", "allow-hide-panel"]
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-hide-panel"
+  ]
 }

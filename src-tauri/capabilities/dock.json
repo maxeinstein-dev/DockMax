@@ -3,9 +3,5 @@
   "identifier": "dock",
   "description": "Capability for the dock window",
   "windows": ["dock"],
-  "permissions": [
-    "core:default",
-    "allow-toggle-panel",
-    "allow-set-dock-hit-rect"
-  ]
+  "permissions": ["allow-toggle-panel", "allow-set-dock-hit-rect"]
 }

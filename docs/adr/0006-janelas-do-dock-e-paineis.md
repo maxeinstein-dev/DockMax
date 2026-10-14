@@ -38,7 +38,15 @@ O dock precisa flutuar acima da barra de tarefas, sem atrapalhar os apps de trá
 
 ### Permissões por janela
 
-- Os comandos do app são declarados no `AppManifest` do `tauri_build` e exigem permissão explícita. `dock` pode chamar `toggle_panel` e `set_dock_hit_rect`; `panel` só `hide_panel`. Chamadas fora disso falham com `Command … not allowed by ACL`.
+- Os comandos do app são declarados no `AppManifest` do `tauri_build` e exigem permissão explícita. Cada janela recebe só o que o seu frontend usa:
+
+  | Janela | Permissões | Uso |
+  |---|---|---|
+  | `dock` | `allow-toggle-panel`, `allow-set-dock-hit-rect` | Clique nos itens e retângulo da barra. Só usa `invoke` de comandos do app. |
+  | `panel` | `core:event:allow-listen`, `core:event:allow-unlisten`, `allow-hide-panel` | Ouvir `panel-show` e fechar com Esc. |
+
+- **Sem `core:default`.** O conjunto padrão do template libera bandeja, menus, imagens a partir de caminhos, resolução de diretórios, emissão de eventos para qualquer janela e leitura de janelas e monitores, nada disso usado pelas duas janelas. Uma página comprometida poderia, por exemplo, emitir `panel-show` ou mexer na bandeja. Quando uma janela precisar de uma API do núcleo, entra só a permissão específica.
+- Chamadas fora disso falham no IPC (verificado no build de dev): comando do app de outra janela com `hide_panel not allowed on window "dock", … referenced by: capability: panel, permission: allow-hide-panel`; API do núcleo com `event.emit not allowed. Permissions associated with this command: core:event:allow-emit, core:event:default` (idem para `path.resolve_directory` e `window.title`).
 
 ### CSP
 
