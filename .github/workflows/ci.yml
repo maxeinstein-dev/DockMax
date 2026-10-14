@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: checks
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # No `version`: the action reads `packageManager` from package.json.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # With no arguments, rustup installs the channel and components from rust-toolchain.toml.
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install
+          rustup show
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      # The Vite build must run before the Rust steps: `tauri::generate_context!`
+      # requires `frontendDist` (../dist) to exist at compile time.
+      - name: Build frontend
+        run: pnpm build
+
+      - name: cargo fmt
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test
