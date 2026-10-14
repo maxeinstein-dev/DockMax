@@ -1,0 +1,18 @@
+.panel {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 16px 20px;
+  border-radius: 12px;
+  color: #f2f2f2;
+  background: rgb(40 40 40 / 85%);
+}
+
+.panel h1 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.panel p {
+  margin: 0;
+}

@@ -7,6 +7,9 @@ pub const LABEL: &str = "dock";
 /// Gap between the dock and the work area edge, in logical pixels.
 const MARGIN: f64 = 8.0;
 
+/// Screen edge the dock sits on.
+pub const EDGE: Edge = Edge::Bottom;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Edge {
     Bottom,
@@ -49,14 +52,35 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         .get_webview_window(LABEL)
         .ok_or("dock window is missing from tauri.conf.json")?;
     #[cfg(windows)]
-    native::install(&window)?;
+    super::native::install(&window, Some(reposition))?;
     place(&window)?;
     window.show()?;
     Ok(())
 }
 
+#[cfg(windows)]
+fn reposition(window: &WebviewWindow) {
+    if let Err(error) = place(window) {
+        eprintln!("failed to reposition the dock: {error}");
+    }
+}
+
 /// Moves and sizes the dock above the primary monitor's work area bottom.
 fn place(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
+    let (work_area, scale_factor) = primary_work_area(window)?;
+    let rect = dock_rect(
+        work_area,
+        scale_factor,
+        logical_size(window.app_handle())?,
+        EDGE,
+    );
+    window.set_size(PhysicalSize::new(rect.width, rect.height))?;
+    window.set_position(PhysicalPosition::new(rect.x, rect.y))?;
+    Ok(())
+}
+
+/// The primary monitor's work area, in physical pixels, and its scale factor.
+pub fn primary_work_area(window: &WebviewWindow) -> Result<(Rect, f64), Box<dyn Error>> {
     let monitor = window
         .primary_monitor()?
         .ok_or("no primary monitor found")?;
@@ -67,15 +91,7 @@ fn place(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
         width: work_area.size.width,
         height: work_area.size.height,
     };
-    let rect = dock_rect(
-        work_area,
-        monitor.scale_factor(),
-        logical_size(window.app_handle())?,
-        Edge::Bottom,
-    );
-    window.set_size(PhysicalSize::new(rect.width, rect.height))?;
-    window.set_position(PhysicalPosition::new(rect.x, rect.y))?;
-    Ok(())
+    Ok((work_area, monitor.scale_factor()))
 }
 
 /// The dock size declared in tauri.conf.json, in logical pixels.
@@ -88,83 +104,6 @@ fn logical_size(app: &AppHandle) -> Result<(f64, f64), Box<dyn Error>> {
         .find(|window| window.label == LABEL)
         .ok_or("dock window is missing from tauri.conf.json")?;
     Ok((config.width, config.height))
-}
-
-/// Win32 glue: keeps the dock out of Alt+Tab and repositions it when the
-/// display configuration changes, which Tauri does not report.
-#[cfg(windows)]
-mod native {
-    use std::error::Error;
-
-    use ::windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
-    use ::windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
-    use ::windows::Win32::UI::WindowsAndMessaging::{
-        GWL_EXSTYLE, GetWindowLongPtrW, PostMessageW, SPI_SETWORKAREA, STYLESTRUCT,
-        SetWindowLongPtrW, WM_APP, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_NCDESTROY, WM_SETTINGCHANGE,
-        WM_STYLECHANGING, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
-    };
-    use tauri::WebviewWindow;
-
-    const SUBCLASS_ID: usize = 1;
-    const WM_DOCK_REPOSITION: u32 = WM_APP + 1;
-
-    pub fn install(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
-        let hwnd = window.hwnd()?;
-        let data = Box::into_raw(Box::new(window.clone())) as usize;
-        unsafe {
-            if !SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, data).as_bool() {
-                drop(Box::from_raw(data as *mut WebviewWindow));
-                return Err("failed to subclass the dock window".into());
-            }
-            let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
-            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, tool_window(style) as isize);
-        }
-        Ok(())
-    }
-
-    /// A tool window without `WS_EX_APPWINDOW` is left out of Alt+Tab.
-    fn tool_window(style: u32) -> u32 {
-        (style | WS_EX_TOOLWINDOW.0) & !WS_EX_APPWINDOW.0
-    }
-
-    fn post_reposition(hwnd: HWND) {
-        // Posted, so it runs after tao has finished handling the message
-        // (on WM_DPICHANGED tao moves the window itself).
-        let _ = unsafe { PostMessageW(Some(hwnd), WM_DOCK_REPOSITION, WPARAM(0), LPARAM(0)) };
-    }
-
-    unsafe extern "system" fn subclass_proc(
-        hwnd: HWND,
-        msg: u32,
-        wparam: WPARAM,
-        lparam: LPARAM,
-        _id: usize,
-        data: usize,
-    ) -> LRESULT {
-        match msg {
-            // tao rewrites the extended style whenever the window is shown or
-            // hidden, which would bring back WS_EX_APPWINDOW.
-            WM_STYLECHANGING if wparam.0 as i32 == GWL_EXSTYLE.0 => {
-                let style = unsafe { &mut *(lparam.0 as *mut STYLESTRUCT) };
-                style.styleNew = tool_window(style.styleNew);
-            }
-            WM_DPICHANGED | WM_DISPLAYCHANGE => post_reposition(hwnd),
-            WM_SETTINGCHANGE if wparam.0 == SPI_SETWORKAREA.0 as usize => post_reposition(hwnd),
-            WM_DOCK_REPOSITION => {
-                let window = unsafe { &*(data as *const WebviewWindow) };
-                if let Err(error) = super::place(window) {
-                    eprintln!("failed to reposition the dock: {error}");
-                }
-                return LRESULT(0);
-            }
-            WM_NCDESTROY => unsafe {
-                let _ = RemoveWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID);
-                drop(Box::from_raw(data as *mut WebviewWindow));
-            },
-            _ => {}
-        }
-        unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
-    }
 }
 
 #[cfg(test)]
