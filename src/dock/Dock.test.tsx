@@ -101,4 +101,21 @@ describe("Dock", () => {
       rect: { x: 10, y: 40, width: 220, height: 64 },
     });
   });
+
+  it("disconnects the resize observer when unmounted", () => {
+    const disconnect = vi.fn();
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect = disconnect;
+      },
+    );
+    const { unmount } = render(<Dock />);
+    expect(disconnect).not.toHaveBeenCalled();
+
+    unmount();
+
+    expect(disconnect).toHaveBeenCalledOnce();
+  });
 });

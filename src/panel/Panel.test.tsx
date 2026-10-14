@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PanelShowPayload } from "../core/panels";
 import Panel from "./Panel";
 
@@ -32,6 +32,10 @@ describe("Panel", () => {
     handlers.clear();
     invoke.mockReset();
     invoke.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("renders nothing until a panel is shown", () => {
@@ -67,6 +71,20 @@ describe("Panel", () => {
 
     fireEvent.keyDown(window, { key: "Enter" });
 
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("removes its keydown listener when unmounted", () => {
+    const add = vi.spyOn(window, "addEventListener");
+    const remove = vi.spyOn(window, "removeEventListener");
+    const { unmount } = render(<Panel />);
+    const added = add.mock.calls.find(([type]) => type === "keydown");
+    expect(added).toBeDefined();
+
+    unmount();
+
+    expect(remove).toHaveBeenCalledWith("keydown", added?.[1]);
+    fireEvent.keyDown(window, { key: "Escape" });
     expect(invoke).not.toHaveBeenCalled();
   });
 
