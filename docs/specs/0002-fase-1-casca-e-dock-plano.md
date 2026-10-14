@@ -98,6 +98,7 @@ Batch paralelo previsto, sem arquivos compartilhados:
 Depois, sequencial:
 - **F6** `[sequential]` integração: comandos `get_settings`/`update_settings`, evento `settings-changed`, plugins `log` e `single-instance` em `lib.rs`, permissões, hook de configurações no frontend.
 - **F7** `[sequential]` ADR 0007, verificação 10–16, revisão e PR.
+- Pendência herdada do PR 1: os `eprintln!` de falha (painel, dock, captura do mouse, bandeja) somem no build de release, que não tem console: passam para o plugin `log` na F6.
 
 ## PR 3 — Dock e painéis (esboço; refinar depois do mock)
 
@@ -105,6 +106,7 @@ Depois, sequencial:
 - Painéis Configurações e Sobre; bandeja completa; dock em cima.
 - Acessibilidade (teclado, rótulos, contraste AA, reduzir movimento).
 - Roadmap da Fase 1 marcado; verificação 17–21; revisão e PR.
+- Pendência herdada do PR 1: o `panel-show` é emitido antes de o listener do painel estar pronto na primeira abertura, e na troca de painel o conteúdo anterior aparece por um instante. Mostrar a janela só depois de o painel confirmar que renderizou o conteúdo pedido.
 
 ## Rastreabilidade (spec → tarefa)
 
