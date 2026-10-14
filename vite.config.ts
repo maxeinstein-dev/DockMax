@@ -45,5 +45,7 @@ export default defineConfig(() => ({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Lets tests read Dock.css as text (`?raw`); other CSS stays stubbed.
+    css: { include: [/Dock\.css/] },
   },
 }));

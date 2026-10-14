@@ -5,7 +5,7 @@ fn main() {
         tauri_build::AppManifest::new().commands(&[
             "toggle_panel",
             "hide_panel",
-            "set_dock_hit_rect",
+            "set_dock_hit_region",
         ]),
     ))
     .expect("failed to run tauri-build");

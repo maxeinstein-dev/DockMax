@@ -3,5 +3,10 @@
   "identifier": "dock",
   "description": "Capability for the dock window",
   "windows": ["dock"],
-  "permissions": ["allow-toggle-panel", "allow-set-dock-hit-rect"]
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-toggle-panel",
+    "allow-set-dock-hit-region"
+  ]
 }

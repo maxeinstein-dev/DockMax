@@ -19,7 +19,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::panel::toggle_panel,
             commands::panel::hide_panel,
-            commands::dock::set_dock_hit_rect
+            commands::dock::set_dock_hit_region
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

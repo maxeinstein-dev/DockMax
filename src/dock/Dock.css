@@ -25,35 +25,50 @@
   box-shadow: var(--glass-highlight), var(--glass-shadow);
 }
 
+/* The button is the item's layout box and is never transformed, so the
+   frontend measures it as is; the face inside carries the magnification. */
 .dock-bar button {
-  height: 48px;
-  font: inherit;
-  padding: 0 12px;
+  display: block;
+  padding: 0;
   border: 0;
+  border-radius: 12px;
+  font: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+.dock-item {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 12px;
   /* Concentric with the bar: its radius minus the 8 px inset. */
   border-radius: 12px;
   color: #1f1f1f;
   background: rgb(255 255 255 / 85%);
-  cursor: pointer;
-  /* Provisional magnification: grows away from the screen edge. */
+  /* Provisional magnification: grows away from the screen edge. The values
+     come from magnification.ts (set on the bar), which also computes the
+     hold region from this origin. */
   transform-origin: center bottom;
   transition: transform 120ms ease-out;
 }
 
-.dock-bar button:hover {
-  transform: translateY(-6px) scale(1.4);
+/* Hover is tracked in JS (data-magnify), not with :hover, so Rust can be
+   told exactly which items are magnified. */
+.dock-bar button[data-magnify="hovered"] .dock-item {
+  transform: translateY(calc(var(--dock-hovered-lift) * -1px))
+    scale(var(--dock-hovered-scale));
 }
 
-.dock-bar button:has(+ button:hover),
-.dock-bar button:hover + button {
-  transform: scale(1.15);
+.dock-bar button[data-magnify="neighbor"] .dock-item {
+  transform: translateY(calc(var(--dock-neighbor-lift) * -1px))
+    scale(var(--dock-neighbor-scale));
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dock-bar button,
-  .dock-bar button:hover,
-  .dock-bar button:has(+ button:hover),
-  .dock-bar button:hover + button {
+  .dock-item,
+  .dock-bar button[data-magnify="hovered"] .dock-item,
+  .dock-bar button[data-magnify="neighbor"] .dock-item {
     transform: none;
     transition: none;
   }
