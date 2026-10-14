@@ -1,0 +1,12 @@
+# Markdown docs are written in PT-BR by hand; do not reformat them.
+docs/
+*.md
+
+# Lockfiles are generated.
+pnpm-lock.yaml
+
+# Rust code is formatted by rustfmt.
+src-tauri/
+
+dist/
+node_modules/
