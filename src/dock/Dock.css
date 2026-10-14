@@ -1,0 +1,75 @@
+/* The window is taller than the bar: the transparent space above it is where
+   a hovered item grows. The bar sits on the screen-edge side (bottom). */
+.dock {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  user-select: none;
+}
+
+/* Height matches the dock height in tauri.conf.json. */
+.dock-bar {
+  box-sizing: border-box;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 7 px + the 1 px border keep the items 8 px from the edge. */
+  padding: 7px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  background: var(--glass-sheen), var(--glass-surface);
+  /* The shadow fits beside and above the bar; below it is the window edge. */
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+}
+
+/* The button is the item's layout box and is never transformed, so the
+   frontend measures it as is; the face inside carries the magnification. */
+.dock-bar button {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+.dock-item {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 12px;
+  /* Concentric with the bar: its radius minus the 8 px inset. */
+  border-radius: 12px;
+  color: #1f1f1f;
+  background: rgb(255 255 255 / 85%);
+  /* Provisional magnification: grows away from the screen edge. The values
+     come from magnification.ts (set on the bar), which also computes the
+     hold region from this origin. */
+  transform-origin: center bottom;
+  transition: transform 120ms ease-out;
+}
+
+/* Hover is tracked in JS (data-magnify), not with :hover, so Rust can be
+   told exactly which items are magnified. */
+.dock-bar button[data-magnify="hovered"] .dock-item {
+  transform: translateY(calc(var(--dock-hovered-lift) * -1px))
+    scale(var(--dock-hovered-scale));
+}
+
+.dock-bar button[data-magnify="neighbor"] .dock-item {
+  transform: translateY(calc(var(--dock-neighbor-lift) * -1px))
+    scale(var(--dock-neighbor-scale));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-item,
+  .dock-bar button[data-magnify="hovered"] .dock-item,
+  .dock-bar button[data-magnify="neighbor"] .dock-item {
+    transform: none;
+    transition: none;
+  }
+}

@@ -2,6 +2,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -31,8 +32,20 @@ export default defineConfig(() => ({
     },
   },
 
+  // One HTML entry per window, no router.
+  build: {
+    rolldownOptions: {
+      input: {
+        dock: fileURLToPath(new URL("index.html", import.meta.url)),
+        panel: fileURLToPath(new URL("panel.html", import.meta.url)),
+      },
+    },
+  },
+
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Lets tests read Dock.css as text (`?raw`); other CSS stays stubbed.
+    css: { include: [/Dock\.css/] },
   },
 }));

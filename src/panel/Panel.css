@@ -1,0 +1,21 @@
+.panel {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 16px 20px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  color: #f2f2f2;
+  background: var(--glass-sheen), var(--glass-surface);
+  /* The panel fills its window: no room for the outer shadow. */
+  box-shadow: var(--glass-highlight);
+}
+
+.panel h1 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.panel p {
+  margin: 0;
+}

@@ -12,13 +12,37 @@
   "app": {
     "windows": [
       {
+        "label": "dock",
         "title": "DockMax",
-        "width": 800,
-        "height": 600
+        "width": 240,
+        "height": 64,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false,
+        "focus": false
+      },
+      {
+        "label": "panel",
+        "title": "DockMax",
+        "url": "panel.html",
+        "width": 360,
+        "height": 480,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false,
+        "focus": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:"
     }
   },
   "bundle": {
