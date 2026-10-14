@@ -230,7 +230,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         .get_webview_window(LABEL)
         .ok_or("panel window is missing from tauri.conf.json")?;
     #[cfg(windows)]
-    super::native::install(&window, None)?;
+    super::native::install(&window, None, false)?;
     app.manage(Mutex::new(PanelState::default()));
     let app = app.clone();
     window.on_window_event(move |event| {

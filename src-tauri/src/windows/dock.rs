@@ -80,7 +80,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         .ok_or("dock window is missing from tauri.conf.json")?;
     hit_test::start(app, &window)?;
     #[cfg(windows)]
-    super::native::install(&window, Some(reposition))?;
+    super::native::install(&window, Some(reposition), true)?;
     let handle = app.clone();
     window.on_window_event(move |event| {
         if let WindowEvent::CloseRequested { api, .. } = event {
