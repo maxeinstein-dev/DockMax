@@ -46,6 +46,18 @@ A Fase 1 é entregue em **três PRs**, com um **mock visual aprovado** entre o p
 8. Visual **neutro e provisório**; o visual final vem do mock.
 9. **ADR 0006 — Janelas do dock e painéis**: janelas separadas, click-through, resultado das validações V1–V3.
 
+### 2.1.1 Resultados do PR 1 (2026-10-14)
+
+Detalhes e motivos no [ADR 0006](../adr/0006-janelas-do-dock-e-paineis.md).
+
+| Item | Resultado |
+|---|---|
+| V1 — ampliação | **Viável.** Folga de 40 px com clique atravessando em repouso; captura por histerese guiada por `GetCursorPos` a 60 Hz; CPU em repouso ~0,03–0,16% de um núcleo. |
+| V2 — vidro real com cantos grandes | **Inviável.** O backdrop do DWM ignora a região recortada e cobre a janela inteira. Adotado o vidro simulado em CSS, com opacidade num token. |
+| V3 — fora do Alt+Tab | **Viável** com subclass Win32 que força `WS_EX_TOOLWINDOW` (o `skipTaskbar` do Tauri não basta). |
+| CSP | Restritiva em release; em `tauri dev` no desktop não há CSP. |
+| Memória em repouso (release, dock visível, painel oculto) | **182 MB privados** no total: `dockmax.exe` 6,4 MB + 7 processos do WebView2 176 MB. Working set somado: 388 MB (conta páginas compartilhadas mais de uma vez). Executável: 4,2 MB. |
+
 ### 2.2 Mock visual (entre o PR 1 e o PR 2)
 
 - HTML estático em `docs/design/`, versionado, feito com o skill `impeccable`.
