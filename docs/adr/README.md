@@ -1,0 +1,17 @@
+# Architecture Decision Records (ADRs)
+
+ADRs registram decisões técnicas importantes, seu contexto e suas consequências.
+
+## Convenção
+
+- Arquivo: `NNNN-titulo-curto.md`
+- Status: `Proposta`, `Aceita`, `Substituída` ou `Rejeitada`.
+- Uma decisão aceita não é imutável; se mudar, criar novo ADR e indicar qual decisão anterior foi substituída.
+- Registrar decisões que afetam arquitetura, dependências, segurança, dados ou experiência de desenvolvimento — não cada detalhe de implementação.
+
+## Índice
+
+- [0001 — Stack desktop](0001-stack-desktop.md)
+- [0002 — Arquitetura modular](0002-arquitetura-modular.md)
+- [0003 — Persistência local](0003-persistencia-local.md)
+- [0004 — Escopo Windows e barra de tarefas](0004-escopo-windows.md)
