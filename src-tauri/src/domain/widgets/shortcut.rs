@@ -36,11 +36,28 @@ impl ShortcutConfig {
 /// host and no credentials (`user:password@`), which a shortcut must never
 /// store.
 ///
-/// The WHATWG parser silently drops leading and trailing spaces and control
-/// characters, and tabs and line breaks anywhere; such text is rejected, so
-/// the text stored is the text that was checked.
+/// The WHATWG parser is lenient where a reader is not, so the text itself
+/// is checked first, and what is stored is what was checked:
+///
+/// - it silently drops leading and trailing spaces and control characters,
+///   and tabs and line breaks anywhere: rejected;
+/// - it reads `http:host`, `http:/host` and `\` as `http://host` and `/`:
+///   the text must start with `http://` or `https://`, and a `\` anywhere
+///   is rejected;
+/// - it reads an empty userinfo (`https://@host`) as no credentials, and
+///   anything before an `@` as userinfo (`https://example.com@evil.com`
+///   opens `evil.com`): an `@` anywhere in the authority is rejected.
 fn is_web_url(text: &str) -> bool {
-    if text.trim() != text || text.chars().any(char::is_control) {
+    if text.trim() != text || text.chars().any(char::is_control) || text.contains('\\') {
+        return false;
+    }
+    let Some(rest) = strip_prefix_ignore_case(text, "https://")
+        .or_else(|| strip_prefix_ignore_case(text, "http://"))
+    else {
+        return false;
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    if authority.contains('@') {
         return false;
     }
     let Ok(url) = Url::parse(text) else {
@@ -50,6 +67,13 @@ fn is_web_url(text: &str) -> bool {
         && url.host_str().is_some_and(|host| !host.is_empty())
         && url.username().is_empty()
         && url.password().is_none()
+}
+
+/// `text` after `prefix` (ASCII), compared without regard to ASCII case.
+fn strip_prefix_ignore_case<'a>(text: &'a str, prefix: &str) -> Option<&'a str> {
+    let head = text.get(..prefix.len())?;
+    head.eq_ignore_ascii_case(prefix)
+        .then(|| &text[prefix.len()..])
 }
 
 /// A file, folder or program path, or a web address.
@@ -208,6 +232,74 @@ mod tests {
                 Err(WidgetError::InvalidTarget),
                 "{text:?}"
             );
+        }
+    }
+
+    #[test]
+    fn urls_must_start_with_the_scheme_and_two_slashes() {
+        for text in [
+            "http:example.com",
+            "https:example.com/",
+            "http:/example.com/",
+            "https:/example.com/",
+            r"https:\\example.com",
+            r"https:\\example.com/",
+            r"https:/\example.com/",
+            "ht\u{00AD}tps://example.com/",
+        ] {
+            assert_eq!(
+                url(text).validate(),
+                Err(WidgetError::InvalidTarget),
+                "{text:?}"
+            );
+        }
+        for text in ["HTTP://example.com/", "hTtPs://example.com/"] {
+            assert_eq!(url(text).validate(), Ok(()), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn urls_with_a_backslash_anywhere_are_rejected() {
+        for text in [
+            r"https://example.com\@evil.com",
+            r"https://example.com\path",
+            r"https://example.com/a\b",
+            r"https://example.com/?q=a\b",
+            r"https://example.com/#a\b",
+        ] {
+            assert_eq!(
+                url(text).validate(),
+                Err(WidgetError::InvalidTarget),
+                "{text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn urls_with_an_at_sign_in_the_authority_are_rejected() {
+        for text in [
+            "https://@example.com/",
+            "https://:@example.com/",
+            "http://@@example.com/",
+            "https://example.com@evil.com/",
+            "https://example.com%40x@evil.com/",
+            "https://@example.com",
+            "https://@example.com?a",
+            "https://@example.com#a",
+        ] {
+            assert_eq!(
+                url(text).validate(),
+                Err(WidgetError::InvalidTarget),
+                "{text:?}"
+            );
+        }
+        // After the authority, `@` is ordinary text.
+        for text in [
+            "https://example.com/@user",
+            "https://example.com/a?mail=a@b.com",
+            "https://example.com/#@top",
+        ] {
+            assert_eq!(url(text).validate(), Ok(()), "{text:?}");
         }
     }
 
