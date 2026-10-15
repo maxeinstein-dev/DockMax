@@ -33,6 +33,20 @@ tauri-plugin-log = "2"
 log = "0.4"
 tauri-plugin-single-instance = "2"
 tauri-plugin-wdio-webdriver = { version = "1.5", optional = true }
+# Widget database (spec 0003 §2.4): SQLite compiled into the binary, so the
+# app never depends on a system copy, and migrations versioned in
+# `PRAGMA user_version`.
+rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite_migration = "2.6"
+# Widget instance IDs: UUID v7, made in Rust.
+uuid = { version = "1", features = ["v7", "serde"] }
+# Only to check clock time zone names against the IANA database. Without the
+# defaults it reads no system time zone and no zoneinfo folder: names are
+# looked up in the copy of the database compiled into the binary, the same on
+# every machine.
+jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
+# Syntax check of shortcut URLs (spec 0003 §2.5); never opens them.
+url = "2"
 
 [dev-dependencies]
 tempfile = "3"

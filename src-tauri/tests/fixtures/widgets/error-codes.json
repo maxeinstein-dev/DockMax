@@ -1,0 +1,16 @@
+[
+  "limitReached",
+  "notCreatable",
+  "notFound",
+  "kindMismatch",
+  "invalidLabel",
+  "invalidTimeZone",
+  "invalidPeriods",
+  "invalidWorkday",
+  "invalidTarget",
+  "invalidFolder",
+  "noteTooLarge",
+  "invalidConfig",
+  "unavailable",
+  "writeFailed"
+]
