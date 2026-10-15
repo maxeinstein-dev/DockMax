@@ -3,7 +3,9 @@ use std::time::Instant;
 use tauri::{AppHandle, WebviewWindow};
 
 use crate::windows::dock;
-use crate::windows::panel::{self, Action, LogicalRect, LogicalSize, PanelGeometry, PanelId};
+use crate::windows::panel::{
+    self, Action, LogicalRect, PanelGeometry, PanelId, PanelInset, PanelSize,
+};
 
 /// Called by the dock when an item is clicked. `anchor` is the item's
 /// rectangle relative to the dock's client area, in logical pixels. Opening
@@ -11,10 +13,8 @@ use crate::windows::panel::{self, Action, LogicalRect, LogicalSize, PanelGeometr
 /// `panel_ready` or after `panel::READY_TIMEOUT`.
 #[tauri::command]
 pub fn toggle_panel(app: AppHandle, panel_id: PanelId, anchor: LogicalRect) -> Result<(), String> {
-    // Before touching the panel state: a rejected click changes nothing.
-    anchor
-        .validate()
-        .map_err(|error| format!("invalid anchor: {error}"))?;
+    // `anchor` was checked when deserialized: an invalid one never gets
+    // here, so a rejected click changes nothing.
     let action = panel::lock(&app).toggle(panel_id, anchor, Instant::now());
     let show = matches!(action, Action::Prepare(..));
     if show && !dock::is_visible(&app) {
@@ -53,17 +53,14 @@ pub fn panel_ready(
     app: AppHandle,
     window: WebviewWindow,
     panel_id: PanelId,
-    size: LogicalSize,
-    inset: f64,
+    size: PanelSize,
+    inset: PanelInset,
 ) -> Result<(), String> {
     if window.label() != panel::LABEL {
         return Err("only the panel reports that it rendered".into());
     }
-    let geometry = PanelGeometry { size, inset };
-    geometry
-        .validate()
-        .map_err(|error| format!("invalid panel geometry: {error}"))?;
-    let action = panel::lock(&app).ready(panel_id, geometry);
+    // `size` and `inset` were checked when deserialized.
+    let action = panel::lock(&app).ready(panel_id, PanelGeometry::new(size, inset));
     if action == Action::Nothing {
         log::debug!("panel: ignored the ready signal of a panel that is not open");
         return Ok(());

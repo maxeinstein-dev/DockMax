@@ -98,33 +98,58 @@ pub fn dock_rect(work_area: Rect, scale_factor: f64, window_size: (f64, f64), ed
 }
 
 /// Largest icon the dock draws, in logical pixels.
-const MAX_ICON: f64 = crate::domain::settings::MAX_ICON_SIZE as f64;
+const MAX_ICON: u32 = crate::domain::settings::MAX_ICON_SIZE as u32;
 
-/// Padding around the icons in the bar, at most: the presets use about
-/// 0.14 of the icon (DESIGN.md "Layout"), 0.15 leaves room.
-const MAX_PAD: f64 = 0.15 * MAX_ICON;
+/// Padding around the icons in the bar, at most, in whole logical pixels:
+/// the presets use about 0.14 of the icon (DESIGN.md "Layout"), 0.15
+/// rounded up leaves room.
+const MAX_PAD: u32 = (MAX_ICON * 3).div_ceil(20);
 
 /// Tallest bar the page may report, in logical pixels: the largest icon
 /// and its padding.
-pub const MAX_BAR_HEIGHT: f64 = MAX_ICON + 2.0 * MAX_PAD;
+pub const MAX_BAR_HEIGHT: f64 = (MAX_ICON + 2 * MAX_PAD) as f64;
 
 /// Tallest window the page may ask for, in logical pixels, by the D1
 /// formula (`dockWindowSize` in `src/dock/layout.ts`): the padding, the
-/// largest icon magnified 1.4 and lifted 6 px, the label pill (10 px gap,
-/// 24 px tall) and 8 px of room. Across, the window is capped to the work
-/// area by `dock_rect`, and the hit test clips the bar to the window.
-pub const MAX_WINDOW_HEIGHT: f64 = MAX_PAD + MAX_ICON * 1.4 + 6.0 + 10.0 + 24.0 + 8.0;
+/// largest icon magnified 1.4 (rounded up) and lifted 6 px, the label pill
+/// (10 px gap, 24 px tall) and 8 px of room. Across, the window is capped
+/// to the work area by `dock_rect`, and the hit test clips the bar to the
+/// window.
+pub const MAX_WINDOW_HEIGHT: f64 = (MAX_PAD + (MAX_ICON * 7).div_ceil(5) + 6 + 10 + 24 + 8) as f64;
 
 /// What the dock page reports whenever its layout changes
 /// (`DockLayout` in `src/core/dock.ts`), in logical pixels relative to its
 /// client area: where it paints (the bar and the magnified items) and the
 /// window size its content needs (bar, magnification and label).
+///
+/// Read from the frontend only through `validate`: a layout that fails it
+/// is rejected by the deserializer, before `set_dock_layout` runs.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RawDockLayout")]
 pub struct DockLayout {
     pub bar: LogicalRect,
     pub hold: Vec<LogicalRect>,
     pub window: LogicalSize,
+}
+
+/// A `DockLayout` as the frontend sends it; its rects and size are checked
+/// on their own as they are read.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawDockLayout {
+    bar: LogicalRect,
+    hold: Vec<LogicalRect>,
+    window: LogicalSize,
+}
+
+impl TryFrom<RawDockLayout> for DockLayout {
+    type Error = LayoutError;
+
+    fn try_from(RawDockLayout { bar, hold, window }: RawDockLayout) -> Result<Self, LayoutError> {
+        let layout = DockLayout { bar, hold, window };
+        layout.validate()?;
+        Ok(layout)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,7 +182,7 @@ impl DockLayout {
     /// most `MAX_HOLD_RECTS` hold rects, a bar at most `MAX_BAR_HEIGHT`
     /// tall and a window size from 1 to `MAX_LOGICAL` logical pixels, at
     /// most `MAX_WINDOW_HEIGHT` tall.
-    pub fn validate(&self) -> Result<(), LayoutError> {
+    fn validate(&self) -> Result<(), LayoutError> {
         hit_test::validate_region(&self.bar, &self.hold).map_err(LayoutError::Region)?;
         self.window
             .validate(MAX_LOGICAL)
@@ -714,6 +739,42 @@ mod tests {
     }
 
     #[test]
+    fn invalid_layouts_are_rejected_when_deserialized() {
+        let rect = r#"{"x":0,"y":0,"width":1,"height":1}"#;
+        let hold = |count: usize| vec![rect; count].join(",");
+        let cases = [
+            // A rect or the window out of bounds.
+            r#"{"bar":{"x":0,"y":0,"width":-1,"height":1},"hold":[],"window":{"width":1,"height":1}}"#
+                .to_string(),
+            format!(
+                r#"{{"bar":{rect},"hold":[{{"x":1e12,"y":0,"width":1,"height":1}}],"window":{{"width":1,"height":1}}}}"#
+            ),
+            format!(r#"{{"bar":{rect},"hold":[],"window":{{"width":0,"height":1}}}}"#),
+            format!(r#"{{"bar":{rect},"hold":[],"window":{{"width":1e300,"height":1}}}}"#),
+            // Taller than the largest icon needs.
+            format!(r#"{{"bar":{rect},"hold":[],"window":{{"width":240,"height":198.5}}}}"#),
+            r#"{"bar":{"x":0,"y":0,"width":240,"height":126.5},"hold":[],"window":{"width":240,"height":190}}"#
+                .to_string(),
+            // Too many magnified icons.
+            format!(
+                r#"{{"bar":{rect},"hold":[{}],"window":{{"width":1,"height":1}}}}"#,
+                hold(17)
+            ),
+            // Not a number, or an unknown field.
+            format!(r#"{{"bar":{rect},"hold":[],"window":{{"width":"NaN","height":1}}}}"#),
+            format!(r#"{{"bar":{rect},"hold":[],"window":{{"width":1,"height":1}},"edge":"top"}}"#),
+        ];
+        for json in &cases {
+            assert!(serde_json::from_str::<DockLayout>(json).is_err(), "{json}");
+        }
+        let largest = format!(
+            r#"{{"bar":{{"x":0,"y":0,"width":240,"height":{MAX_BAR_HEIGHT}}},"hold":[{}],"window":{{"width":100000,"height":{MAX_WINDOW_HEIGHT}}}}}"#,
+            hold(16)
+        );
+        assert!(serde_json::from_str::<DockLayout>(&largest).is_ok());
+    }
+
+    #[test]
     fn layout_with_up_to_16_hold_rects_is_valid() {
         for count in [0, 1, hit_test::MAX_HOLD_RECTS] {
             assert_eq!(
@@ -783,13 +844,12 @@ mod tests {
 
     #[test]
     fn dock_height_limits_follow_the_largest_icon() {
-        // D1 (src/dock/layout.ts) for a 96 px icon, magnified 1.4 and lifted
-        // 6 px, with a padding of 0.15 of the icon, the label pill (10 + 24)
-        // and the room around it (8).
-        let icon = f64::from(crate::domain::settings::MAX_ICON_SIZE);
-        assert_eq!(icon, 96.0);
-        assert!((MAX_BAR_HEIGHT - (icon + 2.0 * 14.4)).abs() < 1e-9);
-        assert!((MAX_WINDOW_HEIGHT - (14.4 + icon * 1.4 + 6.0 + 10.0 + 24.0 + 8.0)).abs() < 1e-9);
+        // D1 (src/dock/layout.ts) for a 96 px icon: a padding of 0.15 of
+        // it (14.4, up to 15), magnified 1.4 (134.4, up to 135) and lifted
+        // 6 px, the label pill (10 + 24) and the room around it (8).
+        assert_eq!(crate::domain::settings::MAX_ICON_SIZE, 96);
+        assert_eq!(MAX_BAR_HEIGHT, 96.0 + 2.0 * 15.0);
+        assert_eq!(MAX_WINDOW_HEIGHT, 15.0 + 135.0 + 6.0 + 10.0 + 24.0 + 8.0);
     }
 
     #[test]

@@ -81,13 +81,47 @@ impl PanelId {
 pub const MAX_LOGICAL: f64 = 100_000.0;
 
 /// A rectangle in logical pixels, relative to a window's client area.
+/// Read from the frontend only through `validate`: a rectangle that fails
+/// it is rejected by the deserializer, before any command runs.
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RawRect")]
 pub struct LogicalRect {
     pub x: f64,
     pub y: f64,
     pub width: f64,
     pub height: f64,
+}
+
+/// A `LogicalRect` as the frontend sends it, before it is checked.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawRect {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+impl TryFrom<RawRect> for LogicalRect {
+    type Error = RectError;
+
+    fn try_from(
+        RawRect {
+            x,
+            y,
+            width,
+            height,
+        }: RawRect,
+    ) -> Result<Self, RectError> {
+        let rect = LogicalRect {
+            x,
+            y,
+            width,
+            height,
+        };
+        rect.validate()?;
+        Ok(rect)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,18 +161,38 @@ impl LogicalRect {
     }
 }
 
-/// A size in logical pixels.
+/// A size in logical pixels. Read from the frontend only through
+/// `validate` with `MAX_LOGICAL`: finite, from 1 to 100000 on each side.
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RawSize")]
 pub struct LogicalSize {
     pub width: f64,
     pub height: f64,
+}
+
+/// A `LogicalSize` as the frontend sends it, before it is checked.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawSize {
+    width: f64,
+    height: f64,
+}
+
+impl TryFrom<RawSize> for LogicalSize {
+    type Error = SizeError;
+
+    fn try_from(RawSize { width, height }: RawSize) -> Result<Self, SizeError> {
+        let size = LogicalSize { width, height };
+        size.validate(MAX_LOGICAL)?;
+        Ok(size)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SizeError {
     NotFinite,
     NotPositive,
+    TooSmall,
     TooLarge,
 }
 
@@ -147,6 +201,7 @@ impl fmt::Display for SizeError {
         f.write_str(match self {
             SizeError::NotFinite => "a value is not a finite number",
             SizeError::NotPositive => "the width or height is below 1 logical pixel",
+            SizeError::TooSmall => "the width or height is below the limit",
             SizeError::TooLarge => "the width or height is beyond the limit",
         })
     }
@@ -172,6 +227,60 @@ impl LogicalSize {
     }
 }
 
+/// Smallest panel window side accepted from the page, in logical pixels:
+/// whatever the inset, at least 1 logical pixel of card is left.
+pub const MIN_PANEL_SIZE: f64 = 2.0 * MAX_INSET + 1.0;
+
+/// The panel window size its page reports: a `LogicalSize` from
+/// `MIN_PANEL_SIZE` to `MAX_PANEL_SIZE` on each side, checked when
+/// deserialized.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(try_from = "LogicalSize")]
+pub struct PanelSize(LogicalSize);
+
+impl TryFrom<LogicalSize> for PanelSize {
+    type Error = SizeError;
+
+    fn try_from(size: LogicalSize) -> Result<Self, SizeError> {
+        size.validate(MAX_PANEL_SIZE)?;
+        if size.width < MIN_PANEL_SIZE || size.height < MIN_PANEL_SIZE {
+            return Err(SizeError::TooSmall);
+        }
+        Ok(PanelSize(size))
+    }
+}
+
+/// The transparent inset around the panel card its page reports, in
+/// logical pixels: finite, from 0 to `MAX_INSET`, checked when
+/// deserialized.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(try_from = "f64")]
+pub struct PanelInset(f64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InsetError;
+
+impl fmt::Display for InsetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("the inset is not a finite number from 0 to 8")
+    }
+}
+
+impl Error for InsetError {}
+
+impl TryFrom<f64> for PanelInset {
+    type Error = InsetError;
+
+    fn try_from(inset: f64) -> Result<Self, InsetError> {
+        // False for NaN.
+        if (0.0..=MAX_INSET).contains(&inset) {
+            Ok(PanelInset(inset))
+        } else {
+            Err(InsetError)
+        }
+    }
+}
+
 /// The panel window as its page rendered it, in logical pixels: the window
 /// size and the transparent inset around the visible card, on every side.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -180,26 +289,13 @@ pub struct PanelGeometry {
     pub inset: f64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GeometryError {
-    Size(SizeError),
-    Inset,
-}
-
-impl fmt::Display for GeometryError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            GeometryError::Size(error) => write!(f, "size: {error}"),
-            GeometryError::Inset => {
-                f.write_str("the inset is not a finite number from 0 to 8 leaving a visible card")
-            }
-        }
-    }
-}
-
-impl Error for GeometryError {}
-
 impl PanelGeometry {
+    /// A geometry from checked parts: its card is at least 1 logical pixel
+    /// wide and tall, and its inset never wider than the gap to the bar.
+    pub fn new(PanelSize(size): PanelSize, PanelInset(inset): PanelInset) -> Self {
+        PanelGeometry { size, inset }
+    }
+
     /// What the panel is shown with before its page ever reported a size.
     pub fn fallback(id: PanelId) -> Self {
         let (width, height) = id.logical_size();
@@ -207,23 +303,6 @@ impl PanelGeometry {
             size: LogicalSize { width, height },
             inset: 0.0,
         }
-    }
-
-    /// Checks a geometry received from the panel page: a valid size of at
-    /// most `MAX_PANEL_SIZE`, and an inset from 0 to `MAX_INSET` that leaves
-    /// a card at least 1 logical pixel wide and tall.
-    pub fn validate(&self) -> Result<(), GeometryError> {
-        self.size
-            .validate(MAX_PANEL_SIZE)
-            .map_err(GeometryError::Size)?;
-        let card = |side: f64| side - 2.0 * self.inset >= 1.0;
-        if !(0.0..=MAX_INSET).contains(&self.inset)
-            || !card(self.size.width)
-            || !card(self.size.height)
-        {
-            return Err(GeometryError::Inset);
-        }
-        Ok(())
     }
 }
 
@@ -1429,8 +1508,7 @@ mod tests {
                         for (width, height) in sizes {
                             for inset in 0..=8 {
                                 let inset = f64::from(inset);
-                                let geometry = geometry(width, height, inset);
-                                assert_eq!(geometry.validate(), Ok(()), "{geometry:?}");
+                                let geometry = reported(width, height, inset).unwrap();
                                 let case = format!(
                                     "{work_area:?} {scale_factor} {edge:?} {anchor:?} {geometry:?}"
                                 );
@@ -1463,46 +1541,70 @@ mod tests {
         assert_eq!(MAX_INSET, MARGIN);
     }
 
-    #[test]
-    fn geometry_within_the_limits_is_valid() {
-        for (width, height, inset) in [
-            (360.0, 480.0, 0.0),
-            (360.0, 480.0, 8.0),
-            (1.0, 1.0, 0.0),
-            (MAX_PANEL_SIZE, MAX_PANEL_SIZE, MAX_INSET),
-            (17.0, 17.0, 8.0),
-        ] {
-            let geometry = geometry(width, height, inset);
-            assert_eq!(geometry.validate(), Ok(()), "{geometry:?}");
-        }
-        assert_eq!(PanelGeometry::fallback(PanelId::About).validate(), Ok(()));
+    /// The geometry the panel page reports, read as `panel_ready` reads it.
+    fn reported(width: f64, height: f64, inset: f64) -> Result<PanelGeometry, String> {
+        let size = serde_json::json!({ "width": width, "height": height });
+        let size = serde_json::from_value::<PanelSize>(size).map_err(|e| e.to_string())?;
+        let inset = serde_json::from_value::<PanelInset>(serde_json::json!(inset))
+            .map_err(|e| e.to_string())?;
+        Ok(PanelGeometry::new(size, inset))
     }
 
     #[test]
-    fn geometry_out_of_bounds_is_rejected() {
-        use GeometryError::*;
+    fn geometry_within_the_limits_is_read() {
+        for (width, height, inset) in [
+            (360.0, 480.0, 0.0),
+            (360.0, 480.0, 8.0),
+            (360.0, 480.0, 4.4),
+            (MIN_PANEL_SIZE, MIN_PANEL_SIZE, 0.0),
+            (MAX_PANEL_SIZE, MAX_PANEL_SIZE, MAX_INSET),
+            (17.0, 17.0, 8.0),
+        ] {
+            assert_eq!(
+                reported(width, height, inset),
+                Ok(geometry(width, height, inset)),
+                "{width}x{height} {inset}"
+            );
+        }
+        assert_eq!(MIN_PANEL_SIZE, 17.0);
+    }
+
+    #[test]
+    fn geometry_out_of_bounds_is_rejected_when_deserialized() {
         let cases = [
-            (f64::NAN, 480.0, 0.0, Size(SizeError::NotFinite)),
-            (360.0, f64::INFINITY, 0.0, Size(SizeError::NotFinite)),
-            (0.0, 480.0, 0.0, Size(SizeError::NotPositive)),
-            (360.0, 0.5, 0.0, Size(SizeError::NotPositive)),
-            (360.0, -480.0, 0.0, Size(SizeError::NotPositive)),
-            (MAX_PANEL_SIZE + 1.0, 480.0, 0.0, Size(SizeError::TooLarge)),
-            (360.0, 1e12, 0.0, Size(SizeError::TooLarge)),
-            (360.0, 480.0, -1.0, Inset),
-            (360.0, 480.0, MAX_INSET + 0.5, Inset),
-            (360.0, 480.0, f64::NAN, Inset),
-            (360.0, 480.0, f64::INFINITY, Inset),
+            // `json!` writes NaN and infinities as null.
+            (f64::NAN, 480.0, 0.0),
+            (360.0, f64::INFINITY, 0.0),
+            (0.0, 480.0, 0.0),
+            (360.0, 0.5, 0.0),
+            (360.0, -480.0, 0.0),
+            (MAX_PANEL_SIZE + 1.0, 480.0, 0.0),
+            (360.0, 1e12, 0.0),
+            (360.0, 480.0, -1.0),
+            (360.0, 480.0, f64::NAN),
+            (360.0, 480.0, f64::INFINITY),
             // Wider than the gap to the dock bar: the window would cover it.
-            (360.0, 480.0, 8.5, Inset),
-            (360.0, 480.0, 32.0, Inset),
-            // Nothing visible would be left of the card.
-            (16.0, 480.0, 8.0, Inset),
-            (360.0, 10.0, 5.0, Inset),
+            (360.0, 480.0, MAX_INSET + 0.5),
+            (360.0, 480.0, 32.0),
+            // Smaller than a card can be with any inset.
+            (16.0, 480.0, 0.0),
+            (360.0, 10.0, 5.0),
         ];
-        for (width, height, inset, expected) in cases {
-            let geometry = geometry(width, height, inset);
-            assert_eq!(geometry.validate(), Err(expected), "{geometry:?}");
+        for (width, height, inset) in cases {
+            assert!(
+                reported(width, height, inset).is_err(),
+                "{width}x{height} {inset}"
+            );
+        }
+        for json in [
+            r#"{"width":360,"height":480,"depth":1}"#,
+            r#"{"width":"360","height":480}"#,
+            r#"{"width":360}"#,
+        ] {
+            assert!(serde_json::from_str::<PanelSize>(json).is_err(), "{json}");
+        }
+        for json in [r#""8""#, "null", "-0.5", "1e400"] {
+            assert!(serde_json::from_str::<PanelInset>(json).is_err(), "{json}");
         }
     }
 
@@ -1519,6 +1621,46 @@ mod tests {
             LogicalSize {
                 width: 1.5,
                 height: 2.0
+            }
+        );
+    }
+
+    #[test]
+    fn invalid_rects_and_sizes_are_rejected_when_deserialized() {
+        let rects = [
+            r#"{"x":0,"y":0,"width":-1,"height":1}"#,
+            r#"{"x":0,"y":0,"width":1,"height":-0.5}"#,
+            r#"{"x":1e12,"y":0,"width":1,"height":1}"#,
+            r#"{"x":0,"y":-100000.5,"width":1,"height":1}"#,
+            r#"{"x":0,"y":0,"width":1e300,"height":1}"#,
+            r#"{"x":0,"y":0,"width":1e400,"height":1}"#,
+            r#"{"x":null,"y":0,"width":1,"height":1}"#,
+            r#"{"x":"NaN","y":0,"width":1,"height":1}"#,
+            r#"{"x":0,"y":0,"width":1,"height":1,"top":0}"#,
+        ];
+        for json in rects {
+            assert!(serde_json::from_str::<LogicalRect>(json).is_err(), "{json}");
+        }
+        let sizes = [
+            r#"{"width":0,"height":1}"#,
+            r#"{"width":1,"height":0.5}"#,
+            r#"{"width":-3,"height":1}"#,
+            r#"{"width":1,"height":100000.5}"#,
+            r#"{"width":1e300,"height":1}"#,
+            r#"{"width":"Infinity","height":1}"#,
+            r#"{"width":1,"height":1,"depth":1}"#,
+        ];
+        for json in sizes {
+            assert!(serde_json::from_str::<LogicalSize>(json).is_err(), "{json}");
+        }
+        assert_eq!(
+            serde_json::from_str::<LogicalRect>(r#"{"x":-4,"y":-13.2,"width":140,"height":0}"#)
+                .unwrap(),
+            LogicalRect {
+                x: -4.0,
+                y: -13.2,
+                width: 140.0,
+                height: 0.0
             }
         );
     }

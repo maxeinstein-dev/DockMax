@@ -15,11 +15,8 @@ pub fn set_dock_layout(
     if window.label() != dock::LABEL {
         return Err("only the dock reports its layout".into());
     }
-    // Before touching the window or the tracker: a rejected layout changes
-    // nothing.
-    layout
-        .validate()
-        .map_err(|error| format!("invalid dock layout: {error}"))?;
+    // `layout` was checked when deserialized: an invalid one never gets
+    // here, so a rejected layout changes nothing.
     dock::set_layout(&app, layout).map_err(|error| {
         log::warn!("dock: failed to apply the layout: {error}");
         "could not place the dock".to_string()
