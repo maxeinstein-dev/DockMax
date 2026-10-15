@@ -6,7 +6,8 @@
 //! 0007): never a path, a label, a config or note text.
 //!
 //! - A missing file is created, migrated and seeded once with a Clock, a Time
-//!   progress and a Note.
+//!   progress and a Note, schema and seed (and the recovery notice, after a
+//!   recovery) in one transaction.
 //! - An existing file at an older schema version is copied to
 //!   `dockmax.db.bak-v<n>` with `VACUUM INTO` and then migrated, all
 //!   migrations in one transaction. If the copy fails, nothing is migrated.
@@ -30,7 +31,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use rusqlite::config::DbConfig;
 use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, Transaction};
 use rusqlite::{TransactionBehavior, params};
-use rusqlite_migration::{M, Migrations};
+use rusqlite_migration::{HookResult, M, Migrations};
 
 use super::widgets_repo;
 use crate::domain::widgets::{
@@ -47,10 +48,16 @@ const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// SQL of migration 1, also used by the tests to build migration sets.
 const MIGRATION_1: &str = include_str!("../../migrations/0001_widgets.sql");
 
-/// The schema migrations, in order; the database's `user_version` is the
-/// number of them applied. Never change or reorder one that has shipped: add
-/// the next file in `src-tauri/migrations/` instead.
-pub const MIGRATIONS: &[M<'static>] = &[M::up(MIGRATION_1)];
+/// The SQL of the schema migrations, in order; the database's
+/// `user_version` is the number of them applied. Never change or reorder one
+/// that has shipped: add the next file in `src-tauri/migrations/` instead.
+pub const MIGRATIONS: &[&str] = &[MIGRATION_1];
+
+/// `application_id` of a new database that replaces one set aside, until
+/// the transaction that makes its schema commits with the recovery notice.
+/// It survives a stop before that commit, so the next start still shows the
+/// notice. ("DMRC" in ASCII.)
+const RECOVERY_MARK: i32 = 0x444D_5243;
 
 /// The kinds a new database starts with, in dock order (spec 0003 §2.1
 /// item 4).
@@ -128,7 +135,7 @@ impl Storage {
 
 /// [`Storage::open`] with the given migrations: a seam for the tests, which
 /// need a database "from a newer version" and a migration that fails.
-pub(super) fn open_with<'m>(dir: &Path, migrations: &'m [M<'m>]) -> Storage {
+pub(super) fn open_with(dir: &Path, migrations: &[&'static str]) -> Storage {
     let path = dir.join(FILE_NAME);
     let found = match fs::symlink_metadata(&path) {
         Ok(metadata) => Some(metadata),
@@ -171,7 +178,7 @@ pub(super) fn open_with<'m>(dir: &Path, migrations: &'m [M<'m>]) -> Storage {
 
 /// Makes a new database at `path`: migrated, seeded and, after a recovery,
 /// with the notice pending.
-fn create<'m>(dir: &Path, path: &Path, migrations: &'m [M<'m>], recovered: bool) -> Storage {
+fn create(dir: &Path, path: &Path, migrations: &[&'static str], recovered: bool) -> Storage {
     if let Err(error) = fs::create_dir_all(dir) {
         return unavailable(
             UnavailableReason::OpenFailed,
@@ -181,8 +188,14 @@ fn create<'m>(dir: &Path, path: &Path, migrations: &'m [M<'m>], recovered: bool)
     let flags = OpenFlags::SQLITE_OPEN_READ_WRITE
         | OpenFlags::SQLITE_OPEN_CREATE
         | OpenFlags::SQLITE_OPEN_NO_MUTEX;
-    match connect(path, flags) {
-        Ok(conn) => prepare(conn, path, 0, migrations, recovered),
+    let connected = connect(path, flags).and_then(|conn| {
+        if recovered {
+            conn.pragma_update(None, "application_id", RECOVERY_MARK)?;
+        }
+        Ok(conn)
+    });
+    match connected {
+        Ok(conn) => prepare(conn, path, 0, migrations),
         Err(error) => unavailable(
             UnavailableReason::OpenFailed,
             format_args!("could not create the file: {}", Cause::sqlite(&error)),
@@ -194,7 +207,7 @@ fn create<'m>(dir: &Path, path: &Path, migrations: &'m [M<'m>], recovered: bool)
 /// known to be a sound database of a version this build can handle: `Err`
 /// means SQLite found it is not a database or is corrupt, and the caller
 /// sets it aside.
-fn open_existing<'m>(path: &Path, migrations: &'m [M<'m>]) -> Result<Storage, Cause> {
+fn open_existing(path: &Path, migrations: &[&'static str]) -> Result<Storage, Cause> {
     // SQLite deletes the `-wal` of a file that turns out not to be a
     // database (seen in the tests), so such a file is caught before SQLite
     // opens it, while its companions are still there to set aside with it.
@@ -275,17 +288,16 @@ fn open_existing<'m>(path: &Path, migrations: &'m [M<'m>]) -> Result<Storage, Ca
         }
     }
 
-    Ok(prepare(conn, path, version, migrations, false))
+    Ok(prepare(conn, path, version, migrations))
 }
 
 /// Sets up the connection, backs up and migrates a database at `version`
-/// (0 for a new one), seeds a new one and reads the recovery notice.
-fn prepare<'m>(
+/// (0 for a new one, which migration 1 seeds) and reads the recovery notice.
+fn prepare(
     mut conn: Connection,
     path: &Path,
     version: usize,
-    migrations: &'m [M<'m>],
-    recovered: bool,
+    migrations: &[&'static str],
 ) -> Storage {
     if let Err(error) = configure(&conn) {
         return unavailable(
@@ -304,24 +316,12 @@ fn prepare<'m>(
                 format_args!("backup before migrating failed: {cause}"),
             );
         }
-        if let Err(error) = Migrations::from_slice(migrations).to_latest(&mut conn) {
+        if let Err(error) = Migrations::new(with_seed(migrations)).to_latest(&mut conn) {
             return unavailable(
                 UnavailableReason::MigrationFailed,
                 format_args!("migration failed: {}", Cause::migration(&error)),
             );
         }
-    }
-
-    // A database at version 0 had no tables of ours, so it is new: this is
-    // the one time it gets the seed. A database emptied by the user stays
-    // empty.
-    if version == 0
-        && let Err(error) = seed(&mut conn, recovered)
-    {
-        return unavailable(
-            UnavailableReason::OpenFailed,
-            format_args!("could not seed the database: {}", Cause::sqlite(&error)),
-        );
     }
 
     // Sound and up to date: closing checkpoints again, as by default.
@@ -348,7 +348,7 @@ fn prepare<'m>(
 }
 
 /// Sets the corrupt database at `path` aside and makes a new one.
-fn recover<'m>(dir: &Path, path: &Path, migrations: &'m [M<'m>], cause: Cause) -> Storage {
+fn recover(dir: &Path, path: &Path, migrations: &[&'static str], cause: Cause) -> Storage {
     log::warn!("widgets: database can't be used, setting it aside: {cause}");
     let stamp = jiff::Timestamp::now().strftime("%Y%m%d-%H%M%S").to_string();
     match set_aside(path, &format!(".corrompido-{stamp}")) {
@@ -488,22 +488,41 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(name)
 }
 
-/// Inserts the first widgets of a new database, and the recovery notice if
-/// it replaces a corrupt one, in one transaction.
-fn seed(conn: &mut Connection, recovered: bool) -> rusqlite::Result<()> {
-    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+/// The migrations to run, with the seed in migration 1: a database at
+/// version 0 has no tables of ours, so it is new, and it gets its schema and
+/// its first widgets (and the recovery notice) in the same transaction, or
+/// neither. A database emptied by the user stays empty.
+fn with_seed(migrations: &[&'static str]) -> Vec<M<'static>> {
+    migrations
+        .iter()
+        .enumerate()
+        .map(|(index, sql)| {
+            if index == 0 {
+                M::up_with_hook(sql, |tx: &Transaction<'_>| -> HookResult { Ok(seed(tx)?) })
+            } else {
+                M::up(sql)
+            }
+        })
+        .collect()
+}
+
+/// Inserts the first widgets of a new database and, if it replaces one set
+/// aside ([`RECOVERY_MARK`]), the recovery notice.
+fn seed(tx: &Transaction<'_>) -> rusqlite::Result<()> {
     let now = now_ms();
     for (position, kind) in SEED.into_iter().enumerate() {
-        widgets_repo::insert(&tx, kind, position, now)?;
+        widgets_repo::insert(tx, kind, position, now)?;
     }
-    if recovered {
+    let mark: i32 = tx.pragma_query_value(None, "application_id", |row| row.get(0))?;
+    if mark == RECOVERY_MARK {
         tx.execute(
             "INSERT INTO meta (key, value) VALUES (?1, ?2) \
              ON CONFLICT (key) DO UPDATE SET value = excluded.value",
             params![RECOVERY_NOTICE_KEY, RECOVERY_NOTICE_PENDING],
         )?;
+        tx.pragma_update(None, "application_id", 0)?;
     }
-    tx.commit()
+    Ok(())
 }
 
 fn recovery_pending(conn: &Connection) -> rusqlite::Result<bool> {
@@ -604,21 +623,27 @@ mod tests {
     /// migrating an existing one.
     const MIGRATION_2: &str = "ALTER TABLE meta ADD COLUMN extra TEXT;";
 
-    fn up_to_v2() -> Vec<M<'static>> {
-        vec![M::up(MIGRATION_1), M::up(MIGRATION_2)]
+    fn up_to_v2() -> Vec<&'static str> {
+        vec![MIGRATION_1, MIGRATION_2]
     }
 
     /// Migration 2 creates a table and then fails: the whole migration must
     /// be rolled back.
-    fn failing_v2() -> Vec<M<'static>> {
+    fn failing_v2() -> Vec<&'static str> {
         vec![
-            M::up(MIGRATION_1),
-            M::up(
-                "CREATE TABLE half_done (x INTEGER) STRICT; \
-                 INSERT INTO no_such_table VALUES (1);",
-            ),
+            MIGRATION_1,
+            "CREATE TABLE half_done (x INTEGER) STRICT; \
+             INSERT INTO no_such_table VALUES (1);",
         ]
     }
+
+    /// Migration 1 and a trigger that refuses every widget: the seed fails
+    /// right after the schema is made, as if the app stopped between them.
+    const SEED_REFUSED: &str = concat!(
+        include_str!("../../migrations/0001_widgets.sql"),
+        "
+CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELECT RAISE(ABORT, 'stopped'); END;"
+    );
 
     fn db_path(dir: &TempDir) -> PathBuf {
         dir.path().join(FILE_NAME)
@@ -670,8 +695,8 @@ mod tests {
 
     #[test]
     fn real_migrations_validate() {
-        assert_eq!(Migrations::from_slice(MIGRATIONS).validate(), Ok(()));
-        assert_eq!(Migrations::new(up_to_v2()).validate(), Ok(()));
+        assert_eq!(Migrations::new(with_seed(MIGRATIONS)).validate(), Ok(()));
+        assert_eq!(Migrations::new(with_seed(&up_to_v2())).validate(), Ok(()));
     }
 
     #[test]
@@ -716,6 +741,51 @@ mod tests {
         assert_eq!(meta, 0);
         drop(storage);
         assert_eq!(user_version(&db_path(&dir)), 1);
+    }
+
+    #[test]
+    fn stopping_between_schema_and_seed_leaves_a_database_to_seed() {
+        let dir = tempdir().unwrap();
+        let stopped = open_with(dir.path(), &[SEED_REFUSED]);
+        assert!(matches!(
+            stopped.status(),
+            StorageStatus::Unavailable { .. }
+        ));
+        drop(stopped);
+
+        let reopened = Storage::open(dir.path());
+
+        assert_eq!(reopened.status(), StorageStatus::Ok);
+        assert_eq!(kinds(&reopened), SEED);
+    }
+
+    #[test]
+    fn stopping_between_schema_and_seed_after_a_recovery_keeps_the_notice() {
+        let dir = tempdir().unwrap();
+        fs::write(db_path(&dir), "garbage".repeat(100)).unwrap();
+        let stopped = open_with(dir.path(), &[SEED_REFUSED]);
+        assert!(matches!(
+            stopped.status(),
+            StorageStatus::Unavailable { .. }
+        ));
+        drop(stopped);
+        // Nothing half done: no schema without its seed and notice.
+        let path = db_path(&dir);
+        assert_eq!(user_version(&path), 0);
+        let tables: i64 = inspect(&path)
+            .query_row("SELECT count(*) FROM sqlite_schema", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(tables, 0);
+
+        let reopened = Storage::open(dir.path());
+
+        assert_eq!(reopened.status(), StorageStatus::Recovered);
+        assert_eq!(kinds(&reopened), SEED);
+        drop(reopened);
+        let mark: i32 = inspect(&path)
+            .pragma_query_value(None, "application_id", |row| row.get(0))
+            .unwrap();
+        assert_eq!(mark, 0, "the mark goes once the notice is stored");
     }
 
     #[test]
