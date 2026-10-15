@@ -12,6 +12,14 @@ mod windows;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // First: a second launch exits here, before creating anything, and
+        // shows the dock of the running instance. Its argv and working
+        // folder are ignored and never logged.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Err(error) = windows::dock::reveal(app) {
+                log::warn!("single instance: failed to show the dock: {error}");
+            }
+        }))
         .plugin(logging::plugin())
         .manage(Arc::new(windows::hit_test::Tracker::default()))
         .setup(|app| {

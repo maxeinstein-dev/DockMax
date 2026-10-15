@@ -123,6 +123,18 @@ pub fn toggle(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     }
 }
 
+/// Shows the dock if it is hidden (the app was launched again). Like every
+/// show, it doesn't take the foreground.
+pub fn reveal(app: &AppHandle) -> Result<(), Box<dyn Error>> {
+    let window = app
+        .get_webview_window(LABEL)
+        .ok_or("dock window is missing")?;
+    if window.is_visible()? {
+        return Ok(());
+    }
+    show(&window)
+}
+
 /// Places the dock and shows it without taking the foreground from the app
 /// in use.
 fn show(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
