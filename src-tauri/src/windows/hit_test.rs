@@ -99,8 +99,12 @@ impl Shared {
         to_screen(rect, (window.x, window.y), scale_factor)
     }
 
+    /// The bar in physical screen pixels, clipped to the dock window like
+    /// the magnified icons: a bar reported beyond the window can't capture
+    /// the mouse outside it. `None` when it lies wholly outside.
     fn bar_on_screen(&self) -> Option<Rect> {
-        self.to_screen(self.region.as_ref()?.bar)
+        let (window, _) = self.window?;
+        clip(self.to_screen(self.region.as_ref()?.bar)?, window)
     }
 
     /// The magnified icons in physical screen pixels, clipped to the dock
@@ -551,6 +555,41 @@ mod tests {
         }
         // Inside the window the clipped rect still holds.
         assert!(next_captured(true, (845, 925), bar, &hold));
+    }
+
+    #[test]
+    fn bar_reported_beyond_the_window_is_clipped_to_it() {
+        // Reported 10 px left of the window, wider than it and 30 px below.
+        let shared = Shared {
+            window: Some((rect(840, 920, 240, 104), 1.0)),
+            region: Some(HitRegion {
+                bar: logical(-10.0, 40.0, 1000.0, 94.0),
+                hold: vec![],
+            }),
+            ..Shared::default()
+        };
+
+        let bar = shared.bar_on_screen();
+
+        assert_eq!(bar, Some(rect(840, 960, 240, 64)));
+        // Outside the window, over the bar as reported: never captured.
+        for cursor in [(835, 1000), (1100, 1000), (900, 1030)] {
+            assert!(!next_captured(false, cursor, bar, &[]), "{cursor:?}");
+        }
+    }
+
+    #[test]
+    fn bar_wholly_outside_the_window_is_dropped() {
+        let shared = Shared {
+            window: Some((rect(840, 920, 240, 104), 1.0)),
+            region: Some(HitRegion {
+                bar: logical(0.0, 104.0, 240.0, 64.0),
+                hold: vec![],
+            }),
+            ..Shared::default()
+        };
+
+        assert_eq!(shared.bar_on_screen(), None);
     }
 
     #[test]

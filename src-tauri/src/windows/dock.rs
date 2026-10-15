@@ -97,6 +97,24 @@ pub fn dock_rect(work_area: Rect, scale_factor: f64, window_size: (f64, f64), ed
     }
 }
 
+/// Largest icon the dock draws, in logical pixels.
+const MAX_ICON: f64 = crate::domain::settings::MAX_ICON_SIZE as f64;
+
+/// Padding around the icons in the bar, at most: the presets use about
+/// 0.14 of the icon (DESIGN.md "Layout"), 0.15 leaves room.
+const MAX_PAD: f64 = 0.15 * MAX_ICON;
+
+/// Tallest bar the page may report, in logical pixels: the largest icon
+/// and its padding.
+pub const MAX_BAR_HEIGHT: f64 = MAX_ICON + 2.0 * MAX_PAD;
+
+/// Tallest window the page may ask for, in logical pixels, by the D1
+/// formula (`dockWindowSize` in `src/dock/layout.ts`): the padding, the
+/// largest icon magnified 1.4 and lifted 6 px, the label pill (10 px gap,
+/// 24 px tall) and 8 px of room. Across, the window is capped to the work
+/// area by `dock_rect`, and the hit test clips the bar to the window.
+pub const MAX_WINDOW_HEIGHT: f64 = MAX_PAD + MAX_ICON * 1.4 + 6.0 + 10.0 + 24.0 + 8.0;
+
 /// What the dock page reports whenever its layout changes
 /// (`DockLayout` in `src/core/dock.ts`), in logical pixels relative to its
 /// client area: where it paints (the bar and the magnified items) and the
@@ -113,6 +131,8 @@ pub struct DockLayout {
 pub enum LayoutError {
     Region(RegionError),
     Window(SizeError),
+    BarTooTall,
+    WindowTooTall,
 }
 
 impl fmt::Display for LayoutError {
@@ -120,6 +140,12 @@ impl fmt::Display for LayoutError {
         match self {
             LayoutError::Region(error) => write!(f, "{error}"),
             LayoutError::Window(error) => write!(f, "window: {error}"),
+            LayoutError::BarTooTall => {
+                write!(f, "bar: taller than {MAX_BAR_HEIGHT} logical pixels")
+            }
+            LayoutError::WindowTooTall => {
+                write!(f, "window: taller than {MAX_WINDOW_HEIGHT} logical pixels")
+            }
         }
     }
 }
@@ -128,13 +154,21 @@ impl Error for LayoutError {}
 
 impl DockLayout {
     /// Checks a layout received from the dock page: every rect valid, at
-    /// most `MAX_HOLD_RECTS` hold rects and a window size from 1 to
-    /// `MAX_LOGICAL` logical pixels.
+    /// most `MAX_HOLD_RECTS` hold rects, a bar at most `MAX_BAR_HEIGHT`
+    /// tall and a window size from 1 to `MAX_LOGICAL` logical pixels, at
+    /// most `MAX_WINDOW_HEIGHT` tall.
     pub fn validate(&self) -> Result<(), LayoutError> {
         hit_test::validate_region(&self.bar, &self.hold).map_err(LayoutError::Region)?;
         self.window
             .validate(MAX_LOGICAL)
-            .map_err(LayoutError::Window)
+            .map_err(LayoutError::Window)?;
+        if self.bar.height > MAX_BAR_HEIGHT {
+            return Err(LayoutError::BarTooTall);
+        }
+        if self.window.height > MAX_WINDOW_HEIGHT {
+            return Err(LayoutError::WindowTooTall);
+        }
+        Ok(())
     }
 
     /// The window size to give the dock, in logical pixels: what the page
@@ -745,6 +779,50 @@ mod tests {
                 "{width}x{height}"
             );
         }
+    }
+
+    #[test]
+    fn dock_height_limits_follow_the_largest_icon() {
+        // D1 (src/dock/layout.ts) for a 96 px icon, magnified 1.4 and lifted
+        // 6 px, with a padding of 0.15 of the icon, the label pill (10 + 24)
+        // and the room around it (8).
+        let icon = f64::from(crate::domain::settings::MAX_ICON_SIZE);
+        assert_eq!(icon, 96.0);
+        assert!((MAX_BAR_HEIGHT - (icon + 2.0 * 14.4)).abs() < 1e-9);
+        assert!((MAX_WINDOW_HEIGHT - (14.4 + icon * 1.4 + 6.0 + 10.0 + 24.0 + 8.0)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn layout_of_every_preset_is_within_the_limits() {
+        // Grande, the largest preset: a 82 px bar in a 147 px window.
+        let large = DockLayout {
+            bar: logical(12.0, 65.0, 166.0, 82.0),
+            ..layout(vec![], 190.0, 147.0)
+        };
+
+        assert_eq!(large.validate(), Ok(()));
+    }
+
+    #[test]
+    fn layout_taller_than_the_largest_icon_needs_is_rejected() {
+        let tall_window = layout(vec![], 240.0, MAX_WINDOW_HEIGHT + 1.0);
+        let tall_bar = DockLayout {
+            bar: logical(0.0, 0.0, 240.0, MAX_BAR_HEIGHT + 1.0),
+            ..layout(vec![], 240.0, 104.0)
+        };
+
+        assert_eq!(tall_window.validate(), Err(LayoutError::WindowTooTall));
+        assert_eq!(tall_bar.validate(), Err(LayoutError::BarTooTall));
+        // Wide is fine: `dock_rect` caps the window to the work area, and
+        // the hit test clips the bar to the window.
+        assert_eq!(
+            DockLayout {
+                bar: logical(0.0, 0.0, 50_000.0, 64.0),
+                ..layout(vec![], MAX_LOGICAL, MAX_WINDOW_HEIGHT)
+            }
+            .validate(),
+            Ok(())
+        );
     }
 
     /// What the page reports in a window whose client area is `viewport`:
