@@ -68,6 +68,21 @@ jobs:
         working-directory: src-tauri
         run: cargo fmt --check
 
+      # Spec 0003, Verificação 8: the WebDriver server comes only with the `e2e`
+      # feature. A failing `cargo tree` fails the step too (`-e`, `pipefail`).
+      - name: Release build has no WebDriver
+        working-directory: src-tauri
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree --locked -e normal)"
+          if hits="$(grep -Ei 'wdio|webdriver' <<<"$tree")"; then
+            echo "::error::the dependency tree without the e2e feature has the WebDriver plugin:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "No wdio/webdriver crate in the release dependency tree."
+
       - name: cargo clippy
         working-directory: src-tauri
         run: cargo clippy --all-targets --locked -- -D warnings
