@@ -57,9 +57,9 @@ vi.mock("./PanelContent", async (importOriginal) => {
 /** Frame sizes the fake layout gives each content, so a size sent for the
  * wrong panel shows. */
 const SIZES = {
-  settings: { width: 352, height: 361.4 },
-  about: { width: 332, height: 251.2 },
-  failed: { width: 352, height: 120 },
+  settings: { width: 336, height: 345.4 },
+  about: { width: 316, height: 235.2 },
+  failed: { width: 336, height: 104 },
 };
 
 /** What the frame held each time it was measured. */
@@ -179,8 +179,8 @@ describe("Panel", () => {
       expect(readyCalls()).toEqual([
         {
           panelId: "settings",
-          size: { width: 352, height: 362 },
-          inset: 16,
+          size: { width: 336, height: 346 },
+          inset: 8,
         },
       ]);
     });
@@ -192,8 +192,8 @@ describe("Panel", () => {
       show("about");
 
       expect(readyCalls()).toEqual([
-        { panelId: "settings", size: { width: 352, height: 362 }, inset: 16 },
-        { panelId: "about", size: { width: 332, height: 252 }, inset: 16 },
+        { panelId: "settings", size: { width: 336, height: 346 }, inset: 8 },
+        { panelId: "about", size: { width: 316, height: 236 }, inset: 8 },
       ]);
       // The about measurement never saw the settings content.
       expect(measured).toHaveLength(2);
@@ -221,7 +221,7 @@ describe("Panel", () => {
       show("settings");
 
       expect(readyCalls()).toEqual([
-        { panelId: "settings", size: { width: 352, height: 120 }, inset: 16 },
+        { panelId: "settings", size: { width: 336, height: 104 }, inset: 8 },
       ]);
     });
 

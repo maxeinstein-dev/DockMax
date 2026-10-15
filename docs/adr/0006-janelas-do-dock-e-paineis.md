@@ -78,6 +78,6 @@ O dock precisa flutuar acima da barra de tarefas, sem atrapalhar os apps de trá
 
 - Comportamentos que dependem do Win32 ficam isolados em `windows/native.rs`, sob `#[cfg(windows)]`.
 - O painel aberto se sobrepõe a parte da folga do dock; ícones ampliados sob o painel ficam cobertos. A ampliação também sobrepõe vizinhos (o `transform` não empurra o layout). Ambos são tratados no visual do PR 3.
-- A margem transparente do painel (`inset`) fica dentro da janela, que bloqueia cliques: com `inset` maior que os 8 px de distância, ela cobre a beira da barra do dock e os cliques ali não chegam aos itens.
+- A margem transparente do painel (`inset`) fica dentro da janela, que bloqueia cliques. Por isso ela é de 8 px, igual à distância entre o cartão e a barra: a borda da janela fica rente à barra e nunca a cobre (um teste em `geometry.test.ts` impede `inset` acima de 8). A sombra do painel cabe nesses 8 px.
 - O "vidro" não desfoca o fundo; a legibilidade vem da opacidade, ajustável pelo usuário (Translúcido/Sólido).
 - Testar CSP exige build de release.

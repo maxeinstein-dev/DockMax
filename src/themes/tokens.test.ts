@@ -135,6 +135,7 @@ describe("tokens.css", () => {
         rgbTriplet(colors[SURFACES[suffix]] ?? ""),
       );
       expect(block.get("--shadow")).toBe(shadow(`surface-${suffix}`));
+      expect(block.get("--shadow-panel")).toBe(shadow(`panel-${suffix}`));
     });
   }
 

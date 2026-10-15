@@ -3,7 +3,7 @@
    (panel_ready), so the card sits centered with --panel-inset around it.
    --panel-inset must match PANEL_INSET in geometry.ts. */
 .panel-frame {
-  --panel-inset: 16px;
+  --panel-inset: 8px;
   box-sizing: border-box;
   width: max-content;
   padding: var(--panel-inset);
@@ -21,11 +21,12 @@
   border-radius: var(--r-panel);
   color: var(--ink);
   background: rgb(var(--surface-rgb));
-  /* Same stack as the dock bar: light edge, hairline ring, shadow. */
+  /* The dock bar's stack (light edge, hairline ring, shadow) with the panel
+     shadow, which fits the --panel-inset margin of the window. */
   box-shadow:
     inset 0 1px 0 var(--hi),
     0 0 0 1px var(--hair),
-    var(--shadow);
+    var(--shadow-panel);
   cursor: default;
   user-select: none;
   /* Grows from the edge facing the dock. */

@@ -254,9 +254,10 @@ O dock é centralizado na borda inferior (ou superior) do monitor, 8 px acima da
 Híbrido de vidro simulado e sombra ambiente. Não existe desfoque do fundo: a profundidade vem de três camadas empilhadas na mesma `box-shadow` (luz de borda interna, anel de fio de 1 px, sombra macia deslocada para fora da tela) e da opacidade da superfície. O dock tem duas opacidades (`--surface-a`: 0,8 Translúcido, 1 Sólido); o painel é sempre opaco.
 
 ### Shadow Vocabulary
-- **Sombra da superfície, claro** (`--shadow: 0 1px 2px rgb(16 20 32 / .10), 0 14px 32px -12px rgb(16 20 32 / .42)`): barra e painel.
-- **Sombra da superfície, escuro** (`--shadow: 0 1px 2px rgb(0 0 0 / .32), 0 16px 36px -12px rgb(0 0 0 / .7)`): barra e painel.
-- **Pilha da barra** (`box-shadow: inset 0 1px 0 var(--hi), 0 0 0 1px var(--hair), var(--shadow)`): com o dock em cima, a luz interna passa para a borda de baixo (`inset 0 -1px 0`). O painel usa a mesma pilha.
+- **Sombra da superfície, claro** (`--shadow: 0 1px 2px rgb(16 20 32 / .10), 0 14px 32px -12px rgb(16 20 32 / .42)`): barra.
+- **Sombra da superfície, escuro** (`--shadow: 0 1px 2px rgb(0 0 0 / .32), 0 16px 36px -12px rgb(0 0 0 / .7)`): barra.
+- **Sombra do painel, claro** (`--shadow-panel: 0 1px 2px rgb(16 20 32 / .10), 0 3px 8px -2px rgb(16 20 32 / .24)`) e **escuro** (`--shadow-panel: 0 1px 2px rgb(0 0 0 / .32), 0 3px 8px -2px rgb(0 0 0 / .5)`): a mesma sombra em versão curta, que cabe nos 8 px de margem transparente da janela do painel (a janela bloqueia cliques e não pode cobrir a barra do dock, ADR 0006).
+- **Pilha da barra** (`box-shadow: inset 0 1px 0 var(--hi), 0 0 0 1px var(--hair), var(--shadow)`): com o dock em cima, a luz interna passa para a borda de baixo (`inset 0 -1px 0`). O painel usa a mesma pilha com a sombra do painel no lugar de `--shadow`.
 - **Sombra da pílula** (`box-shadow: 0 0 0 1px var(--hair), 0 6px 16px -6px rgb(0 0 0 / .35)`).
 - **Sombra do ladrilho** (`filter: drop-shadow(0 1px 1px rgb(0 0 0 / .18)) drop-shadow(0 5px 6px rgb(0 0 0 / .16))`): em `filter` no invólucro sem máscara, para seguir a silhueta da superelipse.
 - **Bordas do esmalte** (`box-shadow: inset 0 1px 0 rgb(255 255 255 / .32), inset 0 -1px 0 rgb(0 0 0 / .16)`).
@@ -298,7 +299,7 @@ Ponto de 4 px em `--accent`, centrado sob o ícone, a 1 px da borda da barra (de
 
 ### Painel
 Folha opaca ancorada, com cara de flyout do Windows 11.
-- **Forma:** 8 px, superfície opaca, pilha da barra, padding 16/16/12 px, grade com 14 px de intervalo.
+- **Forma:** 8 px, superfície opaca, pilha da barra com a sombra do painel, padding 16/16/12 px, grade com 14 px de intervalo.
 - **Entrada:** `pop` de `--t-pop` com `--ease`, de `translateY(6px) scale(.98)` e opacidade 0; origem na borda voltada para o dock.
 - **Configurações:** título; quatro linhas rótulo + controle segmentado (Tema: Sistema/Claro/Escuro; Posição: Embaixo/Em cima; Tamanho: Pequeno/Médio/Grande; Opacidade do dock: Translúcido/Sólido); rodapé.
 - **Sobre:** ladrilho de 56 px + nome (Title About) e descrição; lista chave/valor (Versão, Licença, Código com link em `--accent-ink`); rodapé.

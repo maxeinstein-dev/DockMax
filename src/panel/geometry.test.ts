@@ -9,6 +9,12 @@ describe("panel geometry", () => {
     expect(declared?.[1]).toBe(String(PANEL_INSET));
   });
 
+  it("never lets the window cover the dock bar", () => {
+    // The card sits 8 px from the bar (MARGIN in panel.rs); a wider inset
+    // would put the window, which blocks clicks, over the bar's edge.
+    expect(PANEL_INSET).toBeLessThanOrEqual(8);
+  });
+
   it("rounds the frame size up to whole pixels", () => {
     const frame = document.createElement("div");
     frame.getBoundingClientRect = () =>
