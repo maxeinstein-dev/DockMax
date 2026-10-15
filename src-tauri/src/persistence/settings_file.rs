@@ -83,22 +83,40 @@ fn parse(bytes: &[u8]) -> Result<Settings, LoadIssue> {
 /// the parent folder if needed. Invalid settings are rejected before anything
 /// is written, leaving the previous file as it was.
 pub fn save(path: &Path, settings: &Settings) -> Result<(), SettingsError> {
+    save_with(path, settings, |_| Ok(()))
+}
+
+/// [`save`], running `before_rename` once the temporary file is complete and
+/// before it replaces `path`. A seam for the tests: it lets them look at both
+/// files mid-save and make the save fail at that point.
+fn save_with(
+    path: &Path,
+    settings: &Settings,
+    before_rename: impl FnOnce(&Path) -> io::Result<()>,
+) -> Result<(), SettingsError> {
     settings.validate()?;
     let mut json = serde_json::to_vec_pretty(settings)
         .map_err(|error| SettingsError::Write(io::Error::from(error).kind()))?;
     json.push(b'\n');
-    write_atomically(path, &json).map_err(|error| SettingsError::Write(error.kind()))
+    write_atomically(path, &json, before_rename).map_err(|error| SettingsError::Write(error.kind()))
 }
 
-/// Writes `contents` to a temporary file next to `path`, flushes it to disk
-/// and renames it over `path` (`MoveFileExW` with replace on Windows). On
-/// failure the temporary file is removed and `path` keeps its old content.
-fn write_atomically(path: &Path, contents: &[u8]) -> io::Result<()> {
+/// Writes `contents` to a temporary file next to `path`, flushes it to disk,
+/// runs `before_rename` on it and renames it over `path` (`MoveFileExW` with
+/// replace on Windows). On failure the temporary file is removed and `path`
+/// keeps its old content.
+fn write_atomically(
+    path: &Path,
+    contents: &[u8],
+    before_rename: impl FnOnce(&Path) -> io::Result<()>,
+) -> io::Result<()> {
     if let Some(dir) = path.parent().filter(|dir| !dir.as_os_str().is_empty()) {
         fs::create_dir_all(dir)?;
     }
     let temp = temp_path(path)?;
-    let result = write_temp(&temp, contents).and_then(|()| fs::rename(&temp, path));
+    let result = write_temp(&temp, contents)
+        .and_then(|()| before_rename(&temp))
+        .and_then(|()| fs::rename(&temp, path));
     if result.is_err() {
         // Best effort: the file may not exist if creating it failed.
         let _ = fs::remove_file(&temp);
@@ -404,6 +422,56 @@ mod tests {
         assert_eq!(file_names(dir.path()), [FILE_NAME]);
         assert!(path.is_dir());
         assert_eq!(fs::read_to_string(path.join("keep.txt")).unwrap(), "kept");
+    }
+
+    /// Saves `custom_settings()` over a file holding the defaults, with
+    /// `before_rename` run between writing the temp file and renaming it.
+    fn save_over_defaults(
+        dir: &TempDir,
+        before_rename: impl FnOnce(&Path) -> io::Result<()>,
+    ) -> (Vec<u8>, Result<(), SettingsError>) {
+        let path = settings_path(dir);
+        save(&path, &Settings::default()).unwrap();
+        let before = fs::read(&path).unwrap();
+        (before, save_with(&path, &custom_settings(), before_rename))
+    }
+
+    #[test]
+    fn target_keeps_the_old_content_until_the_temp_file_is_complete() {
+        let dir = tempdir().unwrap();
+        let path = settings_path(&dir);
+        let mut seen = None;
+
+        let (before, result) = save_over_defaults(&dir, |temp| {
+            seen = Some((fs::read(&path)?, fs::read(temp)?, temp.to_path_buf()));
+            Ok(())
+        });
+
+        assert_eq!(result, Ok(()));
+        let (target_then, temp_then, temp) = seen.expect("the hook runs before the rename");
+        // Written in place, the target would already hold the new content.
+        assert_eq!(target_then, before);
+        assert_eq!(temp_then, fs::read(&path).unwrap());
+        assert_eq!(load(&path).settings, custom_settings());
+        assert_eq!(temp.parent(), path.parent());
+        assert!(!temp.exists());
+        assert_eq!(file_names(dir.path()), [FILE_NAME]);
+    }
+
+    #[test]
+    fn failure_before_the_rename_keeps_the_previous_file_byte_for_byte() {
+        let dir = tempdir().unwrap();
+        let path = settings_path(&dir);
+
+        let (before, result) =
+            save_over_defaults(&dir, |_| Err(io::Error::from(io::ErrorKind::StorageFull)));
+
+        assert_eq!(
+            result,
+            Err(SettingsError::Write(io::ErrorKind::StorageFull))
+        );
+        assert_eq!(fs::read(&path).unwrap(), before);
+        assert_eq!(file_names(dir.path()), [FILE_NAME]);
     }
 
     #[test]
