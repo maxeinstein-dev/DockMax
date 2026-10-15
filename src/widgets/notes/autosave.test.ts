@@ -392,15 +392,66 @@ describe("a save that never ends", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
 
-    // Nor does a late failure, once everything is saved.
+    // Nor does a late failure: it neither changes the status nor saves.
     autosave.change("abc");
     await vi.advanceTimersByTimeAsync(500 + SAVE_TIMEOUT_MS);
+    expect(autosave.getStatus()).toEqual({
+      state: "error",
+      error: "writeFailed",
+    });
     autosave.change("ab");
-    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
+    expect(autosave.getStatus()).toEqual({
+      state: "pending",
+      error: "writeFailed",
+    });
+    const beforeLateFailure = seen.length;
     calls[2]!.reject({ code: "unavailable" });
-    await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS);
-    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(seen).toHaveLength(beforeLateFailure);
     expect(save).toHaveBeenCalledTimes(3);
+
+    // The pause saves "ab": the store may hold the late "abc".
+    await vi.advanceTimersByTimeAsync(500);
+    expect(save).toHaveBeenCalledTimes(4);
+    expect(calls[3]!.text).toBe("ab");
+    calls[3]!.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
+  });
+
+  it("saves again after a deadline, even the text stored before it", async () => {
+    // The store writes at once (the Rust commands are synchronous); only the
+    // reply for "abc" comes after the deadline.
+    let stored = "ab";
+    const replies: (() => void)[] = [];
+    const save = vi.fn(
+      (text: string) =>
+        new Promise<void>((resolve) => {
+          stored = text;
+          replies.push(resolve);
+        }),
+    );
+    const autosave = createAutosave({ save, savedText: "ab" });
+
+    autosave.change("abc");
+    await vi.advanceTimersByTimeAsync(500 + SAVE_TIMEOUT_MS);
+    expect(stored).toBe("abc");
+    expect(autosave.getStatus()).toEqual({
+      state: "error",
+      error: "writeFailed",
+    });
+
+    autosave.change("ab");
+    const flushed = autosave.flush();
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save).toHaveBeenLastCalledWith("ab");
+    replies[1]!();
+    await flushed;
+    replies[0]!();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(stored).toBe("ab");
+    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
   });
 
   it("concurrent flushes: one save at a time, and the last text is saved", async () => {

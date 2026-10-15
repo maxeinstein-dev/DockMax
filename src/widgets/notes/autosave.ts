@@ -38,7 +38,8 @@ export interface AutosaveOptions {
   /** Pause in typing before saving. */
   delayMs?: number;
   /** How long a save may run before it counts as failed (`writeFailed`).
-   * Its late outcome, if it ever comes, is ignored. */
+   * Its late outcome, if it ever comes, is ignored; since it may still have
+   * been written, the stored text is unknown until the next save. */
   saveTimeoutMs?: number;
   /** Defaults to the global timers, looked up at each call so fake timers
    * apply. */
@@ -104,8 +105,11 @@ export function createAutosave({
 }: AutosaveOptions): Autosave {
   /** Text on screen. */
   let latest = savedText;
-  /** Text the store holds. */
-  let saved = savedText;
+  /** Text the store holds; `null` when unknown: after a save past its
+   * deadline, which may still have been written (the Rust commands run one
+   * at a time), so the next change or `flush()` saves whatever the text,
+   * even the one confirmed before. */
+  let saved: string | null = savedText;
   /** Text whose last save failed: not retried on its own, or a refused text
    * (too large) would loop; a new change or a `flush()` retries it. */
   let failed: string | null = null;
@@ -160,14 +164,15 @@ export function createAutosave({
     });
     const attempt: Attempt = { done, finish, deadline: null };
     current = attempt;
-    const fail = (code: WidgetErrorCode) => {
+    const fail = (code: WidgetErrorCode, timedOut = false) => {
       if (!end(attempt)) return;
+      if (timedOut) saved = null;
       failed = text;
       setStatus(status.state, code);
       settle();
     };
     attempt.deadline = schedule.setTimeout(
-      () => fail("writeFailed"),
+      () => fail("writeFailed", true),
       saveTimeoutMs,
     );
     request.then(
