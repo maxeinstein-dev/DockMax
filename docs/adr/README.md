@@ -17,3 +17,4 @@ ADRs registram decisões técnicas importantes, seu contexto e suas consequênci
 - [0004 — Escopo Windows e barra de tarefas](0004-escopo-windows.md)
 - [0005 — Ferramentas de desenvolvimento](0005-ferramentas-de-desenvolvimento.md)
 - [0006 — Janelas do dock e painéis](0006-janelas-do-dock-e-paineis.md)
+- [0007 — Configurações, logs e i18n](0007-configuracoes-logs-e-i18n.md)

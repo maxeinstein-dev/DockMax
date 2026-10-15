@@ -6,6 +6,8 @@ fn main() {
             "toggle_panel",
             "hide_panel",
             "set_dock_hit_region",
+            "get_settings",
+            "update_settings",
         ]),
     ))
     .expect("failed to run tauri-build");

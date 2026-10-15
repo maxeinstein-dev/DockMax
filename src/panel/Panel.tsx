@@ -6,20 +6,26 @@ import {
   type PanelId,
   type PanelShowPayload,
 } from "../core/panels";
+import PanelBoundary from "../components/PanelBoundary";
+import { errorKind, log } from "../core/log";
+import { useT } from "../i18n";
+import PanelContent from "./PanelContent";
 import "./Panel.css";
-
-const TITLES: Record<PanelId, string> = {
-  settings: "Configurações",
-  about: "Sobre",
-};
 
 function hidePanel() {
   invoke("hide_panel").catch((error: unknown) => {
-    console.error("hide_panel failed", error);
+    log.error(`panel: hide failed: ${errorKind(error)}`);
   });
 }
 
+/** Records a panel that failed to render: the kind of error only, never its
+ * message (it may carry user data). */
+function logPanelFailure(error: unknown) {
+  log.error(`panel: render failed: ${errorKind(error)}`);
+}
+
 function Panel() {
+  const t = useT();
   const [panelId, setPanelId] = useState<PanelId | null>(null);
 
   useEffect(() => {
@@ -43,8 +49,14 @@ function Panel() {
 
   return (
     <section className="panel" aria-labelledby="panel-title">
-      <h1 id="panel-title">{TITLES[panelId]}</h1>
-      <p>Em construção.</p>
+      <h1 id="panel-title">{t.panel.titles[panelId]}</h1>
+      <PanelBoundary
+        resetKey={panelId}
+        fallback={t.panel.failed}
+        onError={logPanelFailure}
+      >
+        <PanelContent panelId={panelId} />
+      </PanelBoundary>
     </section>
   );
 }

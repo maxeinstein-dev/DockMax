@@ -6,6 +6,11 @@ use super::{hit_test, panel};
 
 pub const LABEL: &str = "dock";
 
+/// Always layered: the dock toggles its mouse capture, and tao would make
+/// it stop being layered (see `native::Layering::Always`).
+#[cfg(windows)]
+pub const LAYERING: super::native::Layering = super::native::Layering::Always;
+
 /// Gap between the visible bar and the work area edge, in logical pixels.
 const MARGIN: f64 = 8.0;
 
@@ -19,7 +24,13 @@ pub const EDGE: Edge = Edge::Bottom;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Edge {
     Bottom,
-    #[allow(dead_code)] // Top placement arrives with the dock settings.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "top placement arrives with the dock settings in PR 3"
+        )
+    )]
     Top,
 }
 
@@ -80,13 +91,13 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         .ok_or("dock window is missing from tauri.conf.json")?;
     hit_test::start(app, &window)?;
     #[cfg(windows)]
-    super::native::install(&window, Some(reposition), true)?;
+    super::native::install(&window, Some(reposition), LAYERING)?;
     let handle = app.clone();
     window.on_window_event(move |event| {
         if let WindowEvent::CloseRequested { api, .. } = event {
             api.prevent_close();
             if let Err(error) = hide(&handle) {
-                eprintln!("failed to hide the dock: {error}");
+                log::warn!("dock: failed to hide: {error}");
             }
         }
     });
@@ -110,6 +121,18 @@ pub fn toggle(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     } else {
         show(&window)
     }
+}
+
+/// Shows the dock if it is hidden (the app was launched again). Like every
+/// show, it doesn't take the foreground.
+pub fn reveal(app: &AppHandle) -> Result<(), Box<dyn Error>> {
+    let window = app
+        .get_webview_window(LABEL)
+        .ok_or("dock window is missing")?;
+    if window.is_visible()? {
+        return Ok(());
+    }
+    show(&window)
 }
 
 /// Places the dock and shows it without taking the foreground from the app
@@ -142,7 +165,7 @@ fn hide(app: &AppHandle) -> Result<(), Box<dyn Error>> {
 #[cfg(windows)]
 fn reposition(window: &WebviewWindow) {
     if let Err(error) = place(window) {
-        eprintln!("failed to reposition the dock: {error}");
+        log::warn!("dock: failed to reposition: {error}");
     }
 }
 

@@ -74,7 +74,7 @@ Detalhes e motivos no [ADR 0006](../adr/0006-janelas-do-dock-e-paineis.md).
 - **Variante escolhida: B1 · Big Sur.** A B2 · Prateleira foi avaliada e descartada.
 - Sistema visual registrado em [`DESIGN.md`](../../DESIGN.md) (tokens em `.impeccable/design.json`); o mock fica em `docs/design/dock-mock.html`, com o estado da tela por parâmetros na URL.
 - Decisões que o mock acrescentou: painel sempre opaco (a opção Translúcido/Sólido vale só para o dock); raio do painel de 8 px, como as janelas do Windows 11; ampliação empurra os vizinhos e congela com painel aberto; cobalto reservado a foco, seleção e indicador ativo; paleta própria dos ícones em classes estáticas (compatível com a CSP).
-- Restrição para o PR 2: no tamanho Grande a B1 ampliada chega a ~105 px acima da base, contra a janela de 104 px; a folga precisa crescer com o tamanho ou a ampliação ser limitada. A janela também precisa de folga lateral, porque a barra cresce na ampliação.
+- Restrição para o PR 3 (quando o tamanho passa a mudar a janela): no tamanho Grande a B1 ampliada chega a ~105 px acima da base, contra a janela de 104 px; a folga precisa crescer com o tamanho ou a ampliação ser limitada. A janela também precisa de folga lateral, porque a barra cresce na ampliação.
 - O visual provisório do PR 1 (`src/themes/base.css`, vidro com raio de 20 px) é substituído pelo `DESIGN.md` no PR 2.
 
 ### 2.3 PR 2 — Fundação

@@ -1,0 +1,193 @@
+/* Design tokens of the DockMax visual system (variant B1 "Big Sur").
+   Source of truth: DESIGN.md (frontmatter + sections named below), with the
+   reference implementation in docs/design/dock-mock.html. Only product
+   tokens live here; component styles use them.
+
+   Theme: without data-mode the colors follow prefers-color-scheme (the
+   "Sistema" theme); data-mode="light" / "dark" on <html> forces one. The
+   dark values are repeated in both dark blocks on purpose (CSS cannot share
+   a block between a media query and an attribute selector); tokens.test.ts
+   keeps the two copies equal to DESIGN.md. */
+
+:root {
+  /* Colors, light (DESIGN.md "Colors": Primary and Neutral). */
+  --accent: #2f5bd3;
+  --accent-ink: #1f45b3;
+  --accent-soft: rgb(47 91 211 / 0.13);
+  --surface-rgb: 247 247 249;
+  --ink: #1d1e22;
+  --ink-2: #5b5f69;
+  --hair: rgb(0 0 0 / 0.09);
+  --hi: rgb(255 255 255 / 0.8);
+  --tip-bg: rgb(252 252 253 / 0.97);
+  --tip-ink: #1d1e22;
+  --track: rgb(29 30 34 / 0.055);
+  --kbd: rgb(29 30 34 / 0.07);
+  /* White stroke on every tile, same in both themes ("Tertiary": Glifo). */
+  --glyph: #ffffff;
+
+  /* Surface shadow, light (DESIGN.md "Elevation & Depth"). */
+  --shadow:
+    0 1px 2px rgb(16 20 32 / 0.1), 0 14px 32px -12px rgb(16 20 32 / 0.42);
+
+  /* Dock opacity (DESIGN.md "Elevation & Depth"): Translúcido by default;
+     the panel ignores it and is always opaque. */
+  --surface-a: 0.8;
+
+  /* Size, default Médio (DESIGN.md "Layout" table). */
+  --icon: 48px;
+  --pad: 7px;
+  --gap: 7px;
+  --r-bar: 20px;
+
+  /* Radii (DESIGN.md "Shapes"; --r-bar is per size above). */
+  --r-panel: 8px;
+  --r-track: 6px;
+  --r-segment: 4px;
+  --r-kbd: 4px;
+  --r-tile: 23%;
+  --r-pill: 999px;
+  --r-dot: 50%;
+
+  /* Typography, system fonts only (DESIGN.md "Typography"). */
+  --font:
+    "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui,
+    sans-serif;
+  --font-display:
+    "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui,
+    sans-serif;
+
+  /* Motion (DESIGN.md "Components": Dock item and Painel). */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-magnify: 0.16s;
+  --t-pop: 0.18s;
+
+  /* Tile glaze saturation factor; illustrative tiles lower it. */
+  --sat-k: 1;
+}
+
+/* Colors and shadow, dark: the "Sistema" theme on a dark Windows. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode="light"]) {
+    --accent: #7c9cff;
+    --accent-ink: #b0c2ff;
+    --accent-soft: rgb(124 156 255 / 0.17);
+    --surface-rgb: 38 39 44;
+    --ink: #ececf0;
+    --ink-2: #a5a9b3;
+    --hair: rgb(255 255 255 / 0.1);
+    --hi: rgb(255 255 255 / 0.16);
+    --tip-bg: rgb(50 51 57 / 0.97);
+    --tip-ink: #f2f2f5;
+    --track: rgb(255 255 255 / 0.06);
+    --kbd: rgb(255 255 255 / 0.09);
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.32), 0 16px 36px -12px rgb(0 0 0 / 0.7);
+  }
+}
+
+/* Colors and shadow, dark: forced by the "Escuro" theme. Must stay equal to
+   the block above. The "Claro" theme needs no block: data-mode="light"
+   turns the media block off and the :root values apply. */
+:root[data-mode="dark"] {
+  --accent: #7c9cff;
+  --accent-ink: #b0c2ff;
+  --accent-soft: rgb(124 156 255 / 0.17);
+  --surface-rgb: 38 39 44;
+  --ink: #ececf0;
+  --ink-2: #a5a9b3;
+  --hair: rgb(255 255 255 / 0.1);
+  --hi: rgb(255 255 255 / 0.16);
+  --tip-bg: rgb(50 51 57 / 0.97);
+  --tip-ink: #f2f2f5;
+  --track: rgb(255 255 255 / 0.06);
+  --kbd: rgb(255 255 255 / 0.09);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.32), 0 16px 36px -12px rgb(0 0 0 / 0.7);
+}
+
+/* Dock opacity options (DESIGN.md "Elevation & Depth"). */
+:root[data-opacity="translucent"] {
+  --surface-a: 0.8;
+}
+
+:root[data-opacity="solid"] {
+  --surface-a: 1;
+}
+
+/* Size presets: icon, padding, gap and bar radius scale together
+   (DESIGN.md "Layout" table and "Do's"). */
+:root[data-size="s"] {
+  --icon: 40px;
+  --pad: 6px;
+  --gap: 6px;
+  --r-bar: 18px;
+}
+
+:root[data-size="m"] {
+  --icon: 48px;
+  --pad: 7px;
+  --gap: 7px;
+  --r-bar: 20px;
+}
+
+:root[data-size="l"] {
+  --icon: 64px;
+  --pad: 9px;
+  --gap: 9px;
+  --r-bar: 24px;
+}
+
+/* Tile glazes as static classes, so the glaze is computed in CSS without
+   inline styles (DESIGN.md "Colors": Tertiary; The Own Glaze Rule). */
+/* Sálvia. */
+.t-files {
+  --h: 150;
+  --sat: 22%;
+  --l: 44%;
+}
+
+/* Ocre. */
+.t-notes {
+  --h: 38;
+  --sat: 48%;
+  --l: 40%;
+}
+
+/* Petróleo. */
+.t-clock {
+  --h: 192;
+  --sat: 26%;
+  --l: 40%;
+}
+
+/* Argila. */
+.t-calendar {
+  --h: 16;
+  --sat: 40%;
+  --l: 44%;
+}
+
+/* Ameixa. */
+.t-music {
+  --h: 318;
+  --sat: 20%;
+  --l: 43%;
+}
+
+/* Tinta. */
+.t-settings {
+  --h: 222;
+  --sat: 14%;
+  --l: 34%;
+}
+
+/* Ardósia. */
+.t-about {
+  --h: 214;
+  --sat: 22%;
+  --l: 46%;
+}
+
+/* Items of later phases shown only as illustration: saturation × 0.55. */
+.illustrative {
+  --sat-k: 0.55;
+}

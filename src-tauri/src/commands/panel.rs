@@ -22,7 +22,7 @@ pub fn toggle_panel(app: AppHandle, panel_id: PanelId, anchor: LogicalRect) -> R
         return Ok(());
     }
     if let Err(error) = panel::apply(&app, action, Some(anchor)) {
-        eprintln!("failed to toggle the panel: {error}");
+        log::warn!("panel: failed to toggle: {error}");
         if show {
             close(&app);
         }
@@ -35,7 +35,7 @@ pub fn toggle_panel(app: AppHandle, panel_id: PanelId, anchor: LogicalRect) -> R
 fn close(app: &AppHandle) {
     let reset = panel::lock(app).hide();
     if let Err(error) = panel::apply(app, reset, None) {
-        eprintln!("failed to hide the panel: {error}");
+        log::warn!("panel: failed to hide: {error}");
     }
 }
 
@@ -44,7 +44,7 @@ fn close(app: &AppHandle) {
 pub fn hide_panel(app: AppHandle) -> Result<(), String> {
     let action = panel::lock(&app).hide();
     panel::apply(&app, action, None).map_err(|error| {
-        eprintln!("failed to hide the panel: {error}");
+        log::warn!("panel: failed to hide: {error}");
         "could not close the panel".to_string()
     })
 }

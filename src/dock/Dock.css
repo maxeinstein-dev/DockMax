@@ -6,23 +6,30 @@
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
+  color: var(--ink);
   user-select: none;
 }
 
-/* Height matches the dock height in tauri.conf.json. */
+/* Height matches the dock height in tauri.conf.json. The surface follows
+   DESIGN.md ("Dock bar"); the geometry is still the PR 1 one. */
 .dock-bar {
   box-sizing: border-box;
   height: 64px;
   display: flex;
   align-items: center;
   gap: 8px;
-  /* 7 px + the 1 px border keep the items 8 px from the edge. */
+  /* 7 px + the 1 px border keep the items 8 px from the edge. The border is
+     the hairline of DESIGN.md, drawn inside the box instead of as an outer
+     0 0 0 1px ring so the bar keeps its size. */
   padding: 7px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--glass-radius);
-  background: var(--glass-sheen), var(--glass-surface);
-  /* The shadow fits beside and above the bar; below it is the window edge. */
-  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-bar);
+  background: rgb(var(--surface-rgb) / var(--surface-a));
+  /* Light edge on the side away from the screen edge. The window ends at
+     the bar's bottom, so the part of --shadow that falls below it is cut. */
+  box-shadow:
+    inset 0 1px 0 var(--hi),
+    var(--shadow);
 }
 
 /* The button is the item's layout box and is never transformed, so the
@@ -37,6 +44,11 @@
   cursor: pointer;
 }
 
+.dock-bar button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .dock-item {
   display: flex;
   align-items: center;
@@ -44,8 +56,10 @@
   padding: 0 12px;
   /* Concentric with the bar: its radius minus the 8 px inset. */
   border-radius: 12px;
-  color: #1f1f1f;
-  background: rgb(255 255 255 / 85%);
+  /* Provisional face until the glazed tiles of PR 3: a faint track tint
+     that reads on both themes. */
+  color: var(--ink);
+  background: var(--track);
   /* Provisional magnification: grows away from the screen edge. The values
      come from magnification.ts (set on the bar), which also computes the
      hold region from this origin. */

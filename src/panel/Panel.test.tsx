@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PanelShowPayload } from "../core/panels";
+import { ptBR } from "../i18n/pt-BR";
 import Panel from "./Panel";
+
+const text = ptBR.panel;
 
 type Handler = (event: { payload: PanelShowPayload }) => void;
 
@@ -21,6 +24,29 @@ const { invoke, listen, handlers, unlisten } = vi.hoisted(() => {
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen }));
 
+const { log, failing } = vi.hoisted(() => ({
+  log: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+  /** The panel whose content throws, if any. */
+  failing: { panelId: null as PanelShowPayload["panelId"] | null },
+}));
+vi.mock("../core/log", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../core/log")>()),
+  log,
+}));
+vi.mock("./PanelContent", async (importOriginal) => {
+  const { default: Real } =
+    await importOriginal<typeof import("./PanelContent")>();
+  return {
+    default: (props: { panelId: PanelShowPayload["panelId"] }) => {
+      if (props.panelId === failing.panelId) {
+        // The message carries a path that must never reach the log.
+        throw new TypeError("C:\\Users\\someone\\settings.json");
+      }
+      return <Real {...props} />;
+    },
+  };
+});
+
 function show(panelId: PanelShowPayload["panelId"]) {
   const handler = handlers.get("panel-show");
   if (!handler) throw new Error("panel-show listener not registered");
@@ -32,6 +58,8 @@ describe("Panel", () => {
     handlers.clear();
     invoke.mockReset();
     invoke.mockResolvedValue(undefined);
+    log.error.mockReset();
+    failing.panelId = null;
   });
 
   afterEach(() => {
@@ -47,6 +75,22 @@ describe("Panel", () => {
   it("renders the panel named by the panel-show event", () => {
     render(<Panel />);
 
+    show("settings");
+    expect(
+      screen.getByRole("heading", { name: text.titles.settings }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(text.underConstruction)).toBeInTheDocument();
+
+    show("about");
+    expect(
+      screen.getByRole("heading", { name: text.titles.about }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows its texts in PT-BR", () => {
+    render(<Panel />);
+
+    // Literal on purpose: catches a broken dictionary, not just a renamed key.
     show("settings");
     expect(
       screen.getByRole("heading", { name: "Configurações" }),
@@ -95,5 +139,60 @@ describe("Panel", () => {
     await Promise.resolve();
 
     expect(unlisten).toHaveBeenCalled();
+  });
+
+  describe("when a panel's content fails", () => {
+    beforeEach(() => {
+      failing.panelId = "settings";
+      // React reports caught render errors on console.error; expected here.
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    it("shows the failure in place of the content, keeping the title", () => {
+      render(<Panel />);
+
+      show("settings");
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Não foi possível mostrar este painel.",
+      );
+      expect(
+        screen.getByRole("heading", { name: text.titles.settings }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(text.underConstruction),
+      ).not.toBeInTheDocument();
+    });
+
+    it("still hides on Escape", () => {
+      render(<Panel />);
+      show("settings");
+
+      fireEvent.keyDown(window, { key: "Escape" });
+
+      expect(invoke).toHaveBeenCalledWith("hide_panel");
+    });
+
+    it("logs only the kind of error", () => {
+      render(<Panel />);
+
+      show("settings");
+
+      expect(log.error).toHaveBeenCalledTimes(1);
+      expect(log.error).toHaveBeenCalledWith("panel: render failed: TypeError");
+    });
+
+    it("recovers when another panel is shown", () => {
+      render(<Panel />);
+      show("settings");
+
+      show("about");
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: text.titles.about }),
+      ).toBeInTheDocument();
+      expect(screen.getByText(text.underConstruction)).toBeInTheDocument();
+    });
   });
 });

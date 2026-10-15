@@ -27,3 +27,6 @@ dist-ssr
 
 # Impeccable review captures (local evidence)
 .impeccable/review/
+
+# Agent worktrees (temporary)
+.claude/worktrees/

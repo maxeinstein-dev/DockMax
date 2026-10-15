@@ -10,7 +10,9 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { DOCK_RELEASED_EVENT, type DockHitRegion } from "../core/dock";
+import { errorKind, log } from "../core/log";
 import type { LogicalRect, PanelId } from "../core/panels";
+import { useT } from "../i18n";
 import {
   MAGNIFICATION_VARIABLES,
   holdRects,
@@ -18,10 +20,7 @@ import {
 } from "./magnification";
 import "./Dock.css";
 
-const ITEMS: { panelId: PanelId; label: string }[] = [
-  { panelId: "settings", label: "Configurações" },
-  { panelId: "about", label: "Sobre" },
-];
+const ITEMS: PanelId[] = ["settings", "about"];
 
 function clientRect(element: Element): LogicalRect {
   const { x, y, width, height } = element.getBoundingClientRect();
@@ -31,7 +30,7 @@ function clientRect(element: Element): LogicalRect {
 function togglePanel(panelId: PanelId, event: MouseEvent<HTMLButtonElement>) {
   const anchor = clientRect(event.currentTarget);
   invoke("toggle_panel", { panelId, anchor }).catch((error: unknown) => {
-    console.error("toggle_panel failed", error);
+    log.error(`dock: toggle panel failed: ${errorKind(error)}`);
   });
 }
 
@@ -67,6 +66,7 @@ function itemIndex(bar: HTMLElement, target: EventTarget): number | null {
 }
 
 function Dock() {
+  const t = useT();
   const barRef = useRef<HTMLElement>(null);
   const [hovered, setHovered] = useState<number | null>(null);
   const hoveredRef = useRef<number | null>(null);
@@ -82,7 +82,7 @@ function Dock() {
     if (key === lastSent.current) return;
     lastSent.current = key;
     invoke("set_dock_hit_region", { region }).catch((error: unknown) => {
-      console.error("set_dock_hit_region failed", error);
+      log.error(`dock: hit region update failed: ${errorKind(error)}`);
       // Lets the next report retry the same region.
       if (lastSent.current === key) lastSent.current = null;
     });
@@ -121,20 +121,20 @@ function Dock() {
       <nav
         ref={barRef}
         className="dock-bar"
-        aria-label="Dock"
+        aria-label={t.dock.label}
         style={MAGNIFICATION_VARIABLES as CSSProperties}
         onPointerOver={onPointer}
         onPointerMove={onPointer}
         onPointerLeave={() => setHovered(null)}
       >
-        {ITEMS.map(({ panelId, label }, index) => (
+        {ITEMS.map((panelId, index) => (
           <button
             key={panelId}
             type="button"
             data-magnify={magnifyRole(index, hovered) ?? undefined}
             onClick={(e) => togglePanel(panelId, e)}
           >
-            <span className="dock-item">{label}</span>
+            <span className="dock-item">{t.dock.items[panelId]}</span>
           </button>
         ))}
       </nav>

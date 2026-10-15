@@ -45,7 +45,8 @@ export default defineConfig(() => ({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
-    // Lets tests read Dock.css as text (`?raw`); other CSS stays stubbed.
-    css: { include: [/Dock\.css/] },
+    // Lets tests read the CSS sources as text (`?raw`): Dock.css for the
+    // magnification guard, every file for the design-token guards.
+    css: { include: [/\.css/] },
   },
 }));

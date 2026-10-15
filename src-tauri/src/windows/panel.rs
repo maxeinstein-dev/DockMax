@@ -13,6 +13,10 @@ use super::hit_test;
 
 pub const LABEL: &str = "panel";
 
+/// The panel never ignores the mouse, so tao never makes it layered.
+#[cfg(windows)]
+pub const LAYERING: super::native::Layering = super::native::Layering::AsTaoSets;
+
 /// Event sent to the panel window right before it is shown.
 const SHOW_EVENT: &str = "panel-show";
 
@@ -230,7 +234,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         .get_webview_window(LABEL)
         .ok_or("panel window is missing from tauri.conf.json")?;
     #[cfg(windows)]
-    super::native::install(&window, None, false)?;
+    super::native::install(&window, None, LAYERING)?;
     app.manage(Mutex::new(PanelState::default()));
     let app = app.clone();
     window.on_window_event(move |event| {
@@ -243,7 +247,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
             _ => return,
         };
         if let Err(error) = apply(&app, action, None) {
-            eprintln!("failed to hide the panel: {error}");
+            log::warn!("panel: failed to hide: {error}");
         }
     });
     Ok(())

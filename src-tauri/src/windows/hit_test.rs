@@ -105,18 +105,39 @@ impl Shared {
         self.to_screen(self.region.as_ref()?.bar)
     }
 
-    /// The magnified icons in physical screen pixels; one that does not fit
-    /// on screen is left out. Empty, without allocating, while no icon is
-    /// magnified.
+    /// The magnified icons in physical screen pixels, clipped to the dock
+    /// window: a rect reported beyond the window can't keep the mouse
+    /// captured once the cursor has left it. One that does not fit on
+    /// screen, or lies wholly outside the window, is left out. Empty,
+    /// without allocating, while no icon is magnified.
     fn hold_on_screen(&self) -> Vec<Rect> {
-        self.region.as_ref().map_or_else(Vec::new, |region| {
-            region
-                .hold
-                .iter()
-                .filter_map(|&rect| self.to_screen(rect))
-                .collect()
-        })
+        let (Some(region), Some((window, _))) = (self.region.as_ref(), self.window) else {
+            return Vec::new();
+        };
+        region
+            .hold
+            .iter()
+            .filter_map(|&rect| clip(self.to_screen(rect)?, window))
+            .collect()
     }
+}
+
+/// The part of `rect` inside `window`; `None` when they don't overlap.
+fn clip(rect: Rect, window: Rect) -> Option<Rect> {
+    // Edges in i64, where i32 + u32 can't overflow.
+    let right = |rect: Rect| i64::from(rect.x) + i64::from(rect.width);
+    let bottom = |rect: Rect| i64::from(rect.y) + i64::from(rect.height);
+    let x = rect.x.max(window.x);
+    let y = rect.y.max(window.y);
+    // At most the smaller width or height, so it fits in u32 when positive.
+    let width = u32::try_from(right(rect).min(right(window)) - i64::from(x)).ok()?;
+    let height = u32::try_from(bottom(rect).min(bottom(window)) - i64::from(y)).ok()?;
+    (width > 0 && height > 0).then_some(Rect {
+        x,
+        y,
+        width,
+        height,
+    })
 }
 
 /// Dock geometry shared with the cursor thread.
@@ -180,6 +201,7 @@ pub fn tracker(app: &AppHandle) -> Arc<Tracker> {
 
 fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
     let mut captured = false;
+    let mut failures = CaptureFailures::default();
     loop {
         let shared = tracker.lock();
         if shared.stopped {
@@ -187,7 +209,7 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
         }
         if !shared.visible && captured {
             drop(shared);
-            if set_captured(window, false) {
+            if set_captured(window, false, &mut failures) {
                 captured = false;
             } else {
                 // Retry at the sampling rate instead of spinning.
@@ -209,7 +231,7 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
         if let Some(cursor) = cursor_position() {
             let next = next_captured(captured, cursor, bar, &hold);
             // On failure the window keeps its old state: retry next tick.
-            if next != captured && set_captured(window, next) {
+            if next != captured && set_captured(window, next, &mut failures) {
                 captured = next;
             }
         }
@@ -219,15 +241,66 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
 
 /// Tauri forwards the change to the main thread. Returns whether it worked.
 /// On release, tells the dock's page to clear its hover state.
-fn set_captured(window: &WebviewWindow, captured: bool) -> bool {
-    if let Err(error) = window.set_ignore_cursor_events(!captured) {
-        eprintln!("failed to change the dock's mouse capture: {error}");
+fn set_captured(window: &WebviewWindow, captured: bool, failures: &mut CaptureFailures) -> bool {
+    let result = window.set_ignore_cursor_events(!captured);
+    if let Some((level, message)) = capture_report(failures, result.is_ok()) {
+        match &result {
+            Err(error) => log::log!(level, "{message}: {error}"),
+            Ok(()) => log::log!(level, "{message}"),
+        }
+    }
+    if result.is_err() {
         return false;
     }
     if !captured && let Err(error) = window.emit_to(dock::LABEL, RELEASED_EVENT, ()) {
-        eprintln!("failed to tell the dock it was released: {error}");
+        log::warn!("dock: failed to send the release event: {error}");
     }
     true
+}
+
+/// Records an attempt to change the mouse capture and returns what to log
+/// about it, if anything: a warning when it starts failing (the error is
+/// appended) and a note when it works again. `None` on every other attempt,
+/// so a failure retried at 60 Hz is not logged at 60 Hz.
+fn capture_report(
+    failures: &mut CaptureFailures,
+    succeeded: bool,
+) -> Option<(log::Level, &'static str)> {
+    match failures.record(succeeded)? {
+        Transition::Failing => Some((
+            log::Level::Warn,
+            "dock: failed to change the mouse capture, retrying",
+        )),
+        Transition::Recovered => Some((log::Level::Info, "dock: mouse capture works again")),
+    }
+}
+
+/// Remembers whether changing the mouse capture is failing, so a failure
+/// retried on every tick is logged once, when it starts, and once more when
+/// it ends.
+#[derive(Debug, Default)]
+struct CaptureFailures {
+    failing: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Transition {
+    /// The first failure after a success (or since the start).
+    Failing,
+    /// The first success after a failure.
+    Recovered,
+}
+
+impl CaptureFailures {
+    /// Records an attempt; returns the transition it makes, if any.
+    fn record(&mut self, succeeded: bool) -> Option<Transition> {
+        let was_failing = std::mem::replace(&mut self.failing, !succeeded);
+        match (was_failing, succeeded) {
+            (false, false) => Some(Transition::Failing),
+            (true, true) => Some(Transition::Recovered),
+            _ => None,
+        }
+    }
 }
 
 /// Read straight from Win32: Tauri's `cursor_position()` waits for a round
@@ -421,13 +494,84 @@ mod tests {
                 bar: logical(-1.0, 0.0, 1.0, 1.0),
                 hold: vec![
                     logical(100_000.0, 0.0, 1.0, 1.0),
-                    logical(-2.0, 0.0, 1.0, 1.0),
+                    logical(1.0, 0.0, 1.0, 1.0),
                 ],
             }),
             ..Shared::default()
         };
 
-        assert_eq!(shared.hold_on_screen(), vec![rect(i32::MAX - 16, 0, 3, 3)]);
+        assert_eq!(shared.hold_on_screen(), vec![rect(i32::MAX - 7, 0, 3, 3)]);
+    }
+
+    // The bottom dock at 100% from the tests above, with the region its
+    // page reports: the bar and the given magnified icons.
+    fn dock_with_hold(hold: Vec<LogicalRect>) -> Shared {
+        Shared {
+            window: Some((rect(840, 920, 240, 104), 1.0)),
+            region: Some(HitRegion {
+                bar: logical(20.0, 40.0, 200.0, 64.0),
+                hold,
+            }),
+            ..Shared::default()
+        }
+    }
+
+    #[test]
+    fn hold_rect_partly_outside_the_window_is_clipped_to_it() {
+        // Reported 10 px left of the window and 13 px above it.
+        let shared = dock_with_hold(vec![logical(-10.0, -13.0, 140.0, 67.0)]);
+
+        assert_eq!(shared.hold_on_screen(), vec![rect(840, 920, 130, 54)]);
+    }
+
+    #[test]
+    fn hold_rects_wholly_outside_the_window_are_dropped() {
+        let shared = dock_with_hold(vec![
+            logical(-200.0, 0.0, 100.0, 10.0), // left of the window
+            logical(0.0, -50.0, 10.0, 30.0),   // above it
+            logical(240.0, 0.0, 10.0, 10.0),   // touching its right edge
+            logical(0.0, 104.0, 10.0, 10.0),   // touching its bottom edge
+            logical(10.0, 10.0, 0.0, 10.0),    // empty
+            logical(10.0, 10.0, 20.0, 20.0),   // inside: kept
+        ]);
+
+        assert_eq!(shared.hold_on_screen(), vec![rect(850, 930, 20, 20)]);
+    }
+
+    #[test]
+    fn captured_dock_releases_outside_the_window_even_over_a_reported_hold_rect() {
+        let shared = dock_with_hold(vec![logical(-10.0, -13.0, 140.0, 67.0)]);
+        let bar = shared.bar_on_screen();
+        let hold = shared.hold_on_screen();
+        // The rect as reported, before clipping.
+        let unclipped = rect(830, 907, 140, 67);
+
+        // Left of the window and above it, both over the reported rect.
+        for cursor in [(835, 950), (900, 910)] {
+            assert!(next_captured(true, cursor, bar, &[unclipped]), "{cursor:?}");
+            assert!(!next_captured(true, cursor, bar, &hold), "{cursor:?}");
+        }
+        // Inside the window the clipped rect still holds.
+        assert!(next_captured(true, (845, 925), bar, &hold));
+    }
+
+    #[test]
+    fn clip_never_overflows() {
+        let max = rect(i32::MAX, i32::MAX, u32::MAX, u32::MAX);
+        let min = rect(i32::MIN, i32::MIN, u32::MAX, u32::MAX);
+
+        assert_eq!(clip(max, max), Some(max));
+        assert_eq!(clip(min, min), Some(min));
+        // `min` ends where `max` starts.
+        assert_eq!(clip(min, max), None);
+        assert_eq!(clip(min, rect(0, 0, 10, 10)), Some(rect(0, 0, 10, 10)));
+        assert_eq!(
+            clip(
+                rect(i32::MAX - 5, 0, u32::MAX, 10),
+                rect(i32::MAX - 10, 0, u32::MAX, 10)
+            ),
+            Some(rect(i32::MAX - 5, 0, u32::MAX - 5, 10))
+        );
     }
 
     #[test]
@@ -523,5 +667,53 @@ mod tests {
         );
         let without_hold = r#"{"bar":{"x":0,"y":0,"width":1,"height":1}}"#;
         assert!(serde_json::from_str::<HitRegion>(without_hold).is_err());
+    }
+
+    #[test]
+    fn capture_failures_are_reported_only_on_transitions() {
+        let mut failures = CaptureFailures::default();
+
+        assert_eq!(failures.record(true), None);
+        assert_eq!(failures.record(false), Some(Transition::Failing));
+        // Retried on every tick while it keeps failing: no new report.
+        assert_eq!(failures.record(false), None);
+        assert_eq!(failures.record(false), None);
+        assert_eq!(failures.record(true), Some(Transition::Recovered));
+        assert_eq!(failures.record(true), None);
+        assert_eq!(failures.record(false), Some(Transition::Failing));
+    }
+
+    #[test]
+    fn a_failing_capture_is_logged_once_when_it_starts_and_once_when_it_ends() {
+        let mut failures = CaptureFailures::default();
+        // 60 Hz retries: ok, then 4 failures in a row, then ok twice.
+        let reports: Vec<_> = [true, false, false, false, false, true, true]
+            .into_iter()
+            .map(|succeeded| capture_report(&mut failures, succeeded))
+            .collect();
+
+        assert_eq!(
+            reports,
+            [
+                None,
+                Some((
+                    log::Level::Warn,
+                    "dock: failed to change the mouse capture, retrying"
+                )),
+                None,
+                None,
+                None,
+                Some((log::Level::Info, "dock: mouse capture works again")),
+                None,
+            ]
+        );
+    }
+
+    #[test]
+    fn a_failure_on_the_first_attempt_is_reported() {
+        assert_eq!(
+            CaptureFailures::default().record(false),
+            Some(Transition::Failing)
+        );
     }
 }

@@ -17,33 +17,43 @@ use tauri::WebviewWindow;
 const SUBCLASS_ID: usize = 1;
 const WM_DISPLAY_CHANGED: u32 = WM_APP + 1;
 
+/// How a window treats `WS_EX_LAYERED`. Each window states its own next
+/// to its label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Layering {
+    /// `WS_EX_LAYERED` stays on for good, with the layered attributes set
+    /// once. For a window whose mouse capture is toggled with
+    /// `set_ignore_cursor_events`, the dock: tao adds and removes
+    /// `WS_EX_LAYERED` along with `WS_EX_TRANSPARENT` and never calls
+    /// `SetLayeredWindowAttributes`, and the first time such a window
+    /// stopped being layered Windows painted its transparent area opaque
+    /// white. Kept layered, the window only toggles `WS_EX_TRANSPARENT`,
+    /// which is what lets clicks through.
+    Always,
+    /// `WS_EX_LAYERED` is left as tao sets it. For a window that never
+    /// ignores the mouse, which tao never makes layered.
+    AsTaoSets,
+}
+
 struct Subclass {
     window: WebviewWindow,
     on_display_change: Option<fn(&WebviewWindow)>,
-    always_layered: bool,
+    layering: Layering,
 }
 
-/// Turns the window into a tool window (left out of Alt+Tab) and, when
-/// `on_display_change` is given, calls it after the resolution, the scale
-/// or the work area change.
-///
-/// `always_layered` keeps `WS_EX_LAYERED` on for good, for a window whose
-/// mouse capture is toggled with `set_ignore_cursor_events`: tao adds and
-/// removes `WS_EX_LAYERED` along with `WS_EX_TRANSPARENT` and never calls
-/// `SetLayeredWindowAttributes`, and the first time such a window stops
-/// being layered Windows paints its transparent area opaque white. Kept
-/// layered, with its attributes set once, the window only toggles
-/// `WS_EX_TRANSPARENT`, which is what lets clicks through.
+/// Turns the window into a tool window (left out of Alt+Tab), keeps its
+/// `WS_EX_LAYERED` as `layering` says and, when `on_display_change` is
+/// given, calls it after the resolution, the scale or the work area change.
 pub fn install(
     window: &WebviewWindow,
     on_display_change: Option<fn(&WebviewWindow)>,
-    always_layered: bool,
+    layering: Layering,
 ) -> Result<(), Box<dyn Error>> {
     let hwnd = window.hwnd()?;
     let data = Box::into_raw(Box::new(Subclass {
         window: window.clone(),
         on_display_change,
-        always_layered,
+        layering,
     })) as usize;
     unsafe {
         if !SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, data).as_bool() {
@@ -51,8 +61,8 @@ pub fn install(
             return Err("failed to subclass the window".into());
         }
         let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
-        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style(style, always_layered) as isize);
-        if always_layered {
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style(style, layering) as isize);
+        if layering == Layering::Always {
             // Fully opaque as a whole; the page's transparent pixels stay
             // transparent.
             SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA)?;
@@ -69,15 +79,14 @@ pub fn owns_foreground() -> bool {
 }
 
 /// The extended style DockMax keeps: a tool window without
-/// `WS_EX_APPWINDOW` is left out of Alt+Tab; `always_layered` also keeps
+/// `WS_EX_APPWINDOW` is left out of Alt+Tab; `Layering::Always` also keeps
 /// `WS_EX_LAYERED`. Any other bit, `WS_EX_TRANSPARENT` included, is left as
 /// tao set it.
-fn ex_style(style: u32, always_layered: bool) -> u32 {
+fn ex_style(style: u32, layering: Layering) -> u32 {
     let style = (style | WS_EX_TOOLWINDOW.0) & !WS_EX_APPWINDOW.0;
-    if always_layered {
-        style | WS_EX_LAYERED.0
-    } else {
-        style
+    match layering {
+        Layering::Always => style | WS_EX_LAYERED.0,
+        Layering::AsTaoSets => style,
     }
 }
 
@@ -103,7 +112,7 @@ unsafe extern "system" fn subclass_proc(
         // WS_EX_LAYERED.
         WM_STYLECHANGING if wparam.0 as i32 == GWL_EXSTYLE.0 => {
             let style = unsafe { &mut *(lparam.0 as *mut STYLESTRUCT) };
-            style.styleNew = ex_style(style.styleNew, subclass.always_layered);
+            style.styleNew = ex_style(style.styleNew, subclass.layering);
         }
         WM_DPICHANGED | WM_DISPLAYCHANGE if subclass.on_display_change.is_some() => {
             post_display_changed(hwnd)
@@ -132,6 +141,7 @@ unsafe extern "system" fn subclass_proc(
 mod tests {
     use ::windows::Win32::UI::WindowsAndMessaging::{WS_EX_TOPMOST, WS_EX_TRANSPARENT};
 
+    use super::super::{dock, panel};
     use super::*;
 
     // What tao writes for the dock: topmost, plus TRANSPARENT|LAYERED while
@@ -139,10 +149,14 @@ mod tests {
     const CAPTURED: u32 = WS_EX_TOPMOST.0 | WS_EX_APPWINDOW.0;
     const RELEASED: u32 = CAPTURED | WS_EX_TRANSPARENT.0 | WS_EX_LAYERED.0;
 
+    // What tao writes for the panel, which never ignores the mouse:
+    // topmost, plus APPWINDOW when shown.
+    const PANEL_STYLES: [u32; 2] = [WS_EX_TOPMOST.0, WS_EX_TOPMOST.0 | WS_EX_APPWINDOW.0];
+
     #[test]
     fn every_window_becomes_a_tool_window_without_appwindow() {
-        for always_layered in [false, true] {
-            let style = ex_style(CAPTURED, always_layered);
+        for layering in [Layering::Always, Layering::AsTaoSets] {
+            let style = ex_style(CAPTURED, layering);
             assert_ne!(style & WS_EX_TOOLWINDOW.0, 0);
             assert_eq!(style & WS_EX_APPWINDOW.0, 0);
         }
@@ -150,17 +164,36 @@ mod tests {
 
     #[test]
     fn always_layered_window_stays_layered_when_tao_captures_the_mouse() {
-        let style = ex_style(CAPTURED, true);
+        let style = ex_style(CAPTURED, Layering::Always);
 
         assert_ne!(style & WS_EX_LAYERED.0, 0);
         // Only WS_EX_TRANSPARENT tells captured from released.
         assert_eq!(style & WS_EX_TRANSPARENT.0, 0);
-        assert_eq!(ex_style(RELEASED, true), style | WS_EX_TRANSPARENT.0);
+        assert_eq!(
+            ex_style(RELEASED, Layering::Always),
+            style | WS_EX_TRANSPARENT.0
+        );
     }
 
     #[test]
     fn other_windows_keep_the_layering_tao_chose() {
-        assert_eq!(ex_style(CAPTURED, false) & WS_EX_LAYERED.0, 0);
-        assert_ne!(ex_style(RELEASED, false) & WS_EX_LAYERED.0, 0);
+        assert_eq!(ex_style(CAPTURED, Layering::AsTaoSets) & WS_EX_LAYERED.0, 0);
+        assert_ne!(ex_style(RELEASED, Layering::AsTaoSets) & WS_EX_LAYERED.0, 0);
+    }
+
+    #[test]
+    fn only_the_dock_is_always_layered() {
+        assert_eq!(dock::LAYERING, Layering::Always);
+        assert_eq!(panel::LAYERING, Layering::AsTaoSets);
+        for style in [CAPTURED, RELEASED] {
+            assert_ne!(ex_style(style, dock::LAYERING) & WS_EX_LAYERED.0, 0);
+        }
+        for style in PANEL_STYLES {
+            assert_eq!(
+                ex_style(style, panel::LAYERING) & WS_EX_LAYERED.0,
+                0,
+                "panel style {style:#x}"
+            );
+        }
     }
 }
