@@ -237,22 +237,90 @@ impl WidgetConfig {
 }
 
 /// Checks an instance label: `None` (the kind's name) or text of 1 to
-/// [`MAX_LABEL_CHARS`] characters (Unicode scalar values, as `chars()`
-/// counts them) with no control character and something besides
-/// whitespace. Leading and trailing spaces are kept as given.
+/// [`MAX_LABEL_CHARS`] Unicode scalar values (as `chars()` counts them)
+/// with at least one visible character and none of these anywhere:
+///
+/// - a control character (`char::is_control`), or a line or paragraph
+///   separator (U+2028, U+2029), which break the line;
+/// - a bidirectional formatting character (see [`is_bidi_formatting`]),
+///   which can make the label read differently from what was stored;
+/// - a noncharacter (see [`is_noncharacter`]), which Unicode reserves for
+///   internal use and never assigns.
+///
+/// Leading and trailing spaces are kept as given.
 pub fn validate_label(label: Option<&str>) -> Result<(), WidgetError> {
     let Some(label) = label else {
         return Ok(());
     };
     let length = label.chars().count();
     let valid = (1..=MAX_LABEL_CHARS).contains(&length)
-        && !label.chars().any(char::is_control)
-        && !label.chars().all(char::is_whitespace);
+        && !label.chars().any(|c| {
+            c.is_control()
+                || matches!(c, '\u{2028}' | '\u{2029}')
+                || is_bidi_formatting(c)
+                || is_noncharacter(c)
+        })
+        && !label.chars().all(is_invisible);
     if valid {
         Ok(())
     } else {
         Err(WidgetError::InvalidLabel)
     }
+}
+
+/// The bidirectional formatting characters: the marks (U+061C ALM, U+200E
+/// LRM, U+200F RLM), the embeddings and overrides (U+202A–U+202E) and the
+/// isolates (U+2066–U+2069). They reorder the text around them, so a label
+/// with one can show something other than its characters in order.
+fn is_bidi_formatting(c: char) -> bool {
+    matches!(
+        c,
+        '\u{061C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'
+    )
+}
+
+/// The 66 noncharacters: U+FDD0–U+FDEF and the last two code points of
+/// every plane (U+xFFFE and U+xFFFF).
+fn is_noncharacter(c: char) -> bool {
+    matches!(c, '\u{FDD0}'..='\u{FDEF}') || u32::from(c) & 0xFFFE == 0xFFFE
+}
+
+/// Whether `c` shows nothing on its own: a label made only of these looks
+/// empty. Next to visible characters they are kept, since some are needed
+/// there (the zero-width joiner in emoji sequences, variation selectors).
+///
+/// The list: whitespace (`char::is_whitespace`, which covers U+00A0, U+3000
+/// and the other spaces); U+00AD soft hyphen; U+034F combining grapheme
+/// joiner; U+115F, U+1160, U+3164 and U+FFA0, the hangul fillers; U+17B4
+/// and U+17B5, the khmer inherent vowels; U+180B–U+180F, the mongolian
+/// variation selectors and vowel separator; U+200B–U+200D, zero-width
+/// space, non-joiner and joiner; U+2060–U+206F, word joiner, invisible
+/// operators and deprecated format characters; U+2800 braille pattern
+/// blank; U+FE00–U+FE0F, variation selectors; U+FEFF, byte order mark;
+/// U+1D173–U+1D17A, musical format characters; U+E0000–U+E0FFF, tags and
+/// supplementary variation selectors. The bidi marks are rejected anywhere
+/// by [`validate_label`], so they need not be here.
+fn is_invisible(c: char) -> bool {
+    c.is_whitespace()
+        || matches!(
+            c,
+            '\u{00AD}'
+                | '\u{034F}'
+                | '\u{115F}'
+                | '\u{1160}'
+                | '\u{17B4}'
+                | '\u{17B5}'
+                | '\u{180B}'..='\u{180F}'
+                | '\u{200B}'..='\u{200D}'
+                | '\u{2060}'..='\u{206F}'
+                | '\u{2800}'
+                | '\u{3164}'
+                | '\u{FE00}'..='\u{FE0F}'
+                | '\u{FEFF}'
+                | '\u{FFA0}'
+                | '\u{1D173}'..='\u{1D17A}'
+                | '\u{E0000}'..='\u{E0FFF}'
+        )
 }
 
 /// The `config` column for `config`: the JSON of the kind's config alone,
@@ -449,7 +517,8 @@ pub enum WidgetErrorCode {
     NotFound,
     /// The config is for another kind than the instance.
     KindMismatch,
-    /// The label is too long or has control characters.
+    /// The label is empty, too long, shows nothing, or has a control,
+    /// bidi formatting or noncharacter code point (see [`validate_label`]).
     InvalidLabel,
     /// The time zone is not in the IANA database.
     InvalidTimeZone,
@@ -949,6 +1018,129 @@ mod tests {
             "c1\u{85}",
         ];
         for label in rejected {
+            assert_eq!(
+                validate_label(Some(label)),
+                Err(WidgetError::InvalidLabel),
+                "{label:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn labels_with_a_bidi_formatting_character_are_rejected() {
+        let bidi = [
+            '\u{061C}', // arabic letter mark
+            '\u{200E}', // left-to-right mark
+            '\u{200F}', // right-to-left mark
+            '\u{202A}', // left-to-right embedding
+            '\u{202B}', // right-to-left embedding
+            '\u{202C}', // pop directional formatting
+            '\u{202D}', // left-to-right override
+            '\u{202E}', // right-to-left override
+            '\u{2066}', // left-to-right isolate
+            '\u{2067}', // right-to-left isolate
+            '\u{2068}', // first strong isolate
+            '\u{2069}', // pop directional isolate
+        ];
+        for c in bidi {
+            for label in [
+                format!("São{c} Paulo"),
+                format!("{c}abc"),
+                format!("abc{c}"),
+            ] {
+                assert_eq!(
+                    validate_label(Some(&label)),
+                    Err(WidgetError::InvalidLabel),
+                    "{label:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn labels_with_a_noncharacter_are_rejected() {
+        let nonchars = [
+            '\u{FDD0}',
+            '\u{FDE7}',
+            '\u{FDEF}',
+            '\u{FFFE}',
+            '\u{FFFF}',
+            '\u{1FFFE}',
+            '\u{1FFFF}',
+            '\u{AFFFE}',
+            '\u{10FFFE}',
+            '\u{10FFFF}',
+        ];
+        for c in nonchars {
+            let label = format!("Lisboa{c}");
+            assert_eq!(
+                validate_label(Some(&label)),
+                Err(WidgetError::InvalidLabel),
+                "{label:?}"
+            );
+        }
+        // Their neighbours are ordinary characters.
+        for c in ['\u{FDCF}', '\u{FDF0}', '\u{FFFD}', '\u{1FFFD}'] {
+            let label = format!("Lisboa{c}");
+            assert_eq!(validate_label(Some(&label)), Ok(()), "{label:?}");
+        }
+    }
+
+    #[test]
+    fn labels_with_nothing_visible_are_rejected() {
+        let invisible = [
+            '\u{00A0}',  // no-break space
+            '\u{00AD}',  // soft hyphen
+            '\u{034F}',  // combining grapheme joiner
+            '\u{115F}',  // hangul choseong filler
+            '\u{1160}',  // hangul jungseong filler
+            '\u{17B4}',  // khmer vowel inherent aq
+            '\u{17B5}',  // khmer vowel inherent aa
+            '\u{180E}',  // mongolian vowel separator
+            '\u{200B}',  // zero width space
+            '\u{200C}',  // zero width non-joiner
+            '\u{200D}',  // zero width joiner
+            '\u{2060}',  // word joiner
+            '\u{2063}',  // invisible separator
+            '\u{2800}',  // braille pattern blank
+            '\u{3164}',  // hangul filler
+            '\u{FE0F}',  // variation selector 16
+            '\u{FEFF}',  // byte order mark
+            '\u{FFA0}',  // halfwidth hangul filler
+            '\u{1D173}', // musical symbol begin beam
+            '\u{E0020}', // tag space
+            '\u{E0100}', // variation selector 17
+        ];
+        for c in invisible {
+            for label in [c.to_string(), format!("{c}{c}{c}"), format!(" {c} ")] {
+                assert_eq!(
+                    validate_label(Some(&label)),
+                    Err(WidgetError::InvalidLabel),
+                    "{label:?}"
+                );
+            }
+        }
+        let all: String = invisible.iter().collect();
+        assert_eq!(validate_label(Some(&all)), Err(WidgetError::InvalidLabel));
+    }
+
+    #[test]
+    fn invisible_characters_next_to_visible_ones_are_kept() {
+        let accepted = [
+            "👨\u{200D}👩\u{200D}👧", // family emoji, joined by ZWJ
+            "❤\u{FE0F}",              // emoji presentation
+            "a\u{200B}b",
+            "co\u{00AD}operar",
+            "\u{2800}Lisboa",
+        ];
+        for label in accepted {
+            assert_eq!(validate_label(Some(label)), Ok(()), "{label:?}");
+        }
+    }
+
+    #[test]
+    fn labels_with_a_line_or_paragraph_separator_are_rejected() {
+        for label in ["São\u{2028}Paulo", "São\u{2029}Paulo"] {
             assert_eq!(
                 validate_label(Some(label)),
                 Err(WidgetError::InvalidLabel),
