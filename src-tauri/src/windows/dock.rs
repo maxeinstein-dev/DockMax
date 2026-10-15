@@ -24,7 +24,13 @@ pub const EDGE: Edge = Edge::Bottom;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Edge {
     Bottom,
-    #[allow(dead_code)] // Top placement arrives with the dock settings.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "top placement arrives with the dock settings in PR 3"
+        )
+    )]
     Top,
 }
 

@@ -83,6 +83,7 @@ impl Default for DockSettings {
 
 impl DockSettings {
     /// The preset matching the icon size, if any.
+    #[cfg_attr(not(test), expect(dead_code, reason = "used by the dock in PR 3"))]
     pub fn preset(&self) -> Option<SizePreset> {
         SizePreset::from_icon_size(self.icon_size)
     }
@@ -91,7 +92,7 @@ impl DockSettings {
 /// Screen edge the dock sits on, as stored in the settings.
 ///
 /// Kept apart from `windows::dock::Edge` so the domain doesn't depend on the
-/// window layer; the settings integration (F6a, PR 3) maps one to the other.
+/// window layer; the dock settings (PR 3) map one to the other.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DockEdge {
@@ -112,12 +113,15 @@ pub enum DockOpacity {
 /// Named icon sizes offered by the settings panel, from `DESIGN.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SizePreset {
+    #[cfg_attr(not(test), expect(dead_code, reason = "used by the dock in PR 3"))]
     Small,
     Medium,
+    #[cfg_attr(not(test), expect(dead_code, reason = "used by the dock in PR 3"))]
     Large,
 }
 
 impl SizePreset {
+    #[cfg_attr(not(test), expect(dead_code, reason = "used by the dock in PR 3"))]
     pub const ALL: [SizePreset; 3] = [SizePreset::Small, SizePreset::Medium, SizePreset::Large];
 
     /// Icon size of the preset, in logical pixels.
@@ -130,6 +134,7 @@ impl SizePreset {
     }
 
     /// The preset with exactly this icon size; `None` for sizes in between.
+    #[cfg_attr(not(test), expect(dead_code, reason = "used by the dock in PR 3"))]
     pub fn from_icon_size(icon_size: u16) -> Option<SizePreset> {
         SizePreset::ALL
             .into_iter()

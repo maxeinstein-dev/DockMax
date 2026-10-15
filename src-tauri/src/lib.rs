@@ -3,10 +3,8 @@ use std::sync::Arc;
 use tauri::RunEvent;
 
 mod commands;
-#[allow(dead_code)] // wired in F6a
 mod domain;
 mod logging;
-#[allow(dead_code)] // wired in F6a
 mod persistence;
 mod tray;
 mod windows;
@@ -17,6 +15,8 @@ pub fn run() {
         .plugin(logging::plugin())
         .manage(Arc::new(windows::hit_test::Tracker::default()))
         .setup(|app| {
+            // First: the windows may ask for the settings as soon as they load.
+            commands::settings::setup(app.handle());
             windows::panel::setup(app.handle())?;
             windows::dock::setup(app.handle())?;
             tray::setup(app.handle())?;
@@ -25,7 +25,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::panel::toggle_panel,
             commands::panel::hide_panel,
-            commands::dock::set_dock_hit_region
+            commands::dock::set_dock_hit_region,
+            commands::settings::get_settings,
+            commands::settings::update_settings
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

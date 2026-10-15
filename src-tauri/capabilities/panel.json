@@ -7,6 +7,8 @@
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "allow-hide-panel",
+    "allow-get-settings",
+    "allow-update-settings",
     "log:allow-log"
   ]
 }
