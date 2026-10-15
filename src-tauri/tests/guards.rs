@@ -97,6 +97,130 @@ fn as_set<S: AsRef<str>>(items: &[S]) -> BTreeSet<String> {
     items.iter().map(|s| s.as_ref().to_owned()).collect()
 }
 
+/// Whether `c` can be part of an identifier (so an `r` after it is not the
+/// start of a raw string).
+fn is_ident_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
+/// `source` without its `//` and `/* */` comments (nested ones included),
+/// so the guards that look for a call in the code are not satisfied by a
+/// commented-out one. String, raw string and character literals are copied
+/// as they are: the `//` of `"https://..."` is not a comment. A block comment
+/// becomes a space, so the tokens around it stay apart.
+fn strip_comments(source: &str) -> String {
+    let chars: Vec<char> = source.chars().collect();
+    let at = |i: usize| chars.get(i).copied();
+    let mut out = String::with_capacity(source.len());
+    let mut i = 0;
+    while let Some(c) = at(i) {
+        match (c, at(i + 1)) {
+            ('/', Some('/')) => {
+                while at(i).is_some_and(|c| c != '\n') {
+                    i += 1;
+                }
+            }
+            ('/', Some('*')) => {
+                let mut depth = 0usize;
+                while let Some(c) = at(i) {
+                    if c == '/' && at(i + 1) == Some('*') {
+                        depth += 1;
+                        i += 2;
+                    } else if c == '*' && at(i + 1) == Some('/') {
+                        depth -= 1;
+                        i += 2;
+                        if depth == 0 {
+                            break;
+                        }
+                    } else {
+                        i += 1;
+                    }
+                }
+                out.push(' ');
+            }
+            ('"', _) => {
+                out.push('"');
+                i += 1;
+                while let Some(c) = at(i) {
+                    out.push(c);
+                    i += 1;
+                    if c == '\\' {
+                        if let Some(escaped) = at(i) {
+                            out.push(escaped);
+                            i += 1;
+                        }
+                    } else if c == '"' {
+                        break;
+                    }
+                }
+            }
+            ('r', Some('"' | '#'))
+                if i == 0 || !is_ident_char(chars[i - 1]) || chars[i - 1] == 'b' =>
+            {
+                let hashes = chars[i + 1..].iter().take_while(|&&c| c == '#').count();
+                if at(i + 1 + hashes) != Some('"') {
+                    // `r#ident`, a raw identifier.
+                    out.push(c);
+                    i += 1;
+                    continue;
+                }
+                let start = i;
+                i += hashes + 2;
+                while let Some(c) = at(i) {
+                    i += 1;
+                    if c == '"' && chars[i..].iter().take_while(|&&c| c == '#').count() >= hashes {
+                        i += hashes;
+                        break;
+                    }
+                }
+                out.extend(&chars[start..i.min(chars.len())]);
+            }
+            ('\'', Some('\\')) => {
+                // An escaped character literal: `'\''`, `'\n'`, `'\u{..}'`.
+                let start = i;
+                i += 3;
+                while at(i).is_some_and(|c| c != '\'') {
+                    i += 1;
+                }
+                i += 1;
+                out.extend(&chars[start..i.min(chars.len())]);
+            }
+            ('\'', Some(_)) if at(i + 2) == Some('\'') => {
+                // A plain character literal, such as `'"'`.
+                out.extend(&chars[i..i + 3]);
+                i += 3;
+            }
+            _ => {
+                // Code, or the `'` of a lifetime.
+                out.push(c);
+                i += 1;
+            }
+        }
+    }
+    out
+}
+
+/// The Rust source at `relative` (from the crate root), without comments.
+fn rust_code(relative: &str) -> String {
+    let path = manifest_dir().join(relative);
+    let source =
+        fs::read_to_string(&path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+    strip_comments(&source)
+}
+
+#[test]
+fn strip_comments_keeps_code_and_literals() {
+    let source = r##"let a = 1; // gone::setup(app);
+/* gone /* nested */ still gone */call(b);
+let url = "https://x/*y*/"; let q = '"'; let s = '\''; fn f<'a>(x: &'a str) {}
+let raw = r#"// kept"#; /// doc gone
+"##;
+    let expected = "let a = 1; \n call(b);
+let url = \"https://x/*y*/\"; let q = '\"'; let s = '\\''; fn f<'a>(x: &'a str) {}
+let raw = r#\"// kept\"#; \n";
+    assert_eq!(strip_comments(source), expected);
+}
+
 #[test]
 fn capability_files_are_exactly_the_expected_ones() {
     let dir = manifest_dir().join("capabilities");
@@ -251,8 +375,7 @@ fn log_plugin_cannot_fail_startup() {
     // opens the log file and can fail, is attached in `logging::setup` with a
     // fallback (ADR 0007). Building the plugin with its logger again would let
     // a locked log file abort the app.
-    let source = std::fs::read_to_string(manifest_dir().join("src").join("logging.rs"))
-        .expect("src/logging.rs must exist");
+    let source = rust_code("src/logging.rs");
     let body = source
         .split("pub fn plugin")
         .nth(1)
@@ -278,8 +401,8 @@ fn logger_settings_and_widgets_start_before_the_windows() {
     // settings (or attaching the logger) in `setup` let the dock call
     // `get_settings` before the state existed, so it never got its theme; the
     // widget database has the same need for `list_widgets`.
-    let source = std::fs::read_to_string(manifest_dir().join("src").join("lib.rs"))
-        .expect("src/lib.rs must exist");
+    // Without comments: a commented-out call must not count.
+    let source = rust_code("src/lib.rs");
     let app_setup = source
         .split(".setup(|app|")
         .nth(1)
@@ -318,5 +441,136 @@ fn logger_settings_and_widgets_start_before_the_windows() {
     assert!(
         source.contains(".plugin(startup())"),
         "src/lib.rs: the `startup` plugin, which attaches the logger, loads the settings and opens the widget database, must be registered"
+    );
+}
+
+/// The comma-separated items between `open` and the next `]` of `code`,
+/// which must appear exactly once.
+fn bracket_items<'a>(code: &'a str, open: &str, file: &str) -> Vec<&'a str> {
+    let found = code.matches(open).count();
+    assert_eq!(
+        found, 1,
+        "{file}: expected exactly one `{open}`, found {found}"
+    );
+    code.split(open)
+        .nth(1)
+        .and_then(|rest| rest.split(']').next())
+        .unwrap_or_else(|| panic!("{file}: `{open}` is not closed by `]`"))
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .collect()
+}
+
+#[test]
+fn every_declared_command_is_registered_and_vice_versa() {
+    // `build.rs` declares the commands that get an `allow-<command>`
+    // permission; `generate_handler!` in `lib.rs` is what the app answers.
+    // A command only on the first list has a permission and no handler; one
+    // only on the second has a handler no capability can grant, so it fails
+    // at runtime instead of here.
+    let manifest = rust_code("build.rs");
+    let declared: Vec<&str> = bracket_items(&manifest, ".commands(&[", "build.rs")
+        .into_iter()
+        .map(|item| {
+            item.strip_prefix('"')
+                .and_then(|item| item.strip_suffix('"'))
+                .unwrap_or_else(|| {
+                    panic!("build.rs: every command in `AppManifest::commands` must be a string literal, found `{item}`")
+                })
+        })
+        .collect();
+    let lib = rust_code("src/lib.rs");
+    let registered: Vec<&str> = bracket_items(&lib, "generate_handler![", "src/lib.rs")
+        .into_iter()
+        .map(|path| path.rsplit("::").next().unwrap_or(path).trim())
+        .collect();
+
+    let declared_set = as_set(&declared);
+    let registered_set = as_set(&registered);
+    let only_declared: Vec<_> = declared_set.difference(&registered_set).collect();
+    let only_registered: Vec<_> = registered_set.difference(&declared_set).collect();
+    assert!(
+        only_declared.is_empty() && only_registered.is_empty(),
+        "the commands of `AppManifest` (build.rs) and `generate_handler!` (src/lib.rs) differ; \
+         only in build.rs: {only_declared:?}, only in lib.rs: {only_registered:?}"
+    );
+    assert_eq!(
+        declared.len(),
+        declared_set.len(),
+        "build.rs: `AppManifest::commands` has duplicate entries: {declared:?}"
+    );
+    assert_eq!(
+        registered.len(),
+        registered_set.len(),
+        "src/lib.rs: `generate_handler!` has duplicate entries: {registered:?}"
+    );
+}
+
+/// The Tauri config files Tauri can read from the crate root. Any other one
+/// (`tauri.windows.conf.json`, `Tauri.toml`...) is merged into every build of
+/// that platform, past the CSP and capability guards above.
+const EXPECTED_TAURI_CONFIGS: &[&str] = &["tauri.conf.json", "tauri.e2e.conf.json"];
+
+#[test]
+fn tauri_config_files_are_exactly_the_expected_ones() {
+    let dir = manifest_dir();
+    let found: BTreeSet<String> = fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("cannot list {}: {e}", dir.display()))
+        .map(|entry| {
+            entry
+                .expect("cannot read directory entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .filter(|name| {
+            let lower = name.to_lowercase();
+            lower.starts_with("tauri")
+                && [".json", ".json5", ".toml"]
+                    .iter()
+                    .any(|ext| lower.ends_with(ext))
+        })
+        .collect();
+    assert_eq!(
+        found,
+        as_set(EXPECTED_TAURI_CONFIGS),
+        "src-tauri/ must hold exactly these Tauri config files"
+    );
+}
+
+#[test]
+fn e2e_config_only_renames_the_app() {
+    // `pnpm test:e2e:build` merges this file over tauri.conf.json. It may
+    // only give the test build its own identifier and binary name: a CSP, a
+    // capability or a window here would make the tested app differ from the
+    // released one without tripping any other guard.
+    let file = "tauri.e2e.conf.json";
+    let json = read_json(&manifest_dir().join(file));
+    let object = json
+        .as_object()
+        .unwrap_or_else(|| panic!("{file}: top level must be a JSON object"));
+    let keys: BTreeSet<String> = object.keys().cloned().collect();
+    assert_eq!(
+        keys,
+        as_set(&["$schema", "identifier", "mainBinaryName"]),
+        "{file}: must set exactly `$schema`, `identifier` and `mainBinaryName`"
+    );
+
+    let base = read_json(&manifest_dir().join("tauri.conf.json"));
+    let base_identifier = base
+        .get("identifier")
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| panic!("tauri.conf.json: `identifier` must be a string"));
+    let identifier = json.get("identifier").and_then(Value::as_str);
+    assert_eq!(
+        identifier,
+        Some(format!("{base_identifier}.e2e").as_str()),
+        "{file}: `identifier` must be the app's own followed by `.e2e` (src/e2e.rs refuses any other)"
+    );
+    let binary = json.get("mainBinaryName").and_then(Value::as_str);
+    assert!(
+        binary.is_some_and(|name| !name.is_empty()),
+        "{file}: `mainBinaryName` must be a non-empty string, found {binary:?}"
     );
 }
