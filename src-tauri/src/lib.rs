@@ -24,7 +24,9 @@ pub fn run() {
         .plugin(logging::plugin())
         .manage(Arc::new(windows::hit_test::Tracker::default()))
         .setup(|app| {
-            // First: the windows may ask for the settings as soon as they load.
+            // First, so the settings can report a bad file. Never fails.
+            logging::setup(app.handle());
+            // Next: the windows may ask for the settings as soon as they load.
             commands::settings::setup(app.handle());
             windows::panel::setup(app.handle())?;
             windows::dock::setup(app.handle())?;
