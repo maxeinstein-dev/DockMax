@@ -52,9 +52,6 @@ const GLAZE: Record<PanelId, string> = {
   about: "t-about",
 };
 
-/** The panel lives in its own window; this names it for `aria-controls`. */
-const PANEL_ELEMENT_ID = "panel";
-
 function reducedMotionQuery(): MediaQueryList | null {
   return typeof window.matchMedia === "function"
     ? window.matchMedia("(prefers-reduced-motion: reduce)")
@@ -314,8 +311,9 @@ function Dock() {
                 type="button"
                 className="dock-item"
                 aria-label={t.dock.items[panelId]}
+                // No aria-controls: the panel is in another window, which
+                // an IDREF can't reach.
                 aria-expanded={expanded}
-                aria-controls={expanded ? PANEL_ELEMENT_ID : undefined}
                 tabIndex={index === current ? 0 : -1}
                 data-magnify={magnifyRole(index, magnified) ?? undefined}
                 style={

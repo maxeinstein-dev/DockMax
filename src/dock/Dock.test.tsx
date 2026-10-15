@@ -468,21 +468,28 @@ describe("Dock", () => {
   });
 
   describe("open panel", () => {
-    it("marks the open item and points it to the panel", async () => {
+    it("marks the open item as expanded", async () => {
       await renderDock();
       expect(settings()).toHaveAttribute("aria-expanded", "false");
-      expect(settings()).not.toHaveAttribute("aria-controls");
 
       emit("panel-changed", { panelId: "settings" });
 
       expect(settings()).toHaveAttribute("aria-expanded", "true");
-      expect(settings()).toHaveAttribute("aria-controls", "panel");
       expect(about()).toHaveAttribute("aria-expanded", "false");
 
       emit("panel-changed", { panelId: null });
 
       expect(settings()).toHaveAttribute("aria-expanded", "false");
-      expect(settings()).not.toHaveAttribute("aria-controls");
+    });
+
+    it("never points to the panel with aria-controls", async () => {
+      // The panel lives in another window: no IDREF here can reach it.
+      await renderDock();
+
+      for (const panelId of [null, "settings", "about"]) {
+        emit("panel-changed", { panelId });
+        expect(document.querySelector("[aria-controls]")).toBeNull();
+      }
     });
 
     it("freezes the magnification while a panel is open", async () => {
