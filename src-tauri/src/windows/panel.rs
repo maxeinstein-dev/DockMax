@@ -42,8 +42,9 @@ pub const READY_TIMEOUT: Duration = Duration::from_millis(400);
 pub const MAX_PANEL_SIZE: f64 = 4096.0;
 
 /// Largest transparent inset around the panel card accepted from the page,
-/// in logical pixels.
-pub const MAX_INSET: f64 = 32.0;
+/// in logical pixels: the gap between the card and the dock bar, so the
+/// window (which blocks clicks) never covers the bar.
+pub const MAX_INSET: f64 = MARGIN;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -186,7 +187,7 @@ impl fmt::Display for GeometryError {
         match self {
             GeometryError::Size(error) => write!(f, "size: {error}"),
             GeometryError::Inset => {
-                f.write_str("the inset is not a finite number from 0 to 32 leaving a visible card")
+                f.write_str("the inset is not a finite number from 0 to 8 leaving a visible card")
             }
         }
     }
@@ -240,12 +241,16 @@ pub fn to_screen(rect: LogicalRect, client_origin: (i32, i32), scale_factor: f64
     })
 }
 
-/// Physical rectangle of a panel window anchored to a dock item. The
-/// visible card (the window minus `geometry.inset` on every side) sits
+/// Physical rectangle of a panel window anchored to a dock item, or `None`
+/// when the work area leaves no room for its card.
+///
+/// The visible card (the window minus `geometry.inset` on every side) sits
 /// `MARGIN` away from the dock bar on the side away from the screen edge,
-/// horizontally centered on the anchor, and kept `MARGIN` inside the work
-/// area; only the transparent inset may go beyond. A card larger than the
-/// work area is pinned to the left (or top) margin.
+/// horizontally centered on the anchor. It is kept `MARGIN` inside the work
+/// area, and shrunk when it doesn't fit: across, to the work area; along,
+/// to the space between the bar (plus `MARGIN`) and the far work-area edge
+/// (minus `MARGIN`). Only the transparent inset goes beyond the card, and
+/// it is at most `MARGIN`, so the window never reaches the bar.
 pub fn panel_rect(
     anchor: Rect,
     bar: Rect,
@@ -253,40 +258,48 @@ pub fn panel_rect(
     scale_factor: f64,
     geometry: PanelGeometry,
     edge: Edge,
-) -> Rect {
-    // Every term fits in i32/u32 (`as` saturates), so sums in i64 can't
-    // overflow; the result is saturated back into i32.
-    let width = (geometry.size.width * scale_factor).round() as u32;
-    let height = (geometry.size.height * scale_factor).round() as u32;
-    let inset = ((geometry.inset * scale_factor).round() as u32)
+) -> Option<Rect> {
+    // Every term fits in u32 or i32 (`as` saturates, NaN gives 0), so sums
+    // in i64 can't overflow; the position is saturated back into i32.
+    let physical = |value: f64| i64::from((value * scale_factor).round() as u32);
+    let margin = physical(MARGIN);
+    let width = physical(geometry.size.width);
+    let height = physical(geometry.size.height);
+    let inset = physical(geometry.inset)
+        .min(margin)
         .min(width / 2)
         .min(height / 2);
-    let card_width = width - 2 * inset;
-    let card_height = height - 2 * inset;
-    let margin = i64::from((MARGIN * scale_factor).round() as i32);
-    let anchor_center = i64::from(anchor.x) + i64::from(anchor.width).div_euclid(2);
-    let card_x = anchor_center - i64::from(card_width).div_euclid(2);
-    let card_y = match edge {
-        Edge::Bottom => i64::from(bar.y) - margin - i64::from(card_height),
-        Edge::Top => i64::from(bar.y) + i64::from(bar.height) + margin,
+    let end = |start: i32, length: u32| i64::from(start) + i64::from(length);
+    let (left, right) = (
+        i64::from(work_area.x) + margin,
+        end(work_area.x, work_area.width) - margin,
+    );
+    let (top, bottom) = match edge {
+        Edge::Bottom => (
+            i64::from(work_area.y) + margin,
+            (i64::from(bar.y) - margin).min(end(work_area.y, work_area.height) - margin),
+        ),
+        Edge::Top => (
+            (end(bar.y, bar.height) + margin).max(i64::from(work_area.y) + margin),
+            end(work_area.y, work_area.height) - margin,
+        ),
     };
-    let card_x = clamp_axis(card_x, card_width, work_area.x, work_area.width, margin);
-    let card_y = clamp_axis(card_y, card_height, work_area.y, work_area.height, margin);
-    Rect {
-        x: dock::saturate(i64::from(card_x) - i64::from(inset)),
-        y: dock::saturate(i64::from(card_y) - i64::from(inset)),
-        width,
-        height,
+    let card_width = (width - 2 * inset).min(right - left);
+    let card_height = (height - 2 * inset).min(bottom - top);
+    if card_width < 1 || card_height < 1 {
+        return None;
     }
-}
-
-fn clamp_axis(position: i64, size: u32, start: i32, length: u32, margin: i64) -> i32 {
-    let min = i64::from(start) + margin;
-    let max = i64::from(start) + i64::from(length) - margin - i64::from(size);
-    dock::saturate(if max < min {
-        min
-    } else {
-        position.clamp(min, max)
+    let anchor_center = i64::from(anchor.x) + i64::from(anchor.width).div_euclid(2);
+    let card_x = (anchor_center - card_width.div_euclid(2)).clamp(left, right - card_width);
+    let card_y = match edge {
+        Edge::Bottom => bottom - card_height,
+        Edge::Top => top,
+    };
+    Some(Rect {
+        x: dock::saturate(card_x - inset),
+        y: dock::saturate(card_y - inset),
+        width: u32::try_from(card_width + 2 * inset).ok()?,
+        height: u32::try_from(card_height + 2 * inset).ok()?,
     })
 }
 
@@ -619,7 +632,8 @@ fn place(
         scale_factor,
         geometry,
         dock::edge(app),
-    );
+    )
+    .ok_or("the work area leaves no room for the panel")?;
     window.set_size(PhysicalSize::new(rect.width, rect.height))?;
     window.set_position(PhysicalPosition::new(rect.x, rect.y))?;
     Ok(())
@@ -994,7 +1008,8 @@ mod tests {
             1.0,
             size(360.0, 480.0),
             Edge::Bottom,
-        );
+        )
+        .unwrap();
         assert_eq!(panel.x, i32::MAX);
     }
 
@@ -1009,7 +1024,8 @@ mod tests {
             1.0,
             size(360.0, 480.0),
             Edge::Bottom,
-        );
+        )
+        .unwrap();
 
         assert_eq!(panel, rect(1250 - 180, 960 - 8 - 480, 360, 480));
     }
@@ -1025,7 +1041,8 @@ mod tests {
             1.0,
             size(360.0, 480.0),
             Edge::Bottom,
-        );
+        )
+        .unwrap();
 
         assert_eq!(panel.x, 8);
     }
@@ -1041,7 +1058,8 @@ mod tests {
             1.0,
             size(360.0, 480.0),
             Edge::Bottom,
-        );
+        )
+        .unwrap();
 
         assert_eq!(panel.x, 2560 - 8 - 360);
     }
@@ -1051,7 +1069,7 @@ mod tests {
         let bar = rect(1160, 8, 240, 64);
         let anchor = rect(1200, 24, 100, 32);
 
-        let panel = panel_rect(anchor, bar, WORK_AREA, 1.0, size(320.0, 240.0), Edge::Top);
+        let panel = panel_rect(anchor, bar, WORK_AREA, 1.0, size(320.0, 240.0), Edge::Top).unwrap();
 
         assert_eq!(panel, rect(1250 - 160, 8 + 64 + 8, 320, 240));
     }
@@ -1069,7 +1087,8 @@ mod tests {
             1.25,
             size(360.0, 480.0),
             Edge::Bottom,
-        );
+        )
+        .unwrap();
 
         // 360 * 1.25 = 450, 480 * 1.25 = 600, 8 * 1.25 = 10.
         assert_eq!(panel, rect(962 - 225, 734 - 10 - 600, 450, 600));
@@ -1088,7 +1107,8 @@ mod tests {
             1.5,
             size(320.0, 240.0),
             Edge::Bottom,
-        );
+        )
+        .unwrap();
 
         // 320 * 1.5 = 480, 240 * 1.5 = 360, 8 * 1.5 = 12.
         assert_eq!(panel, rect(1205 - 240, 1260 - 12 - 360, 480, 360));
@@ -1107,13 +1127,14 @@ mod tests {
             1.5,
             size(320.0, 240.0),
             Edge::Bottom,
-        );
+        )
+        .unwrap();
 
         assert_eq!(panel.x, 12);
     }
 
     #[test]
-    fn panel_wider_than_the_work_area_is_pinned_to_the_left_margin() {
+    fn card_wider_than_the_work_area_is_shrunk_to_it() {
         let work_area = rect(100, 0, 300, 1032);
 
         let panel = panel_rect(
@@ -1121,16 +1142,19 @@ mod tests {
             BAR,
             work_area,
             1.0,
-            size(360.0, 480.0),
+            geometry(360.0, 480.0, 8.0),
             Edge::Bottom,
-        );
+        )
+        .unwrap();
 
-        assert_eq!(panel.x, 108);
-        assert_eq!(panel.width, 360);
+        // The card spans 108..392; the inset goes 8 px beyond on each side.
+        assert_eq!(panel.x, 100);
+        assert_eq!(panel.width, 300 - 16 + 16);
+        assert_eq!(panel.height, 480);
     }
 
     #[test]
-    fn panel_taller_than_the_space_above_the_bar_stays_inside_the_work_area() {
+    fn panel_taller_than_the_space_above_the_bar_is_shrunk_to_it() {
         let work_area = rect(0, 40, 2560, 600);
         let bar = rect(1160, 400, 240, 64);
 
@@ -1141,10 +1165,12 @@ mod tests {
             1.0,
             size(360.0, 480.0),
             Edge::Bottom,
-        );
+        )
+        .unwrap();
 
-        // 400 - 8 - 480 = -88 would leave the work area.
-        assert_eq!(panel.y, 48);
+        // 400 - 8 - 480 = -88 would leave the work area: the card spans
+        // 48..392, between the work area's margin and the bar's.
+        assert_eq!((panel.y, panel.height), (48, 400 - 8 - 48));
     }
 
     #[test]
@@ -1156,13 +1182,15 @@ mod tests {
             BAR,
             WORK_AREA,
             1.0,
-            geometry(360.0, 480.0, 16.0),
+            geometry(360.0, 480.0, 8.0),
             Edge::Bottom,
-        );
+        )
+        .unwrap();
 
-        // The card is 328x448, centered on 1250, its bottom at 960 - 8.
-        assert_eq!(panel, rect(1250 - 164 - 16, 960 - 8 - 448 - 16, 360, 480));
-        assert_eq!(panel.y + 480 - 16, 960 - 8);
+        // The card is 344x464, centered on 1250, its bottom at 960 - 8; the
+        // window's bottom is flush with the bar.
+        assert_eq!(panel, rect(1250 - 172 - 8, 960 - 8 - 464 - 8, 360, 480));
+        assert_eq!(panel.y + 480, 960);
     }
 
     #[test]
@@ -1176,12 +1204,13 @@ mod tests {
             bar,
             work_area,
             1.5,
-            geometry(320.0, 240.0, 12.0),
+            geometry(320.0, 240.0, 8.0),
             Edge::Top,
-        );
+        )
+        .unwrap();
 
-        // 320x240 at 1.5 = 480x360, inset 18, card 444x324, gap 12.
-        assert_eq!(panel, rect(1205 - 222 - 18, 12 + 96 + 12 - 18, 480, 360));
+        // 320x240 at 1.5 = 480x360, inset 12, card 456x336, gap 12.
+        assert_eq!(panel, rect(1205 - 228 - 12, 12 + 96 + 12 - 12, 480, 360));
     }
 
     #[test]
@@ -1195,17 +1224,18 @@ mod tests {
             bar,
             work_area,
             1.25,
-            geometry(360.0, 480.0, 10.0),
+            geometry(360.0, 480.0, 4.4),
             Edge::Bottom,
-        );
+        )
+        .unwrap();
 
-        // 450x600, inset 12.5 -> 13, card 424x574, gap 10.
-        assert_eq!(panel, rect(962 - 212 - 13, 734 - 10 - 574 - 13, 450, 600));
+        // 450x600, inset 5.5 -> 6, card 438x588, gap 10.
+        assert_eq!(panel, rect(962 - 219 - 6, 734 - 10 - 588 - 6, 450, 600));
     }
 
     #[test]
     fn card_is_clamped_inside_the_work_area_and_only_the_inset_goes_beyond() {
-        let inset = geometry(360.0, 480.0, 16.0);
+        let inset = geometry(360.0, 480.0, 8.0);
 
         let left = panel_rect(
             rect(20, 976, 40, 32),
@@ -1214,7 +1244,8 @@ mod tests {
             1.0,
             inset,
             Edge::Bottom,
-        );
+        )
+        .unwrap();
         let right = panel_rect(
             rect(2500, 976, 40, 32),
             BAR,
@@ -1222,16 +1253,17 @@ mod tests {
             1.0,
             inset,
             Edge::Bottom,
-        );
+        )
+        .unwrap();
 
         // Card at x = 8 and ending at 2560 - 8.
-        assert_eq!(left.x, 8 - 16);
-        assert_eq!(right.x + 360 - 16, 2560 - 8);
+        assert_eq!(left.x, 8 - 8);
+        assert_eq!(right.x + 360 - 8, 2560 - 8);
     }
 
     #[test]
-    fn card_too_tall_for_the_space_is_clamped_on_both_edges() {
-        let inset = geometry(360.0, 480.0, 16.0);
+    fn card_too_tall_for_the_space_is_shrunk_between_the_bar_and_the_far_edge() {
+        let inset = geometry(360.0, 480.0, 8.0);
         let anchor = rect(1200, 416, 100, 32);
 
         let bottom = panel_rect(
@@ -1241,7 +1273,8 @@ mod tests {
             1.0,
             inset,
             Edge::Bottom,
-        );
+        )
+        .unwrap();
         let top = panel_rect(
             rect(1200, 24, 100, 32),
             rect(1160, 8, 240, 64),
@@ -1249,11 +1282,29 @@ mod tests {
             1.0,
             inset,
             Edge::Top,
-        );
+        )
+        .unwrap();
 
-        // Card top at 40 + 8; card bottom at 500 - 8.
-        assert_eq!(bottom.y + 16, 48);
-        assert_eq!(top.y + 480 - 16, 500 - 8);
+        // Bottom: card from 40 + 8 down to 400 - 8, the window flush with
+        // the bar. Top: card from 72 + 8 down to 500 - 8.
+        assert_eq!((bottom.y + 8, bottom.height - 16), (48, 392 - 48));
+        assert_eq!(bottom.y + bottom.height as i32, 400);
+        assert_eq!((top.y + 8, top.height - 16), (80, 492 - 80));
+        assert_eq!(top.y, 72);
+    }
+
+    #[test]
+    fn no_room_for_the_card_gives_no_window() {
+        // The bar fills the work area: nothing fits above or below it.
+        let work_area = rect(0, 0, 1920, 80);
+        let bar = rect(840, 8, 240, 64);
+
+        for edge in [Edge::Bottom, Edge::Top] {
+            assert_eq!(
+                panel_rect(bar, bar, work_area, 1.0, size(360.0, 480.0), edge),
+                None
+            );
+        }
     }
 
     #[test]
@@ -1273,14 +1324,132 @@ mod tests {
         }
     }
 
+    /// `panel_rect`, as `None` when there is no room for the card.
+    fn placed(
+        anchor: Rect,
+        bar: Rect,
+        work_area: Rect,
+        scale_factor: f64,
+        geometry: PanelGeometry,
+        edge: Edge,
+    ) -> Option<Rect> {
+        panel_rect(anchor, bar, work_area, scale_factor, geometry, edge)
+    }
+
+    fn overlaps(a: Rect, b: Rect) -> bool {
+        let (a_right, b_right) = (
+            i64::from(a.x) + i64::from(a.width),
+            i64::from(b.x) + i64::from(b.width),
+        );
+        let (a_bottom, b_bottom) = (
+            i64::from(a.y) + i64::from(a.height),
+            i64::from(b.y) + i64::from(b.height),
+        );
+        i64::from(a.x) < b_right
+            && i64::from(b.x) < a_right
+            && i64::from(a.y) < b_bottom
+            && i64::from(b.y) < a_bottom
+    }
+
+    fn within(inner: Rect, outer: Rect) -> bool {
+        inner.x >= outer.x
+            && inner.y >= outer.y
+            && i64::from(inner.x) + i64::from(inner.width)
+                <= i64::from(outer.x) + i64::from(outer.width)
+            && i64::from(inner.y) + i64::from(inner.height)
+                <= i64::from(outer.y) + i64::from(outer.height)
+    }
+
+    #[test]
+    fn panel_never_covers_the_bar_and_its_card_never_leaves_the_work_area() {
+        let work_areas = [
+            rect(0, 0, 1920, 1032),
+            rect(0, 0, 2560, 1392),
+            rect(0, 48, 1920, 1032),
+            rect(62, 0, 1858, 1080),
+            rect(-1920, -200, 1920, 1040),
+            rect(0, 0, 800, 600),
+            rect(0, 0, 400, 300),
+        ];
+        let sizes = [
+            (17.0, 17.0),
+            (40.0, 30.0),
+            (336.0, 400.0),
+            (360.0, 480.0),
+            (1200.0, 900.0),
+            (MAX_PANEL_SIZE, MAX_PANEL_SIZE),
+        ];
+        let mut checked = 0;
+        for work_area in work_areas {
+            for scale_factor in [1.0, 1.25, 1.5, 1.75] {
+                for edge in [Edge::Bottom, Edge::Top] {
+                    // The bar as the dock lays it: flush with the window
+                    // side that faces the screen edge.
+                    let dock = dock::dock_rect(work_area, scale_factor, (240.0, 140.0), edge);
+                    let bar_height = (62.0 * scale_factor).round() as u32;
+                    let bar = Rect {
+                        x: dock.x + 20,
+                        y: match edge {
+                            Edge::Bottom => dock.y + dock.height as i32 - bar_height as i32,
+                            Edge::Top => dock.y,
+                        },
+                        width: dock.width - 40,
+                        height: bar_height,
+                    };
+                    let right = work_area.x + work_area.width as i32;
+                    let anchors = [
+                        rect(bar.x + 6, bar.y + 6, 50, 50),
+                        rect(work_area.x - 500, bar.y, 50, 50),
+                        rect(work_area.x, bar.y, 1, 1),
+                        rect(right - 10, bar.y, 50, 50),
+                        rect(right + 500, bar.y, 50, 50),
+                    ];
+                    for anchor in anchors {
+                        for (width, height) in sizes {
+                            for inset in 0..=8 {
+                                let inset = f64::from(inset);
+                                let geometry = geometry(width, height, inset);
+                                assert_eq!(geometry.validate(), Ok(()), "{geometry:?}");
+                                let case = format!(
+                                    "{work_area:?} {scale_factor} {edge:?} {anchor:?} {geometry:?}"
+                                );
+                                let Some(window) =
+                                    placed(anchor, bar, work_area, scale_factor, geometry, edge)
+                                else {
+                                    panic!("no room: {case}");
+                                };
+                                let inset = (inset * scale_factor).round() as u32;
+                                let card = Rect {
+                                    x: window.x + inset as i32,
+                                    y: window.y + inset as i32,
+                                    width: window.width - 2 * inset,
+                                    height: window.height - 2 * inset,
+                                };
+                                assert!(!overlaps(window, bar), "covers the bar: {case}");
+                                assert!(within(card, work_area), "card leaves: {case}");
+                                checked += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(checked, 7 * 4 * 2 * 5 * 6 * 9);
+    }
+
+    #[test]
+    fn the_inset_is_at_most_the_gap_to_the_bar() {
+        assert_eq!(MAX_INSET, MARGIN);
+    }
+
     #[test]
     fn geometry_within_the_limits_is_valid() {
         for (width, height, inset) in [
             (360.0, 480.0, 0.0),
-            (360.0, 480.0, 16.0),
+            (360.0, 480.0, 8.0),
             (1.0, 1.0, 0.0),
             (MAX_PANEL_SIZE, MAX_PANEL_SIZE, MAX_INSET),
-            (65.0, 65.0, 32.0),
+            (17.0, 17.0, 8.0),
         ] {
             let geometry = geometry(width, height, inset);
             assert_eq!(geometry.validate(), Ok(()), "{geometry:?}");
@@ -1303,9 +1472,12 @@ mod tests {
             (360.0, 480.0, MAX_INSET + 0.5, Inset),
             (360.0, 480.0, f64::NAN, Inset),
             (360.0, 480.0, f64::INFINITY, Inset),
+            // Wider than the gap to the dock bar: the window would cover it.
+            (360.0, 480.0, 8.5, Inset),
+            (360.0, 480.0, 32.0, Inset),
             // Nothing visible would be left of the card.
-            (64.0, 480.0, 32.0, Inset),
-            (360.0, 40.0, 20.0, Inset),
+            (16.0, 480.0, 8.0, Inset),
+            (360.0, 10.0, 5.0, Inset),
         ];
         for (width, height, inset, expected) in cases {
             let geometry = geometry(width, height, inset);
@@ -1369,7 +1541,7 @@ mod tests {
             width: 392.0,
             height: 520.0,
         },
-        inset: 16.0,
+        inset: 8.0,
     };
 
     fn prepared(action: Action) -> (PanelId, u64) {
@@ -1563,7 +1735,7 @@ mod tests {
                 width: 392.0,
                 height: 600.0,
             },
-            inset: 16.0,
+            inset: 8.0,
         };
 
         assert_eq!(
