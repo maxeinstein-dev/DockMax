@@ -44,9 +44,10 @@ O dock precisa flutuar acima da barra de tarefas, sem atrapalhar os apps de trá
 
   | Janela | Permissões | Uso |
   |---|---|---|
-  | `dock` | `core:event:allow-listen`, `core:event:allow-unlisten`, `allow-toggle-panel`, `allow-set-dock-hit-region` | Clique nos itens, região de captura (barra e ícones ampliados) e ouvir `dock-released`. |
-  | `panel` | `core:event:allow-listen`, `core:event:allow-unlisten`, `allow-hide-panel` | Ouvir `panel-show` e fechar com Esc. |
+  | `dock` | `core:event:allow-listen`, `core:event:allow-unlisten`, `allow-toggle-panel`, `allow-set-dock-hit-region`, `log:allow-log` | Clique nos itens, região de captura (barra e ícones ampliados), ouvir `dock-released` e registrar no log do app. |
+  | `panel` | `core:event:allow-listen`, `core:event:allow-unlisten`, `allow-hide-panel`, `log:allow-log` | Ouvir `panel-show`, fechar com Esc e registrar no log do app. |
 
+- `log:allow-log` libera só o comando `log` do `tauri-plugin-log` (o frontend grava no mesmo arquivo do Rust, com o nível filtrado no Rust); não inclui ler nem apagar arquivos de log.
 - **Sem `core:default`.** O conjunto padrão do template libera bandeja, menus, imagens a partir de caminhos, resolução de diretórios, emissão de eventos para qualquer janela e leitura de janelas e monitores, nada disso usado pelas duas janelas. Uma página comprometida poderia, por exemplo, emitir `panel-show` ou mexer na bandeja. Quando uma janela precisar de uma API do núcleo, entra só a permissão específica.
 - Chamadas fora disso falham no IPC (verificado no build de dev): comando do app de outra janela com `hide_panel not allowed on window "dock", … referenced by: capability: panel, permission: allow-hide-panel`; API do núcleo com `event.emit not allowed. Permissions associated with this command: core:event:allow-emit, core:event:default` (idem para `path.resolve_directory` e `window.title`).
 

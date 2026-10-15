@@ -5,6 +5,7 @@ use tauri::RunEvent;
 mod commands;
 #[allow(dead_code)] // wired in F6a
 mod domain;
+mod logging;
 #[allow(dead_code)] // wired in F6a
 mod persistence;
 mod tray;
@@ -13,6 +14,7 @@ mod windows;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(logging::plugin())
         .manage(Arc::new(windows::hit_test::Tracker::default()))
         .setup(|app| {
             windows::panel::setup(app.handle())?;

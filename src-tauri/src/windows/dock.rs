@@ -91,7 +91,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         if let WindowEvent::CloseRequested { api, .. } = event {
             api.prevent_close();
             if let Err(error) = hide(&handle) {
-                eprintln!("failed to hide the dock: {error}");
+                log::warn!("dock: failed to hide: {error}");
             }
         }
     });
@@ -147,7 +147,7 @@ fn hide(app: &AppHandle) -> Result<(), Box<dyn Error>> {
 #[cfg(windows)]
 fn reposition(window: &WebviewWindow) {
     if let Err(error) = place(window) {
-        eprintln!("failed to reposition the dock: {error}");
+        log::warn!("dock: failed to reposition: {error}");
     }
 }
 

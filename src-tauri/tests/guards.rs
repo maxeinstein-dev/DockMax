@@ -24,6 +24,7 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "core:event:allow-unlisten",
             "allow-toggle-panel",
             "allow-set-dock-hit-region",
+            "log:allow-log",
         ],
     ),
     (
@@ -34,6 +35,7 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "core:event:allow-listen",
             "core:event:allow-unlisten",
             "allow-hide-panel",
+            "log:allow-log",
         ],
     ),
 ];

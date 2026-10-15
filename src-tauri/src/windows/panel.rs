@@ -247,7 +247,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
             _ => return,
         };
         if let Err(error) = apply(&app, action, None) {
-            eprintln!("failed to hide the panel: {error}");
+            log::warn!("panel: failed to hide: {error}");
         }
     });
     Ok(())

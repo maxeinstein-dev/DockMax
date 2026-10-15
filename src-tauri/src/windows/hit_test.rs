@@ -201,6 +201,7 @@ pub fn tracker(app: &AppHandle) -> Arc<Tracker> {
 
 fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
     let mut captured = false;
+    let mut failures = CaptureFailures::default();
     loop {
         let shared = tracker.lock();
         if shared.stopped {
@@ -208,7 +209,7 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
         }
         if !shared.visible && captured {
             drop(shared);
-            if set_captured(window, false) {
+            if set_captured(window, false, &mut failures) {
                 captured = false;
             } else {
                 // Retry at the sampling rate instead of spinning.
@@ -230,7 +231,7 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
         if let Some(cursor) = cursor_position() {
             let next = next_captured(captured, cursor, bar, &hold);
             // On failure the window keeps its old state: retry next tick.
-            if next != captured && set_captured(window, next) {
+            if next != captured && set_captured(window, next, &mut failures) {
                 captured = next;
             }
         }
@@ -240,15 +241,52 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
 
 /// Tauri forwards the change to the main thread. Returns whether it worked.
 /// On release, tells the dock's page to clear its hover state.
-fn set_captured(window: &WebviewWindow, captured: bool) -> bool {
-    if let Err(error) = window.set_ignore_cursor_events(!captured) {
-        eprintln!("failed to change the dock's mouse capture: {error}");
+fn set_captured(window: &WebviewWindow, captured: bool, failures: &mut CaptureFailures) -> bool {
+    let result = window.set_ignore_cursor_events(!captured);
+    match failures.record(result.is_ok()) {
+        Some(Transition::Failing) => {
+            if let Err(error) = &result {
+                log::warn!("dock: failed to change the mouse capture, retrying: {error}");
+            }
+        }
+        Some(Transition::Recovered) => log::info!("dock: mouse capture works again"),
+        None => {}
+    }
+    if result.is_err() {
         return false;
     }
     if !captured && let Err(error) = window.emit_to(dock::LABEL, RELEASED_EVENT, ()) {
-        eprintln!("failed to tell the dock it was released: {error}");
+        log::warn!("dock: failed to send the release event: {error}");
     }
     true
+}
+
+/// Remembers whether changing the mouse capture is failing, so a failure
+/// retried on every tick is logged once, when it starts, and once more when
+/// it ends.
+#[derive(Debug, Default)]
+struct CaptureFailures {
+    failing: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Transition {
+    /// The first failure after a success (or since the start).
+    Failing,
+    /// The first success after a failure.
+    Recovered,
+}
+
+impl CaptureFailures {
+    /// Records an attempt; returns the transition it makes, if any.
+    fn record(&mut self, succeeded: bool) -> Option<Transition> {
+        let was_failing = std::mem::replace(&mut self.failing, !succeeded);
+        match (was_failing, succeeded) {
+            (false, false) => Some(Transition::Failing),
+            (true, true) => Some(Transition::Recovered),
+            _ => None,
+        }
+    }
 }
 
 /// Read straight from Win32: Tauri's `cursor_position()` waits for a round
@@ -615,5 +653,27 @@ mod tests {
         );
         let without_hold = r#"{"bar":{"x":0,"y":0,"width":1,"height":1}}"#;
         assert!(serde_json::from_str::<HitRegion>(without_hold).is_err());
+    }
+
+    #[test]
+    fn capture_failures_are_reported_only_on_transitions() {
+        let mut failures = CaptureFailures::default();
+
+        assert_eq!(failures.record(true), None);
+        assert_eq!(failures.record(false), Some(Transition::Failing));
+        // Retried on every tick while it keeps failing: no new report.
+        assert_eq!(failures.record(false), None);
+        assert_eq!(failures.record(false), None);
+        assert_eq!(failures.record(true), Some(Transition::Recovered));
+        assert_eq!(failures.record(true), None);
+        assert_eq!(failures.record(false), Some(Transition::Failing));
+    }
+
+    #[test]
+    fn a_failure_on_the_first_attempt_is_reported() {
+        assert_eq!(
+            CaptureFailures::default().record(false),
+            Some(Transition::Failing)
+        );
     }
 }

@@ -34,7 +34,7 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     match event.id().as_ref() {
         TOGGLE_DOCK_ID => {
             if let Err(error) = dock::toggle(app) {
-                eprintln!("failed to toggle the dock: {error}");
+                log::warn!("tray: failed to toggle the dock: {error}");
             }
         }
         QUIT_ID => app.exit(0),
