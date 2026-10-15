@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::sync::Mutex;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -17,21 +18,32 @@ pub const LABEL: &str = "panel";
 #[cfg(windows)]
 pub const LAYERING: super::native::Layering = super::native::Layering::AsTaoSets;
 
-/// Event sent to the panel window right before it is shown.
+/// Event sent to the panel window, while hidden, with the panel to render.
+/// The page answers with `panel_ready` once it has.
 const SHOW_EVENT: &str = "panel-show";
 
 /// Event sent to the dock when the open panel changes, with
 /// `{ "panelId": <id> | null }` (`PanelChanged` in `src/core/panels.ts`).
-#[expect(dead_code, reason = "emitted in R1")]
 pub const CHANGED_EVENT: &str = "panel-changed";
 
-/// Gap between the panel and the dock, and between the panel and the work
-/// area edges, in logical pixels.
+/// Gap between the panel's visible card and the dock bar, and between the
+/// card and the work area edges, in logical pixels.
 const MARGIN: f64 = 8.0;
 
 /// How long after a blur-hide a toggle of the same panel still counts as
 /// the click that closed it.
 const REOPEN_GUARD: Duration = Duration::from_millis(300);
+
+/// How long the panel waits for its page to confirm it rendered before it
+/// is shown anyway, with the last known size.
+pub const READY_TIMEOUT: Duration = Duration::from_millis(400);
+
+/// Largest panel window side accepted from the page, in logical pixels.
+pub const MAX_PANEL_SIZE: f64 = 4096.0;
+
+/// Largest transparent inset around the panel card accepted from the page,
+/// in logical pixels.
+pub const MAX_INSET: f64 = 32.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -41,11 +53,19 @@ pub enum PanelId {
 }
 
 impl PanelId {
-    /// Fixed panel size in logical pixels.
+    /// Size the panel is shown with before its page ever reported one, in
+    /// logical pixels.
     pub fn logical_size(self) -> (f64, f64) {
         match self {
             PanelId::Settings => (360.0, 480.0),
             PanelId::About => (320.0, 240.0),
+        }
+    }
+
+    fn index(self) -> usize {
+        match self {
+            PanelId::Settings => 0,
+            PanelId::About => 1,
         }
     }
 }
@@ -57,6 +77,7 @@ pub const MAX_LOGICAL: f64 = 100_000.0;
 
 /// A rectangle in logical pixels, relative to a window's client area.
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LogicalRect {
     pub x: f64,
     pub y: f64,
@@ -101,6 +122,106 @@ impl LogicalRect {
     }
 }
 
+/// A size in logical pixels.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LogicalSize {
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SizeError {
+    NotFinite,
+    NotPositive,
+    TooLarge,
+}
+
+impl fmt::Display for SizeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            SizeError::NotFinite => "a value is not a finite number",
+            SizeError::NotPositive => "the width or height is below 1 logical pixel",
+            SizeError::TooLarge => "the width or height is beyond the limit",
+        })
+    }
+}
+
+impl Error for SizeError {}
+
+impl LogicalSize {
+    /// Checks a size received from the frontend: finite, at least 1 logical
+    /// pixel and at most `max` on each side.
+    pub fn validate(&self, max: f64) -> Result<(), SizeError> {
+        let values = [self.width, self.height];
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(SizeError::NotFinite);
+        }
+        if values.iter().any(|&value| value < 1.0) {
+            return Err(SizeError::NotPositive);
+        }
+        if values.iter().any(|&value| value > max) {
+            return Err(SizeError::TooLarge);
+        }
+        Ok(())
+    }
+}
+
+/// The panel window as its page rendered it, in logical pixels: the window
+/// size and the transparent inset around the visible card, on every side.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PanelGeometry {
+    pub size: LogicalSize,
+    pub inset: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GeometryError {
+    Size(SizeError),
+    Inset,
+}
+
+impl fmt::Display for GeometryError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GeometryError::Size(error) => write!(f, "size: {error}"),
+            GeometryError::Inset => {
+                f.write_str("the inset is not a finite number from 0 to 32 leaving a visible card")
+            }
+        }
+    }
+}
+
+impl Error for GeometryError {}
+
+impl PanelGeometry {
+    /// What the panel is shown with before its page ever reported a size.
+    pub fn fallback(id: PanelId) -> Self {
+        let (width, height) = id.logical_size();
+        PanelGeometry {
+            size: LogicalSize { width, height },
+            inset: 0.0,
+        }
+    }
+
+    /// Checks a geometry received from the panel page: a valid size of at
+    /// most `MAX_PANEL_SIZE`, and an inset from 0 to `MAX_INSET` that leaves
+    /// a card at least 1 logical pixel wide and tall.
+    pub fn validate(&self) -> Result<(), GeometryError> {
+        self.size
+            .validate(MAX_PANEL_SIZE)
+            .map_err(GeometryError::Size)?;
+        let card = |side: f64| side - 2.0 * self.inset >= 1.0;
+        if !(0.0..=MAX_INSET).contains(&self.inset)
+            || !card(self.size.width)
+            || !card(self.size.height)
+        {
+            return Err(GeometryError::Inset);
+        }
+        Ok(())
+    }
+}
+
 /// Converts a rectangle relative to a window's client area into physical
 /// screen coordinates. Returns `None` for an invalid rectangle or scale, or
 /// when the result leaves the `i32` range.
@@ -119,32 +240,41 @@ pub fn to_screen(rect: LogicalRect, client_origin: (i32, i32), scale_factor: f64
     })
 }
 
-/// Physical rectangle of a panel anchored to a dock item: `MARGIN` away from
-/// the visible dock bar on the side facing the screen, horizontally centered
-/// on the anchor, and kept `MARGIN` inside the work area. A panel larger than the
+/// Physical rectangle of a panel window anchored to a dock item. The
+/// visible card (the window minus `geometry.inset` on every side) sits
+/// `MARGIN` away from the dock bar on the side away from the screen edge,
+/// horizontally centered on the anchor, and kept `MARGIN` inside the work
+/// area; only the transparent inset may go beyond. A card larger than the
 /// work area is pinned to the left (or top) margin.
 pub fn panel_rect(
     anchor: Rect,
     bar: Rect,
     work_area: Rect,
     scale_factor: f64,
-    logical_size: (f64, f64),
+    geometry: PanelGeometry,
     edge: Edge,
 ) -> Rect {
     // Every term fits in i32/u32 (`as` saturates), so sums in i64 can't
     // overflow; the result is saturated back into i32.
-    let width = (logical_size.0 * scale_factor).round() as u32;
-    let height = (logical_size.1 * scale_factor).round() as u32;
+    let width = (geometry.size.width * scale_factor).round() as u32;
+    let height = (geometry.size.height * scale_factor).round() as u32;
+    let inset = ((geometry.inset * scale_factor).round() as u32)
+        .min(width / 2)
+        .min(height / 2);
+    let card_width = width - 2 * inset;
+    let card_height = height - 2 * inset;
     let margin = i64::from((MARGIN * scale_factor).round() as i32);
     let anchor_center = i64::from(anchor.x) + i64::from(anchor.width).div_euclid(2);
-    let x = anchor_center - i64::from(width).div_euclid(2);
-    let y = match edge {
-        Edge::Bottom => i64::from(bar.y) - margin - i64::from(height),
+    let card_x = anchor_center - i64::from(card_width).div_euclid(2);
+    let card_y = match edge {
+        Edge::Bottom => i64::from(bar.y) - margin - i64::from(card_height),
         Edge::Top => i64::from(bar.y) + i64::from(bar.height) + margin,
     };
+    let card_x = clamp_axis(card_x, card_width, work_area.x, work_area.width, margin);
+    let card_y = clamp_axis(card_y, card_height, work_area.y, work_area.height, margin);
     Rect {
-        x: clamp_axis(x, width, work_area.x, work_area.width, margin),
-        y: clamp_axis(y, height, work_area.y, work_area.height, margin),
+        x: dock::saturate(i64::from(card_x) - i64::from(inset)),
+        y: dock::saturate(i64::from(card_y) - i64::from(inset)),
         width,
         height,
     }
@@ -160,54 +290,85 @@ fn clamp_axis(position: i64, size: u32, start: i32, length: u32, margin: i64) ->
     })
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Action {
-    Show(PanelId),
+    /// Hide the window, ask its page to render the panel and wait for
+    /// `panel_ready`, or `READY_TIMEOUT`. The number tells this wait from
+    /// later ones, so a late time-out can't show a newer panel.
+    Prepare(PanelId, u64),
+    /// Place the window for the open panel and show it; when it is already
+    /// on screen, only place it again.
+    Reveal {
+        anchor: LogicalRect,
+        geometry: PanelGeometry,
+    },
     Hide,
     Nothing,
 }
 
 /// Which panel is open. Only one panel is open at a time.
+///
+/// A panel opens in two steps: `toggle` prepares it (the window stays
+/// hidden while its page renders), then `ready` or `time_out` reveals it.
 #[derive(Debug, Default)]
 pub struct PanelState {
-    open: Option<PanelId>,
+    /// The open panel, shown or waiting for its page, and the dock item it
+    /// is anchored to.
+    open: Option<(PanelId, LogicalRect)>,
+    /// The wait for the open panel's page, while it lasts.
+    waiting: Option<u64>,
+    /// Waits started so far; numbers each one.
+    waits: u64,
     /// Panel hidden by losing focus, and when.
     blurred: Option<(PanelId, Instant)>,
+    /// Last geometry each panel's page reported.
+    known: [Option<PanelGeometry>; 2],
 }
 
 impl PanelState {
     /// A click on a dock item. Clicking the item of an open panel makes the
     /// panel lose focus (and hide) before the toggle arrives, so a toggle of
     /// that panel right after a blur-hide keeps it closed.
-    pub fn toggle(&mut self, id: PanelId, now: Instant) -> Action {
+    pub fn toggle(&mut self, id: PanelId, anchor: LogicalRect, now: Instant) -> Action {
         let blurred = self.blurred.take();
         match self.open {
-            Some(open) if open == id => {
-                self.open = None;
-                Action::Hide
-            }
-            Some(_) => {
-                self.open = Some(id);
-                Action::Show(id)
-            }
+            Some((open, _)) if open == id => self.close(),
+            Some(_) => self.prepare(id, anchor),
             None => match blurred {
                 Some((closed, at))
                     if closed == id && now.saturating_duration_since(at) < REOPEN_GUARD =>
                 {
                     Action::Nothing
                 }
-                _ => {
-                    self.open = Some(id);
-                    Action::Show(id)
-                }
+                _ => self.prepare(id, anchor),
             },
         }
     }
 
-    /// The panel window lost focus.
-    pub fn blur(&mut self, now: Instant) -> Action {
+    fn prepare(&mut self, id: PanelId, anchor: LogicalRect) -> Action {
+        self.waits += 1;
+        self.open = Some((id, anchor));
+        self.waiting = Some(self.waits);
+        Action::Prepare(id, self.waits)
+    }
+
+    fn close(&mut self) -> Action {
+        self.waiting = None;
         match self.open.take() {
-            Some(id) => {
+            Some(_) => Action::Hide,
+            None => Action::Nothing,
+        }
+    }
+
+    /// The panel window lost focus. Ignored while the open panel waits for
+    /// its page: the window is hidden then, and only hiding it for the wait
+    /// can take its focus.
+    pub fn blur(&mut self, now: Instant) -> Action {
+        if self.waiting.is_some() {
+            return Action::Nothing;
+        }
+        match self.open.take() {
+            Some((id, _)) => {
                 self.blurred = Some((id, now));
                 Action::Hide
             }
@@ -215,21 +376,70 @@ impl PanelState {
         }
     }
 
-    /// The panel asked to close itself (Esc), or the dock is hiding. Keeps a
-    /// pending reopen guard: a late hide after a blur-hide must not let the
-    /// click that closed the panel reopen it.
+    /// The panel asked to close itself (Esc), or the dock is hiding or
+    /// moving. Keeps a pending reopen guard: a late hide after a blur-hide
+    /// must not let the click that closed the panel reopen it.
     pub fn hide(&mut self) -> Action {
-        match self.open.take() {
-            Some(_) => Action::Hide,
+        self.close()
+    }
+
+    /// The panel page rendered `id` at `geometry` (validated). Reveals the
+    /// open panel; a signal for any other panel is stale and ignored. A
+    /// signal for the panel already on screen places it again (its content
+    /// changed size, or the time-out showed it first).
+    pub fn ready(&mut self, id: PanelId, geometry: PanelGeometry) -> Action {
+        let Some((open, anchor)) = self.open else {
+            return Action::Nothing;
+        };
+        if open != id {
+            return Action::Nothing;
+        }
+        self.known[id.index()] = Some(geometry);
+        self.waiting = None;
+        Action::Reveal { anchor, geometry }
+    }
+
+    /// `READY_TIMEOUT` passed since `Prepare(_, wait)`. Reveals the panel
+    /// with the last geometry its page reported, if it is still waiting.
+    pub fn time_out(&mut self, wait: u64) -> Action {
+        if self.waiting != Some(wait) {
+            return Action::Nothing;
+        }
+        self.waiting = None;
+        match self.open {
+            Some((id, anchor)) => Action::Reveal {
+                anchor,
+                geometry: self.known[id.index()].unwrap_or_else(|| PanelGeometry::fallback(id)),
+            },
             None => Action::Nothing,
         }
     }
+
+    /// The open panel, shown or waiting for its page.
+    pub fn open(&self) -> Option<PanelId> {
+        self.open.map(|(id, _)| id)
+    }
+
+    /// Drops the reopen guard: the next toggle is an explicit request (the
+    /// tray), not the click that closed the panel.
+    pub fn forget_blur(&mut self) {
+        self.blurred = None;
+    }
 }
 
-#[derive(Clone, Serialize)]
+/// `{ "panelId": <id> }`: the payload of `panel-show` and of the dock's
+/// `dock-request-panel`.
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ShowPayload {
-    panel_id: PanelId,
+pub struct PanelPayload {
+    pub panel_id: PanelId,
+}
+
+/// `{ "panelId": <id> | null }`: the payload of `panel-changed`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ChangedPayload {
+    panel_id: Option<PanelId>,
 }
 
 /// Registers the panel state and hides the panel when it loses focus or is
@@ -251,7 +461,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
             }
             _ => return,
         };
-        if let Err(error) = apply(&app, action, None) {
+        if let Err(error) = apply(&app, action) {
             log::warn!("panel: failed to hide: {error}");
         }
     });
@@ -266,37 +476,91 @@ pub fn lock(app: &AppHandle) -> std::sync::MutexGuard<'_, PanelState> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// Carries out an action on the panel window. `anchor` is the clicked dock
-/// item, relative to the dock's client area; it is required to show.
-/// Must be called without holding the state lock: hiding the window
-/// synchronously triggers the blur handler.
-pub fn apply(
-    app: &AppHandle,
-    action: Action,
-    anchor: Option<LogicalRect>,
-) -> Result<(), Box<dyn Error>> {
+/// Closes the panel through the state, telling the dock.
+pub fn close(app: &AppHandle) {
+    let action = lock(app).hide();
+    if let Err(error) = apply(app, action) {
+        log::warn!("panel: failed to hide: {error}");
+    }
+}
+
+/// Carries out an action on the panel window and tells the dock when the
+/// open panel changed. Must be called without holding the state lock:
+/// hiding the window synchronously triggers the blur handler.
+pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
     let window = app
         .get_webview_window(LABEL)
         .ok_or("panel window is missing")?;
     match action {
-        Action::Show(id) => {
-            let anchor = anchor.ok_or("missing anchor")?;
-            place(app, &window, id, anchor)?;
-            window.emit_to(LABEL, SHOW_EVENT, ShowPayload { panel_id: id })?;
-            window.show()?;
-            focus(&window)?;
+        Action::Prepare(id, wait) => {
+            notify_dock(app, Some(id));
+            // Hidden while the page renders: no previous content, no flash
+            // at the previous size.
+            window.hide()?;
+            window.emit_to(LABEL, SHOW_EVENT, PanelPayload { panel_id: id })?;
+            schedule_time_out(app, wait)?;
         }
-        Action::Hide => window.hide()?,
+        Action::Reveal { anchor, geometry } => {
+            place(app, &window, anchor, geometry)?;
+            // Already on screen (placed again): showing it would activate
+            // it again.
+            if !window.is_visible()? {
+                window.show()?;
+                focus(&window)?;
+            }
+        }
+        Action::Hide => {
+            notify_dock(app, None);
+            window.hide()?;
+        }
         Action::Nothing => {}
     }
+    Ok(())
+}
+
+/// Carries out a `Reveal` (or nothing); on failure, closes the panel.
+pub fn reveal_or_close(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
+    apply(app, action).inspect_err(|_| close(app))
+}
+
+fn notify_dock(app: &AppHandle, panel_id: Option<PanelId>) {
+    if let Err(error) = app.emit_to(dock::LABEL, CHANGED_EVENT, ChangedPayload { panel_id }) {
+        log::warn!("panel: failed to tell the dock: {error}");
+    }
+}
+
+/// Reveals the panel after `READY_TIMEOUT` if its page has not confirmed by
+/// then.
+fn schedule_time_out(app: &AppHandle, wait: u64) -> Result<(), Box<dyn Error>> {
+    let app = app.clone();
+    thread::Builder::new()
+        .name("panel-ready-timeout".into())
+        .spawn(move || {
+            thread::sleep(READY_TIMEOUT);
+            let handle = app.clone();
+            // On the main thread, in order with the commands and the window
+            // events.
+            let scheduled = app.run_on_main_thread(move || {
+                let action = lock(&handle).time_out(wait);
+                if action != Action::Nothing {
+                    log::debug!("panel: no ready signal in time, showing the last known size");
+                }
+                if let Err(error) = reveal_or_close(&handle, action) {
+                    log::warn!("panel: failed to show: {error}");
+                }
+            });
+            if let Err(error) = scheduled {
+                log::warn!("panel: failed to schedule the time-out: {error}");
+            }
+        })?;
     Ok(())
 }
 
 fn place(
     app: &AppHandle,
     window: &WebviewWindow,
-    id: PanelId,
     anchor: LogicalRect,
+    geometry: PanelGeometry,
 ) -> Result<(), Box<dyn Error>> {
     let dock_window = app
         .get_webview_window(dock::LABEL)
@@ -314,8 +578,8 @@ fn place(
         bar,
         work_area,
         scale_factor,
-        id.logical_size(),
-        dock::EDGE,
+        geometry,
+        dock::edge(app),
     );
     window.set_size(PhysicalSize::new(rect.width, rect.height))?;
     window.set_position(PhysicalPosition::new(rect.x, rect.y))?;
@@ -344,6 +608,18 @@ mod tests {
             width,
             height,
         }
+    }
+
+    fn geometry(width: f64, height: f64, inset: f64) -> PanelGeometry {
+        PanelGeometry {
+            size: LogicalSize { width, height },
+            inset,
+        }
+    }
+
+    /// A panel without a transparent inset: the whole window is the card.
+    fn size(width: f64, height: f64) -> PanelGeometry {
+        geometry(width, height, 0.0)
     }
 
     const WORK_AREA: Rect = Rect {
@@ -662,7 +938,14 @@ mod tests {
         for (anchor, bar, work_area, scale_factor) in cases {
             for edge in [Edge::Bottom, Edge::Top] {
                 // Must not panic.
-                let _ = panel_rect(anchor, bar, work_area, scale_factor, (360.0, 480.0), edge);
+                let _ = panel_rect(
+                    anchor,
+                    bar,
+                    work_area,
+                    scale_factor,
+                    size(360.0, 480.0),
+                    edge,
+                );
             }
         }
         let panel = panel_rect(
@@ -670,7 +953,7 @@ mod tests {
             BAR,
             rect(i32::MAX, 0, u32::MAX, 1032),
             1.0,
-            (360.0, 480.0),
+            size(360.0, 480.0),
             Edge::Bottom,
         );
         assert_eq!(panel.x, i32::MAX);
@@ -680,7 +963,14 @@ mod tests {
     fn bottom_panel_is_centered_on_the_anchor_8px_above_the_bar() {
         let anchor = rect(1200, 976, 100, 32);
 
-        let panel = panel_rect(anchor, BAR, WORK_AREA, 1.0, (360.0, 480.0), Edge::Bottom);
+        let panel = panel_rect(
+            anchor,
+            BAR,
+            WORK_AREA,
+            1.0,
+            size(360.0, 480.0),
+            Edge::Bottom,
+        );
 
         assert_eq!(panel, rect(1250 - 180, 960 - 8 - 480, 360, 480));
     }
@@ -689,7 +979,14 @@ mod tests {
     fn panel_near_the_left_edge_is_clamped_to_the_margin() {
         let anchor = rect(20, 976, 40, 32);
 
-        let panel = panel_rect(anchor, BAR, WORK_AREA, 1.0, (360.0, 480.0), Edge::Bottom);
+        let panel = panel_rect(
+            anchor,
+            BAR,
+            WORK_AREA,
+            1.0,
+            size(360.0, 480.0),
+            Edge::Bottom,
+        );
 
         assert_eq!(panel.x, 8);
     }
@@ -698,7 +995,14 @@ mod tests {
     fn panel_near_the_right_edge_is_clamped_to_the_margin() {
         let anchor = rect(2500, 976, 40, 32);
 
-        let panel = panel_rect(anchor, BAR, WORK_AREA, 1.0, (360.0, 480.0), Edge::Bottom);
+        let panel = panel_rect(
+            anchor,
+            BAR,
+            WORK_AREA,
+            1.0,
+            size(360.0, 480.0),
+            Edge::Bottom,
+        );
 
         assert_eq!(panel.x, 2560 - 8 - 360);
     }
@@ -708,7 +1012,7 @@ mod tests {
         let bar = rect(1160, 8, 240, 64);
         let anchor = rect(1200, 24, 100, 32);
 
-        let panel = panel_rect(anchor, bar, WORK_AREA, 1.0, (320.0, 240.0), Edge::Top);
+        let panel = panel_rect(anchor, bar, WORK_AREA, 1.0, size(320.0, 240.0), Edge::Top);
 
         assert_eq!(panel, rect(1250 - 160, 8 + 64 + 8, 320, 240));
     }
@@ -719,7 +1023,14 @@ mod tests {
         let bar = rect(874, 734, 300, 80);
         let anchor = rect(900, 754, 125, 40);
 
-        let panel = panel_rect(anchor, bar, work_area, 1.25, (360.0, 480.0), Edge::Bottom);
+        let panel = panel_rect(
+            anchor,
+            bar,
+            work_area,
+            1.25,
+            size(360.0, 480.0),
+            Edge::Bottom,
+        );
 
         // 360 * 1.25 = 450, 480 * 1.25 = 600, 8 * 1.25 = 10.
         assert_eq!(panel, rect(962 - 225, 734 - 10 - 600, 450, 600));
@@ -731,7 +1042,14 @@ mod tests {
         let bar = rect(1100, 1260, 360, 96);
         let anchor = rect(1130, 1284, 150, 48);
 
-        let panel = panel_rect(anchor, bar, work_area, 1.5, (320.0, 240.0), Edge::Bottom);
+        let panel = panel_rect(
+            anchor,
+            bar,
+            work_area,
+            1.5,
+            size(320.0, 240.0),
+            Edge::Bottom,
+        );
 
         // 320 * 1.5 = 480, 240 * 1.5 = 360, 8 * 1.5 = 12.
         assert_eq!(panel, rect(1205 - 240, 1260 - 12 - 360, 480, 360));
@@ -743,7 +1061,14 @@ mod tests {
         let bar = rect(1100, 1260, 360, 96);
         let anchor = rect(0, 1284, 20, 48);
 
-        let panel = panel_rect(anchor, bar, work_area, 1.5, (320.0, 240.0), Edge::Bottom);
+        let panel = panel_rect(
+            anchor,
+            bar,
+            work_area,
+            1.5,
+            size(320.0, 240.0),
+            Edge::Bottom,
+        );
 
         assert_eq!(panel.x, 12);
     }
@@ -757,7 +1082,7 @@ mod tests {
             BAR,
             work_area,
             1.0,
-            (360.0, 480.0),
+            size(360.0, 480.0),
             Edge::Bottom,
         );
 
@@ -775,7 +1100,7 @@ mod tests {
             bar,
             work_area,
             1.0,
-            (360.0, 480.0),
+            size(360.0, 480.0),
             Edge::Bottom,
         );
 
@@ -783,17 +1108,447 @@ mod tests {
         assert_eq!(panel.y, 48);
     }
 
+    #[test]
+    fn bottom_card_sits_8px_above_the_bar_with_the_inset_around_it() {
+        let anchor = rect(1200, 976, 100, 32);
+
+        let panel = panel_rect(
+            anchor,
+            BAR,
+            WORK_AREA,
+            1.0,
+            geometry(360.0, 480.0, 16.0),
+            Edge::Bottom,
+        );
+
+        // The card is 328x448, centered on 1250, its bottom at 960 - 8.
+        assert_eq!(panel, rect(1250 - 164 - 16, 960 - 8 - 448 - 16, 360, 480));
+        assert_eq!(panel.y + 480 - 16, 960 - 8);
+    }
+
+    #[test]
+    fn top_card_sits_8px_below_the_bar_at_150_percent() {
+        let work_area = rect(0, 0, 2560, 1368);
+        let bar = rect(1100, 12, 360, 96);
+        let anchor = rect(1130, 36, 150, 48);
+
+        let panel = panel_rect(
+            anchor,
+            bar,
+            work_area,
+            1.5,
+            geometry(320.0, 240.0, 12.0),
+            Edge::Top,
+        );
+
+        // 320x240 at 1.5 = 480x360, inset 18, card 444x324, gap 12.
+        assert_eq!(panel, rect(1205 - 222 - 18, 12 + 96 + 12 - 18, 480, 360));
+    }
+
+    #[test]
+    fn inset_scales_and_rounds_like_the_size_at_125_percent() {
+        let work_area = rect(0, 0, 2048, 824);
+        let bar = rect(874, 734, 300, 80);
+        let anchor = rect(900, 754, 125, 40);
+
+        let panel = panel_rect(
+            anchor,
+            bar,
+            work_area,
+            1.25,
+            geometry(360.0, 480.0, 10.0),
+            Edge::Bottom,
+        );
+
+        // 450x600, inset 12.5 -> 13, card 424x574, gap 10.
+        assert_eq!(panel, rect(962 - 212 - 13, 734 - 10 - 574 - 13, 450, 600));
+    }
+
+    #[test]
+    fn card_is_clamped_inside_the_work_area_and_only_the_inset_goes_beyond() {
+        let inset = geometry(360.0, 480.0, 16.0);
+
+        let left = panel_rect(
+            rect(20, 976, 40, 32),
+            BAR,
+            WORK_AREA,
+            1.0,
+            inset,
+            Edge::Bottom,
+        );
+        let right = panel_rect(
+            rect(2500, 976, 40, 32),
+            BAR,
+            WORK_AREA,
+            1.0,
+            inset,
+            Edge::Bottom,
+        );
+
+        // Card at x = 8 and ending at 2560 - 8.
+        assert_eq!(left.x, 8 - 16);
+        assert_eq!(right.x + 360 - 16, 2560 - 8);
+    }
+
+    #[test]
+    fn card_too_tall_for_the_space_is_clamped_on_both_edges() {
+        let inset = geometry(360.0, 480.0, 16.0);
+        let anchor = rect(1200, 416, 100, 32);
+
+        let bottom = panel_rect(
+            anchor,
+            rect(1160, 400, 240, 64),
+            rect(0, 40, 2560, 600),
+            1.0,
+            inset,
+            Edge::Bottom,
+        );
+        let top = panel_rect(
+            rect(1200, 24, 100, 32),
+            rect(1160, 8, 240, 64),
+            rect(0, 0, 2560, 500),
+            1.0,
+            inset,
+            Edge::Top,
+        );
+
+        // Card top at 40 + 8; card bottom at 500 - 8.
+        assert_eq!(bottom.y + 16, 48);
+        assert_eq!(top.y + 480 - 16, 500 - 8);
+    }
+
+    #[test]
+    fn inset_wider_than_half_the_window_never_underflows() {
+        let odd = PanelGeometry {
+            size: LogicalSize {
+                width: 10.0,
+                height: 4.0,
+            },
+            inset: 1e9,
+        };
+        for scale_factor in [1.0, 1.5, f64::MAX, f64::NAN] {
+            for edge in [Edge::Bottom, Edge::Top] {
+                // Must not panic.
+                let _ = panel_rect(BAR, BAR, WORK_AREA, scale_factor, odd, edge);
+            }
+        }
+    }
+
+    #[test]
+    fn geometry_within_the_limits_is_valid() {
+        for (width, height, inset) in [
+            (360.0, 480.0, 0.0),
+            (360.0, 480.0, 16.0),
+            (1.0, 1.0, 0.0),
+            (MAX_PANEL_SIZE, MAX_PANEL_SIZE, MAX_INSET),
+            (65.0, 65.0, 32.0),
+        ] {
+            let geometry = geometry(width, height, inset);
+            assert_eq!(geometry.validate(), Ok(()), "{geometry:?}");
+        }
+        assert_eq!(PanelGeometry::fallback(PanelId::About).validate(), Ok(()));
+    }
+
+    #[test]
+    fn geometry_out_of_bounds_is_rejected() {
+        use GeometryError::*;
+        let cases = [
+            (f64::NAN, 480.0, 0.0, Size(SizeError::NotFinite)),
+            (360.0, f64::INFINITY, 0.0, Size(SizeError::NotFinite)),
+            (0.0, 480.0, 0.0, Size(SizeError::NotPositive)),
+            (360.0, 0.5, 0.0, Size(SizeError::NotPositive)),
+            (360.0, -480.0, 0.0, Size(SizeError::NotPositive)),
+            (MAX_PANEL_SIZE + 1.0, 480.0, 0.0, Size(SizeError::TooLarge)),
+            (360.0, 1e12, 0.0, Size(SizeError::TooLarge)),
+            (360.0, 480.0, -1.0, Inset),
+            (360.0, 480.0, MAX_INSET + 0.5, Inset),
+            (360.0, 480.0, f64::NAN, Inset),
+            (360.0, 480.0, f64::INFINITY, Inset),
+            // Nothing visible would be left of the card.
+            (64.0, 480.0, 32.0, Inset),
+            (360.0, 40.0, 20.0, Inset),
+        ];
+        for (width, height, inset, expected) in cases {
+            let geometry = geometry(width, height, inset);
+            assert_eq!(geometry.validate(), Err(expected), "{geometry:?}");
+        }
+    }
+
+    #[test]
+    fn rects_and_sizes_with_unknown_fields_are_rejected() {
+        let rect = r#"{"x":0,"y":0,"width":1,"height":1,"top":0}"#;
+        let size = r#"{"width":1,"height":1,"depth":1}"#;
+
+        assert!(serde_json::from_str::<LogicalRect>(rect).is_err());
+        assert!(serde_json::from_str::<LogicalSize>(size).is_err());
+        assert!(serde_json::from_str::<LogicalSize>(r#"{"width":1}"#).is_err());
+        assert_eq!(
+            serde_json::from_str::<LogicalSize>(r#"{"width":1.5,"height":2}"#).unwrap(),
+            LogicalSize {
+                width: 1.5,
+                height: 2.0
+            }
+        );
+    }
+
+    #[test]
+    fn payloads_use_the_names_the_pages_expect() {
+        assert_eq!(
+            serde_json::to_value(PanelPayload {
+                panel_id: PanelId::Settings
+            })
+            .unwrap(),
+            serde_json::json!({ "panelId": "settings" })
+        );
+        assert_eq!(
+            serde_json::to_value(ChangedPayload { panel_id: None }).unwrap(),
+            serde_json::json!({ "panelId": null })
+        );
+        assert_eq!(
+            serde_json::to_value(ChangedPayload {
+                panel_id: Some(PanelId::About)
+            })
+            .unwrap(),
+            serde_json::json!({ "panelId": "about" })
+        );
+        assert_eq!(CHANGED_EVENT, "panel-changed");
+    }
+
     fn at(base: Instant, ms: u64) -> Instant {
         base + Duration::from_millis(ms)
     }
 
+    const ANCHOR: LogicalRect = LogicalRect {
+        x: 20.0,
+        y: 40.0,
+        width: 64.0,
+        height: 64.0,
+    };
+
+    const RENDERED: PanelGeometry = PanelGeometry {
+        size: LogicalSize {
+            width: 392.0,
+            height: 520.0,
+        },
+        inset: 16.0,
+    };
+
+    fn prepared(action: Action) -> (PanelId, u64) {
+        match action {
+            Action::Prepare(id, wait) => (id, wait),
+            other => panic!("expected Prepare, got {other:?}"),
+        }
+    }
+
+    /// Opens `id` and reveals it as its page confirms, at `RENDERED`.
+    fn show(state: &mut PanelState, id: PanelId, now: Instant) {
+        assert_eq!(prepared(state.toggle(id, ANCHOR, now)).0, id);
+        assert_eq!(
+            state.ready(id, RENDERED),
+            Action::Reveal {
+                anchor: ANCHOR,
+                geometry: RENDERED
+            }
+        );
+    }
+
     #[test]
-    fn toggle_opens_a_closed_panel() {
+    fn toggle_prepares_a_closed_panel_without_showing_it() {
         let mut state = PanelState::default();
 
+        let (id, _) = prepared(state.toggle(PanelId::Settings, ANCHOR, Instant::now()));
+
+        assert_eq!(id, PanelId::Settings);
+        assert_eq!(state.open(), Some(PanelId::Settings));
+    }
+
+    #[test]
+    fn ready_for_the_waiting_panel_reveals_it_at_the_reported_geometry() {
+        let mut state = PanelState::default();
+        state.toggle(PanelId::About, ANCHOR, Instant::now());
+
         assert_eq!(
-            state.toggle(PanelId::Settings, Instant::now()),
-            Action::Show(PanelId::Settings)
+            state.ready(PanelId::About, RENDERED),
+            Action::Reveal {
+                anchor: ANCHOR,
+                geometry: RENDERED
+            }
+        );
+    }
+
+    #[test]
+    fn ready_for_a_stale_panel_is_ignored() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        state.toggle(PanelId::Settings, ANCHOR, t);
+        let (_, wait) = prepared(state.toggle(PanelId::About, ANCHOR, at(t, 50)));
+
+        // The Settings page confirms late, after the switch to About.
+        assert_eq!(state.ready(PanelId::Settings, RENDERED), Action::Nothing);
+        // About still waits, and still falls back on its own size.
+        assert_eq!(
+            state.time_out(wait),
+            Action::Reveal {
+                anchor: ANCHOR,
+                geometry: PanelGeometry::fallback(PanelId::About)
+            }
+        );
+    }
+
+    #[test]
+    fn ready_without_an_open_panel_is_ignored() {
+        let mut state = PanelState::default();
+        assert_eq!(state.ready(PanelId::Settings, RENDERED), Action::Nothing);
+
+        state.toggle(PanelId::Settings, ANCHOR, Instant::now());
+        state.hide();
+        assert_eq!(state.ready(PanelId::Settings, RENDERED), Action::Nothing);
+    }
+
+    #[test]
+    fn time_out_reveals_the_waiting_panel_at_its_fallback_size() {
+        let mut state = PanelState::default();
+        let (_, wait) = prepared(state.toggle(PanelId::Settings, ANCHOR, Instant::now()));
+
+        assert_eq!(
+            state.time_out(wait),
+            Action::Reveal {
+                anchor: ANCHOR,
+                geometry: PanelGeometry::fallback(PanelId::Settings)
+            }
+        );
+        assert_eq!(
+            PanelGeometry::fallback(PanelId::Settings).size,
+            LogicalSize {
+                width: 360.0,
+                height: 480.0
+            }
+        );
+    }
+
+    #[test]
+    fn time_out_reveals_at_the_last_size_the_page_reported() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        show(&mut state, PanelId::Settings, t);
+        state.hide();
+
+        let (_, wait) = prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1000)));
+
+        assert_eq!(
+            state.time_out(wait),
+            Action::Reveal {
+                anchor: ANCHOR,
+                geometry: RENDERED
+            }
+        );
+    }
+
+    #[test]
+    fn time_out_after_ready_or_of_an_older_wait_does_nothing() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        let (_, first) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
+        state.ready(PanelId::Settings, RENDERED);
+        assert_eq!(state.time_out(first), Action::Nothing);
+
+        state.hide();
+        let (_, second) = prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1000)));
+        assert_ne!(first, second);
+        // The first wait's timer fires late: the second wait is untouched.
+        assert_eq!(state.time_out(first), Action::Nothing);
+        assert!(matches!(state.time_out(second), Action::Reveal { .. }));
+    }
+
+    #[test]
+    fn toggle_of_the_waiting_panel_cancels_it() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        let (_, wait) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
+
+        assert_eq!(
+            state.toggle(PanelId::Settings, ANCHOR, at(t, 100)),
+            Action::Hide
+        );
+        assert_eq!(state.time_out(wait), Action::Nothing);
+        assert_eq!(state.ready(PanelId::Settings, RENDERED), Action::Nothing);
+        assert_eq!(state.open(), None);
+    }
+
+    #[test]
+    fn toggle_of_another_panel_while_waiting_starts_a_new_wait() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        let (_, first) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
+
+        let (id, second) = prepared(state.toggle(PanelId::About, ANCHOR, at(t, 100)));
+
+        assert_eq!(id, PanelId::About);
+        assert_eq!(state.time_out(first), Action::Nothing);
+        assert!(matches!(state.time_out(second), Action::Reveal { .. }));
+    }
+
+    #[test]
+    fn blur_while_waiting_is_ignored() {
+        // Hiding the window for the wait takes its focus.
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        state.toggle(PanelId::Settings, ANCHOR, t);
+
+        assert_eq!(state.blur(at(t, 10)), Action::Nothing);
+        assert_eq!(state.open(), Some(PanelId::Settings));
+        assert!(matches!(
+            state.ready(PanelId::Settings, RENDERED),
+            Action::Reveal { .. }
+        ));
+        // Revealed, a blur hides it again.
+        assert_eq!(state.blur(at(t, 500)), Action::Hide);
+    }
+
+    #[test]
+    fn hide_while_waiting_closes_and_ends_the_wait() {
+        let mut state = PanelState::default();
+        let (_, wait) = prepared(state.toggle(PanelId::About, ANCHOR, Instant::now()));
+
+        assert_eq!(state.hide(), Action::Hide);
+        assert_eq!(state.time_out(wait), Action::Nothing);
+        assert_eq!(state.ready(PanelId::About, RENDERED), Action::Nothing);
+    }
+
+    #[test]
+    fn ready_for_the_panel_on_screen_places_it_again() {
+        let mut state = PanelState::default();
+        show(&mut state, PanelId::Settings, Instant::now());
+        let taller = PanelGeometry {
+            size: LogicalSize {
+                width: 392.0,
+                height: 600.0,
+            },
+            inset: 16.0,
+        };
+
+        assert_eq!(
+            state.ready(PanelId::Settings, taller),
+            Action::Reveal {
+                anchor: ANCHOR,
+                geometry: taller
+            }
+        );
+        assert_eq!(state.ready(PanelId::About, taller), Action::Nothing);
+    }
+
+    #[test]
+    fn toggle_anchors_the_panel_to_the_clicked_item() {
+        let mut state = PanelState::default();
+        let item = LogicalRect { x: 90.0, ..ANCHOR };
+        state.toggle(PanelId::About, item, Instant::now());
+
+        assert_eq!(
+            state.ready(PanelId::About, RENDERED),
+            Action::Reveal {
+                anchor: item,
+                geometry: RENDERED
+            }
         );
     }
 
@@ -801,12 +1556,15 @@ mod tests {
     fn toggle_of_the_open_panel_hides_it() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        state.toggle(PanelId::Settings, t);
+        show(&mut state, PanelId::Settings, t);
 
-        assert_eq!(state.toggle(PanelId::Settings, at(t, 1000)), Action::Hide);
         assert_eq!(
-            state.toggle(PanelId::Settings, at(t, 1100)),
-            Action::Show(PanelId::Settings)
+            state.toggle(PanelId::Settings, ANCHOR, at(t, 1000)),
+            Action::Hide
+        );
+        assert_eq!(
+            prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1100))).0,
+            PanelId::Settings
         );
     }
 
@@ -814,20 +1572,23 @@ mod tests {
     fn toggle_of_another_panel_switches_content() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        state.toggle(PanelId::Settings, t);
+        show(&mut state, PanelId::Settings, t);
 
         assert_eq!(
-            state.toggle(PanelId::About, at(t, 50)),
-            Action::Show(PanelId::About)
+            prepared(state.toggle(PanelId::About, ANCHOR, at(t, 50))).0,
+            PanelId::About
         );
-        assert_eq!(state.toggle(PanelId::About, at(t, 100)), Action::Hide);
+        assert_eq!(
+            state.toggle(PanelId::About, ANCHOR, at(t, 100)),
+            Action::Hide
+        );
     }
 
     #[test]
     fn blur_hides_the_open_panel() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        state.toggle(PanelId::About, t);
+        show(&mut state, PanelId::About, t);
 
         assert_eq!(state.blur(at(t, 10)), Action::Hide);
         assert_eq!(state.blur(at(t, 20)), Action::Nothing);
@@ -844,17 +1605,17 @@ mod tests {
     fn toggle_right_after_a_blur_hide_of_the_same_panel_keeps_it_closed() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        state.toggle(PanelId::Settings, t);
+        show(&mut state, PanelId::Settings, t);
         state.blur(at(t, 1000));
 
         assert_eq!(
-            state.toggle(PanelId::Settings, at(t, 1299)),
+            state.toggle(PanelId::Settings, ANCHOR, at(t, 1299)),
             Action::Nothing
         );
         // The guard is consumed: the next click opens again.
         assert_eq!(
-            state.toggle(PanelId::Settings, at(t, 1350)),
-            Action::Show(PanelId::Settings)
+            prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1350))).0,
+            PanelId::Settings
         );
     }
 
@@ -862,12 +1623,12 @@ mod tests {
     fn toggle_300ms_or_more_after_a_blur_hide_reopens() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        state.toggle(PanelId::Settings, t);
+        show(&mut state, PanelId::Settings, t);
         state.blur(at(t, 1000));
 
         assert_eq!(
-            state.toggle(PanelId::Settings, at(t, 1300)),
-            Action::Show(PanelId::Settings)
+            prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1300))).0,
+            PanelId::Settings
         );
     }
 
@@ -875,12 +1636,27 @@ mod tests {
     fn toggle_of_another_panel_right_after_a_blur_hide_opens_it() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        state.toggle(PanelId::Settings, t);
+        show(&mut state, PanelId::Settings, t);
         state.blur(at(t, 1000));
 
         assert_eq!(
-            state.toggle(PanelId::About, at(t, 1050)),
-            Action::Show(PanelId::About)
+            prepared(state.toggle(PanelId::About, ANCHOR, at(t, 1050))).0,
+            PanelId::About
+        );
+    }
+
+    #[test]
+    fn forgetting_the_blur_lets_an_explicit_request_reopen_at_once() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        show(&mut state, PanelId::Settings, t);
+        state.blur(at(t, 1000));
+
+        state.forget_blur();
+
+        assert_eq!(
+            prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1010))).0,
+            PanelId::Settings
         );
     }
 
@@ -888,14 +1664,14 @@ mod tests {
     fn hide_closes_the_open_panel_without_arming_the_reopen_guard() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        state.toggle(PanelId::Settings, t);
+        show(&mut state, PanelId::Settings, t);
 
         assert_eq!(state.hide(), Action::Hide);
         // The focus loss caused by hiding must not arm the guard.
         assert_eq!(state.blur(at(t, 10)), Action::Nothing);
         assert_eq!(
-            state.toggle(PanelId::Settings, at(t, 50)),
-            Action::Show(PanelId::Settings)
+            prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 50))).0,
+            PanelId::Settings
         );
     }
 
@@ -903,14 +1679,14 @@ mod tests {
     fn hide_after_a_blur_hide_keeps_the_reopen_guard() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        state.toggle(PanelId::Settings, t);
+        show(&mut state, PanelId::Settings, t);
         state.blur(at(t, 1000));
 
         // A late hide (Esc or the dock hiding) after the blur-hide.
         assert_eq!(state.hide(), Action::Nothing);
         // The click that closed the panel must not reopen it.
         assert_eq!(
-            state.toggle(PanelId::Settings, at(t, 1100)),
+            state.toggle(PanelId::Settings, ANCHOR, at(t, 1100)),
             Action::Nothing
         );
     }

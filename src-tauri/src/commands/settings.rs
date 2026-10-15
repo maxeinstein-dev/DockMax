@@ -13,6 +13,7 @@ use crate::domain::settings::{
     DockEdge, DockOpacity, DockSettings, Settings, SettingsError, SettingsErrorCode, Theme,
 };
 use crate::persistence::settings_file::{self, FILE_NAME};
+use crate::windows::dock;
 
 /// Event sent to every window with the new settings after a change.
 pub const CHANGED_EVENT: &str = "settings-changed";
@@ -131,6 +132,14 @@ fn lock<'a>(state: &'a State<'_, Mutex<SettingsState>>) -> MutexGuard<'a, Settin
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+/// The settings in use, for the Rust side (the dock's edge). The defaults
+/// if the state is not loaded yet, which `startup` rules out.
+pub fn current(app: &AppHandle) -> Settings {
+    app.try_state::<Mutex<SettingsState>>()
+        .map(|state| lock(&state).settings.clone())
+        .unwrap_or_default()
+}
+
 /// Called by both windows at startup.
 #[tauri::command]
 pub fn get_settings(state: State<'_, Mutex<SettingsState>>) -> Settings {
@@ -143,24 +152,32 @@ pub fn get_settings(state: State<'_, Mutex<SettingsState>>) -> Settings {
 /// nothing changed.
 ///
 /// Sync commands run on the main thread, one at a time, so the events go out
-/// in the same order as the saves.
+/// in the same order as the saves. A change of edge or size places the dock
+/// again and closes the open panel (its anchor moved).
 #[tauri::command]
 pub fn update_settings(
     app: AppHandle,
     state: State<'_, Mutex<SettingsState>>,
     settings: SettingsInput,
 ) -> Result<Settings, SettingsCommandError> {
-    let updated = lock(&state)
-        .update(settings.into())
-        .map_err(|error| {
-            log::warn!("settings: change rejected: {error}");
-            SettingsCommandError::from(&error)
-        })?
-        .clone();
-    // The lock is released before emitting.
+    let (before, updated) = {
+        let mut state = lock(&state);
+        let before = state.settings.dock.clone();
+        let updated = state
+            .update(settings.into())
+            .map_err(|error| {
+                log::warn!("settings: change rejected: {error}");
+                SettingsCommandError::from(&error)
+            })?
+            .clone();
+        (before, updated)
+    };
+    // The lock is released before emitting and placing the dock, which
+    // reads the settings.
     if let Err(error) = app.emit(CHANGED_EVENT, &updated) {
         log::warn!("settings: saved, but failed to notify the windows: {error}");
     }
+    dock::settings_changed(&app, &before, &updated.dock);
     Ok(updated)
 }
 

@@ -5,7 +5,8 @@ fn main() {
         tauri_build::AppManifest::new().commands(&[
             "toggle_panel",
             "hide_panel",
-            "set_dock_hit_region",
+            "panel_ready",
+            "set_dock_layout",
             "get_settings",
             "update_settings",
         ]),

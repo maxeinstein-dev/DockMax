@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tauri::{RunEvent, Wry, plugin::TauriPlugin};
 
@@ -39,6 +39,7 @@ pub fn run() {
         }))
         .plugin(logging::plugin())
         .manage(Arc::new(windows::hit_test::Tracker::default()))
+        .manage(Mutex::new(windows::dock::Placement::default()))
         .plugin(startup())
         .setup(|app| {
             windows::panel::setup(app.handle())?;
@@ -49,7 +50,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::panel::toggle_panel,
             commands::panel::hide_panel,
-            commands::dock::set_dock_hit_region,
+            commands::panel::panel_ready,
+            commands::dock::set_dock_layout,
             commands::settings::get_settings,
             commands::settings::update_settings
         ])

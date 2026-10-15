@@ -17,7 +17,6 @@ pub struct TrayMessages {
     /// Shows the dock when hidden, hides it otherwise.
     pub toggle_dock: &'static str,
     /// Opens the Settings panel, showing the dock first if it is hidden.
-    #[cfg_attr(not(test), expect(dead_code, reason = "used by the tray in R1"))]
     pub open_settings: &'static str,
     /// Ends the app.
     pub quit: &'static str,

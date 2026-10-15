@@ -7,7 +7,7 @@
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "allow-toggle-panel",
-    "allow-set-dock-hit-region",
+    "allow-set-dock-layout",
     "allow-get-settings",
     "log:allow-log"
   ]

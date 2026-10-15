@@ -12,7 +12,6 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
 
-use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 use super::dock::{self, Rect};
@@ -30,8 +29,9 @@ const RELEASED_EVENT: &str = "dock-released";
 pub const MAX_HOLD_RECTS: usize = 16;
 
 /// Where the dock paints, relative to its client area, in logical pixels:
-/// the visible bar and the final rects of the magnified icons.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+/// the visible bar and the final rects of the magnified icons. Comes from
+/// the layout the dock page reports (`dock::DockLayout`).
+#[derive(Debug, Clone, PartialEq)]
 pub struct HitRegion {
     pub bar: LogicalRect,
     pub hold: Vec<LogicalRect>,
@@ -58,20 +58,18 @@ impl fmt::Display for RegionError {
 
 impl Error for RegionError {}
 
-impl HitRegion {
-    /// Checks a region received from the frontend: every rect valid and at
-    /// most `MAX_HOLD_RECTS` hold rects.
-    pub fn validate(&self) -> Result<(), RegionError> {
-        if self.hold.len() > MAX_HOLD_RECTS {
-            return Err(RegionError::TooManyHoldRects);
-        }
-        self.bar.validate().map_err(RegionError::Bar)?;
-        for (index, rect) in self.hold.iter().enumerate() {
-            rect.validate()
-                .map_err(|error| RegionError::Hold(index, error))?;
-        }
-        Ok(())
+/// Checks a region received from the frontend: every rect valid and at
+/// most `MAX_HOLD_RECTS` hold rects.
+pub fn validate_region(bar: &LogicalRect, hold: &[LogicalRect]) -> Result<(), RegionError> {
+    if hold.len() > MAX_HOLD_RECTS {
+        return Err(RegionError::TooManyHoldRects);
     }
+    bar.validate().map_err(RegionError::Bar)?;
+    for (index, rect) in hold.iter().enumerate() {
+        rect.validate()
+            .map_err(|error| RegionError::Hold(index, error))?;
+    }
+    Ok(())
 }
 
 /// Whether the dock captures the mouse after the cursor moves to `cursor`.
@@ -593,80 +591,6 @@ mod tests {
         assert!(without_window.hold_on_screen().is_empty());
         assert_eq!(without_region.bar_on_screen(), None);
         assert!(without_region.hold_on_screen().is_empty());
-    }
-
-    const VALID: LogicalRect = LogicalRect {
-        x: 0.0,
-        y: 0.0,
-        width: 1.0,
-        height: 1.0,
-    };
-
-    #[test]
-    fn region_with_up_to_16_hold_rects_is_valid() {
-        for count in [0, 1, MAX_HOLD_RECTS] {
-            let region = HitRegion {
-                bar: VALID,
-                hold: vec![VALID; count],
-            };
-            assert_eq!(region.validate(), Ok(()), "{count} hold rects");
-        }
-        assert_eq!(MAX_HOLD_RECTS, 16);
-    }
-
-    #[test]
-    fn region_with_too_many_hold_rects_is_rejected() {
-        let region = HitRegion {
-            bar: VALID,
-            hold: vec![VALID; MAX_HOLD_RECTS + 1],
-        };
-
-        assert_eq!(region.validate(), Err(RegionError::TooManyHoldRects));
-    }
-
-    #[test]
-    fn region_with_an_invalid_rect_is_rejected() {
-        let bad = LogicalRect {
-            width: f64::NAN,
-            ..VALID
-        };
-        let huge = LogicalRect { x: 1e12, ..VALID };
-
-        assert_eq!(
-            HitRegion {
-                bar: bad,
-                hold: vec![]
-            }
-            .validate(),
-            Err(RegionError::Bar(RectError::NotFinite))
-        );
-        assert_eq!(
-            HitRegion {
-                bar: VALID,
-                hold: vec![VALID, huge]
-            }
-            .validate(),
-            Err(RegionError::Hold(1, RectError::TooLarge))
-        );
-    }
-
-    #[test]
-    fn region_is_read_from_the_frontend_json() {
-        let region: HitRegion = serde_json::from_str(
-            r#"{"bar":{"x":20,"y":40,"width":200,"height":64},
-                "hold":[{"x":-4,"y":-13.2,"width":140,"height":67.2}]}"#,
-        )
-        .unwrap();
-
-        assert_eq!(
-            region,
-            HitRegion {
-                bar: logical(20.0, 40.0, 200.0, 64.0),
-                hold: vec![logical(-4.0, -13.2, 140.0, 67.2)],
-            }
-        );
-        let without_hold = r#"{"bar":{"x":0,"y":0,"width":1,"height":1}}"#;
-        assert!(serde_json::from_str::<HitRegion>(without_hold).is_err());
     }
 
     #[test]

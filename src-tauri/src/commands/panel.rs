@@ -1,50 +1,75 @@
 use std::time::Instant;
 
-use tauri::AppHandle;
+use tauri::{AppHandle, WebviewWindow};
 
 use crate::windows::dock;
-use crate::windows::panel::{self, Action, LogicalRect, PanelId};
+use crate::windows::panel::{self, Action, LogicalRect, LogicalSize, PanelGeometry, PanelId};
 
 /// Called by the dock when an item is clicked. `anchor` is the item's
-/// rectangle relative to the dock's client area, in logical pixels.
+/// rectangle relative to the dock's client area, in logical pixels. Opening
+/// asks the panel page to render first (`panel-show`); the window shows on
+/// `panel_ready` or after `panel::READY_TIMEOUT`.
 #[tauri::command]
 pub fn toggle_panel(app: AppHandle, panel_id: PanelId, anchor: LogicalRect) -> Result<(), String> {
     // Before touching the panel state: a rejected click changes nothing.
     anchor
         .validate()
         .map_err(|error| format!("invalid anchor: {error}"))?;
-    let action = panel::lock(&app).toggle(panel_id, Instant::now());
-    let show = matches!(action, Action::Show(_));
+    let action = panel::lock(&app).toggle(panel_id, anchor, Instant::now());
+    let show = matches!(action, Action::Prepare(..));
     if show && !dock::is_visible(&app) {
         // A click queued before the dock was hidden from the tray: a panel
         // anchored to a hidden dock stays closed.
-        close(&app);
+        panel::close(&app);
         return Ok(());
     }
-    if let Err(error) = panel::apply(&app, action, Some(anchor)) {
+    if let Err(error) = panel::apply(&app, action) {
         log::warn!("panel: failed to toggle: {error}");
         if show {
-            close(&app);
+            panel::close(&app);
         }
         return Err("could not open the panel".into());
     }
     Ok(())
 }
 
-/// Brings the state back to closed after a `Show` that won't happen.
-fn close(app: &AppHandle) {
-    let reset = panel::lock(app).hide();
-    if let Err(error) = panel::apply(app, reset, None) {
-        log::warn!("panel: failed to hide: {error}");
-    }
-}
-
 /// Called by the panel to close itself (Esc).
 #[tauri::command]
 pub fn hide_panel(app: AppHandle) -> Result<(), String> {
     let action = panel::lock(&app).hide();
-    panel::apply(&app, action, None).map_err(|error| {
+    panel::apply(&app, action).map_err(|error| {
         log::warn!("panel: failed to hide: {error}");
         "could not close the panel".to_string()
+    })
+}
+
+/// Called by the panel once the content `panel-show` asked for has
+/// rendered, with the window size it needs and the transparent inset around
+/// its visible card, in logical pixels. Shows the panel there; a signal for
+/// a panel that is no longer open is ignored. Called again for the open
+/// panel, places it again.
+#[tauri::command]
+pub fn panel_ready(
+    app: AppHandle,
+    window: WebviewWindow,
+    panel_id: PanelId,
+    size: LogicalSize,
+    inset: f64,
+) -> Result<(), String> {
+    if window.label() != panel::LABEL {
+        return Err("only the panel reports that it rendered".into());
+    }
+    let geometry = PanelGeometry { size, inset };
+    geometry
+        .validate()
+        .map_err(|error| format!("invalid panel geometry: {error}"))?;
+    let action = panel::lock(&app).ready(panel_id, geometry);
+    if action == Action::Nothing {
+        log::debug!("panel: ignored the ready signal of a panel that is not open");
+        return Ok(());
+    }
+    panel::reveal_or_close(&app, action).map_err(|error| {
+        log::warn!("panel: failed to show: {error}");
+        "could not open the panel".to_string()
     })
 }
