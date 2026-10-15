@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AUTOSAVE_DELAY_MS, createAutosave, type Schedule } from "./autosave";
+import {
+  AUTOSAVE_DELAY_MS,
+  createAutosave,
+  SAVE_TIMEOUT_MS,
+  type Schedule,
+} from "./autosave";
 
 /** A save the test settles by hand, to hold one "in flight". */
 function manualSave() {
@@ -15,6 +20,15 @@ function manualSave() {
       }),
   );
   return { save, calls };
+}
+
+/** Whether `promise` has settled, without waiting for it. */
+function tracked(promise: Promise<unknown>) {
+  const state = { settled: false };
+  void promise.finally(() => {
+    state.settled = true;
+  });
+  return state;
 }
 
 beforeEach(() => {
@@ -264,6 +278,20 @@ describe("errors", () => {
     });
   });
 
+  it("reads a code that isn't a widget error code as writeFailed", async () => {
+    const save = vi.fn(async () => {
+      throw { code: "boom" };
+    });
+    const autosave = createAutosave({ save });
+
+    autosave.change("a");
+    await autosave.flush();
+    expect(autosave.getStatus()).toEqual({
+      state: "error",
+      error: "writeFailed",
+    });
+  });
+
   it("reads anything that isn't a command error as writeFailed", async () => {
     const save = vi.fn(() => {
       throw new Error("the note's text could be in here");
@@ -276,6 +304,172 @@ describe("errors", () => {
       state: "error",
       error: "writeFailed",
     });
+  });
+});
+
+describe("a save that never ends", () => {
+  it("gives up after 10 s by default: error, and the next change retries", async () => {
+    const { save, calls } = manualSave();
+    const autosave = createAutosave({ save });
+    expect(SAVE_TIMEOUT_MS).toBe(10_000);
+
+    autosave.change("a");
+    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
+    expect(autosave.getStatus().state).toBe("saving");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(autosave.getStatus()).toEqual({
+      state: "error",
+      error: "writeFailed",
+    });
+    // Not retried on its own.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(save).toHaveBeenCalledOnce();
+
+    autosave.change("ab");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(calls[1]!.text).toBe("ab");
+    calls[1]!.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
+  });
+
+  it("uses the injected deadline", async () => {
+    const { save } = manualSave();
+    const autosave = createAutosave({ save, saveTimeoutMs: 2000 });
+
+    autosave.change("a");
+    await vi.advanceTimersByTimeAsync(500 + 1999);
+    expect(autosave.getStatus().state).toBe("saving");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(autosave.getStatus().state).toBe("error");
+  });
+
+  it("lets flush resolve at the deadline, and the next flush retries", async () => {
+    const { save, calls } = manualSave();
+    const autosave = createAutosave({ save });
+
+    autosave.change("a");
+    const first = tracked(autosave.flush());
+    await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
+    expect(first.settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(first.settled).toBe(true);
+    expect(autosave.getStatus()).toEqual({
+      state: "error",
+      error: "writeFailed",
+    });
+
+    const second = autosave.flush();
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.text).toBe("a");
+    calls[1]!.resolve();
+    await second;
+    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
+  });
+
+  it("ignores a save that ends after its deadline", async () => {
+    const { save, calls } = manualSave();
+    const autosave = createAutosave({ save });
+    const seen: string[] = [];
+    autosave.subscribe(() => seen.push(autosave.getStatus().state));
+
+    autosave.change("a");
+    await vi.advanceTimersByTimeAsync(500 + SAVE_TIMEOUT_MS);
+    autosave.change("ab");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(autosave.getStatus().state).toBe("saving");
+    const before = seen.length;
+
+    // The late "a" neither ends the "ab" save nor starts another one.
+    calls[0]!.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(seen).toHaveLength(before);
+    expect(autosave.getStatus().state).toBe("saving");
+    expect(save).toHaveBeenCalledTimes(2);
+
+    calls[1]!.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
+
+    // Nor does a late failure, once everything is saved.
+    autosave.change("abc");
+    await vi.advanceTimersByTimeAsync(500 + SAVE_TIMEOUT_MS);
+    autosave.change("ab");
+    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
+    calls[2]!.reject({ code: "unavailable" });
+    await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS);
+    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
+    expect(save).toHaveBeenCalledTimes(3);
+  });
+
+  it("concurrent flushes: one save at a time, and the last text is saved", async () => {
+    const { save, calls } = manualSave();
+    const autosave = createAutosave({ save });
+    let running = 0;
+    let most = 0;
+    save.mockImplementation(
+      (text: string) =>
+        new Promise<void>((resolve, reject) => {
+          running += 1;
+          most = Math.max(most, running);
+          const end = () => {
+            running -= 1;
+          };
+          calls.push({
+            text,
+            resolve: () => {
+              end();
+              resolve();
+            },
+            reject: (error) => {
+              end();
+              reject(error);
+            },
+          });
+        }),
+    );
+
+    autosave.change("a");
+    const first = tracked(autosave.flush());
+    autosave.change("ab");
+    const second = tracked(autosave.flush());
+    autosave.change("abc");
+    const third = tracked(autosave.flush());
+    expect(save).toHaveBeenCalledOnce();
+
+    calls[0]!.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.text).toBe("abc");
+    expect([first, second, third].some((f) => f.settled)).toBe(false);
+
+    calls[1]!.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect([first, second, third].every((f) => f.settled)).toBe(true);
+    expect(most).toBe(1);
+    expect(save).toHaveBeenLastCalledWith("abc");
+    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
+  });
+
+  it("concurrent flushes over a hung save: both resolve, then one retry", async () => {
+    const { save, calls } = manualSave();
+    const autosave = createAutosave({ save });
+
+    autosave.change("a");
+    const first = tracked(autosave.flush());
+    autosave.change("ab");
+    const second = tracked(autosave.flush());
+    await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS);
+    // "ab" arrived during the hung save: it is saved at once, alone.
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.text).toBe("ab");
+    expect(first.settled || second.settled).toBe(false);
+
+    calls[1]!.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(first.settled && second.settled).toBe(true);
+    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
   });
 });
 
@@ -310,5 +504,29 @@ describe("status and disposal", () => {
     autosave.change("ab");
     await autosave.flush();
     expect(save).not.toHaveBeenCalled();
+  });
+
+  it("dispose during a save: flush resolves, the late result is ignored", async () => {
+    const { save, calls } = manualSave();
+    const autosave = createAutosave({ save });
+    const listener = vi.fn();
+    autosave.subscribe(listener);
+
+    autosave.change("a");
+    const flushed = tracked(autosave.flush());
+    autosave.change("ab");
+    const status = autosave.getStatus();
+    listener.mockClear();
+
+    autosave.dispose();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(flushed.settled).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+
+    calls[0]!.resolve();
+    await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS);
+    expect(save).toHaveBeenCalledOnce();
+    expect(listener).not.toHaveBeenCalled();
+    expect(autosave.getStatus()).toBe(status);
   });
 });
