@@ -1,7 +1,8 @@
 /* The panel window holds the frame: the visible card plus a transparent
    margin on every side for its shadow. The window is sized to the frame
    (panel_ready), so the card sits centered with --panel-inset around it.
-   --panel-inset must match PANEL_INSET in geometry.ts. */
+   --panel-inset must match PANEL_INSET in geometry.ts and PAGE_INSET in
+   src-tauri/src/windows/panel.rs (pinned by tests on both sides). */
 .panel-frame {
   --panel-inset: 8px;
   box-sizing: border-box;
@@ -11,7 +12,9 @@
 
 /* The card (DESIGN.md "Painel"). Always opaque, whatever the dock opacity
    (The Opaque Panel Rule). Its width is fixed, so the text wraps the same
-   whatever the window size was before panel_ready. */
+   whatever the window size was before panel_ready. The card widths here
+   also size the panel shown without panel_ready (PanelId::card_size in
+   panel.rs, pinned by its tests). */
 .panel {
   box-sizing: border-box;
   width: 320px;

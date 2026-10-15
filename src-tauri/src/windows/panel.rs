@@ -57,14 +57,26 @@ pub enum PanelId {
     About,
 }
 
+/// Transparent inset the panel page lays around the card, in logical
+/// pixels (`--panel-inset` in `src/panel/Panel.css`, `PANEL_INSET` in
+/// `src/panel/geometry.ts`).
+const PAGE_INSET: f64 = 8.0;
+
 impl PanelId {
-    /// Size the panel is shown with before its page ever reported one, in
-    /// logical pixels.
-    pub fn logical_size(self) -> (f64, f64) {
+    /// The visible card, in logical pixels: its width as `Panel.css` fixes
+    /// it, and about the height its content takes.
+    fn card_size(self) -> (f64, f64) {
         match self {
-            PanelId::Settings => (360.0, 480.0),
-            PanelId::About => (320.0, 240.0),
+            PanelId::Settings => (320.0, 390.0),
+            PanelId::About => (300.0, 236.0),
         }
+    }
+
+    /// Size the panel window is shown with before its page ever reported
+    /// one, in logical pixels: the card and `PAGE_INSET` on every side.
+    pub fn logical_size(self) -> (f64, f64) {
+        let (width, height) = self.card_size();
+        (width + 2.0 * PAGE_INSET, height + 2.0 * PAGE_INSET)
     }
 
     fn index(self) -> usize {
@@ -296,12 +308,13 @@ impl PanelGeometry {
         PanelGeometry { size, inset }
     }
 
-    /// What the panel is shown with before its page ever reported a size.
+    /// What the panel is shown with before its page ever reported a size:
+    /// the geometry the page lays it out with, give or take the height.
     pub fn fallback(id: PanelId) -> Self {
         let (width, height) = id.logical_size();
         PanelGeometry {
             size: LogicalSize { width, height },
-            inset: 0.0,
+            inset: PAGE_INSET,
         }
     }
 }
@@ -814,8 +827,57 @@ mod tests {
 
     #[test]
     fn panels_have_fixed_sizes() {
-        assert_eq!(PanelId::Settings.logical_size(), (360.0, 480.0));
-        assert_eq!(PanelId::About.logical_size(), (320.0, 240.0));
+        assert_eq!(PanelId::Settings.logical_size(), (336.0, 406.0));
+        assert_eq!(PanelId::About.logical_size(), (316.0, 252.0));
+    }
+
+    /// The number of pixels `property` is set to in the CSS rule whose
+    /// selector is exactly `selector`.
+    fn css_px(css: &str, selector: &str, property: &str) -> f64 {
+        let start = css
+            .find(&format!("\n{selector} {{"))
+            .unwrap_or_else(|| panic!("no rule for {selector}"));
+        let body = &css[start..];
+        let body = &body[..body.find('}').unwrap()];
+        let value = body
+            .split(&format!("{property}:"))
+            .nth(1)
+            .unwrap_or_else(|| panic!("no {property} in {selector}"));
+        value
+            .split("px")
+            .next()
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap_or_else(|_| panic!("{property} of {selector} is not in px"))
+    }
+
+    #[test]
+    fn fallback_geometry_is_the_card_the_page_lays_out_with_its_inset() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/panel/Panel.css");
+        let css = std::fs::read_to_string(&path)
+            .unwrap()
+            .replace("\r\n", "\n");
+        let inset = css_px(&css, ".panel-frame", "--panel-inset");
+        let cards = [
+            (PanelId::Settings, css_px(&css, ".panel", "width")),
+            (
+                PanelId::About,
+                css_px(&css, r#".panel[data-panel="about"]"#, "width"),
+            ),
+        ];
+
+        for (id, card_width) in cards {
+            let fallback = PanelGeometry::fallback(id);
+            assert_eq!(fallback.inset, inset, "{id:?}");
+            assert_eq!(fallback.size.width, card_width + 2.0 * inset, "{id:?}");
+            // A geometry the page could have reported.
+            assert_eq!(
+                reported(fallback.size.width, fallback.size.height, fallback.inset),
+                Ok(fallback),
+                "{id:?}"
+            );
+        }
     }
 
     #[test]
@@ -1850,8 +1912,8 @@ mod tests {
         assert_eq!(
             PanelGeometry::fallback(PanelId::Settings).size,
             LogicalSize {
-                width: 360.0,
-                height: 480.0
+                width: 336.0,
+                height: 406.0
             }
         );
     }
