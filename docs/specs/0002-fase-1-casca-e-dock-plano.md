@@ -86,20 +86,42 @@ Depois do J7: revisão completa (`revisor-com-carta`), converge e PR, com push e
 - Publicar uma versão para você ver e escolher. A variante escolhida vira `docs/design/tokens.md` (ou CSS de tokens).
 - Commit: `docs: adiciona mock visual da fase 1`.
 
-## PR 2 — Fundação (esboço; refinar antes de começar)
+## PR 2 — Fundação (branch `feat/fase-1-fundacao`)
 
-Batch paralelo previsto, sem arquivos compartilhados:
-- **F1** `[parallel-safe]` testes-guarda de capability e CSP (arquivos de teste novos).
-- **F2** `[parallel-safe]` domínio e persistência de configurações + testes (`src-tauri/src/domain/`, `src-tauri/src/persistence/`).
-- **F3** `[parallel-safe]` i18n do frontend (`src/i18n/`) e `src-tauri/src/i18n.rs`.
-- **F4** `[parallel-safe]` tokens de tema e tema "Sistema" (`src/themes/`).
-- **F5** `[parallel-safe]` error boundary de painel + teste (`src/components/panels/`).
+Refinado em 2026-10-15, depois do mock (`DESIGN.md`) e com o código do PR 1 em `main`.
 
-Depois, sequencial:
-- **F6** `[sequential]` integração: comandos `get_settings`/`update_settings`, evento `settings-changed`, plugins `log` e `single-instance` em `lib.rs`, permissões, hook de configurações no frontend.
-- **F7** `[sequential]` ADR 0007, verificação 10–16, revisão e PR.
-- Pendência herdada do PR 1: os `eprintln!` de falha (painel, dock, captura do mouse, bandeja) somem no build de release, que não tem console: passam para o plugin `log` na F6. A falha de captura do mouse deve ser registrada só na transição de sucesso para falha, para não gravar ~60 linhas por segundo.
-- Pendência herdada do PR 1 (revisão, rodada 3): trocar o `bool` de `native::install` por um enum (`Layering::Always` / `Layering::AsTaoSets`) com teste que exige layered só no dock; recortar os retângulos de ampliação pela área da janela do dock em `hold_on_screen`, com teste.
+### Análise: spec × plano × realidade
+
+| Achado | Ajuste |
+|---|---|
+| No esboço, i18n (F3) e error boundary (F5) mexeriam no mesmo `Panel.tsx`, e os tokens precisam adaptar `Dock.css`/`Panel.css` | Lanes redesenhadas sem arquivo compartilhado: o boundary nasce como componente isolado e é encaixado na integração |
+| Módulo Rust só compila se declarado no `lib.rs`, e o clippy reprova código sem uso | A lane de configurações declara os próprios módulos com `allow(dead_code)` temporário; a integração remove o `allow` |
+| Textos da bandeja (Rust) e do frontend estavam na mesma lane | `i18n.rs` vai para a integração Rust, que já mexe em `tray.rs` |
+| Pendências da revisão do PR 1 (enum de layering, recorte dos retângulos de ampliação) | Lane própria (F7), só em `windows/` |
+| A spec §2.2.1 pedia ao PR 2 a folga da janela no tamanho Grande | Pertence ao PR 3, onde o tamanho passa a mudar a janela; spec corrigida |
+| `src/themes/base.css` tem o vidro provisório do PR 1 (`--glass-*`, raio 20) | Substituído pelos tokens do `DESIGN.md` (F4) |
+| Spec §2.3.4 pede mensagem de erro no painel | O comando devolve o erro no PR 2; a mensagem na tela é do PR 3 (UI de Configurações) |
+
+### Batch A — paralelo (sem arquivos compartilhados)
+
+- **F1** `[parallel-safe]` **Testes-guarda** (spec §2.3.1). Arquivo novo `src-tauri/tests/guards.rs`: fixa o conteúdo exato de `capabilities/*.json` (lista de arquivos, janelas e permissões) e falha se a CSP de release for `null` ou tiver `unsafe-eval`/`*`. Bite-check de cada guarda.
+- **F2** `[parallel-safe]` **Domínio e persistência de configurações** (§2.3.2–3). `src-tauri/src/domain/{mod,settings}.rs` (tipos, padrão, validação, presets 40/48/64 sobre `iconSize` 32–96), `src-tauri/src/persistence/{mod,settings_file}.rs` (leitura com fallback e gravação atômica), erros com `thiserror`; `Cargo.toml`/`Cargo.lock` (`thiserror`, `tempfile` em dev); declara os módulos no `lib.rs`. Testes: padrão, cada campo inválido, arquivo ausente, corrompido, versão desconhecida, gravação atômica (sem arquivo meio escrito), JSON compatível com o formato v1.
+- **F3** `[parallel-safe]` **i18n do frontend** (§2.3.7). `src/i18n/` (`pt-BR.ts` como contrato de tipo, `useT()`, teste que prova que chave faltando quebra o `typecheck`), troca dos textos fixos em `src/dock/Dock.tsx` e `src/panel/Panel.tsx` (e ajuste dos testes deles).
+- **F4** `[parallel-safe]` **Tokens do `DESIGN.md`** (§2.3.8). `src/themes/tokens.css` com os tokens dos dois temas (`[data-mode]`), tamanhos, raios, movimento e a paleta `.t-*`; `base.css` sem o vidro provisório; `Dock.css`/`Panel.css` passam a usar os tokens (sem redesenhar componentes, que é o PR 3); `src/dock/main.tsx`/`src/panel/main.tsx` importam os tokens. Sem `data-mode`, o tema segue `prefers-color-scheme`. Teste que confere os tokens do `DESIGN.md` presentes nos dois temas.
+- **F5** `[parallel-safe]` **Error boundary** (§2.3.9). Componente novo `src/components/PanelBoundary.tsx` (estado de falha, reset ao trocar de painel) + teste. Ainda não encaixado.
+- **F7** `[parallel-safe]` **Pendências do PR 1**. `windows/native.rs` (`Layering::Always`/`AsTaoSets` no lugar do `bool`, com teste que exige layered só no dock), call sites em `windows/dock.rs` e `windows/panel.rs`, e `windows/hit_test.rs` (recorte dos retângulos de ampliação pela janela, com teste).
+
+### Batch B — integração Rust
+
+- **F6a** `[sequential]` Comandos `get_settings`/`update_settings` (estado gerenciado, carga na inicialização com fallback e aviso), evento `settings-changed` para todas as janelas; `tauri-plugin-log` (arquivo rotativo, `info` em release e `debug` em dev, sem dados sensíveis) no lugar de todos os `eprintln!`, com a falha de captura registrada só na transição; `tauri-plugin-single-instance` (segunda execução mostra o dock e sai); `src-tauri/src/i18n.rs` para a bandeja; `build.rs` e capabilities mínimas (dock: `get_settings`; painel: `get_settings` + `update_settings`; os dois: `log` para o frontend); guarda do F1 atualizada; remove o `allow(dead_code)` do F2.
+
+### Batch C — integração do frontend
+
+- **F6b** `[sequential]` Hook `useSettings` (`src/core/settings.ts`) com `get_settings` + `settings-changed`; aplica o tema (`data-mode`) nas duas janelas, com "Sistema" seguindo o Windows em tempo real; encaixa o `PanelBoundary` no painel; logs do frontend pelo plugin.
+
+### Batch D — fechamento
+
+- **F8** `[sequential]` ADR 0007 (configurações em arquivo, validação no Rust, i18n tipado, logs); verificação 10–16 da spec no app real (persistência após reiniciar, arquivo apagado/corrompido, inspeção do log, instância única); revisão adversarial; PR.
 
 ## PR 3 — Dock e painéis (esboço; refinar depois do mock)
 
@@ -120,10 +142,10 @@ Depois, sequencial:
 | §2.1.6 V1 | J5 |
 | §2.1.6 V2 | J6 |
 | §2.1.7–9 Memória, visual provisório, ADR 0006 | J2 (visual), J7 |
-| §2.2 Mock | M1 |
-| §2.3 Fundação | F1–F7 |
+| §2.2 Mock | M1 (concluído) |
+| §2.3 Fundação | F1–F6b |
 | §2.4 Dock e painéis | PR 3 |
 | Verificação 1–8 | J1–J7 |
 | Verificação 9 | M1 |
-| Verificação 10–16 | F1–F7 |
+| Verificação 10–16 | F8 |
 | Verificação 17–21 | PR 3 |
