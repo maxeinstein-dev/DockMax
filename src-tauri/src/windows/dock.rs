@@ -137,12 +137,15 @@ impl DockLayout {
     }
 
     /// The window size to give the dock, in logical pixels: what the page
-    /// asked for, grown to hold the whole bar. `dock_rect` caps it to the
-    /// work area.
+    /// asked for, grown to the bar's own size so the bar always fits.
+    /// Not to where the bar ends: the page lays the bar flush with the
+    /// window it is in now, so its far edge is that window's edge, and
+    /// growing to it would keep the window from ever shrinking.
+    /// `dock_rect` caps it to the work area.
     pub fn window_size(&self) -> (f64, f64) {
         (
-            self.window.width.max(self.bar.x + self.bar.width),
-            self.window.height.max(self.bar.y + self.bar.height),
+            self.window.width.max(self.bar.width),
+            self.window.height.max(self.bar.height),
         )
     }
 
@@ -743,8 +746,61 @@ mod tests {
         }
     }
 
+    /// What the page reports in a window whose client area is `viewport`:
+    /// the bar flush with the side facing the screen edge and centered
+    /// across (`placeDock` in `src/dock/layout.ts`), and the window it
+    /// needs.
+    fn page_layout(
+        viewport: (f64, f64),
+        bar: (f64, f64),
+        needed: (f64, f64),
+        edge: Edge,
+    ) -> DockLayout {
+        DockLayout {
+            bar: logical(
+                (viewport.0 - bar.0) / 2.0,
+                match edge {
+                    Edge::Bottom => viewport.1 - bar.1,
+                    Edge::Top => 0.0,
+                },
+                bar.0,
+                bar.1,
+            ),
+            hold: vec![],
+            window: LogicalSize {
+                width: needed.0,
+                height: needed.1,
+            },
+        }
+    }
+
     #[test]
-    fn window_size_grows_to_hold_the_whole_bar() {
+    fn window_reaches_the_size_the_page_needs_growing_and_shrinking() {
+        // Grande and Pequeno (src/dock/layout.ts): bar and window needed.
+        let large = ((166.0, 82.0), (190.0, 147.0));
+        let small = ((104.0, 52.0), (128.0, 110.0));
+        for edge in [Edge::Bottom, Edge::Top] {
+            for (from, to) in [(large, small), (small, large)] {
+                // The window is where the previous size left it; the page
+                // reports for it, then for each window Rust gives it.
+                let mut viewport = from.1;
+                let mut steps = 0;
+                loop {
+                    let next = page_layout(viewport, to.0, to.1, edge).window_size();
+                    if next == viewport {
+                        break;
+                    }
+                    viewport = next;
+                    steps += 1;
+                    assert!(steps < 4, "{edge:?}: stuck at {viewport:?}");
+                }
+                assert_eq!(viewport, to.1, "{edge:?} from {:?}", from.1);
+            }
+        }
+    }
+
+    #[test]
+    fn window_size_grows_to_the_bar_size() {
         let bar = logical(20.0, 40.0, 200.0, 64.0);
         let roomy = DockLayout {
             bar,
@@ -756,6 +812,6 @@ mod tests {
         };
 
         assert_eq!(roomy.window_size(), (240.0, 104.0));
-        assert_eq!(cramped.window_size(), (220.0, 104.0));
+        assert_eq!(cramped.window_size(), (200.0, 64.0));
     }
 }
