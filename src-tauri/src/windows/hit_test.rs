@@ -105,18 +105,39 @@ impl Shared {
         self.to_screen(self.region.as_ref()?.bar)
     }
 
-    /// The magnified icons in physical screen pixels; one that does not fit
-    /// on screen is left out. Empty, without allocating, while no icon is
-    /// magnified.
+    /// The magnified icons in physical screen pixels, clipped to the dock
+    /// window: a rect reported beyond the window can't keep the mouse
+    /// captured once the cursor has left it. One that does not fit on
+    /// screen, or lies wholly outside the window, is left out. Empty,
+    /// without allocating, while no icon is magnified.
     fn hold_on_screen(&self) -> Vec<Rect> {
-        self.region.as_ref().map_or_else(Vec::new, |region| {
-            region
-                .hold
-                .iter()
-                .filter_map(|&rect| self.to_screen(rect))
-                .collect()
-        })
+        let (Some(region), Some((window, _))) = (self.region.as_ref(), self.window) else {
+            return Vec::new();
+        };
+        region
+            .hold
+            .iter()
+            .filter_map(|&rect| clip(self.to_screen(rect)?, window))
+            .collect()
     }
+}
+
+/// The part of `rect` inside `window`; `None` when they don't overlap.
+fn clip(rect: Rect, window: Rect) -> Option<Rect> {
+    // Edges in i64, where i32 + u32 can't overflow.
+    let right = |rect: Rect| i64::from(rect.x) + i64::from(rect.width);
+    let bottom = |rect: Rect| i64::from(rect.y) + i64::from(rect.height);
+    let x = rect.x.max(window.x);
+    let y = rect.y.max(window.y);
+    // At most the smaller width or height, so it fits in u32 when positive.
+    let width = u32::try_from(right(rect).min(right(window)) - i64::from(x)).ok()?;
+    let height = u32::try_from(bottom(rect).min(bottom(window)) - i64::from(y)).ok()?;
+    (width > 0 && height > 0).then_some(Rect {
+        x,
+        y,
+        width,
+        height,
+    })
 }
 
 /// Dock geometry shared with the cursor thread.
@@ -421,13 +442,84 @@ mod tests {
                 bar: logical(-1.0, 0.0, 1.0, 1.0),
                 hold: vec![
                     logical(100_000.0, 0.0, 1.0, 1.0),
-                    logical(-2.0, 0.0, 1.0, 1.0),
+                    logical(1.0, 0.0, 1.0, 1.0),
                 ],
             }),
             ..Shared::default()
         };
 
-        assert_eq!(shared.hold_on_screen(), vec![rect(i32::MAX - 16, 0, 3, 3)]);
+        assert_eq!(shared.hold_on_screen(), vec![rect(i32::MAX - 7, 0, 3, 3)]);
+    }
+
+    // The bottom dock at 100% from the tests above, with the region its
+    // page reports: the bar and the given magnified icons.
+    fn dock_with_hold(hold: Vec<LogicalRect>) -> Shared {
+        Shared {
+            window: Some((rect(840, 920, 240, 104), 1.0)),
+            region: Some(HitRegion {
+                bar: logical(20.0, 40.0, 200.0, 64.0),
+                hold,
+            }),
+            ..Shared::default()
+        }
+    }
+
+    #[test]
+    fn hold_rect_partly_outside_the_window_is_clipped_to_it() {
+        // Reported 10 px left of the window and 13 px above it.
+        let shared = dock_with_hold(vec![logical(-10.0, -13.0, 140.0, 67.0)]);
+
+        assert_eq!(shared.hold_on_screen(), vec![rect(840, 920, 130, 54)]);
+    }
+
+    #[test]
+    fn hold_rects_wholly_outside_the_window_are_dropped() {
+        let shared = dock_with_hold(vec![
+            logical(-200.0, 0.0, 100.0, 10.0), // left of the window
+            logical(0.0, -50.0, 10.0, 30.0),   // above it
+            logical(240.0, 0.0, 10.0, 10.0),   // touching its right edge
+            logical(0.0, 104.0, 10.0, 10.0),   // touching its bottom edge
+            logical(10.0, 10.0, 0.0, 10.0),    // empty
+            logical(10.0, 10.0, 20.0, 20.0),   // inside: kept
+        ]);
+
+        assert_eq!(shared.hold_on_screen(), vec![rect(850, 930, 20, 20)]);
+    }
+
+    #[test]
+    fn captured_dock_releases_outside_the_window_even_over_a_reported_hold_rect() {
+        let shared = dock_with_hold(vec![logical(-10.0, -13.0, 140.0, 67.0)]);
+        let bar = shared.bar_on_screen();
+        let hold = shared.hold_on_screen();
+        // The rect as reported, before clipping.
+        let unclipped = rect(830, 907, 140, 67);
+
+        // Left of the window and above it, both over the reported rect.
+        for cursor in [(835, 950), (900, 910)] {
+            assert!(next_captured(true, cursor, bar, &[unclipped]), "{cursor:?}");
+            assert!(!next_captured(true, cursor, bar, &hold), "{cursor:?}");
+        }
+        // Inside the window the clipped rect still holds.
+        assert!(next_captured(true, (845, 925), bar, &hold));
+    }
+
+    #[test]
+    fn clip_never_overflows() {
+        let max = rect(i32::MAX, i32::MAX, u32::MAX, u32::MAX);
+        let min = rect(i32::MIN, i32::MIN, u32::MAX, u32::MAX);
+
+        assert_eq!(clip(max, max), Some(max));
+        assert_eq!(clip(min, min), Some(min));
+        // `min` ends where `max` starts.
+        assert_eq!(clip(min, max), None);
+        assert_eq!(clip(min, rect(0, 0, 10, 10)), Some(rect(0, 0, 10, 10)));
+        assert_eq!(
+            clip(
+                rect(i32::MAX - 5, 0, u32::MAX, 10),
+                rect(i32::MAX - 10, 0, u32::MAX, 10)
+            ),
+            Some(rect(i32::MAX - 5, 0, u32::MAX - 5, 10))
+        );
     }
 
     #[test]

@@ -6,6 +6,11 @@ use super::{hit_test, panel};
 
 pub const LABEL: &str = "dock";
 
+/// Always layered: the dock toggles its mouse capture, and tao would make
+/// it stop being layered (see `native::Layering::Always`).
+#[cfg(windows)]
+pub const LAYERING: super::native::Layering = super::native::Layering::Always;
+
 /// Gap between the visible bar and the work area edge, in logical pixels.
 const MARGIN: f64 = 8.0;
 
@@ -80,7 +85,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         .ok_or("dock window is missing from tauri.conf.json")?;
     hit_test::start(app, &window)?;
     #[cfg(windows)]
-    super::native::install(&window, Some(reposition), true)?;
+    super::native::install(&window, Some(reposition), LAYERING)?;
     let handle = app.clone();
     window.on_window_event(move |event| {
         if let WindowEvent::CloseRequested { api, .. } = event {
