@@ -158,7 +158,7 @@ Refinado em 2026-10-15, com o PR 2 em `main`.
   - informa ao Rust a região de captura e o tamanho que precisa (barra + ampliação + rótulo).
 - **P2** `[parallel-safe]` **Painéis** (`src/panel/`):
   - Configurações: Tema, Posição, Tamanho e Opacidade como grupos de opções acessíveis (setas entre opções), aplicando e salvando a cada clique; em erro, mostra a mensagem traduzida e volta ao valor anterior;
-  - Sobre: versão, licença MIT e link para o repositório;
+  - Sobre: versão, licença MIT e o endereço do repositório como texto selecionável (o link entra na Fase 3, com o `opener`);
   - confirma ao Rust (`panel_ready`) quando o conteúdo pedido renderizou.
 - **R1** `[parallel-safe]` **Rust: janelas e bandeja** (`src-tauri/src/windows/`, `commands/`, `tray.rs`, `build.rs`, capabilities, `tests/guards.rs`, `lib.rs`):
   - a janela do dock passa a ter o tamanho informado pelo frontend (com limites) e a borda das configurações; reposiciona ao mudar tamanho ou borda;

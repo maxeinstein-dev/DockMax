@@ -117,7 +117,7 @@ Detalhes e motivos no [ADR 0006](../adr/0006-janelas-do-dock-e-paineis.md).
 1. **Dock na direção escolhida no mock**: ícones em quadrado arredondado, **rótulo flutuante** com o nome ao passar o mouse, **ponto indicador** (nesta fase marca o painel aberto), **separador** entre grupos e **ampliação** se V1 for viável.
 2. **Itens do dock**: apenas **Configurações** e **Sobre**. Nenhum item de demonstração.
 3. **Painel Configurações**: Tema (Sistema/Claro/Escuro), Posição (Embaixo/Em cima), Tamanho (Pequeno/Médio/Grande) e Opacidade (Translúcido/Sólido), todos aplicados na hora.
-4. **Painel Sobre**: versão, licença MIT e link para o repositório.
+4. **Painel Sobre**: versão, licença MIT e o endereço do repositório como **texto selecionável** (decisão de 2026-10-15). O link que abre o navegador entra na Fase 3, quando o plugin `opener` volta com validação de caminhos e URLs (spec 0001 §3).
 5. **Bandeja completa**: Mostrar/ocultar dock, Configurações (abre o painel) e Sair.
 6. **Dock em cima**: layout e ancoragem do painel funcionando nas duas bordas.
 7. **Acessibilidade mínima**: itens navegáveis por teclado (Tab e setas) com foco visível, `aria-label` em todo item só com ícone, contraste AA nos dois temas e nas duas opacidades, animações desligadas com "reduzir movimento" do Windows.

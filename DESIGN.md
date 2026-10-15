@@ -184,7 +184,7 @@ Neutros frios quase sem matiz, um azul-cobalto contido e uma paleta de esmaltes 
 
 ### Primary
 - **Azul-cobalto** (`cobalto-light` / `cobalto-dark`, token `--accent`): contorno de foco do ladrilho e dos segmentos (2 px), anel interno do segmento selecionado (a 40%) e ponto de painel aberto. No escuro, sobe para um cobalto claro para manter contraste sobre o grafite.
-- **Tinta de cobalto** (`cobalto-ink-light` / `cobalto-ink-dark`, token `--accent-ink`): texto do segmento selecionado e links do painel Sobre.
+- **Tinta de cobalto** (`cobalto-ink-light` / `cobalto-ink-dark`, token `--accent-ink`): texto do segmento selecionado (e, a partir da Fase 3, o link do painel Sobre).
 - **Véu de cobalto** (`cobalto-soft-light` / `cobalto-soft-dark`, token `--accent-soft`): fundo do segmento selecionado.
 
 ### Tertiary (esmaltes dos ladrilhos)
@@ -302,7 +302,7 @@ Folha opaca ancorada, com cara de flyout do Windows 11.
 - **Forma:** 8 px, superfície opaca, pilha da barra com a sombra do painel, padding 16/16/12 px, grade com 14 px de intervalo.
 - **Entrada:** `pop` de `--t-pop` com `--ease`, de `translateY(6px) scale(.98)` e opacidade 0; origem na borda voltada para o dock.
 - **Configurações:** título; quatro linhas rótulo + controle segmentado (Tema: Sistema/Claro/Escuro; Posição: Embaixo/Em cima; Tamanho: Pequeno/Médio/Grande; Opacidade do dock: Translúcido/Sólido); rodapé.
-- **Sobre:** ladrilho de 56 px + nome (Title About) e descrição; lista chave/valor (Versão, Licença, Código com link em `--accent-ink`); rodapé.
+- **Sobre:** ladrilho de 56 px + nome (Title About) e descrição; lista chave/valor (Versão, Licença, Código com o endereço do repositório em texto selecionável em `--ink`; vira link em `--accent-ink` na Fase 3, com o `opener`); rodapé.
 - **Rodapé:** Caption em `--ink-2`, fio superior `--hair`, 10 px de respiro, texto à esquerda e dica de tecla à direita.
 - **Fechamento:** Esc (devolve o foco ao item), clique fora ou novo clique no item.
 

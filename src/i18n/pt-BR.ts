@@ -79,7 +79,7 @@ const messages = {
       license: "Licença",
       code: "Código",
     },
-    /** Text of the link to the source code repository. */
+    /** The source code repository, shown as selectable text (a link from Fase 3). */
     repository: "github.com/maxeinstein-dev/DockMax",
     footer: "Projeto independente",
   },
