@@ -7,7 +7,6 @@
 //! a [`Storage`] and are tested without Tauri. Logs name only the capability
 //! and the kind of error, never an ID, a label, a config or note text.
 
-use std::fmt;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
@@ -45,11 +44,14 @@ impl From<WidgetError> for WidgetCommandError {
 /// Opens the widget database in the app data folder, `data_dir` as Tauri
 /// resolved it (redirected in the e2e build). Never fails: without a folder
 /// the widgets are unavailable in this run, with a warning in the log.
-pub fn open_storage<E: fmt::Display>(data_dir: Result<PathBuf, E>) -> Storage {
+///
+/// The error is not logged, and `E` has no bound so it can't be: its text
+/// may hold the folder, which the e2e override can point anywhere.
+pub fn open_storage<E>(data_dir: Result<PathBuf, E>) -> Storage {
     match data_dir {
         Ok(dir) => Storage::open(&dir),
-        Err(error) => {
-            log::warn!("widgets: data folder unavailable, widgets disabled: {error}");
+        Err(_) => {
+            log::warn!("widgets: data folder unavailable, widgets disabled");
             Storage::unavailable(UnavailableReason::OpenFailed)
         }
     }
@@ -435,7 +437,10 @@ mod tests {
 
     #[test]
     fn without_a_data_folder_the_app_opens_with_the_widgets_unavailable() {
-        let storage = open_storage(Err("unknown path"));
+        // Neither `Display` nor `Debug`: this only compiles while the error,
+        // whose text may hold the redirected data folder, is never logged.
+        struct Unprintable;
+        let storage = open_storage(Err::<PathBuf, _>(Unprintable));
 
         assert_eq!(
             snapshot(&storage),

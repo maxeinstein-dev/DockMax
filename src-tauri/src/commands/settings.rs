@@ -100,7 +100,17 @@ impl SettingsState {
 /// missing, corrupt or invalid file gives the defaults, with a warning in
 /// the log for the last two.
 pub fn setup(app: &AppHandle) {
-    let state = match app.path().app_config_dir() {
+    let state = load_state(app.path().app_config_dir());
+    app.manage(Mutex::new(state));
+}
+
+/// The settings state from `config_dir`, the app config folder as Tauri
+/// resolved it. Without a folder, the defaults and a warning in the log.
+///
+/// The error is not logged, and `E` has no bound so it can't be: its text
+/// may hold the folder, which an override can point anywhere.
+fn load_state<E>(config_dir: Result<PathBuf, E>) -> SettingsState {
+    match config_dir {
         Ok(dir) => {
             let path = dir.join(FILE_NAME);
             let loaded = settings_file::load(&path);
@@ -112,15 +122,14 @@ pub fn setup(app: &AppHandle) {
                 path: Some(path),
             }
         }
-        Err(error) => {
-            log::warn!("settings: config folder unavailable, using the defaults: {error}");
+        Err(_) => {
+            log::warn!("settings: config folder unavailable, using the defaults");
             SettingsState {
                 settings: Settings::default(),
                 path: None,
             }
         }
-    };
-    app.manage(Mutex::new(state));
+    }
 }
 
 fn lock<'a>(state: &'a State<'_, Mutex<SettingsState>>) -> MutexGuard<'a, SettingsState> {
@@ -210,6 +219,34 @@ mod tests {
         settings.dock.icon_size = 64;
         settings
     }
+
+    #[test]
+    fn without_a_config_folder_the_defaults_are_used_and_never_saved() {
+        let mut state = load_state(Err::<PathBuf, _>(Unprintable));
+
+        assert_eq!(state.settings, Settings::default());
+        assert_eq!(state.path, None);
+        assert!(matches!(
+            state.update(large_icons()),
+            Err(SettingsError::Unavailable)
+        ));
+    }
+
+    #[test]
+    fn with_a_config_folder_the_settings_file_is_loaded() {
+        let dir = tempdir().unwrap();
+        state_in(&dir).update(large_icons()).unwrap();
+
+        let state = load_state::<Unprintable>(Ok(dir.path().to_path_buf()));
+
+        assert_eq!(state.settings, large_icons());
+        assert_eq!(state.path, Some(dir.path().join(FILE_NAME)));
+    }
+
+    /// Neither `Display` nor `Debug`: the tests above only compile while the
+    /// error of the config folder, whose text may hold the redirected
+    /// folder, is never logged.
+    struct Unprintable;
 
     #[test]
     fn update_saves_then_becomes_the_current_settings() {
