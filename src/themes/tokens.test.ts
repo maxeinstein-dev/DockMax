@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import design from "../../DESIGN.md?raw";
 import designJsonText from "../../.impeccable/design.json?raw";
 import css from "./tokens.css?raw";
+import { PANEL_INSET } from "../panel/geometry";
 
 // tokens.css must carry DESIGN.md exactly. The expected values are read from
 // DESIGN.md (frontmatter) and .impeccable/design.json, never restated here,
@@ -138,6 +139,26 @@ describe("tokens.css", () => {
       expect(block.get("--shadow-panel")).toBe(shadow(`panel-${suffix}`));
     });
   }
+
+  it("keeps the panel shadow within the panel window's inset", () => {
+    // Each layer reaches its offset plus its blur plus its spread beyond
+    // the card; past PANEL_INSET it would be cut by the window edge.
+    for (const [mode, block] of Object.entries(blocks)) {
+      const value = block.get("--shadow-panel") ?? "";
+      const layers = value.split(/,(?![^(]*\))/);
+      expect(layers.length, mode).toBeGreaterThan(0);
+      for (const layer of layers) {
+        const [x = 0, y = 0, blur = 0, spread = 0] = (
+          layer.trim().match(/^(?:-?[\d.]+(?:px)?\s*){2,4}/)?.[0] ?? ""
+        )
+          .trim()
+          .split(/\s+/)
+          .map((length) => parseFloat(length));
+        const reach = Math.max(Math.abs(x), Math.abs(y)) + blur + spread;
+        expect(reach, `${mode}: ${layer}`).toBeLessThanOrEqual(PANEL_INSET);
+      }
+    }
+  });
 
   it("keeps the dark copies inside the system media query and equal", () => {
     expect(mediaStart).toBeGreaterThanOrEqual(0);

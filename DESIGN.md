@@ -256,7 +256,7 @@ Híbrido de vidro simulado e sombra ambiente. Não existe desfoque do fundo: a p
 ### Shadow Vocabulary
 - **Sombra da superfície, claro** (`--shadow: 0 1px 2px rgb(16 20 32 / .10), 0 14px 32px -12px rgb(16 20 32 / .42)`): barra.
 - **Sombra da superfície, escuro** (`--shadow: 0 1px 2px rgb(0 0 0 / .32), 0 16px 36px -12px rgb(0 0 0 / .7)`): barra.
-- **Sombra do painel, claro** (`--shadow-panel: 0 1px 2px rgb(16 20 32 / .10), 0 3px 8px -2px rgb(16 20 32 / .24)`) e **escuro** (`--shadow-panel: 0 1px 2px rgb(0 0 0 / .32), 0 3px 8px -2px rgb(0 0 0 / .5)`): a mesma sombra em versão curta, que cabe nos 8 px de margem transparente da janela do painel (a janela bloqueia cliques e não pode cobrir a barra do dock, ADR 0006).
+- **Sombra do painel, claro** (`--shadow-panel: 0 1px 2px rgb(16 20 32 / .10), 0 2px 8px -2px rgb(16 20 32 / .24)`) e **escuro** (`--shadow-panel: 0 1px 2px rgb(0 0 0 / .32), 0 2px 8px -2px rgb(0 0 0 / .5)`): a mesma sombra em versão curta, que cabe nos 8 px de margem transparente da janela do painel (a janela bloqueia cliques e não pode cobrir a barra do dock, ADR 0006).
 - **Pilha da barra** (`box-shadow: inset 0 1px 0 var(--hi), 0 0 0 1px var(--hair), var(--shadow)`): com o dock em cima, a luz interna passa para a borda de baixo (`inset 0 -1px 0`). O painel usa a mesma pilha com a sombra do painel no lugar de `--shadow`.
 - **Sombra da pílula** (`box-shadow: 0 0 0 1px var(--hair), 0 6px 16px -6px rgb(0 0 0 / .35)`).
 - **Sombra do ladrilho** (`filter: drop-shadow(0 1px 1px rgb(0 0 0 / .18)) drop-shadow(0 5px 6px rgb(0 0 0 / .16))`): em `filter` no invólucro sem máscara, para seguir a silhueta da superelipse.

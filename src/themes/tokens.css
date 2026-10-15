@@ -32,7 +32,7 @@
   /* Panel shadow, light: fits the 8 px transparent margin of the panel
      window, which may not cover the dock bar. */
   --shadow-panel:
-    0 1px 2px rgb(16 20 32 / 0.1), 0 3px 8px -2px rgb(16 20 32 / 0.24);
+    0 1px 2px rgb(16 20 32 / 0.1), 0 2px 8px -2px rgb(16 20 32 / 0.24);
 
   /* Dock opacity (DESIGN.md "Elevation & Depth"): Translúcido by default;
      the panel ignores it and is always opaque. */
@@ -87,7 +87,7 @@
     --kbd: rgb(255 255 255 / 0.09);
     --shadow: 0 1px 2px rgb(0 0 0 / 0.32), 0 16px 36px -12px rgb(0 0 0 / 0.7);
     --shadow-panel:
-      0 1px 2px rgb(0 0 0 / 0.32), 0 3px 8px -2px rgb(0 0 0 / 0.5);
+      0 1px 2px rgb(0 0 0 / 0.32), 0 2px 8px -2px rgb(0 0 0 / 0.5);
   }
 }
 
@@ -108,7 +108,7 @@
   --track: rgb(255 255 255 / 0.06);
   --kbd: rgb(255 255 255 / 0.09);
   --shadow: 0 1px 2px rgb(0 0 0 / 0.32), 0 16px 36px -12px rgb(0 0 0 / 0.7);
-  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.32), 0 3px 8px -2px rgb(0 0 0 / 0.5);
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.32), 0 2px 8px -2px rgb(0 0 0 / 0.5);
 }
 
 /* Dock opacity options (DESIGN.md "Elevation & Depth"). */

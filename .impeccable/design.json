@@ -524,12 +524,12 @@
       },
       {
         "name": "panel-light",
-        "value": "0 1px 2px rgb(16 20 32 / .10), 0 3px 8px -2px rgb(16 20 32 / .24)",
+        "value": "0 1px 2px rgb(16 20 32 / .10), 0 2px 8px -2px rgb(16 20 32 / .24)",
         "purpose": "--shadow-panel do tema claro: cabe nos 8 px de margem transparente da janela do painel."
       },
       {
         "name": "panel-dark",
-        "value": "0 1px 2px rgb(0 0 0 / .32), 0 3px 8px -2px rgb(0 0 0 / .5)",
+        "value": "0 1px 2px rgb(0 0 0 / .32), 0 2px 8px -2px rgb(0 0 0 / .5)",
         "purpose": "--shadow-panel do tema escuro: cabe nos 8 px de margem transparente da janela do painel."
       },
       {
