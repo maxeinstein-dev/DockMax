@@ -57,11 +57,11 @@ A interface depende dos contratos públicos, não da implementação interna de 
 - React + TypeScript + Vite.
 - Tauri 2.
 - Rust.
-- SQLite para dados estruturados.
+- SQLite para dados estruturados, embutido no binário via `rusqlite` (`bundled`), com migrações por `rusqlite_migration`; preferências globais em `settings.json` (ADR 0007 e ADR 0008).
 - CSS Modules ou CSS com tokens/variáveis bem definidos.
 - Vitest e React Testing Library.
 - Testes unitários Rust.
-- Testes end-to-end com ferramenta compatível com o setup Tauri.
+- Testes end-to-end com WebdriverIO e `@wdio/tauri-service`, sobre um build de teste isolado (ADR 0008).
 
 Fixar versões reais na implementação e verificar requisitos atuais do Tauri, Rust e plugins antes de instalar.
 
@@ -131,76 +131,77 @@ Criar diretórios quando houver código real para colocar neles; não criar mód
 
 ## 5. Contrato de widgets
 
-Um widget possui:
-- `id` estável do tipo de widget;
-- nome, descrição e categoria;
-- configuração padrão validável;
-- tamanho inicial sugerido;
-- capacidades requeridas;
-- componente de apresentação;
-- identificador único por instância;
-- política explícita para persistência e ciclo de vida, quando necessário.
+Cada **instância** de widget é um item do dock que abre o seu painel. Os tipos são um conjunto fechado, sem widgets de terceiros. O Rust é a fonte da verdade da forma e das regras; o TypeScript espelha os tipos e cuida da apresentação. Decisões e alternativas no [ADR 0008](adr/0008-persistencia-sqlite-e-widgets.md).
 
-Exemplo conceitual em TypeScript:
+### Rust: `src-tauri/src/domain/widgets/`
 
-```ts
-export type WidgetCategory =
-  | "productivity"
-  | "time"
-  | "system"
-  | "media"
-  | "developer"
-  | "utilities";
+Puro: não toca no banco, no Tauri nem no Windows. Um arquivo por tipo (`clock.rs`, `time_progress.rs`, `note.rs`, `shortcut.rs`, `files.rs`) com a configuração, o padrão e o `validate()`.
 
-export interface WidgetDefinition<TConfig = unknown> {
-  id: string;
-  name: string;
-  description: string;
-  category: WidgetCategory;
-  defaultSize: { width: number; height: number };
-  defaultConfig: TConfig;
-  capabilities: string[];
-}
+| Item | Papel |
+|---|---|
+| `WidgetKind` | `clock`, `time-progress`, `note`, `shortcut`, `files`, com o mesmo nome em kebab-case no JSON e na coluna `kind`. `creatable()` diz o que pode ser criado nesta fase (Atalho e Arquivos não, até a Fase 3). `config_version()` é a versão do formato da configuração, por tipo. |
+| `WidgetConfig` | Enum com a configuração de cada tipo, marcado pelo tipo: `{ "kind": "clock", "config": { ... } }`. Uma configuração do tipo errado não chega a existir. `default_for(kind)` é o padrão e `validate()` aplica as regras que o serde não expressa. |
+| `WidgetId` | UUID v7 em texto, gerado no Rust. Do frontend, só a forma exata que o Rust gera vira ID; qualquer outro texto é `notFound`. |
+| `WidgetInstance` | O que a interface recebe: `{ id, label, kind, config }`. Sem posição: uma lista de instâncias está sempre na ordem do dock. `label` nulo usa o nome do tipo. |
+| `WidgetsSnapshot` | O que `list_widgets` devolve e `widgets-changed` carrega: `{ storage, widgets }`. |
+| `StorageStatus` | `ok`, `recovered` ou `unavailable` com o motivo (`newerVersion`, `migrationFailed`, `openFailed`). |
+| `decode_config` / `encode_config` | Leem e gravam a coluna `config`. Campos ausentes recebem o padrão e desconhecidos são ignorados; outra versão ou JSON ilegível é `invalidConfig`. |
 
-export interface WidgetContext {
-  widgetInstanceId: string;
-  publishEvent(event: string, payload?: unknown): void;
-}
+**Validação.** Limites de 12 instâncias, rótulo de até 40 caracteres sem caractere de controle e nota de até 64 KiB em UTF-8. Por tipo:
 
-export interface WidgetModule<TConfig = unknown> {
-  definition: WidgetDefinition<TConfig>;
-  Component: React.ComponentType<{
-    config: TConfig;
-    context: WidgetContext;
-  }>;
-  validateConfig(value: unknown): value is TConfig;
-}
-```
+- Relógio: fuso IANA conhecido pela base compilada no binário;
+- Progresso do tempo: ao menos um período, sem repetição, e expediente `HH:mm` com o início antes do fim;
+- Atalho e Arquivos: validação só sintática (caminho absoluto do Windows, URL `http`/`https` com host), sem acesso a disco ou rede.
 
-Este contrato é ilustrativo. Ajustá-lo depois de implementar os primeiros widgets; evitar um sistema genérico complexo antes de existir necessidade real.
+**Erros.** Cada `WidgetError` tem um `WidgetErrorCode`, que é o que o comando devolve: `{ code }`, sem caminho nem valor. Códigos: `limitReached`, `notCreatable`, `notFound`, `kindMismatch`, `invalidLabel`, `invalidTimeZone`, `invalidPeriods`, `invalidWorkday`, `invalidTarget`, `invalidFolder`, `noteTooLarge`, `invalidConfig`, `unavailable` e `writeFailed`. A interface traduz cada um pelo `pt-BR.ts`.
+
+**Comandos.** `list_widgets` (dock e painel). Só no painel: `add_widget`, `remove_widget`, `move_widget`, `update_widget` (rótulo e configuração completos; o tipo deve ser o da instância), `get_note`, `save_note` e `dismiss_storage_notice`. Uma mudança aceita emite `widgets-changed` para todas as janelas.
+
+### TypeScript
+
+- **`src/core/widgets.ts`:** espelha os tipos, as constantes de limite, os nomes de comandos e eventos e as cargas, no molde de `src/core/settings.ts`. Acrescenta o código `notReady`, para quando o comando nem chega a rodar.
+- **`src/widgets/registry.ts`** (chega no PR 2 da Fase 2): liga cada tipo à sua apresentação — nome (chave do i18n), classe do esmalte do ícone, conteúdo do ícone, painel e ajustes. Não guarda regra nem valida configuração.
+- **Regras de negócio em funções puras**, sem React e sem `invoke`, testadas no Vitest sem renderizar: formatação do relógio, períodos do Progresso e agenda do salvamento automático da Nota.
+
+### Contrato travado por teste
+
+Os JSON de referência ficam em `src-tauri/tests/fixtures/widgets/`. O Rust compara a serialização de cada tipo com eles. O TS tem as mesmas fixtures tipadas com `satisfies` (`src/core/widgets.fixtures.ts`), e `src/core/widgets.contract.test.ts` compara as duas. Mudar um lado sem o outro quebra um dos testes.
 
 ### Ciclo de vida
 
-Widgets puramente visuais não precisam de métodos artificiais de inicialização e encerramento. Widgets que assinam eventos ou mantêm recursos devem usar hooks/serviços com cleanup explícito. Serviços de sistema de uso compartilhado devem ser centralizados para evitar polling duplicado.
+- Uma instância nasce por `add_widget` (ou pela semente, na criação do banco), recebe o ID e a configuração padrão, e só sai por `remove_widget`. Remover uma Nota remove o texto junto.
+- Reordenar, ajustar e reiniciar nunca mudam o ID.
+- Widgets puramente visuais não têm métodos artificiais de inicialização e encerramento. Os que assinam eventos ou mantêm recursos usam hooks com cleanup explícito.
+- Os ícones vivos (hora do Relógio, anel do Progresso) usam um único timer no dock, alinhado à virada do minuto, em vez de um por widget. Serviços de sistema de uso compartilhado também são centralizados, para evitar polling duplicado.
 
 ### Erros
 
-- Configuração inválida: validar, recuperar valor padrão quando seguro e registrar aviso sem dados sensíveis.
-- Serviço indisponível: apresentar estado de indisponibilidade.
-- Falha de um widget: isolar a falha; não encerrar a aplicação.
-- Permissão negada: explicar qual capacidade está indisponível.
-- Integração externa sem rede: manter UI responsiva e indicar dados desatualizados.
+- **Configuração inválida num comando:** rejeitada com o código do erro; o estado e o banco ficam como estavam, e o valor na interface volta ao anterior.
+- **Configuração inválida lida do banco** (editada à mão ou de versão antiga): a instância usa o padrão do tipo, um aviso vai para o log com o tipo do problema, e a linha só é regravada quando o usuário muda algo. A inicialização nunca é bloqueada. Uma linha de tipo desconhecido é ignorada com aviso, sem ser apagada.
+- **Armazenamento indisponível** (migração que falha, banco mais novo, banco que não abre): o arquivo não é tocado, o dock mostra só Configurações e Sobre, e Configurações › Itens do dock explica que os widgets estão indisponíveis.
+- **Banco recuperado:** a interface avisa que um banco corrompido foi posto de lado, até o usuário dispensar o aviso.
+- **Falha de um widget:** isolada no error boundary do painel; não encerra a aplicação.
+- **Permissão negada:** explicar qual capacidade está indisponível.
+- **Integração externa sem rede:** manter a UI responsiva e indicar dados desatualizados.
 
 ## 6. Persistência
 
-SQLite para entidades estruturadas:
-- `widget_instances`
-- `dock_settings` ou tabela de configurações versionada
-- `notes`
-- `reminders`
-- futuras tabelas específicas quando necessárias
+Dois armazenamentos convivem na pasta de dados do app (`%APPDATA%\dev.maxsueleinstein.dockmax`), ambos lidos e gravados só pelo Rust:
 
-Cada instância deve ter ID estável, tipo de widget, estado habilitado, posição e configuração validada/versionada.
+- **`settings.json`** (ADR 0007): preferências globais (tema, borda, tamanho e opacidade). Não migra para o SQLite, para as preferências carregarem mesmo com o banco indisponível.
+- **`dockmax.db`** (ADR 0008): SQLite com instâncias de widget e notas. Pragmas WAL, `foreign_keys=ON` e `busy_timeout` de 5 s. Migrações em `src-tauri/migrations/`, embutidas no binário, com a versão em `PRAGMA user_version`.
+
+Tabelas da migração 1 (`STRICT`):
+
+| Tabela | Colunas | Observações |
+|---|---|---|
+| `widget_instances` | `id` (UUID v7), `kind`, `label` (opcional), `position`, `config` (JSON), `config_version`, `created_at` | `position` começa em 0 e é contígua. `config` não leva o tipo, que tem coluna própria. O frontend não vê `position`, `config_version` nem `created_at`. |
+| `notes` | `instance_id`, `body`, `updated_at` | Chave estrangeira com `ON DELETE CASCADE`: remover a instância remove o texto. |
+| `meta` | `key`, `value` | Estado interno do banco, como o aviso de recuperação pendente. Nunca dado do usuário. |
+
+- **Semente única:** o banco nasce com Relógio, Progresso do tempo e Nota. Não volta depois de remover todos.
+- **Recuperação:** banco corrompido é renomeado para `dockmax.db.corrompido-<data>` e substituído por um novo, com aviso. Migração que falha ou banco mais novo que o app: o arquivo não é tocado e os widgets ficam indisponíveis. Antes de cada migração de um banco existente, `VACUUM INTO` grava `dockmax.db.bak-v<n>`. Nenhum caminho apaga dados.
+- **Tabelas novas** (lembretes e outras) entram por migração nova, quando houver código que as use.
 
 Não persistir métricas de CPU/RAM/rede indefinidamente. Começar com snapshots em memória; adicionar histórico apenas se houver um caso de uso concreto.
 
@@ -268,8 +269,13 @@ Exibir origem, horário de atualização e distinção entre dado oficial, estim
 - Unitários TypeScript: validação de configuração, estado, formatação e lógica dos widgets.
 - Componentes: estados normal, carregando, erro e indisponível.
 - Unitários Rust: regras de domínio e conversão de erros.
+- Contrato Rust × TS: fixtures JSON comparadas dos dois lados (§5).
 - Integração: persistência/migrações e comandos com adaptadores simulados quando possível.
 - E2E: abrir dock, mudar tema, criar nota, reiniciar e verificar persistência.
+  - WebdriverIO com `@wdio/tauri-service`, provedor embutido: o servidor WebDriver roda dentro do app (`tauri-plugin-wdio-webdriver`) e encontra cada janela pela label.
+  - Build de teste separado: feature cargo `e2e`, `identifier` `dev.maxsueleinstein.dockmax.e2e` (`src-tauri/tauri.e2e.conf.json`) e uma pasta de dados temporária por execução (`DOCKMAX_E2E_DATA_DIR`). O build normal não contém o plugin.
+  - `pnpm test:e2e:build` e `pnpm test:e2e`. Roda num job próprio do CI (`e2e`) e, localmente, só com autorização do usuário, porque abre um segundo dock na tela.
+  - Detalhes, reinício e alternativas no [ADR 0008](adr/0008-persistencia-sqlite-e-widgets.md).
 - Manual: monitores, escala, tela cheia, permissões, instalação e inicialização automática.
 
 ## 13. Observabilidade
