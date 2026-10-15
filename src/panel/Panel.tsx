@@ -14,7 +14,7 @@ import "./Panel.css";
 
 function hidePanel() {
   invoke("hide_panel").catch((error: unknown) => {
-    console.error("hide_panel failed", error);
+    log.error(`panel: hide failed: ${errorKind(error)}`);
   });
 }
 

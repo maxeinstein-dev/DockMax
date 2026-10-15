@@ -10,6 +10,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { DOCK_RELEASED_EVENT, type DockHitRegion } from "../core/dock";
+import { errorKind, log } from "../core/log";
 import type { LogicalRect, PanelId } from "../core/panels";
 import { useT } from "../i18n";
 import {
@@ -29,7 +30,7 @@ function clientRect(element: Element): LogicalRect {
 function togglePanel(panelId: PanelId, event: MouseEvent<HTMLButtonElement>) {
   const anchor = clientRect(event.currentTarget);
   invoke("toggle_panel", { panelId, anchor }).catch((error: unknown) => {
-    console.error("toggle_panel failed", error);
+    log.error(`dock: toggle panel failed: ${errorKind(error)}`);
   });
 }
 
@@ -81,7 +82,7 @@ function Dock() {
     if (key === lastSent.current) return;
     lastSent.current = key;
     invoke("set_dock_hit_region", { region }).catch((error: unknown) => {
-      console.error("set_dock_hit_region failed", error);
+      log.error(`dock: hit region update failed: ${errorKind(error)}`);
       // Lets the next report retry the same region.
       if (lastSent.current === key) lastSent.current = null;
     });
