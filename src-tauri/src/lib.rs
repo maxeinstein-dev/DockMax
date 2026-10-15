@@ -3,6 +3,10 @@ use std::sync::Arc;
 use tauri::RunEvent;
 
 mod commands;
+#[allow(dead_code)] // wired in F6a
+mod domain;
+#[allow(dead_code)] // wired in F6a
+mod persistence;
 mod tray;
 mod windows;
 
