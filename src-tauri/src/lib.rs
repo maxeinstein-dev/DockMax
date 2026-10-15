@@ -4,6 +4,8 @@ use tauri::{RunEvent, Wry, plugin::TauriPlugin};
 
 mod commands;
 mod domain;
+#[cfg(feature = "e2e")]
+mod e2e;
 mod i18n;
 mod logging;
 mod persistence;
@@ -28,7 +30,13 @@ fn startup() -> TauriPlugin<Wry> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    #[cfg_attr(not(feature = "e2e"), expect(unused_mut))]
+    let mut context = tauri::generate_context!();
+    // Test build only: before anything reads the identifier or a folder.
+    #[cfg(feature = "e2e")]
+    e2e::isolate(&mut context);
+
+    let builder = tauri::Builder::default()
         // First: a second launch exits here, before creating anything, and
         // shows the dock of the running instance. Its argv and working
         // folder are ignored and never logged.
@@ -54,8 +62,13 @@ pub fn run() {
             commands::dock::set_dock_layout,
             commands::settings::get_settings,
             commands::settings::update_settings
-        ])
-        .build(tauri::generate_context!())
+        ]);
+    // Test build only: the WebDriver server the E2E suite drives the windows
+    // through, on the port in `TAURI_WEBDRIVER_PORT` (4445 by default).
+    #[cfg(feature = "e2e")]
+    let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+    builder
+        .build(context)
         .expect("error while building tauri application")
         .run(|app, event| {
             if let RunEvent::Exit = event {

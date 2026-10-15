@@ -1,0 +1,8 @@
+# Build scripts of dependencies run only when listed here as `true`.
+allowBuilds:
+  # Download browser drivers on install; the E2E tests use the WebDriver
+  # server embedded in the test build of the app instead.
+  edgedriver: false
+  geckodriver: false
+  # Only checks its binary on install; the platform package works without it.
+  esbuild: false
