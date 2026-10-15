@@ -7,8 +7,11 @@
 //! or Windows.
 
 pub mod clock;
+#[cfg(test)]
+mod contract_tests;
 pub mod files;
 pub mod note;
+mod path;
 pub mod shortcut;
 pub mod time_progress;
 
@@ -213,13 +216,23 @@ impl WidgetConfig {
     }
 }
 
-/// Checks an instance label: `None` (the kind's name) or up to
-/// [`MAX_LABEL_CHARS`] characters.
+/// Checks an instance label: `None` (the kind's name) or text of 1 to
+/// [`MAX_LABEL_CHARS`] characters (Unicode scalar values, as `chars()`
+/// counts them) with no control character and something besides
+/// whitespace. Leading and trailing spaces are kept as given.
 pub fn validate_label(label: Option<&str>) -> Result<(), WidgetError> {
-    // L2: the validation lane implements this (length, no control
-    // characters); until then every label is accepted.
-    let _ = label;
-    Ok(())
+    let Some(label) = label else {
+        return Ok(());
+    };
+    let length = label.chars().count();
+    let valid = (1..=MAX_LABEL_CHARS).contains(&length)
+        && !label.chars().any(char::is_control)
+        && !label.chars().all(char::is_whitespace);
+    if valid {
+        Ok(())
+    } else {
+        Err(WidgetError::InvalidLabel)
+    }
 }
 
 /// The `config` column for `config`: the JSON of the kind's config alone,
@@ -809,10 +822,121 @@ mod tests {
             let message = error.to_string();
             assert!(!message.is_empty());
             assert!(
-                !message.contains('/') && !message.contains('\\'),
+                !message.contains('/') && !message.contains('\\') && !message.contains(':'),
                 "{message}"
             );
         }
+    }
+
+    #[test]
+    fn decoding_a_readable_config_that_breaks_a_rule_gives_the_rule_error() {
+        let cases = [
+            (
+                WidgetKind::Clock,
+                r#"{"timeZone":"Mars/Olympus_Mons"}"#,
+                WidgetError::InvalidTimeZone,
+            ),
+            (
+                WidgetKind::Clock,
+                r#"{"timeZone":"america/sao_paulo"}"#,
+                WidgetError::InvalidTimeZone,
+            ),
+            (
+                WidgetKind::TimeProgress,
+                r#"{"periods":[]}"#,
+                WidgetError::InvalidPeriods,
+            ),
+            (
+                WidgetKind::TimeProgress,
+                r#"{"periods":["day","day"]}"#,
+                WidgetError::InvalidPeriods,
+            ),
+            (
+                WidgetKind::TimeProgress,
+                r#"{"workday":{"start":"24:00"}}"#,
+                WidgetError::InvalidWorkday,
+            ),
+            (
+                WidgetKind::TimeProgress,
+                r#"{"workday":{"start":"18:00","end":"09:00"}}"#,
+                WidgetError::InvalidWorkday,
+            ),
+            (
+                WidgetKind::Shortcut,
+                r#"{"target":{"type":"path","path":"relatorio.pdf"}}"#,
+                WidgetError::InvalidTarget,
+            ),
+            (
+                WidgetKind::Shortcut,
+                r#"{"target":{"type":"url","url":"file:///C:/Windows"}}"#,
+                WidgetError::InvalidTarget,
+            ),
+            (
+                WidgetKind::Files,
+                r#"{"folder":"Downloads"}"#,
+                WidgetError::InvalidFolder,
+            ),
+            (
+                WidgetKind::Files,
+                r#"{"folder":""}"#,
+                WidgetError::InvalidFolder,
+            ),
+        ];
+        for (kind, json, error) in cases {
+            assert_eq!(decode_config(kind, 1, json), Err(error), "{kind} {json}");
+        }
+    }
+
+    #[test]
+    fn labels_up_to_40_characters_are_accepted() {
+        let accepted = [
+            "São Paulo",
+            "a",
+            " Lisboa ",
+            "relógio 🕐",
+            &"a".repeat(MAX_LABEL_CHARS),
+            // 40 characters, 80 bytes: the limit counts characters.
+            &"ç".repeat(MAX_LABEL_CHARS),
+        ];
+        assert_eq!(validate_label(None), Ok(()));
+        for label in accepted {
+            assert_eq!(validate_label(Some(label)), Ok(()), "{label:?}");
+        }
+    }
+
+    #[test]
+    fn labels_empty_blank_too_long_or_with_control_characters_are_rejected() {
+        let rejected = [
+            "",
+            " ",
+            "   ",
+            "\u{3000}", // ideographic space
+            &"a".repeat(MAX_LABEL_CHARS + 1),
+            &"ç".repeat(MAX_LABEL_CHARS + 1),
+            "São\nPaulo",
+            "São\tPaulo",
+            "São Paulo\0",
+            "\u{1b}[31mvermelho",
+            "fim\u{7f}",
+            "c1\u{85}",
+        ];
+        for label in rejected {
+            assert_eq!(
+                validate_label(Some(label)),
+                Err(WidgetError::InvalidLabel),
+                "{label:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_label_error_never_carries_the_label() {
+        let label = "Rótulo secreto\n";
+        let message = validate_label(Some(label)).unwrap_err().to_string();
+        assert!(
+            !message.contains("Rótulo") && !message.contains("secreto"),
+            "{message}"
+        );
     }
 
     #[test]
