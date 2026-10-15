@@ -1,12 +1,12 @@
 use std::error::Error;
 
+use tauri::AppHandle;
 use tauri::menu::{Menu, MenuEvent, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter};
 
 use crate::i18n;
 use crate::windows::dock;
-use crate::windows::panel::{self, PanelId, PanelPayload};
+use crate::windows::panel::{self, PanelId};
 
 /// The product name: the same in every locale.
 const TOOLTIP: &str = "DockMax";
@@ -77,13 +77,7 @@ fn open_settings(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         must_request_settings(state.open())
     };
     if request {
-        app.emit_to(
-            dock::LABEL,
-            dock::REQUEST_PANEL_EVENT,
-            PanelPayload {
-                panel_id: PanelId::Settings,
-            },
-        )?;
+        dock::request_panel(app, PanelId::Settings)?;
     }
     Ok(())
 }
@@ -91,6 +85,7 @@ fn open_settings(app: &AppHandle) -> Result<(), Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::windows::panel::PanelPayload;
 
     #[test]
     fn settings_are_requested_unless_already_open() {

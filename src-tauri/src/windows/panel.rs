@@ -323,6 +323,9 @@ pub struct PanelState {
     blurred: Option<(PanelId, Instant)>,
     /// Last geometry each panel's page reported.
     known: [Option<PanelGeometry>; 2],
+    /// Panel closed because the dock moved (its edge or size changed), to
+    /// reopen at its item once the dock has settled in its new place.
+    reopen: Option<PanelId>,
 }
 
 impl PanelState {
@@ -330,6 +333,8 @@ impl PanelState {
     /// panel lose focus (and hide) before the toggle arrives, so a toggle of
     /// that panel right after a blur-hide keeps it closed.
     pub fn toggle(&mut self, id: PanelId, anchor: LogicalRect, now: Instant) -> Action {
+        // A click is an explicit request: it replaces a pending reopen.
+        self.reopen = None;
         let blurred = self.blurred.take();
         match self.open {
             Some((open, _)) if open == id => self.close(),
@@ -376,11 +381,36 @@ impl PanelState {
         }
     }
 
-    /// The panel asked to close itself (Esc), or the dock is hiding or
-    /// moving. Keeps a pending reopen guard: a late hide after a blur-hide
-    /// must not let the click that closed the panel reopen it.
+    /// The panel asked to close itself (Esc, Alt+F4), or the dock is
+    /// hiding. Drops a pending reopen (`close_for_move`), but keeps the
+    /// reopen guard: a late hide after a blur-hide must not let the click
+    /// that closed the panel reopen it.
     pub fn hide(&mut self) -> Action {
+        self.reopen = None;
         self.close()
+    }
+
+    /// The dock is moving (its edge or size changed in the settings):
+    /// closes the open panel, whose anchor moved, and remembers it, to be
+    /// reopened at its item once the dock has settled (`dock_settled`).
+    /// Without an open panel, a reopen still pending is kept.
+    pub fn close_for_move(&mut self) -> Action {
+        let open = self.open();
+        let action = self.close();
+        self.reopen = open.or(self.reopen);
+        action
+    }
+
+    /// The dock applied a layout its page reported. When the layout left
+    /// the window as it was, the page measured the window it is really in,
+    /// so its items are where they will stay: hands out, once, the panel
+    /// to reopen. When the layout resized or moved the window, the page
+    /// reports again for the new window, and the reopen waits for that.
+    pub fn dock_settled(&mut self, window_changed: bool) -> Option<PanelId> {
+        if window_changed {
+            return None;
+        }
+        self.reopen.take()
     }
 
     /// The panel page rendered `id` at `geometry` (validated). Reveals the
@@ -479,6 +509,15 @@ pub fn lock(app: &AppHandle) -> std::sync::MutexGuard<'_, PanelState> {
 /// Closes the panel through the state, telling the dock.
 pub fn close(app: &AppHandle) {
     let action = lock(app).hide();
+    if let Err(error) = apply(app, action) {
+        log::warn!("panel: failed to hide: {error}");
+    }
+}
+
+/// Closes the panel because the dock is moving, to reopen it at its item
+/// once the dock has settled (`PanelState::close_for_move`).
+pub fn close_for_move(app: &AppHandle) {
+    let action = lock(app).close_for_move();
     if let Err(error) = apply(app, action) {
         log::warn!("panel: failed to hide: {error}");
     }
@@ -1696,5 +1735,114 @@ mod tests {
         let mut state = PanelState::default();
 
         assert_eq!(state.hide(), Action::Nothing);
+    }
+
+    #[test]
+    fn moving_the_dock_closes_the_open_panel_and_remembers_it() {
+        let mut state = PanelState::default();
+        show(&mut state, PanelId::Settings, Instant::now());
+
+        assert_eq!(state.close_for_move(), Action::Hide);
+        assert_eq!(state.open(), None);
+        assert_eq!(state.dock_settled(false), Some(PanelId::Settings));
+    }
+
+    #[test]
+    fn moving_the_dock_closes_a_waiting_panel_and_remembers_it() {
+        let mut state = PanelState::default();
+        let (_, wait) = prepared(state.toggle(PanelId::About, ANCHOR, Instant::now()));
+
+        assert_eq!(state.close_for_move(), Action::Hide);
+        assert_eq!(state.time_out(wait), Action::Nothing);
+        assert_eq!(state.dock_settled(false), Some(PanelId::About));
+    }
+
+    #[test]
+    fn moving_the_dock_without_an_open_panel_reopens_nothing() {
+        let mut state = PanelState::default();
+
+        assert_eq!(state.close_for_move(), Action::Nothing);
+        assert_eq!(state.dock_settled(false), None);
+    }
+
+    #[test]
+    fn reopen_waits_while_the_layout_resizes_or_moves_the_dock() {
+        let mut state = PanelState::default();
+        show(&mut state, PanelId::Settings, Instant::now());
+        state.close_for_move();
+
+        // The page measured the old window: its items are not where they
+        // will be.
+        assert_eq!(state.dock_settled(true), None);
+        assert_eq!(state.dock_settled(true), None);
+        assert_eq!(state.dock_settled(false), Some(PanelId::Settings));
+    }
+
+    #[test]
+    fn reopen_is_handed_out_once() {
+        let mut state = PanelState::default();
+        show(&mut state, PanelId::Settings, Instant::now());
+        state.close_for_move();
+
+        assert_eq!(state.dock_settled(false), Some(PanelId::Settings));
+        assert_eq!(state.dock_settled(false), None);
+        assert_eq!(state.dock_settled(true), None);
+    }
+
+    #[test]
+    fn a_second_move_before_the_dock_settles_keeps_the_reopen() {
+        let mut state = PanelState::default();
+        show(&mut state, PanelId::About, Instant::now());
+        state.close_for_move();
+
+        assert_eq!(state.close_for_move(), Action::Nothing);
+        assert_eq!(state.dock_settled(false), Some(PanelId::About));
+    }
+
+    #[test]
+    fn explicit_close_or_hide_drops_the_reopen() {
+        let mut state = PanelState::default();
+        show(&mut state, PanelId::Settings, Instant::now());
+        state.close_for_move();
+
+        // Esc, Alt+F4 or the dock hiding.
+        assert_eq!(state.hide(), Action::Nothing);
+        assert_eq!(state.dock_settled(false), None);
+    }
+
+    #[test]
+    fn a_click_on_an_item_replaces_the_reopen() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        show(&mut state, PanelId::Settings, t);
+        state.close_for_move();
+
+        let (id, _) = prepared(state.toggle(PanelId::About, ANCHOR, at(t, 1000)));
+
+        assert_eq!(id, PanelId::About);
+        assert_eq!(state.dock_settled(false), None);
+    }
+
+    #[test]
+    fn the_reopened_panel_opens_like_a_click() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        show(&mut state, PanelId::Settings, t);
+        state.close_for_move();
+        // Hiding the window for the move takes its focus.
+        assert_eq!(state.blur(at(t, 1)), Action::Nothing);
+        let reopen = state.dock_settled(false).unwrap();
+
+        // The dock answers `dock-request-panel` with a toggle at the item's
+        // new place, right away: no reopen guard applies.
+        let moved = LogicalRect { x: 120.0, ..ANCHOR };
+        prepared(state.toggle(reopen, moved, at(t, 20)));
+        assert_eq!(
+            state.ready(reopen, RENDERED),
+            Action::Reveal {
+                anchor: moved,
+                geometry: RENDERED
+            }
+        );
     }
 }

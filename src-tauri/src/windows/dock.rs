@@ -3,10 +3,12 @@ use std::fmt;
 use std::sync::{Mutex, MutexGuard};
 
 use serde::Deserialize;
-use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent};
+use tauri::{
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent,
+};
 
 use super::hit_test::{self, HitRegion, RegionError};
-use super::panel::{self, LogicalRect, LogicalSize, MAX_LOGICAL, SizeError};
+use super::panel::{self, LogicalRect, LogicalSize, MAX_LOGICAL, PanelId, PanelPayload, SizeError};
 use crate::commands;
 use crate::domain::settings::{DockEdge, DockSettings};
 
@@ -18,7 +20,8 @@ pub const LABEL: &str = "dock";
 pub const LAYERING: super::native::Layering = super::native::Layering::Always;
 
 /// Event sent to the dock asking it to open a panel anchored to its own
-/// item, with `{ "panelId": <id> }` (the tray's "Configurações").
+/// item, with `{ "panelId": <id> }`: the tray's "Configurações", and the
+/// panel closed by a settings change that moved the dock, once it settled.
 pub const REQUEST_PANEL_EVENT: &str = "dock-request-panel";
 
 /// Gap between the dock window (and the bar, flush with its screen-facing
@@ -182,7 +185,8 @@ pub fn edge(app: &AppHandle) -> Edge {
 }
 
 /// Whether a settings change moves the dock or its items: then the open
-/// panel, anchored to an item, is closed.
+/// panel, anchored to an item, is closed and reopened at the item's new
+/// place.
 pub fn moves_the_dock(before: &DockSettings, after: &DockSettings) -> bool {
     before.edge != after.edge || before.icon_size != after.icon_size
 }
@@ -209,6 +213,9 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
 
 /// The dock page reported a new layout (validated): resizes and moves the
 /// window when its size changed, and captures the mouse where it paints.
+/// Once a layout leaves the window as it was (the page laid it out for the
+/// window it is in), asks the dock to reopen the panel a settings change
+/// closed.
 pub fn set_layout(app: &AppHandle, layout: DockLayout) -> Result<(), Box<dyn Error>> {
     let window = app
         .get_webview_window(LABEL)
@@ -217,17 +224,30 @@ pub fn set_layout(app: &AppHandle, layout: DockLayout) -> Result<(), Box<dyn Err
     let placed = place(&window, false);
     // Even when placing failed: the region is relative to the window.
     hit_test::tracker(app).set_region(layout.into_region());
-    placed
+    let window_changed = placed?;
+    let reopen = panel::lock(app).dock_settled(window_changed);
+    if let Some(panel_id) = reopen {
+        log::debug!("dock: settled after a move, reopening the panel");
+        request_panel(app, panel_id)?;
+    }
+    Ok(())
+}
+
+/// Asks the dock to open a panel anchored to its own item, as a click
+/// would (unless that panel is already open).
+pub fn request_panel(app: &AppHandle, panel_id: PanelId) -> tauri::Result<()> {
+    app.emit_to(LABEL, REQUEST_PANEL_EVENT, PanelPayload { panel_id })
 }
 
 /// The settings changed: when the dock moves (edge) or its items resize,
 /// closes the open panel, whose anchor moved, and places the dock again.
-/// The page reports the new layout after applying the settings.
+/// The page reports the new layout after applying the settings; once the
+/// dock settles there, `set_layout` has the panel reopened at its item.
 pub fn settings_changed(app: &AppHandle, before: &DockSettings, after: &DockSettings) {
     if !moves_the_dock(before, after) {
         return;
     }
-    panel::close(app);
+    panel::close_for_move(app);
     let placed = app
         .get_webview_window(LABEL)
         .ok_or_else(|| Box::<dyn Error>::from("dock window is missing"))
@@ -306,8 +326,9 @@ fn reposition(window: &WebviewWindow) {
 
 /// Moves and sizes the dock on the edge of the primary monitor's work area
 /// the settings choose. Unless `force`d, leaves the window alone when it
-/// already has that rectangle.
-fn place(window: &WebviewWindow, force: bool) -> Result<(), Box<dyn Error>> {
+/// already has that rectangle. Returns whether the window was moved or
+/// resized.
+fn place(window: &WebviewWindow, force: bool) -> Result<bool, Box<dyn Error>> {
     let app = window.app_handle();
     let (work_area, scale_factor) = primary_work_area(window)?;
     let size = placement(app).size;
@@ -317,7 +338,7 @@ fn place(window: &WebviewWindow, force: bool) -> Result<(), Box<dyn Error>> {
     };
     let rect = dock_rect(work_area, scale_factor, size, edge(app));
     if !placement(app).needs(rect, force) {
-        return Ok(());
+        return Ok(false);
     }
     window.set_size(PhysicalSize::new(rect.width, rect.height))?;
     window.set_position(PhysicalPosition::new(rect.x, rect.y))?;
@@ -333,7 +354,7 @@ fn place(window: &WebviewWindow, force: bool) -> Result<(), Box<dyn Error>> {
         },
         window.scale_factor()?,
     );
-    Ok(())
+    Ok(true)
 }
 
 /// The primary monitor's work area, in physical pixels, and its scale factor.
