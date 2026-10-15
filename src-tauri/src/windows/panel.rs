@@ -408,9 +408,9 @@ pub enum Action {
 /// hidden while its page renders), then `ready` or `time_out` reveals it.
 #[derive(Debug, Default)]
 pub struct PanelState {
-    /// The open panel, shown or waiting for its page, and the dock item it
-    /// is anchored to.
-    open: Option<(PanelId, LogicalRect)>,
+    /// The open panel, shown or waiting for its page, the dock item it is
+    /// anchored to, and the wait that showed it (its `panel-show`).
+    open: Option<(PanelId, LogicalRect, u64)>,
     /// The wait for the open panel's page, while it lasts.
     waiting: Option<u64>,
     /// Waits started so far; numbers each one.
@@ -434,7 +434,7 @@ impl PanelState {
         self.reopen = None;
         let blurred = self.blurred.take();
         match self.open {
-            Some((open, _)) if open == id => self.close(),
+            Some((open, _, _)) if open == id => self.close(),
             Some(_) => self.prepare(id, anchor),
             None => match blurred {
                 Some((closed, at))
@@ -449,7 +449,7 @@ impl PanelState {
 
     fn prepare(&mut self, id: PanelId, anchor: LogicalRect) -> Action {
         self.waits += 1;
-        self.open = Some((id, anchor));
+        self.open = Some((id, anchor, self.waits));
         self.waiting = Some(self.waits);
         Action::Prepare(id, self.waits)
     }
@@ -470,7 +470,7 @@ impl PanelState {
             return Action::Nothing;
         }
         match self.open.take() {
-            Some((id, _)) => {
+            Some((id, _, _)) => {
                 self.blurred = Some((id, now));
                 Action::Hide
             }
@@ -526,15 +526,16 @@ impl PanelState {
             .map(|(id, _)| id)
     }
 
-    /// The panel page rendered `id` at `geometry` (validated). Reveals the
-    /// open panel; a signal for any other panel is stale and ignored. A
-    /// signal for the panel already on screen places it again (its content
-    /// changed size, or the time-out showed it first).
-    pub fn ready(&mut self, id: PanelId, geometry: PanelGeometry) -> Action {
-        let Some((open, anchor)) = self.open else {
+    /// The panel page rendered `id` at `geometry` (validated), answering
+    /// the `panel-show` of `wait`. Reveals the open panel; a signal for any
+    /// other panel, or for an earlier show of the same one, is stale and
+    /// ignored. A signal for the panel already on screen places it again
+    /// (its content changed size, or the time-out showed it first).
+    pub fn ready(&mut self, id: PanelId, wait: u64, geometry: PanelGeometry) -> Action {
+        let Some((open, anchor, shown)) = self.open else {
             return Action::Nothing;
         };
-        if open != id {
+        if open != id || shown != wait {
             return Action::Nothing;
         }
         self.known[id.index()] = Some(geometry);
@@ -550,7 +551,7 @@ impl PanelState {
         }
         self.waiting = None;
         match self.open {
-            Some((id, anchor)) => Action::Reveal {
+            Some((id, anchor, _)) => Action::Reveal {
                 anchor,
                 geometry: self.known[id.index()].unwrap_or_else(|| PanelGeometry::fallback(id)),
             },
@@ -560,7 +561,7 @@ impl PanelState {
 
     /// The open panel, shown or waiting for its page.
     pub fn open(&self) -> Option<PanelId> {
-        self.open.map(|(id, _)| id)
+        self.open.map(|(id, _, _)| id)
     }
 
     /// Drops the reopen guard: the next toggle is an explicit request (the
@@ -570,12 +571,21 @@ impl PanelState {
     }
 }
 
-/// `{ "panelId": <id> }`: the payload of `panel-show` and of the dock's
-/// `dock-request-panel`.
+/// `{ "panelId": <id> }`: the payload of the dock's `dock-request-panel`.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PanelPayload {
     pub panel_id: PanelId,
+}
+
+/// `{ "panelId": <id>, "wait": <n> }`: the payload of `panel-show`. The
+/// page sends `wait` back in `panel_ready`, so a late answer to an earlier
+/// show is told apart.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShowPayload {
+    panel_id: PanelId,
+    wait: u64,
 }
 
 /// `{ "panelId": <id> | null }`: the payload of `panel-changed`.
@@ -649,7 +659,7 @@ pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
             // Hidden while the page renders: no previous content, no flash
             // at the previous size.
             window.hide()?;
-            window.emit_to(LABEL, SHOW_EVENT, PanelPayload { panel_id: id })?;
+            window.emit_to(LABEL, SHOW_EVENT, ShowPayload { panel_id: id, wait })?;
             schedule_time_out(app, wait)?;
         }
         Action::Reveal { anchor, geometry } => {
@@ -1675,6 +1685,15 @@ mod tests {
             serde_json::json!({ "panelId": "settings" })
         );
         assert_eq!(
+            serde_json::to_value(ShowPayload {
+                panel_id: PanelId::About,
+                wait: 7
+            })
+            .unwrap(),
+            serde_json::json!({ "panelId": "about", "wait": 7 })
+        );
+        assert_eq!(SHOW_EVENT, "panel-show");
+        assert_eq!(
             serde_json::to_value(ChangedPayload { panel_id: None }).unwrap(),
             serde_json::json!({ "panelId": null })
         );
@@ -1715,15 +1734,18 @@ mod tests {
     }
 
     /// Opens `id` and reveals it as its page confirms, at `RENDERED`.
-    fn show(state: &mut PanelState, id: PanelId, now: Instant) {
-        assert_eq!(prepared(state.toggle(id, ANCHOR, now)).0, id);
+    /// Returns the wait that showed it.
+    fn show(state: &mut PanelState, id: PanelId, now: Instant) -> u64 {
+        let (prepared_id, wait) = prepared(state.toggle(id, ANCHOR, now));
+        assert_eq!(prepared_id, id);
         assert_eq!(
-            state.ready(id, RENDERED),
+            state.ready(id, wait, RENDERED),
             Action::Reveal {
                 anchor: ANCHOR,
                 geometry: RENDERED
             }
         );
+        wait
     }
 
     #[test]
@@ -1739,10 +1761,10 @@ mod tests {
     #[test]
     fn ready_for_the_waiting_panel_reveals_it_at_the_reported_geometry() {
         let mut state = PanelState::default();
-        state.toggle(PanelId::About, ANCHOR, Instant::now());
+        let (_, wait) = prepared(state.toggle(PanelId::About, ANCHOR, Instant::now()));
 
         assert_eq!(
-            state.ready(PanelId::About, RENDERED),
+            state.ready(PanelId::About, wait, RENDERED),
             Action::Reveal {
                 anchor: ANCHOR,
                 geometry: RENDERED
@@ -1754,11 +1776,14 @@ mod tests {
     fn ready_for_a_stale_panel_is_ignored() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        state.toggle(PanelId::Settings, ANCHOR, t);
+        let (_, first) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
         let (_, wait) = prepared(state.toggle(PanelId::About, ANCHOR, at(t, 50)));
 
         // The Settings page confirms late, after the switch to About.
-        assert_eq!(state.ready(PanelId::Settings, RENDERED), Action::Nothing);
+        assert_eq!(
+            state.ready(PanelId::Settings, first, RENDERED),
+            Action::Nothing
+        );
         // About still waits, and still falls back on its own size.
         assert_eq!(
             state.time_out(wait),
@@ -1770,13 +1795,44 @@ mod tests {
     }
 
     #[test]
+    fn ready_of_an_earlier_show_of_the_same_panel_is_ignored() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        // A, then B, then A again before either page confirmed.
+        let (_, a) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
+        let (_, b) = prepared(state.toggle(PanelId::About, ANCHOR, at(t, 30)));
+        let moved = LogicalRect { x: 120.0, ..ANCHOR };
+        let (_, again) = prepared(state.toggle(PanelId::Settings, moved, at(t, 60)));
+
+        // The answers to the first A and to B arrive late.
+        assert_eq!(state.ready(PanelId::Settings, a, RENDERED), Action::Nothing);
+        assert_eq!(state.ready(PanelId::About, b, RENDERED), Action::Nothing);
+        // An answer to a show that never happened is ignored too.
+        assert_eq!(
+            state.ready(PanelId::Settings, again + 1, RENDERED),
+            Action::Nothing
+        );
+        // Still waiting: only the answer to the latest show reveals it.
+        assert_eq!(
+            state.ready(PanelId::Settings, again, RENDERED),
+            Action::Reveal {
+                anchor: moved,
+                geometry: RENDERED
+            }
+        );
+    }
+
+    #[test]
     fn ready_without_an_open_panel_is_ignored() {
         let mut state = PanelState::default();
-        assert_eq!(state.ready(PanelId::Settings, RENDERED), Action::Nothing);
+        assert_eq!(state.ready(PanelId::Settings, 1, RENDERED), Action::Nothing);
 
-        state.toggle(PanelId::Settings, ANCHOR, Instant::now());
+        let (_, wait) = prepared(state.toggle(PanelId::Settings, ANCHOR, Instant::now()));
         state.hide();
-        assert_eq!(state.ready(PanelId::Settings, RENDERED), Action::Nothing);
+        assert_eq!(
+            state.ready(PanelId::Settings, wait, RENDERED),
+            Action::Nothing
+        );
     }
 
     #[test]
@@ -1823,7 +1879,7 @@ mod tests {
         let mut state = PanelState::default();
         let t = Instant::now();
         let (_, first) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
-        state.ready(PanelId::Settings, RENDERED);
+        state.ready(PanelId::Settings, first, RENDERED);
         assert_eq!(state.time_out(first), Action::Nothing);
 
         state.hide();
@@ -1845,7 +1901,10 @@ mod tests {
             Action::Hide
         );
         assert_eq!(state.time_out(wait), Action::Nothing);
-        assert_eq!(state.ready(PanelId::Settings, RENDERED), Action::Nothing);
+        assert_eq!(
+            state.ready(PanelId::Settings, wait, RENDERED),
+            Action::Nothing
+        );
         assert_eq!(state.open(), None);
     }
 
@@ -1867,12 +1926,12 @@ mod tests {
         // Hiding the window for the wait takes its focus.
         let mut state = PanelState::default();
         let t = Instant::now();
-        state.toggle(PanelId::Settings, ANCHOR, t);
+        let (_, wait) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
 
         assert_eq!(state.blur(at(t, 10)), Action::Nothing);
         assert_eq!(state.open(), Some(PanelId::Settings));
         assert!(matches!(
-            state.ready(PanelId::Settings, RENDERED),
+            state.ready(PanelId::Settings, wait, RENDERED),
             Action::Reveal { .. }
         ));
         // Revealed, a blur hides it again.
@@ -1886,13 +1945,13 @@ mod tests {
 
         assert_eq!(state.hide(), Action::Hide);
         assert_eq!(state.time_out(wait), Action::Nothing);
-        assert_eq!(state.ready(PanelId::About, RENDERED), Action::Nothing);
+        assert_eq!(state.ready(PanelId::About, wait, RENDERED), Action::Nothing);
     }
 
     #[test]
     fn ready_for_the_panel_on_screen_places_it_again() {
         let mut state = PanelState::default();
-        show(&mut state, PanelId::Settings, Instant::now());
+        let wait = show(&mut state, PanelId::Settings, Instant::now());
         let taller = PanelGeometry {
             size: LogicalSize {
                 width: 392.0,
@@ -1902,23 +1961,23 @@ mod tests {
         };
 
         assert_eq!(
-            state.ready(PanelId::Settings, taller),
+            state.ready(PanelId::Settings, wait, taller),
             Action::Reveal {
                 anchor: ANCHOR,
                 geometry: taller
             }
         );
-        assert_eq!(state.ready(PanelId::About, taller), Action::Nothing);
+        assert_eq!(state.ready(PanelId::About, wait, taller), Action::Nothing);
     }
 
     #[test]
     fn toggle_anchors_the_panel_to_the_clicked_item() {
         let mut state = PanelState::default();
         let item = LogicalRect { x: 90.0, ..ANCHOR };
-        state.toggle(PanelId::About, item, Instant::now());
+        let (_, wait) = prepared(state.toggle(PanelId::About, item, Instant::now()));
 
         assert_eq!(
-            state.ready(PanelId::About, RENDERED),
+            state.ready(PanelId::About, wait, RENDERED),
             Action::Reveal {
                 anchor: item,
                 geometry: RENDERED
@@ -2228,9 +2287,9 @@ mod tests {
         // The dock answers `dock-request-panel` with a toggle at the item's
         // new place, right away: no reopen guard applies.
         let moved = LogicalRect { x: 120.0, ..ANCHOR };
-        prepared(state.toggle(reopen, moved, at(t, 20)));
+        let (_, wait) = prepared(state.toggle(reopen, moved, at(t, 20)));
         assert_eq!(
-            state.ready(reopen, RENDERED),
+            state.ready(reopen, wait, RENDERED),
             Action::Reveal {
                 anchor: moved,
                 geometry: RENDERED

@@ -37,6 +37,8 @@ function logPanelFailure(error: unknown) {
 /** One `panel-show`: showing the same panel again is a new request. */
 interface ShowRequest {
   panelId: PanelId;
+  /** Rust's number for this show, sent back in `panel_ready`. */
+  wait: number;
   seq: number;
 }
 
@@ -50,8 +52,12 @@ function Panel() {
 
   useEffect(() => {
     const unlisten = listen<PanelShowPayload>(PANEL_SHOW_EVENT, (event) => {
-      const { panelId } = event.payload;
-      setRequest((previous) => ({ panelId, seq: (previous?.seq ?? 0) + 1 }));
+      const { panelId, wait } = event.payload;
+      setRequest((previous) => ({
+        panelId,
+        wait,
+        seq: (previous?.seq ?? 0) + 1,
+      }));
     });
     return () => {
       void unlisten.then((stop) => stop());
@@ -74,6 +80,7 @@ function Panel() {
     if (request === null || frame === null) return;
     panelReady({
       panelId: request.panelId,
+      wait: request.wait,
       size: measureFrame(frame),
       inset: PANEL_INSET,
     });

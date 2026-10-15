@@ -75,10 +75,13 @@ function fakeLayout(this: HTMLElement): DOMRect {
   return rect(SIZES.failed);
 }
 
-function show(panelId: PanelShowPayload["panelId"]) {
+/** Numbers each `panel-show`, as Rust does. */
+let waits = 0;
+
+function show(panelId: PanelShowPayload["panelId"], wait = ++waits) {
   const handler = handlers.get("panel-show");
   if (!handler) throw new Error("panel-show listener not registered");
-  act(() => handler({ payload: { panelId } }));
+  act(() => handler({ payload: { panelId, wait } }));
 }
 
 /** The `panel_ready` calls so far, in order. */
@@ -91,6 +94,7 @@ function readyCalls(): PanelReadyArgs[] {
 describe("Panel", () => {
   beforeEach(() => {
     handlers.clear();
+    waits = 0;
     measured.length = 0;
     invoke.mockReset();
     invoke.mockImplementation((command: string) =>
@@ -179,6 +183,7 @@ describe("Panel", () => {
       expect(readyCalls()).toEqual([
         {
           panelId: "settings",
+          wait: 1,
           size: { width: 336, height: 346 },
           inset: 8,
         },
@@ -192,8 +197,18 @@ describe("Panel", () => {
       show("about");
 
       expect(readyCalls()).toEqual([
-        { panelId: "settings", size: { width: 336, height: 346 }, inset: 8 },
-        { panelId: "about", size: { width: 316, height: 236 }, inset: 8 },
+        {
+          panelId: "settings",
+          wait: 1,
+          size: { width: 336, height: 346 },
+          inset: 8,
+        },
+        {
+          panelId: "about",
+          wait: 2,
+          size: { width: 316, height: 236 },
+          inset: 8,
+        },
       ]);
       // The about measurement never saw the settings content.
       expect(measured).toHaveLength(2);
@@ -213,6 +228,22 @@ describe("Panel", () => {
       ]);
     });
 
+    it("answers each panel-show with its own wait number", () => {
+      render(<Panel />);
+
+      show("settings", 7);
+      show("about", 8);
+      show("settings", 9);
+
+      expect(
+        readyCalls().map(({ panelId, wait }) => ({ panelId, wait })),
+      ).toEqual([
+        { panelId: "settings", wait: 7 },
+        { panelId: "about", wait: 8 },
+        { panelId: "settings", wait: 9 },
+      ]);
+    });
+
     it("is sent for a panel whose content failed, with the failure's size", () => {
       failing.panelId = "settings";
       vi.spyOn(console, "error").mockImplementation(() => {});
@@ -221,7 +252,12 @@ describe("Panel", () => {
       show("settings");
 
       expect(readyCalls()).toEqual([
-        { panelId: "settings", size: { width: 336, height: 104 }, inset: 8 },
+        {
+          panelId: "settings",
+          wait: 1,
+          size: { width: 336, height: 104 },
+          inset: 8,
+        },
       ]);
     });
 

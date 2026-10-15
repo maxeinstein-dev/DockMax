@@ -44,15 +44,17 @@ pub fn hide_panel(app: AppHandle) -> Result<(), String> {
 }
 
 /// Called by the panel once the content `panel-show` asked for has
-/// rendered, with the window size it needs and the transparent inset around
-/// its visible card, in logical pixels. Shows the panel there; a signal for
-/// a panel that is no longer open is ignored. Called again for the open
-/// panel, places it again.
+/// rendered, with that show's `wait`, the window size it needs and the
+/// transparent inset around its visible card, in logical pixels. Shows the
+/// panel there; a signal for a panel that is no longer open, or for an
+/// earlier show of it, is ignored. Called again for the open panel, places
+/// it again.
 #[tauri::command]
 pub fn panel_ready(
     app: AppHandle,
     window: WebviewWindow,
     panel_id: PanelId,
+    wait: u64,
     size: PanelSize,
     inset: PanelInset,
 ) -> Result<(), String> {
@@ -60,9 +62,9 @@ pub fn panel_ready(
         return Err("only the panel reports that it rendered".into());
     }
     // `size` and `inset` were checked when deserialized.
-    let action = panel::lock(&app).ready(panel_id, PanelGeometry::new(size, inset));
+    let action = panel::lock(&app).ready(panel_id, wait, PanelGeometry::new(size, inset));
     if action == Action::Nothing {
-        log::debug!("panel: ignored the ready signal of a panel that is not open");
+        log::debug!("panel: ignored a stale ready signal");
         return Ok(());
     }
     panel::reveal_or_close(&app, action).map_err(|error| {

@@ -14,6 +14,9 @@ export const PANEL_SHOW_EVENT = "panel-show";
 
 export interface PanelShowPayload {
   panelId: PanelId;
+  /** Numbers this show; sent back in `panel_ready`, so Rust can tell the
+   * answer to this show from a late answer to an earlier one. */
+  wait: number;
 }
 
 /** Event the dock receives when the open panel changes; drives the open
@@ -42,6 +45,8 @@ export interface LogicalSize {
 export interface PanelReadyArgs {
   /** The panel whose content rendered; never the one shown before it. */
   panelId: PanelId;
+  /** The `wait` of the `panel-show` this answers. */
+  wait: number;
   /** Full size the panel window must have, in logical pixels: the visible
    * card plus `inset` on every side, rounded up to whole pixels. */
   size: LogicalSize;
