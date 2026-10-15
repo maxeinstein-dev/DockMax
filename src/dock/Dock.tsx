@@ -138,11 +138,17 @@ function Dock() {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const tips = useRef<(HTMLSpanElement | null)[]>([]);
   const lastSent = useRef<string | null>(null);
+  const lastPlace = useRef<string | null>(null);
 
   const { size, edge } = settings
     ? { size: dockSize(settings.dock.iconSize), edge: settings.dock.edge }
     : DEFAULT_DOCK_LOOK;
   const shape: DockShape = { size, groups: GROUP_SIZES };
+  // Edge and icon size as set, not as drawn: several sizes draw the same
+  // preset.
+  const placeKey = settings
+    ? `${settings.dock.edge} ${settings.dock.iconSize}`
+    : null;
 
   // Frozen while a panel is open, off with reduced motion.
   const active = hovered ?? focused;
@@ -190,9 +196,17 @@ function Dock() {
   const measured = labelWidths.length === ITEMS.length;
 
   /** Tells Rust where the dock paints (the mouse is captured only there)
-   * and the window it needs. Sends only when the layout changed. */
+   * and the window it needs. Sends when the layout changed, and after any
+   * change of edge or icon size even when the layout did not: Rust closed
+   * the open panel for the move and reopens it only once a layout comes. */
   useEffect(() => {
-    if (!measured || layoutKey === lastSent.current) return;
+    if (!measured) return;
+    const moved =
+      lastPlace.current !== null &&
+      placeKey !== null &&
+      placeKey !== lastPlace.current;
+    if (placeKey !== null) lastPlace.current = placeKey;
+    if (!moved && layoutKey === lastSent.current) return;
     lastSent.current = layoutKey;
     const args: SetDockLayoutArgs = { layout: JSON.parse(layoutKey) };
     invoke(SET_DOCK_LAYOUT_COMMAND, { ...args }).catch((error: unknown) => {
@@ -200,7 +214,7 @@ function Dock() {
       // A later change back to this layout sends it again.
       if (lastSent.current === layoutKey) lastSent.current = null;
     });
-  }, [layoutKey, measured]);
+  }, [layoutKey, measured, placeKey]);
 
   useEffect(() => {
     const stops = [

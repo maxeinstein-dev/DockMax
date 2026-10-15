@@ -288,6 +288,22 @@ describe("Dock", () => {
       });
     });
 
+    it("reports again when the icon size changes within the same preset", async () => {
+      // Rust closed the open panel for the move and reopens it only on the
+      // next layout: one must come even though the dock draws the same.
+      await renderDock();
+
+      emit("settings-changed", withDock({ iconSize: 50 }));
+
+      expect(layoutCalls()).toHaveLength(2);
+      expect(lastLayout()).toEqual(layoutCalls()[0]?.[1]?.layout);
+
+      emit("settings-changed", withDock({ iconSize: 50, edge: "top" }));
+      emit("settings-changed", withDock({ iconSize: 50, edge: "top" }));
+
+      expect(layoutCalls()).toHaveLength(3);
+    });
+
     it("does not report an unchanged layout again", async () => {
       await renderDock();
 

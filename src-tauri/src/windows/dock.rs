@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::sync::{Mutex, MutexGuard};
+use std::time::Instant;
 
 use serde::Deserialize;
 use tauri::{
@@ -228,7 +229,7 @@ pub fn set_layout(app: &AppHandle, layout: DockLayout) -> Result<(), Box<dyn Err
     // Even when placing failed: the region is relative to the window.
     hit_test::tracker(app).set_region(layout.into_region());
     let window_changed = placed?;
-    let reopen = panel::lock(app).dock_settled(window_changed);
+    let reopen = panel::lock(app).dock_settled(window_changed, Instant::now());
     if let Some(panel_id) = reopen {
         log::debug!("dock: settled after a move, reopening the panel");
         request_panel(app, panel_id)?;
