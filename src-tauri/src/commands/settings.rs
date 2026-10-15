@@ -7,13 +7,59 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
+use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::domain::settings::{Settings, SettingsError};
+use crate::domain::settings::{
+    DockEdge, DockOpacity, DockSettings, Settings, SettingsError, Theme,
+};
 use crate::persistence::settings_file::{self, FILE_NAME};
 
 /// Event sent to every window with the new settings after a change.
 pub const CHANGED_EVENT: &str = "settings-changed";
+
+/// The settings `update_settings` receives: the full object, nothing more.
+///
+/// Stricter than [`Settings`], which fills missing fields with defaults and
+/// ignores unknown ones so an older `settings.json` still loads. From the
+/// interface, a missing field would silently reset that setting and an
+/// unknown one would be dropped, so both are rejected here.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SettingsInput {
+    version: u32,
+    theme: Theme,
+    dock: DockSettingsInput,
+}
+
+/// The `dock` part of [`SettingsInput`], as strict.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct DockSettingsInput {
+    edge: DockEdge,
+    icon_size: u16,
+    opacity: DockOpacity,
+}
+
+impl From<SettingsInput> for Settings {
+    /// Only the shape is checked here; the values are validated when saved.
+    fn from(input: SettingsInput) -> Self {
+        let SettingsInput {
+            version,
+            theme,
+            dock,
+        } = input;
+        Settings {
+            version,
+            theme,
+            dock: DockSettings {
+                edge: dock.edge,
+                icon_size: dock.icon_size,
+                opacity: dock.opacity,
+            },
+        }
+    }
+}
 
 /// The settings in use and where they are saved.
 #[derive(Debug)]
@@ -80,8 +126,10 @@ pub fn get_settings(state: State<'_, Mutex<SettingsState>>) -> Settings {
     lock(&state).settings.clone()
 }
 
-/// Called by the panel on every change. Returns the settings now in use; on
-/// failure, a message safe to show (no path, no value) and nothing changed.
+/// Called by the panel on every change, with the full settings (a partial or
+/// unknown payload is rejected by Tauri before this runs). Returns the
+/// settings now in use; on failure, a message safe to show (no path, no
+/// value) and nothing changed.
 ///
 /// Sync commands run on the main thread, one at a time, so the events go out
 /// in the same order as the saves.
@@ -89,10 +137,10 @@ pub fn get_settings(state: State<'_, Mutex<SettingsState>>) -> Settings {
 pub fn update_settings(
     app: AppHandle,
     state: State<'_, Mutex<SettingsState>>,
-    settings: Settings,
+    settings: SettingsInput,
 ) -> Result<Settings, String> {
     let updated = lock(&state)
-        .update(settings)
+        .update(settings.into())
         .map_err(|error| {
             log::warn!("settings: change rejected: {error}");
             error.to_string()
@@ -168,6 +216,72 @@ mod tests {
 
         assert!(matches!(error, SettingsError::Write(_)), "{error:?}");
         assert_eq!(state.settings, Settings::default());
+    }
+
+    fn input(json: &str) -> Result<SettingsInput, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    const FULL: &str =
+        r#"{"version":1,"theme":"dark","dock":{"edge":"top","iconSize":64,"opacity":"solid"}}"#;
+
+    #[test]
+    fn full_update_payload_converts_into_the_settings() {
+        let settings = Settings::from(input(FULL).unwrap());
+
+        assert_eq!(
+            settings,
+            Settings {
+                version: 1,
+                theme: Theme::Dark,
+                dock: DockSettings {
+                    edge: DockEdge::Top,
+                    icon_size: 64,
+                    opacity: DockOpacity::Solid,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn update_payload_with_missing_fields_is_rejected() {
+        // Unlike the file, a missing field is never filled with its default:
+        // it would silently reset that setting.
+        let partial = [
+            "{}",
+            r#"{"version":1,"theme":"dark"}"#,
+            r#"{"theme":"dark","dock":{"edge":"top","iconSize":64,"opacity":"solid"}}"#,
+            r#"{"version":1,"dock":{"edge":"top","iconSize":64,"opacity":"solid"}}"#,
+            r#"{"version":1,"theme":"dark","dock":{}}"#,
+            r#"{"version":1,"theme":"dark","dock":{"edge":"top","iconSize":64}}"#,
+            r#"{"version":1,"theme":"dark","dock":{"edge":"top","opacity":"solid"}}"#,
+            r#"{"version":1,"theme":"dark","dock":{"iconSize":64,"opacity":"solid"}}"#,
+        ];
+        for json in partial {
+            assert!(input(json).is_err(), "{json}");
+        }
+    }
+
+    #[test]
+    fn update_payload_with_unknown_fields_is_rejected() {
+        let extra = [
+            r#"{"version":1,"theme":"dark","locale":"en",
+                "dock":{"edge":"top","iconSize":64,"opacity":"solid"}}"#,
+            r#"{"version":1,"theme":"dark",
+                "dock":{"edge":"top","iconSize":64,"opacity":"solid","offset":3}}"#,
+            r#"{"version":1,"theme":"dark",
+                "dock":{"edge":"top","icon_size":64,"opacity":"solid"}}"#,
+        ];
+        for json in extra {
+            assert!(input(json).is_err(), "{json}");
+        }
+    }
+
+    #[test]
+    fn update_payload_of_the_wrong_shape_is_rejected() {
+        for json in ["null", "[]", r#"{"version":1,"theme":"dark","dock":null}"#] {
+            assert!(input(json).is_err(), "{json}");
+        }
     }
 
     #[test]

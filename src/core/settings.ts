@@ -41,9 +41,9 @@ export function getSettings(): Promise<Settings> {
 }
 
 /** Saves `settings` and returns the ones now in use. Takes the full object:
- * a missing field would be saved as its default. Rejects with a message
- * safe to show when they are invalid or can't be saved; nothing changes
- * then. */
+ * Rust rejects a missing or unknown field, unlike when it reads the file.
+ * Rejects with a message safe to show when they are invalid or can't be
+ * saved; nothing changes then. */
 export function updateSettings(settings: Settings): Promise<Settings> {
   return invoke<Settings>("update_settings", { settings });
 }
