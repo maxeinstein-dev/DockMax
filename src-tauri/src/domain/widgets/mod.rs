@@ -295,6 +295,8 @@ pub struct WidgetInstance {
 }
 
 impl WidgetInstance {
+    /// Only the tests need it: the app reads the kind from the config.
+    #[cfg(test)]
     pub fn kind(&self) -> WidgetKind {
         self.config.kind()
     }

@@ -12,7 +12,8 @@ mod persistence;
 mod tray;
 mod windows;
 
-/// Attaches the logger and loads the settings before any page can use them.
+/// Attaches the logger, loads the settings and opens the widget database
+/// before any page can use them.
 /// Tauri creates the windows of `tauri.conf.json` before the app's `setup`
 /// runs, so a page could call `get_settings` (or log) before either existed;
 /// plugins, on the other hand, are initialized in `Builder::build`, before
@@ -23,6 +24,9 @@ fn startup() -> TauriPlugin<Wry> {
             // First, so the settings can report a bad file.
             logging::setup(app);
             commands::settings::setup(app);
+            // After the settings: the dock and Settings work even when the
+            // widget database can't be used.
+            commands::widgets::setup(app);
             Ok(())
         })
         .build()
@@ -61,7 +65,15 @@ pub fn run() {
             commands::panel::panel_ready,
             commands::dock::set_dock_layout,
             commands::settings::get_settings,
-            commands::settings::update_settings
+            commands::settings::update_settings,
+            commands::widgets::list_widgets,
+            commands::widgets::add_widget,
+            commands::widgets::remove_widget,
+            commands::widgets::move_widget,
+            commands::widgets::update_widget,
+            commands::widgets::get_note,
+            commands::widgets::save_note,
+            commands::widgets::dismiss_storage_notice
         ]);
     // Test build only: the WebDriver server the E2E suite drives the windows
     // through, on the port in `TAURI_WEBDRIVER_PORT` (4445 by default).

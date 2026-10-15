@@ -25,6 +25,9 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-toggle-panel",
             "allow-set-dock-layout",
             "allow-get-settings",
+            // The dock only reads the widgets; every change goes through the
+            // panel (spec 0003 §2.7).
+            "allow-list-widgets",
             "log:allow-log",
         ],
     ),
@@ -39,6 +42,14 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-panel-ready",
             "allow-get-settings",
             "allow-update-settings",
+            "allow-list-widgets",
+            "allow-add-widget",
+            "allow-remove-widget",
+            "allow-move-widget",
+            "allow-update-widget",
+            "allow-get-note",
+            "allow-save-note",
+            "allow-dismiss-storage-notice",
             "log:allow-log",
         ],
     ),
@@ -261,11 +272,12 @@ fn log_plugin_cannot_fail_startup() {
 }
 
 #[test]
-fn logger_and_settings_start_before_the_windows() {
+fn logger_settings_and_widgets_start_before_the_windows() {
     // Tauri creates the windows of tauri.conf.json before the app's `setup`
     // runs, but initializes plugins earlier, in `Builder::build`. Loading the
     // settings (or attaching the logger) in `setup` let the dock call
-    // `get_settings` before the state existed, so it never got its theme.
+    // `get_settings` before the state existed, so it never got its theme; the
+    // widget database has the same need for `list_widgets`.
     let source = std::fs::read_to_string(manifest_dir().join("src").join("lib.rs"))
         .expect("src/lib.rs must exist");
     let app_setup = source
@@ -273,14 +285,38 @@ fn logger_and_settings_start_before_the_windows() {
         .nth(1)
         .and_then(|rest| rest.split(".invoke_handler(").next())
         .unwrap_or_else(|| panic!("src/lib.rs: the app's `.setup(|app| ...)` was not found"));
-    for call in ["logging::setup", "commands::settings::setup"] {
+    // In this order: the logger first, so the others can log; the settings
+    // before the widgets, so a broken database never keeps them from loading.
+    let calls = [
+        "logging::setup",
+        "commands::settings::setup",
+        "commands::widgets::setup",
+    ];
+    for call in calls {
         assert!(
             !app_setup.contains(call),
             "src/lib.rs: `{call}` must run in the `startup` plugin, not in the app's `setup` (the windows already exist there)"
         );
     }
+    let startup = source
+        .split("fn startup()")
+        .nth(1)
+        .and_then(|rest| rest.split(".build()").next())
+        .unwrap_or_else(|| panic!("src/lib.rs: `fn startup()` was not found"));
+    let positions: Vec<usize> = calls
+        .iter()
+        .map(|call| {
+            startup
+                .find(call)
+                .unwrap_or_else(|| panic!("src/lib.rs: `startup` must call `{call}`"))
+        })
+        .collect();
+    assert!(
+        positions.is_sorted(),
+        "src/lib.rs: `startup` must call {calls:?} in this order"
+    );
     assert!(
         source.contains(".plugin(startup())"),
-        "src/lib.rs: the `startup` plugin, which attaches the logger and loads the settings, must be registered"
+        "src/lib.rs: the `startup` plugin, which attaches the logger, loads the settings and opens the widget database, must be registered"
     );
 }

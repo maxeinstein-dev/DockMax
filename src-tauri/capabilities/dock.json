@@ -9,6 +9,7 @@
     "allow-toggle-panel",
     "allow-set-dock-layout",
     "allow-get-settings",
+    "allow-list-widgets",
     "log:allow-log"
   ]
 }

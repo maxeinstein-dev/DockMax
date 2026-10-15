@@ -6,7 +6,8 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use super::database::{begin, now_ms, write_failed};
 use super::widgets_repo::kind_of;
-use crate::domain::widgets::{MAX_NOTE_BYTES, WidgetError, WidgetId, WidgetKind};
+use crate::domain::widgets::note::validate_note_body;
+use crate::domain::widgets::{WidgetError, WidgetId, WidgetKind};
 
 /// The text of the note `id`; empty if it was never written.
 pub fn read(conn: &Connection, id: &WidgetId) -> Result<String, WidgetError> {
@@ -22,12 +23,10 @@ pub fn read(conn: &Connection, id: &WidgetId) -> Result<String, WidgetError> {
     Ok(body.unwrap_or_default())
 }
 
-/// Replaces the text of the note `id`. Over [`MAX_NOTE_BYTES`] in UTF-8 it
-/// is rejected and the text saved before stays.
+/// Replaces the text of the note `id`. Over the limit of
+/// [`validate_note_body`] it is rejected and the text saved before stays.
 pub fn save(conn: &mut Connection, id: &WidgetId, body: &str) -> Result<(), WidgetError> {
-    if body.len() > MAX_NOTE_BYTES {
-        return Err(WidgetError::NoteTooLarge);
-    }
+    validate_note_body(body)?;
     let tx = begin(conn)?;
     ensure_note(&tx, id)?;
     tx.execute(
@@ -53,6 +52,7 @@ mod tests {
     use tempfile::{TempDir, tempdir};
 
     use super::*;
+    use crate::domain::widgets::MAX_NOTE_BYTES;
     use crate::persistence::database::Storage;
     use crate::persistence::widgets_repo;
 

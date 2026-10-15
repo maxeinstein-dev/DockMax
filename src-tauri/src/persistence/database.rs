@@ -82,6 +82,8 @@ impl Storage {
         }
     }
 
+    /// Only the tests need it: the app reads the status in the snapshot.
+    #[cfg(test)]
     pub fn status(&self) -> StorageStatus {
         self.status
     }
