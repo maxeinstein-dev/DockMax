@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ptBR } from "../i18n/pt-BR";
 import Dock from "./Dock";
 import { MAGNIFICATION, magnifiedRect } from "./magnification";
 
@@ -19,6 +20,8 @@ const { invoke, listen, handlers, unlisten } = vi.hoisted(() => {
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen }));
 
+const text = ptBR.dock;
+
 const BAR = { x: 20, y: 40, width: 200, height: 64 };
 const SETTINGS = { x: 28, y: 48, width: 110, height: 48 };
 const ABOUT = { x: 146, y: 48, width: 66, height: 48 };
@@ -30,9 +33,9 @@ function layOut() {
       const rect =
         this.tagName === "NAV"
           ? BAR
-          : this.textContent === "Configurações"
+          : this.textContent === text.items.settings
             ? SETTINGS
-            : this.textContent === "Sobre"
+            : this.textContent === text.items.about
               ? ABOUT
               : { x: 0, y: 0, width: 0, height: 0 };
       return rect as DOMRect;
@@ -51,9 +54,10 @@ function lastRegion() {
   return calls[calls.length - 1]?.[1];
 }
 
-const settings = () => screen.getByRole("button", { name: "Configurações" });
-const about = () => screen.getByRole("button", { name: "Sobre" });
-const bar = () => screen.getByRole("navigation", { name: "Dock" });
+const settings = () =>
+  screen.getByRole("button", { name: text.items.settings });
+const about = () => screen.getByRole("button", { name: text.items.about });
+const bar = () => screen.getByRole("navigation", { name: text.label });
 
 describe("Dock", () => {
   beforeEach(() => {
@@ -73,6 +77,19 @@ describe("Dock", () => {
 
     expect(settings()).toBeInTheDocument();
     expect(about()).toBeInTheDocument();
+  });
+
+  it("shows its texts in PT-BR", () => {
+    render(<Dock />);
+
+    // Literal on purpose: catches a broken dictionary, not just a renamed key.
+    expect(
+      screen.getByRole("navigation", { name: "Dock" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Configurações" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sobre" })).toBeInTheDocument();
   });
 
   it("toggles the settings panel anchored to the clicked item", () => {
@@ -154,7 +171,7 @@ describe("Dock", () => {
     layOut();
     render(<Dock />);
 
-    fireEvent.pointerOver(screen.getByText("Sobre"));
+    fireEvent.pointerOver(screen.getByText(text.items.about));
 
     expect(about()).toHaveAttribute("data-magnify", "hovered");
     expect(lastRegion()).toEqual({
@@ -175,7 +192,7 @@ describe("Dock", () => {
     invoke.mockClear();
 
     fireEvent.pointerMove(settings());
-    fireEvent.pointerOver(screen.getByText("Configurações"));
+    fireEvent.pointerOver(screen.getByText(text.items.settings));
 
     expect(regionCalls()).toHaveLength(0);
   });

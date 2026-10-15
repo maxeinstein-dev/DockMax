@@ -6,12 +6,8 @@ import {
   type PanelId,
   type PanelShowPayload,
 } from "../core/panels";
+import { useT } from "../i18n";
 import "./Panel.css";
-
-const TITLES: Record<PanelId, string> = {
-  settings: "Configurações",
-  about: "Sobre",
-};
 
 function hidePanel() {
   invoke("hide_panel").catch((error: unknown) => {
@@ -20,6 +16,7 @@ function hidePanel() {
 }
 
 function Panel() {
+  const t = useT();
   const [panelId, setPanelId] = useState<PanelId | null>(null);
 
   useEffect(() => {
@@ -43,8 +40,8 @@ function Panel() {
 
   return (
     <section className="panel" aria-labelledby="panel-title">
-      <h1 id="panel-title">{TITLES[panelId]}</h1>
-      <p>Em construção.</p>
+      <h1 id="panel-title">{t.panel.titles[panelId]}</h1>
+      <p>{t.panel.underConstruction}</p>
     </section>
   );
 }

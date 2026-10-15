@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PanelShowPayload } from "../core/panels";
+import { ptBR } from "../i18n/pt-BR";
 import Panel from "./Panel";
+
+const text = ptBR.panel;
 
 type Handler = (event: { payload: PanelShowPayload }) => void;
 
@@ -47,6 +50,22 @@ describe("Panel", () => {
   it("renders the panel named by the panel-show event", () => {
     render(<Panel />);
 
+    show("settings");
+    expect(
+      screen.getByRole("heading", { name: text.titles.settings }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(text.underConstruction)).toBeInTheDocument();
+
+    show("about");
+    expect(
+      screen.getByRole("heading", { name: text.titles.about }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows its texts in PT-BR", () => {
+    render(<Panel />);
+
+    // Literal on purpose: catches a broken dictionary, not just a renamed key.
     show("settings");
     expect(
       screen.getByRole("heading", { name: "Configurações" }),
