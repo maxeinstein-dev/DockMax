@@ -50,8 +50,30 @@ export default defineConfig(
           message:
             "Log only the kind of an error, through errorKind(...): never its message, a path, settings or other data.",
         },
+        {
+          selector: 'ImportSpecifier[imported.name="log"][local.name!="log"]',
+          message:
+            "Import `log` under its own name, so the log rules can see the calls.",
+        },
+      ],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@tauri-apps/plugin-log",
+              message:
+                "Log through src/core/log.ts, which keeps data out of the messages.",
+            },
+          ],
+        },
       ],
     },
+  },
+  {
+    // The one place allowed to talk to the log plugin.
+    files: ["src/core/log.ts"],
+    rules: { "no-restricted-imports": "off" },
   },
   {
     files: ["vite.config.ts", "eslint.config.js"],

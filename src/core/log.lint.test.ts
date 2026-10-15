@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
  * literal whose only interpolations are `errorKind(...)`. */
 
 const RULE = "no-restricted-syntax";
+const IMPORTS = "no-restricted-imports";
 
 const eslint = new ESLint();
 
@@ -43,5 +44,30 @@ describe("frontend log rule", () => {
     "log.error();",
   ])("rejects %s", async (code) => {
     expect(await violations(code)).toHaveLength(1);
+  });
+
+  it("rejects an alias of log, which would hide the calls from the rule", async () => {
+    const [result] = await eslint.lintText(
+      'import { log as logger } from "../core/log";\nlogger.error("x");\n',
+      { filePath: "src/dock/Example.ts" },
+    );
+    expect(result?.messages.filter((m) => m.ruleId === RULE)).toHaveLength(1);
+  });
+
+  it("rejects importing the log plugin outside src/core/log.ts", async () => {
+    const source =
+      'import { error } from "@tauri-apps/plugin-log";\nvoid error("x");\n';
+    const [outside] = await eslint.lintText(source, {
+      filePath: "src/dock/Example.ts",
+    });
+    const [inside] = await eslint.lintText(source, {
+      filePath: "src/core/log.ts",
+    });
+    expect(outside?.messages.filter((m) => m.ruleId === IMPORTS)).toHaveLength(
+      1,
+    );
+    expect(inside?.messages.filter((m) => m.ruleId === IMPORTS)).toHaveLength(
+      0,
+    );
   });
 });

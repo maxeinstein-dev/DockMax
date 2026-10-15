@@ -100,7 +100,7 @@ describe("ROOT_OPTIONS", () => {
 
     act(() =>
       root?.render(
-        <PanelBoundary resetKey="settings" fallback="Falha.">
+        <PanelBoundary resetKey="settings" fallback="Falha." onError={() => {}}>
           <Thrower />
         </PanelBoundary>,
       ),

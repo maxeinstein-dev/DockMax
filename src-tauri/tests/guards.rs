@@ -232,3 +232,29 @@ fn no_inline_capabilities_in_config() {
         "tauri.conf.json: `app.security.capabilities` must not be set; capabilities live only in capabilities/*.json"
     );
 }
+
+#[test]
+fn log_plugin_cannot_fail_startup() {
+    // The plugin is registered for its `log` command only; the logger, which
+    // opens the log file and can fail, is attached in `logging::setup` with a
+    // fallback (ADR 0007). Building the plugin with its logger again would let
+    // a locked log file abort the app.
+    let source = std::fs::read_to_string(manifest_dir().join("src").join("logging.rs"))
+        .expect("src/logging.rs must exist");
+    let body = source
+        .split("pub fn plugin")
+        .nth(1)
+        .and_then(|rest| {
+            rest.split(
+                "
+}
+",
+            )
+            .next()
+        })
+        .unwrap_or_else(|| panic!("src/logging.rs: `pub fn plugin` not found"));
+    assert!(
+        body.contains(".skip_logger()"),
+        "src/logging.rs: `logging::plugin` must build the log plugin with `.skip_logger()`; the logger is attached in `logging::setup`"
+    );
+}

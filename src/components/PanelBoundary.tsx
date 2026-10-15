@@ -5,8 +5,10 @@ type PanelBoundaryProps = {
   resetKey: string | number;
   /** Shown, inside an alert, when the children fail to render. */
   fallback: ReactNode;
-  /** Receives the error; the caller decides how to log it. */
-  onError?: (error: unknown) => void;
+  /** Receives the error; the caller decides how to log it. Required: the
+   * root's `onCaughtError` stays silent, so a boundary without it would
+   * swallow the failure. */
+  onError: (error: unknown) => void;
   children?: ReactNode;
 };
 

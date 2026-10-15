@@ -9,7 +9,15 @@ function Thrower({ failOn, panel }: { failOn: string; panel: string }) {
   return <p>Painel {panel}</p>;
 }
 
-function Screen({ panel, onError }: { panel: string; onError?: () => void }) {
+const ignore = () => {};
+
+function Screen({
+  panel,
+  onError = ignore,
+}: {
+  panel: string;
+  onError?: (error: unknown) => void;
+}) {
   return (
     <>
       <p>Dock</p>
@@ -36,7 +44,11 @@ describe("PanelBoundary", () => {
 
   it("renders its children when nothing fails", () => {
     render(
-      <PanelBoundary resetKey="about" fallback="Falha no painel.">
+      <PanelBoundary
+        resetKey="about"
+        fallback="Falha no painel."
+        onError={ignore}
+      >
         <p>Conteúdo</p>
       </PanelBoundary>,
     );
@@ -79,7 +91,11 @@ describe("PanelBoundary", () => {
       return <p>Recuperado</p>;
     }
     const tree = () => (
-      <PanelBoundary resetKey="settings" fallback="Falha no painel.">
+      <PanelBoundary
+        resetKey="settings"
+        fallback="Falha no painel."
+        onError={ignore}
+      >
         <Flaky />
       </PanelBoundary>
     );

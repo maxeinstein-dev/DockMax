@@ -161,6 +161,15 @@ mod tests {
 
     use super::*;
 
+    // The command must keep taking the strict DTO: with a `Settings`
+    // parameter, serde defaults would silently accept partial payloads again.
+    type UpdateCommand = fn(
+        AppHandle,
+        State<'static, Mutex<SettingsState>>,
+        SettingsInput,
+    ) -> Result<Settings, String>;
+    const _: UpdateCommand = update_settings;
+
     fn state_in(dir: &TempDir) -> SettingsState {
         SettingsState {
             settings: Settings::default(),
