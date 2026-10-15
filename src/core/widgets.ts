@@ -1,3 +1,8 @@
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { errorKind, log } from "./log";
+
 /* Widget instances (spec 0003 §2.1, §2.5–§2.7). Must match
  * `src-tauri/src/domain/widgets/`; the JSON in
  * `src-tauri/tests/fixtures/widgets/` pins the shapes on both sides
@@ -185,6 +190,21 @@ export interface WidgetCommandError {
   code: WidgetErrorCode;
 }
 
+const ERROR_CODES: ReadonlySet<string> = new Set(WIDGET_ERROR_CODES);
+
+/** Whether `error` is the `{ code }` a widget command rejects with. */
+export function isWidgetCommandError(
+  error: unknown,
+): error is WidgetCommandError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    ERROR_CODES.has(error.code)
+  );
+}
+
 /** The widget commands. The dock only reads (`list_widgets`); the panel
  * reads and writes. */
 export const WIDGET_COMMANDS = {
@@ -250,4 +270,124 @@ export interface WidgetCommandSignatures {
   get_note: { args: GetNoteArgs; result: string };
   save_note: { args: SaveNoteArgs; result: void };
   dismiss_storage_notice: { args: Record<string, never>; result: void };
+}
+
+type WidgetArgs<C extends WidgetCommand> = WidgetCommandSignatures[C]["args"];
+type WidgetResult<C extends WidgetCommand> =
+  WidgetCommandSignatures[C]["result"];
+
+/** Runs `command`. A known `{ code }` from Rust passes through; any other
+ * failure (payload refused by Tauri, state missing) has no code of its own:
+ * `logFailure` logs its kind and it rejects with `notReady`. */
+function run<C extends WidgetCommand>(
+  command: C,
+  args: WidgetArgs<C>,
+  logFailure: (error: unknown) => void,
+): Promise<WidgetResult<C>> {
+  return invoke<WidgetResult<C>>(command, { ...args }).catch(
+    (error: unknown) => {
+      if (isWidgetCommandError(error)) throw error;
+      logFailure(error);
+      const notReady: WidgetCommandError = { code: "notReady" };
+      throw notReady;
+    },
+  );
+}
+
+/* Every command below rejects with a `WidgetCommandError` only, and nothing
+ * changes when it does. The log messages name the action and the kind of
+ * error: never an ID, a label, a config or a note's text. */
+
+/** The instances in dock order, with the state of the storage. */
+export function listWidgets(): Promise<WidgetsSnapshot> {
+  return run(WIDGET_COMMANDS.list, {}, (error) =>
+    log.warn(`widgets: list failed: ${errorKind(error)}`),
+  );
+}
+
+/** Adds an instance of `kind` (one of `CREATABLE_KINDS`) at the end of the
+ * dock and returns it. */
+export function addWidget(args: AddWidgetArgs): Promise<WidgetInstance> {
+  return run(WIDGET_COMMANDS.add, args, (error) =>
+    log.warn(`widgets: add failed: ${errorKind(error)}`),
+  );
+}
+
+/** Removes an instance; a note's text goes with it. */
+export function removeWidget(args: RemoveWidgetArgs): Promise<void> {
+  return run(WIDGET_COMMANDS.remove, args, (error) =>
+    log.warn(`widgets: remove failed: ${errorKind(error)}`),
+  );
+}
+
+/** Moves an instance one place up or down the dock. */
+export function moveWidget(args: MoveWidgetArgs): Promise<void> {
+  return run(WIDGET_COMMANDS.move, args, (error) =>
+    log.warn(`widgets: move failed: ${errorKind(error)}`),
+  );
+}
+
+/** Replaces an instance's label and config, and returns the instance. */
+export function updateWidget(args: UpdateWidgetArgs): Promise<WidgetInstance> {
+  return run(WIDGET_COMMANDS.update, args, (error) =>
+    log.warn(`widgets: update failed: ${errorKind(error)}`),
+  );
+}
+
+/** The text of a note. */
+export function getNote(args: GetNoteArgs): Promise<string> {
+  return run(WIDGET_COMMANDS.getNote, args, (error) =>
+    log.warn(`widgets: note read failed: ${errorKind(error)}`),
+  );
+}
+
+/** Saves the full text of a note. */
+export function saveNote(args: SaveNoteArgs): Promise<void> {
+  return run(WIDGET_COMMANDS.saveNote, args, (error) =>
+    log.warn(`widgets: note save failed: ${errorKind(error)}`),
+  );
+}
+
+/** Dismisses the notice of a recovered database. */
+export function dismissStorageNotice(): Promise<void> {
+  return run(WIDGET_COMMANDS.dismissStorageNotice, {}, (error) =>
+    log.warn(`widgets: notice dismiss failed: ${errorKind(error)}`),
+  );
+}
+
+/** The instances and storage state, kept current by `widgets-changed`; null
+ * while loading, and for good if they can't be read (the dock then shows
+ * only Settings and About). */
+export function useWidgets(): WidgetsSnapshot | null {
+  const [snapshot, setSnapshot] = useState<WidgetsSnapshot | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    // A change may arrive before the initial read answers; the read is
+    // older then, so it is dropped.
+    let changed = false;
+
+    const unlisten = listen<WidgetsSnapshot>(WIDGETS_CHANGED_EVENT, (event) => {
+      if (!active) return;
+      changed = true;
+      setSnapshot(event.payload);
+    });
+
+    listWidgets().then(
+      (current) => {
+        if (active && !changed) setSnapshot(current);
+      },
+      () => {
+        // `listWidgets` already logged the kind of an unexpected failure.
+        if (active) log.warn("widgets: read failed");
+      },
+    );
+
+    return () => {
+      active = false;
+      void unlisten.then((stop) => stop());
+    };
+  }, []);
+
+  return snapshot;
 }
