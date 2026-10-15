@@ -3,15 +3,14 @@
 //! telling every window (spec 0002 §2.3 items 2–4). Rust is the source of
 //! truth; the windows apply what `settings-changed` carries.
 
-use std::io;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::domain::settings::{
-    DockEdge, DockOpacity, DockSettings, Settings, SettingsError, Theme,
+    DockEdge, DockOpacity, DockSettings, Settings, SettingsError, SettingsErrorCode, Theme,
 };
 use crate::persistence::settings_file::{self, FILE_NAME};
 
@@ -61,6 +60,21 @@ impl From<SettingsInput> for Settings {
     }
 }
 
+/// How `update_settings` fails: `{ "code": "writeFailed" }`, matching
+/// `SettingsCommandError` in `src/core/settings.ts`. The interface turns the
+/// code into a translated message; the error carries no path and no value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsCommandError {
+    code: SettingsErrorCode,
+}
+
+impl From<&SettingsError> for SettingsCommandError {
+    fn from(error: &SettingsError) -> Self {
+        SettingsCommandError { code: error.code() }
+    }
+}
+
 /// The settings in use and where they are saved.
 #[derive(Debug)]
 pub struct SettingsState {
@@ -74,10 +88,7 @@ impl SettingsState {
     /// Validates and saves `settings`, and only then makes them the current
     /// ones. On failure nothing changes, in memory or on disk.
     pub fn update(&mut self, settings: Settings) -> Result<&Settings, SettingsError> {
-        let path = self
-            .path
-            .as_deref()
-            .ok_or(SettingsError::Write(io::ErrorKind::NotFound))?;
+        let path = self.path.as_deref().ok_or(SettingsError::Unavailable)?;
         settings_file::save(path, &settings)?;
         self.settings = settings;
         Ok(&self.settings)
@@ -128,8 +139,8 @@ pub fn get_settings(state: State<'_, Mutex<SettingsState>>) -> Settings {
 
 /// Called by the panel on every change, with the full settings (a partial or
 /// unknown payload is rejected by Tauri before this runs). Returns the
-/// settings now in use; on failure, a message safe to show (no path, no
-/// value) and nothing changed.
+/// settings now in use; on failure, the error code (no path, no value) and
+/// nothing changed.
 ///
 /// Sync commands run on the main thread, one at a time, so the events go out
 /// in the same order as the saves.
@@ -138,12 +149,12 @@ pub fn update_settings(
     app: AppHandle,
     state: State<'_, Mutex<SettingsState>>,
     settings: SettingsInput,
-) -> Result<Settings, String> {
+) -> Result<Settings, SettingsCommandError> {
     let updated = lock(&state)
         .update(settings.into())
         .map_err(|error| {
             log::warn!("settings: change rejected: {error}");
-            error.to_string()
+            SettingsCommandError::from(&error)
         })?
         .clone();
     // The lock is released before emitting.
@@ -155,7 +166,7 @@ pub fn update_settings(
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::{fs, io};
 
     use tempfile::{TempDir, tempdir};
 
@@ -167,7 +178,7 @@ mod tests {
         AppHandle,
         State<'static, Mutex<SettingsState>>,
         SettingsInput,
-    ) -> Result<Settings, String>;
+    ) -> Result<Settings, SettingsCommandError>;
     const _: UpdateCommand = update_settings;
 
     fn state_in(dir: &TempDir) -> SettingsState {
@@ -300,10 +311,27 @@ mod tests {
             path: None,
         };
 
-        assert_eq!(
-            state.update(large_icons()),
-            Err(SettingsError::Write(io::ErrorKind::NotFound))
-        );
+        assert_eq!(state.update(large_icons()), Err(SettingsError::Unavailable));
         assert_eq!(state.settings, Settings::default());
+    }
+
+    #[test]
+    fn command_error_is_only_the_code() {
+        let cases = [
+            (SettingsError::IconSizeOutOfRange, "iconSizeOutOfRange"),
+            (SettingsError::UnsupportedVersion, "unsupportedVersion"),
+            (
+                SettingsError::Write(io::ErrorKind::PermissionDenied),
+                "writeFailed",
+            ),
+            (SettingsError::Unavailable, "notReady"),
+        ];
+        for (error, code) in cases {
+            assert_eq!(
+                serde_json::to_value(SettingsCommandError::from(&error)).unwrap(),
+                serde_json::json!({ "code": code }),
+                "{error:?}"
+            );
+        }
     }
 }

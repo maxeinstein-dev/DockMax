@@ -20,6 +20,11 @@ pub const LAYERING: super::native::Layering = super::native::Layering::AsTaoSets
 /// Event sent to the panel window right before it is shown.
 const SHOW_EVENT: &str = "panel-show";
 
+/// Event sent to the dock when the open panel changes, with
+/// `{ "panelId": <id> | null }` (`PanelChanged` in `src/core/panels.ts`).
+#[expect(dead_code, reason = "emitted in R1")]
+pub const CHANGED_EVENT: &str = "panel-changed";
+
 /// Gap between the panel and the dock, and between the panel and the work
 /// area edges, in logical pixels.
 const MARGIN: f64 = 8.0;
