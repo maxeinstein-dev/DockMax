@@ -12,6 +12,7 @@ export const otherText: Messages = {
   panel: {
     titles: { settings: "Settings", about: "About" },
     underConstruction: "Under construction.",
+    failed: "This panel could not be shown.",
   },
 };
 
@@ -22,6 +23,7 @@ export const missingKey: Messages = {
     // @ts-expect-error -- `about` is missing.
     titles: { settings: "Settings" },
     underConstruction: "Under construction.",
+    failed: "This panel could not be shown.",
   },
 };
 

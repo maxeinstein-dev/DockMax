@@ -17,6 +17,8 @@ const messages = {
       about: "Sobre",
     },
     underConstruction: "Em construção.",
+    /** Shown in place of a panel that failed to render. */
+    failed: "Não foi possível mostrar este painel.",
   },
 } as const;
 
