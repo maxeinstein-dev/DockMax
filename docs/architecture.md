@@ -143,29 +143,39 @@ Puro: não toca no banco, no Tauri nem no Windows. Um arquivo por tipo (`clock.r
 | `WidgetConfig` | Enum com a configuração de cada tipo, marcado pelo tipo: `{ "kind": "clock", "config": { ... } }`. Uma configuração do tipo errado não chega a existir. `default_for(kind)` é o padrão e `validate()` aplica as regras que o serde não expressa. |
 | `WidgetId` | UUID v7 em texto, gerado no Rust. Do frontend, só a forma exata que o Rust gera vira ID; qualquer outro texto é `notFound`. |
 | `WidgetInstance` | O que a interface recebe: `{ id, label, kind, config }`. Sem posição: uma lista de instâncias está sempre na ordem do dock. `label` nulo usa o nome do tipo. |
-| `WidgetsSnapshot` | O que `list_widgets` devolve e `widgets-changed` carrega: `{ storage, widgets }`. |
+| `WidgetsSnapshot` | O que `list_widgets` devolve e `widgets-changed` carrega: `{ storage, widgets }`. A lista só tem as instâncias visíveis (ver "Erros"). |
 | `StorageStatus` | `ok`, `recovered` ou `unavailable` com o motivo (`newerVersion`, `migrationFailed`, `openFailed`). |
 | `decode_config` / `encode_config` | Leem e gravam a coluna `config`. Campos ausentes recebem o padrão e desconhecidos são ignorados; outra versão ou JSON ilegível é `invalidConfig`. |
 
-**Validação.** Limites de 12 instâncias, rótulo de até 40 caracteres sem caractere de controle e nota de até 64 KiB em UTF-8. Por tipo:
+**Validação.** Limites de 12 instâncias e nota de até 64 KiB em UTF-8. Rótulo de até 40 code points (não unidades UTF-16: a interface conta com `[...label].length`), com ao menos um caractere visível e sem controle, separador de linha, controle bidi ou não-caractere. Por tipo:
 
-- Relógio: fuso IANA conhecido pela base compilada no binário;
+- Relógio: fuso IANA conhecido pela base compilada no binário, na grafia exata da base; `Factory` recusado;
 - Progresso do tempo: ao menos um período, sem repetição, e expediente `HH:mm` com o início antes do fim;
-- Atalho e Arquivos: validação só sintática (caminho absoluto do Windows, URL `http`/`https` com host), sem acesso a disco ou rede.
+- Atalho e Arquivos: validação só sintática, sem acesso a disco ou rede. Caminho absoluto do Windows (unidade ou UNC) sem nenhum caractere de controle; URL que começa literalmente com `http://` ou `https://`, sem `\` e sem `@` na autoridade. Nomes de dispositivo do DOS ficam para a Fase 3.
 
 **Erros.** Cada `WidgetError` tem um `WidgetErrorCode`, que é o que o comando devolve: `{ code }`, sem caminho nem valor. Códigos: `limitReached`, `notCreatable`, `notFound`, `kindMismatch`, `invalidLabel`, `invalidTimeZone`, `invalidPeriods`, `invalidWorkday`, `invalidTarget`, `invalidFolder`, `noteTooLarge`, `invalidConfig`, `unavailable` e `writeFailed`. A interface traduz cada um pelo `pt-BR.ts`.
 
-**Comandos.** `list_widgets` (dock e painel). Só no painel: `add_widget`, `remove_widget`, `move_widget`, `update_widget` (rótulo e configuração completos; o tipo deve ser o da instância), `get_note`, `save_note` e `dismiss_storage_notice`. Uma mudança aceita emite `widgets-changed` para todas as janelas.
+**Comandos.** `list_widgets` (dock e painel). Só no painel: `add_widget`, `remove_widget`, `move_widget`, `update_widget` (rótulo e configuração completos; o tipo deve ser o da instância), `get_note`, `save_note` e `dismiss_storage_notice`. Uma mudança aceita emite `widgets-changed` para todas as janelas. A entrada é estrita:
+
+- `kind` desconhecido é `notCreatable`; ID fora da forma exata é `notFound`;
+- `update_widget` sem `label` é recusado pelo Tauri (`notReady` no TS), para um rótulo ausente não virar `null` e apagar o rótulo;
+- a configuração de `update_widget` precisa ser a canônica, com todos os campos e nada mais (`invalidConfig`). Só a leitura do banco preenche campos ausentes com o padrão.
 
 ### TypeScript
 
 - **`src/core/widgets.ts`:** espelha os tipos, as constantes de limite, os nomes de comandos e eventos e as cargas, no molde de `src/core/settings.ts`. Acrescenta o código `notReady`, para quando o comando nem chega a rodar.
 - **`src/widgets/registry.ts`** (chega no PR 2 da Fase 2): liga cada tipo à sua apresentação — nome (chave do i18n), classe do esmalte do ícone, conteúdo do ícone, painel e ajustes. Não guarda regra nem valida configuração.
 - **Regras de negócio em funções puras**, sem React e sem `invoke`, testadas no Vitest sem renderizar: formatação do relógio, períodos do Progresso e agenda do salvamento automático da Nota.
+  - Relógio: um fuso que o `Intl` não conhece cai no do sistema, sinalizado; um fuso do sistema que o `Intl` não identifica (`Etc/Unknown`) formata sem `timeZone`. Nunca lança e nunca inventa um nome.
+  - Salvamento automático: prazo de 10 s por salvamento. Um que não responde vira `writeFailed` e a próxima mudança tenta de novo.
 
 ### Contrato travado por teste
 
 Os JSON de referência ficam em `src-tauri/tests/fixtures/widgets/`. O Rust compara a serialização de cada tipo com eles. O TS tem as mesmas fixtures tipadas com `satisfies` (`src/core/widgets.fixtures.ts`), e `src/core/widgets.contract.test.ts` compara as duas. Mudar um lado sem o outro quebra um dos testes.
+
+- `ipc.json`: nome do evento e de cada comando, com os nomes dos argumentos. Do lado Rust, conferido com as assinaturas dos comandos, o `AppManifest` do `build.rs` e o `generate_handler!` do `lib.rs`; do lado TS, com `WIDGET_COMMANDS`, `WIDGETS_CHANGED_EVENT` e os tipos dos argumentos.
+- `enums.json`: todos os conjuntos fechados, na ordem do `ALL` de cada enum Rust, incluindo os códigos de erro.
+- Um teste-guarda (`src-tauri/tests/guards.rs`) exige que `build.rs` e `generate_handler!` tenham exatamente os mesmos comandos, para todos os comandos do app.
 
 ### Ciclo de vida
 
@@ -177,8 +187,10 @@ Os JSON de referência ficam em `src-tauri/tests/fixtures/widgets/`. O Rust comp
 ### Erros
 
 - **Configuração inválida num comando:** rejeitada com o código do erro; o estado e o banco ficam como estavam, e o valor na interface volta ao anterior.
-- **Configuração inválida lida do banco** (editada à mão ou de versão antiga): a instância usa o padrão do tipo, um aviso vai para o log com o tipo do problema, e a linha só é regravada quando o usuário muda algo. A inicialização nunca é bloqueada. Uma linha de tipo desconhecido é ignorada com aviso, sem ser apagada.
-- **Armazenamento indisponível** (migração que falha, banco mais novo, banco que não abre): o arquivo não é tocado, o dock mostra só Configurações e Sobre, e Configurações › Itens do dock explica que os widgets estão indisponíveis.
+- **Configuração inválida lida do banco** (editada à mão ou de versão antiga): a instância usa o padrão do tipo, um aviso vai para o log com o tipo do problema, e a linha só é regravada quando o usuário muda algo. A inicialização nunca é bloqueada.
+- **Linhas ocultas:** tipo desconhecido, tipo que não pode ser criado nesta fase (`shortcut`, `files`) ou ID ilegível. Ficam fora da lista com aviso, sem ser apagadas; mantêm a posição, não contam no limite e não podem ser movidas, ajustadas nem removidas. Mover uma instância visível pula as ocultas.
+- **Texto que não é UTF-8** numa linha visível: rótulo vira nulo, configuração vira o padrão. Numa nota, `get_note` devolve `writeFailed`.
+- **Armazenamento indisponível** (migração que falha, banco mais novo, arquivo somente leitura, banco que não abre): o arquivo não é tocado, o dock mostra só Configurações e Sobre, e Configurações › Itens do dock explica que os widgets estão indisponíveis.
 - **Banco recuperado:** a interface avisa que um banco corrompido foi posto de lado, até o usuário dispensar o aviso.
 - **Falha de um widget:** isolada no error boundary do painel; não encerra a aplicação.
 - **Permissão negada:** explicar qual capacidade está indisponível.
@@ -186,10 +198,13 @@ Os JSON de referência ficam em `src-tauri/tests/fixtures/widgets/`. O Rust comp
 
 ## 6. Persistência
 
-Dois armazenamentos convivem na pasta de dados do app (`%APPDATA%\dev.maxsueleinstein.dockmax`), ambos lidos e gravados só pelo Rust:
+Dois armazenamentos convivem, ambos lidos e gravados só pelo Rust. No Windows os dois ficam em `%APPDATA%\dev.maxsueleinstein.dockmax`:
 
-- **`settings.json`** (ADR 0007): preferências globais (tema, borda, tamanho e opacidade). Não migra para o SQLite, para as preferências carregarem mesmo com o banco indisponível.
-- **`dockmax.db`** (ADR 0008): SQLite com instâncias de widget e notas. Pragmas WAL, `foreign_keys=ON` e `busy_timeout` de 5 s. Migrações em `src-tauri/migrations/`, embutidas no binário, com a versão em `PRAGMA user_version`.
+- **`settings.json`** (ADR 0007), na pasta de configuração (`app_config_dir()`): preferências globais (tema, borda, tamanho e opacidade). Não migra para o SQLite, para as preferências carregarem mesmo com o banco indisponível.
+- **`dockmax.db`** (ADR 0008), na pasta de dados (`app_data_dir()`): SQLite com instâncias de widget e notas.
+  - Pragmas WAL, `foreign_keys=ON` e `busy_timeout` de 250 ms. Curto porque os comandos rodam na thread principal: com outra ferramenta segurando o banco, o salvamento falha rápido com `writeFailed` em vez de congelar o dock.
+  - Migrações em `src-tauri/migrations/`, embutidas no binário, com a versão em `PRAGMA user_version`. Todas as pendentes rodam numa única transação.
+  - Na saída do app, `wal_checkpoint(TRUNCATE)`: o processo termina sem fechar a conexão, e o `.db` precisa ficar completo sozinho.
 
 Tabelas da migração 1 (`STRICT`):
 
@@ -199,8 +214,11 @@ Tabelas da migração 1 (`STRICT`):
 | `notes` | `instance_id`, `body`, `updated_at` | Chave estrangeira com `ON DELETE CASCADE`: remover a instância remove o texto. |
 | `meta` | `key`, `value` | Estado interno do banco, como o aviso de recuperação pendente. Nunca dado do usuário. |
 
-- **Semente única:** o banco nasce com Relógio, Progresso do tempo e Nota. Não volta depois de remover todos.
-- **Recuperação:** banco corrompido é renomeado para `dockmax.db.corrompido-<data>` e substituído por um novo, com aviso. Migração que falha ou banco mais novo que o app: o arquivo não é tocado e os widgets ficam indisponíveis. Antes de cada migração de um banco existente, `VACUUM INTO` grava `dockmax.db.bak-v<n>`. Nenhum caminho apaga dados.
+- **Semente única:** o banco nasce com Relógio, Progresso do tempo e Nota, na mesma transação do esquema. Não volta depois de remover todos.
+- **Recuperação:** nenhum caminho apaga dados.
+  - Banco corrompido, ou `.db` ausente ou vazio com companheiros órfãos: renomeado para `dockmax.db.corrompido-AAAAMMDD-HHMMSS` (UTC; `-2`, `-3`... se o nome existir), com `-wal`, `-shm` e `-journal` junto, e substituído por um novo, com aviso. O aviso é gravado na transação do esquema.
+  - Migração que falha, banco mais novo que o app ou arquivo somente leitura: o arquivo não é tocado e os widgets ficam indisponíveis.
+  - Antes de migrar um banco existente, `VACUUM INTO` grava `dockmax.db.bak-v<n>`, uma cópia por abertura. Uma cópia anterior nunca é substituída, e uma com os mesmos dados é reaproveitada.
 - **Tabelas novas** (lembretes e outras) entram por migração nova, quando houver código que as use.
 
 Não persistir métricas de CPU/RAM/rede indefinidamente. Começar com snapshots em memória; adicionar histórico apenas se houver um caso de uso concreto.
@@ -273,7 +291,8 @@ Exibir origem, horário de atualização e distinção entre dado oficial, estim
 - Integração: persistência/migrações e comandos com adaptadores simulados quando possível.
 - E2E: abrir dock, mudar tema, criar nota, reiniciar e verificar persistência.
   - WebdriverIO com `@wdio/tauri-service`, provedor embutido: o servidor WebDriver roda dentro do app (`tauri-plugin-wdio-webdriver`) e encontra cada janela pela label.
-  - Build de teste separado: feature cargo `e2e`, `identifier` `dev.maxsueleinstein.dockmax.e2e` (`src-tauri/tauri.e2e.conf.json`) e uma pasta de dados temporária por execução (`DOCKMAX_E2E_DATA_DIR`). O build normal não contém o plugin.
+  - Build de teste separado: feature cargo `e2e`, `identifier` `dev.maxsueleinstein.dockmax.e2e` (`src-tauri/tauri.e2e.conf.json`) e uma pasta de dados temporária por execução (`DOCKMAX_E2E_DATA_DIR`). O runner recusa um executável sem a `identifier` de teste ou sem a feature `e2e`.
+  - O build normal não contém o plugin: um passo do job `checks` do CI falha se `cargo tree -e normal` listar `wdio` ou `webdriver`. Testes-guarda fixam o conteúdo do `tauri.e2e.conf.json` e aceitam só os dois arquivos de config do Tauri.
   - `pnpm test:e2e:build` e `pnpm test:e2e`. Roda num job próprio do CI (`e2e`) e, localmente, só com autorização do usuário, porque abre um segundo dock na tela.
   - Detalhes, reinício e alternativas no [ADR 0008](adr/0008-persistencia-sqlite-e-widgets.md).
 - Manual: monitores, escala, tela cheia, permissões, instalação e inicialização automática.

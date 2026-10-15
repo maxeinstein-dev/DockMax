@@ -40,6 +40,7 @@ O primeiro commit do PR leva esta spec e este plano.
   - o resultado vai para o ADR 0008.
 - **Local:** só executar com autorização do usuário naquela hora. Enquanto não houver autorização, a validação é pelo CI.
 - **Commit:** `test: adiciona E2E com WebdriverIO e build isolado`.
+- **Feito** em `f821c07`: o provedor embutido funcionou (resultado na spec §2.10).
 
 ### Batch A — contratos
 
@@ -58,38 +59,43 @@ O primeiro commit do PR leva esta spec e este plano.
   - `src/core/widgets.ts`: tipos espelhados, nomes de comandos e eventos e cargas, como `src/core/settings.ts`, ainda sem o hook;
   - fixtures de contrato: `src-tauri/tests/fixtures/widgets/*.json` (padrão e um exemplo por tipo) e `src/core/widgets.fixtures.ts` (as mesmas, tipadas com `satisfies`), mais o teste Vitest que compara as duas.
 - **Decisões a fechar aqui:**
-  - nomes e cargas dos comandos (spec §4);
+  - nomes e cargas dos comandos (hoje na spec §2.7);
   - crate de fusos (`jiff`), medindo o tamanho do binário e o tempo de build antes e depois;
   - forma de `meta` e do estado do armazenamento (`ok`, `recovered` ou `unavailable`, com motivo).
 - Declara os módulos novos com `allow(dead_code)` temporário, removido no I1.
 - **Commit:** `feat: define o contrato de widgets e o esquema do banco`.
+- **Feito** em `9a18fe4`: nomes da spec §2.7, `jiff` e `StorageStatus` com `ok`, `recovered` e `unavailable`.
 
 ### Batch B — paralelo (sem arquivos compartilhados)
 
 - **L1** `[parallel-safe]` **Persistência**: `src-tauri/src/persistence/{mod,database,widgets_repo,notes_repo}.rs`.
   - Abrir o banco com os pragmas; migrar com `rusqlite_migration`; backup `bak-v<n>` (`VACUUM INTO`) antes de migrar um banco que já existe.
-  - Banco corrompido: renomear para `.corrompido-<data>`, criar um novo e marcar o aviso no `meta`.
+  - Banco corrompido: renomear para `.corrompido-AAAAMMDD-HHMMSS` (UTC), criar um novo e marcar o aviso no `meta`.
   - Banco de versão mais nova ou migração que falha: não tocar e devolver indisponível.
   - Semente única na criação.
   - CRUD de instâncias (posições contíguas, mover para cima e para baixo, limite de 12) e de notas (`ON DELETE CASCADE`).
   - Configuração que não decodifica vira padrão, com aviso no log e sem regravar.
   - Testes com pasta temporária para cada caso das verificações 1 e 3 da spec. A migração que falha é simulada com um conjunto de migrações de teste.
   - Commit: `feat: adiciona banco SQLite com migrações e recuperação`.
+  - **Feito** em `dd373fc`.
 - **L2** `[parallel-safe]` **Validação por tipo**: `src-tauri/src/domain/widgets/*.rs`.
   - Fuso IANA, formato, períodos (ao menos um, sem repetição), início da semana, expediente (início antes do fim, formato `HH:mm`), rótulo (até 40 caracteres, sem caractere de controle) e nota (até 64 KiB).
   - Atalho e Arquivos: caminho absoluto do Windows (unidade ou UNC, sem NUL, até 32 767 caracteres) e URL `http`/`https` com host, sem acesso a disco ou rede.
   - Teste de contrato que compara a serialização com `tests/fixtures/widgets/*.json`.
   - Testes de cada campo inválido; mensagens de erro sem caminho nem valor.
   - Commit: `feat: valida a configuração de cada tipo de widget`.
+  - **Feito** em `15fcc80`.
 - **L3** `[parallel-safe]` **Regras TS puras**: `src/widgets/clock/format.ts`, `src/widgets/time-progress/progress.ts` e `src/widgets/notes/autosave.ts`, cada um com teste.
   - Sem React e sem `invoke`; o relógio e o agendador são injetados, para testar sem esperar.
   - Casos da verificação 5 da spec.
   - Commit: `feat: adiciona as regras de relógio, progresso e salvamento da nota`.
+  - **Feito** em `325bb38`.
 - **L4** `[parallel-safe]` **Documentação**:
   - `docs/adr/0008-persistencia-sqlite-e-widgets.md`: SQLite ao lado do `settings.json`, recuperação, contrato Rust × TS e o resultado do E0;
   - `docs/adr/README.md`;
   - `docs/architecture.md`: §5 com o contrato real no lugar do ilustrativo, §6 e §12 com a ferramenta de E2E.
   - Commit: `docs: registra a persistência em SQLite e o contrato de widgets`.
+  - **Feito** em `642a9ca`; alinhado ao código final depois da rodada 1.
 
 ### Batch C — integração (paralelo: Rust × TS)
 
@@ -104,15 +110,18 @@ O primeiro commit do PR leva esta spec e este plano.
   - `tests/guards.rs`, com as permissões novas exatas e o bite-check mostrado.
   - Testes: conversão de erro em código, e o app abrindo com o banco indisponível.
   - Commit: `feat: expõe instâncias de widgets e notas por comandos`.
+  - **Feito** em `c422f07`.
 - **I2** `[parallel-safe]` **Integração TS**:
   - `src/core/widgets.ts`, com os wrappers dos comandos e o hook `useWidgets` (leitura + `widgets-changed`, no mesmo molde do `useSettings`);
   - `src/core/widgets.test.ts` com `mockIPC`;
   - `e2e/specs/dock.e2e.ts` (E2E 1: o dock abre com Configurações e Sobre).
   - Commit: `feat: adiciona o acesso do frontend às instâncias de widgets`.
+  - **Feito** em `2f72ede`.
 
 ### Batch D — fechamento do PR 1
 
 **V1** `[sequential]` **Verificação, revisão e PR**
+- **Em andamento:** rodada 2 de revisão e teste manual. Medições já registradas na spec §2.10.
 - Rodar todos os checks locais e mostrar a saída.
 - Medir o tamanho do executável e o tempo de build com SQLite, e registrar na spec.
 - E2E local, só com autorização; com o DockMax do usuário aberto, o hash do `settings.json` real é o mesmo antes e depois.
@@ -120,6 +129,30 @@ O primeiro commit do PR leva esta spec e este plano.
 - Converge: spec × código.
 - Teste manual do usuário no build de release (verificação 9).
 - Push e PR só com aprovação explícita.
+
+**Rodada 1 de revisão** (três revisores independentes: persistência, IPC/logs/E2E, domínio/TS/docs). Bloqueou em três achados: companheiros órfãos apagados pelo SQLite, nomes de comandos e evento sem trava, e conjuntos fechados sem trava nos dois lados. As correções foram em quatro lanes:
+
+- **F1 — Persistência** (`a9a04dd`, `d272aea`, `6ca42eb`, `08a2329`):
+  - `.db` ausente ou vazio com `-wal`/`-shm`/`-journal` órfãos vira recuperação, e o `-journal` vai junto ao pôr um banco de lado;
+  - semente e aviso de recuperação na mesma transação do esquema;
+  - linhas ruins não derrubam a lista: UTF-8 inválido, rótulo inválido, tipo desconhecido ou não criável e ID ilegível;
+  - `busy_timeout` de 250 ms, backup `bak-v<n>` reaproveitado, somente leitura como `openFailed`, log de leitura separado do de escrita e checkpoint `TRUNCATE` na saída.
+- **F2 — Contrato e validação** (`9239ee8`, `7b94748`, `8d6cd0f`, `c9757cf`, `dd77f94`, `60bde8e`, `c179c20`):
+  - `ipc.json` e `enums.json` travam comandos, argumentos, evento e conjuntos fechados nos dois lados (o `error-codes.json` saiu, coberto pelo `enums.json`);
+  - rótulo invisível, com controle bidi ou com não-caractere recusado; `Factory` recusado no relógio;
+  - URL do atalho exige `http://` ou `https://` e recusa `\` e `@` na autoridade; caminho recusa qualquer caractere de controle;
+  - o erro da pasta de dados e de configuração não vai mais para o log;
+  - documentação interna: rótulo em code points e `invalidConfig` também para carga não canônica.
+- **F3 — Regras TS** (`c157102`, `1770fde`, `b0a3e0d`):
+  - relógio não lança com fuso do sistema desconhecido;
+  - autosave com prazo de 10 s por salvamento e código de erro só da lista conhecida;
+  - progresso coberto com meia-noite inexistente e repetida em America/Santiago.
+- **F4 — Guardas, E2E e CI** (`5d4c3f6`, `7a1645a`, `5e29017`):
+  - guardas ignoram comentários, fixam o `tauri.e2e.conf.json` e aceitam só os dois arquivos de config do Tauri; `build.rs` × `generate_handler!` travados;
+  - `assertTestBuild` exige a feature `e2e` no binário;
+  - passo do CI que falha se o build sem a feature tiver o WebDriver.
+
+Aceitos ou adiados: `config`/`body` gigantes desserializados antes do limite (aceito); ressincronizar o timer do dock em mudança de hora (PR 2); guarda Rust de logs com interpolação (proposta para depois). As pendências do PR 2 estão na spec §2.10.
 
 ## Mock visual (esboço)
 
