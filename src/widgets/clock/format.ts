@@ -13,8 +13,12 @@ export type Instant = Date | number;
 
 /** The time zone a clock actually uses. */
 export interface ResolvedTimeZone {
-  /** IANA name used to format, such as `America/Sao_Paulo`. */
-  timeZone: string;
+  /** IANA name used to format, such as `America/Sao_Paulo`. Null when the
+   * clock follows the system zone and `Intl` can't name it (it reports
+   * `Etc/Unknown`, which it then refuses as a `timeZone`): the clock is
+   * formatted without a `timeZone`, in `Intl`'s own default, and the panel
+   * says the system zone wasn't identified instead of naming one. */
+  timeZone: string | null;
   /** True when the clock follows the system zone: either the config asks for
    * it (null) or the configured zone is unknown here. The panel names it
    * "do sistema" through the i18n. */
@@ -41,30 +45,44 @@ export interface ClockReading extends ResolvedTimeZone {
   date: string;
 }
 
-/** The zone `Intl` uses when no `timeZone` is given. */
-export function systemTimeZone(): string {
-  return new Intl.DateTimeFormat().resolvedOptions().timeZone;
-}
-
-/** The zone to format with. `Intl.DateTimeFormat` throws a `RangeError` for
- * a zone it doesn't know; that falls back to the system zone, flagged. */
-export function resolveTimeZone(timeZone: string | null): ResolvedTimeZone {
-  if (timeZone === null) {
-    return {
-      timeZone: systemTimeZone(),
-      system: true,
-      timeZoneFallback: false,
-    };
-  }
+/** The canonical name `Intl` gives `timeZone`, or null when it doesn't know
+ * it: `Intl.DateTimeFormat` throws a `RangeError` for such a zone. */
+function knownTimeZone(timeZone: string): string | null {
   try {
-    const resolved = new Intl.DateTimeFormat("en-US", {
-      timeZone,
-    }).resolvedOptions().timeZone;
-    return { timeZone: resolved, system: false, timeZoneFallback: false };
+    return new Intl.DateTimeFormat("en-US", { timeZone }).resolvedOptions()
+      .timeZone;
   } catch (error) {
     if (!(error instanceof RangeError)) throw error;
-    return { timeZone: systemTimeZone(), system: true, timeZoneFallback: true };
+    return null;
   }
+}
+
+/** The zone `Intl` uses when no `timeZone` is given, or null when `Intl`
+ * can't name it: with an unknown system zone it reports `Etc/Unknown`, a
+ * name it then refuses as a `timeZone`. */
+export function systemTimeZone(): string | null {
+  const name: unknown = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return typeof name === "string" ? knownTimeZone(name) : null;
+}
+
+/** The zone to format with. A zone `Intl` doesn't know falls back to the
+ * system zone, flagged; never to an invented offset. */
+export function resolveTimeZone(timeZone: string | null): ResolvedTimeZone {
+  const resolved = timeZone === null ? null : knownTimeZone(timeZone);
+  if (resolved !== null) {
+    return { timeZone: resolved, system: false, timeZoneFallback: false };
+  }
+  return {
+    timeZone: systemTimeZone(),
+    system: true,
+    timeZoneFallback: timeZone !== null,
+  };
+}
+
+/** The `timeZone` option: left out for a system zone `Intl` can't name, so
+ * it formats in its own default instead of throwing. */
+function zoneOption(timeZone: string | null): { timeZone?: string } {
+  return timeZone === null ? {} : { timeZone };
 }
 
 interface TimeParts {
@@ -79,12 +97,12 @@ interface TimeParts {
  * period, whatever pattern the locale has. */
 function timeParts(
   instant: Instant,
-  timeZone: string,
+  timeZone: string | null,
   hourCycle: ClockConfig["hourCycle"],
   locale: string,
 ): TimeParts {
   const parts = new Intl.DateTimeFormat(locale, {
-    timeZone,
+    ...zoneOption(timeZone),
     // Explicit `hourCycle`, never `hour12`: `hour12: false` can pick h24
     // and show midnight as 24:00.
     hourCycle,
@@ -113,7 +131,7 @@ export function formatClock(
   const t = timeParts(instant, zone.timeZone, config.hourCycle, locale);
   const icon = `${t.hour}:${t.minute}`;
   const date = new Intl.DateTimeFormat(locale, {
-    timeZone: zone.timeZone,
+    ...zoneOption(zone.timeZone),
     weekday: "long",
     day: "numeric",
     month: "long",

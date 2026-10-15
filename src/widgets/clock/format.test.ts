@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ClockConfig } from "../../core/widgets";
 import {
   formatClock,
@@ -7,6 +7,22 @@ import {
   resolveTimeZone,
   systemTimeZone,
 } from "./format";
+
+/* `TZ` changes the system zone, which Node re-reads when it changes. Deleting
+ * it doesn't bring the original zone back, so it is restored by name. */
+// `src` doesn't load the Node types; only `TZ` is needed here.
+declare const process: { env: Record<string, string | undefined> };
+
+function inZone(timeZone: string): void {
+  const before = process.env.TZ;
+  const system = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+  beforeAll(() => {
+    process.env.TZ = timeZone;
+  });
+  afterAll(() => {
+    process.env.TZ = before ?? system;
+  });
+}
 
 const clock = (config: Partial<ClockConfig> = {}): ClockConfig => ({
   timeZone: "America/Sao_Paulo",
@@ -113,6 +129,65 @@ describe("time zones", () => {
 
   it("reports the canonical name Intl resolves", () => {
     expect(resolveTimeZone("asia/tokyo").timeZone).toBe("Asia/Tokyo");
+  });
+});
+
+describe("a system zone Intl doesn't identify", () => {
+  // An unknown `TZ` makes `Intl` report `Etc/Unknown`, a name it refuses
+  // itself as a `timeZone`.
+  inZone("Mars/Base");
+
+  /** What `Intl` shows with its own default zone, without a `timeZone`. */
+  const intlDefault = (instant: number) =>
+    new Intl.DateTimeFormat("pt-BR", {
+      hourCycle: "h23",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(instant);
+
+  it("is reported as unidentified", () => {
+    expect(systemTimeZone()).toBeNull();
+    expect(resolveTimeZone(null)).toEqual({
+      timeZone: null,
+      system: true,
+      timeZoneFallback: false,
+    });
+  });
+
+  it("formats with Intl's default zone when the clock follows the system", () => {
+    const reading = formatClock(AFTERNOON, clock({ timeZone: null }));
+    expect(reading).toMatchObject({
+      timeZone: null,
+      system: true,
+      timeZoneFallback: false,
+    });
+    expect(reading.icon).toBe(intlDefault(AFTERNOON));
+    expect(reading.date).toBe(
+      new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(AFTERNOON),
+    );
+  });
+
+  it("formats with Intl's default zone when the configured zone is unknown too", () => {
+    const reading = formatClock(
+      AFTERNOON,
+      clock({ timeZone: "Mars/Olympus", hourCycle: "h12" }),
+    );
+    expect(reading).toMatchObject({
+      timeZone: null,
+      system: true,
+      timeZoneFallback: true,
+    });
+    expect(formatDockTime(AFTERNOON, clock({ timeZone: "Mars/Olympus" }))).toBe(
+      intlDefault(AFTERNOON),
+    );
+  });
+
+  it("still formats a zone Intl knows", () => {
+    expect(formatClock(AFTERNOON, clock())).toMatchObject({
+      icon: "15:07",
+      timeZone: "America/Sao_Paulo",
+      system: false,
+    });
   });
 });
 
