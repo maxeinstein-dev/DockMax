@@ -130,6 +130,8 @@ Refinado em 2026-10-15, depois do mock (`DESIGN.md`) e com o código do PR 1 em 
 - Acessibilidade (teclado, rótulos, contraste AA, reduzir movimento).
 - Roadmap da Fase 1 marcado; verificação 17–21; revisão e PR.
 - Pendência herdada do PR 1: o `panel-show` é emitido antes de o listener do painel estar pronto na primeira abertura, e na troca de painel o conteúdo anterior aparece por um instante. Mostrar a janela só depois de o painel confirmar que renderizou o conteúdo pedido.
+- Pendência da revisão do PR 2: hoje `update_settings` devolve a mensagem do erro em inglês. Antes de a tela de Configurações mostrá-la, o erro vira um código serializável, e o frontend traduz esse código por `pt-BR.ts`.
+- Pendência da revisão do PR 2: "salvar a cada mudança" com um controle deslizante de tamanho gravaria o arquivo a cada passo, e o `sync_all` roda na thread principal (o comando é síncrono). A interface agrupa as mudanças (debounce) ou o comando passa a ser assíncrono.
 
 ## Rastreabilidade (spec → tarefa)
 
