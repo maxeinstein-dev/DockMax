@@ -16,6 +16,8 @@ pub struct Messages {
 pub struct TrayMessages {
     /// Shows the dock when hidden, hides it otherwise.
     pub toggle_dock: &'static str,
+    /// Opens the Settings panel, showing the dock first if it is hidden.
+    pub open_settings: &'static str,
     /// Ends the app.
     pub quit: &'static str,
 }
@@ -23,6 +25,7 @@ pub struct TrayMessages {
 const PT_BR: Messages = Messages {
     tray: TrayMessages {
         toggle_dock: "Mostrar/ocultar dock",
+        open_settings: "Configurações",
         quit: "Sair",
     },
 };
@@ -41,6 +44,7 @@ mod tests {
         let tray = &messages().tray;
 
         assert_eq!(tray.toggle_dock, "Mostrar/ocultar dock");
+        assert_eq!(tray.open_settings, "Configurações");
         assert_eq!(tray.quit, "Sair");
     }
 }

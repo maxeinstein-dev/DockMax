@@ -154,6 +154,39 @@ pub enum SettingsError {
     IconSizeOutOfRange,
     #[error("settings file could not be written ({0})")]
     Write(io::ErrorKind),
+    /// There is nowhere to save: the app config folder could not be
+    /// resolved at startup, so the app runs on the defaults.
+    #[error("config folder unavailable")]
+    Unavailable,
+}
+
+impl SettingsError {
+    /// The code the interface gets for this error, to show a translated
+    /// message (`settings.errors` in `src/i18n/pt-BR.ts`).
+    pub fn code(&self) -> SettingsErrorCode {
+        match self {
+            SettingsError::IconSizeOutOfRange => SettingsErrorCode::IconSizeOutOfRange,
+            SettingsError::UnsupportedVersion => SettingsErrorCode::UnsupportedVersion,
+            SettingsError::Write(_) => SettingsErrorCode::WriteFailed,
+            SettingsError::Unavailable => SettingsErrorCode::NotReady,
+        }
+    }
+}
+
+/// What went wrong with a settings change, as the interface sees it. Must
+/// match `SettingsErrorCode` in `src/core/settings.ts`; carries no path and
+/// no value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SettingsErrorCode {
+    /// The icon size is outside `MIN_ICON_SIZE..=MAX_ICON_SIZE`.
+    IconSizeOutOfRange,
+    /// The format version is not `CURRENT_VERSION`.
+    UnsupportedVersion,
+    /// The settings could not be saved; the previous ones stay.
+    WriteFailed,
+    /// The settings can't be changed in this run (no config folder).
+    NotReady,
 }
 
 #[cfg(test)]
@@ -314,6 +347,7 @@ mod tests {
             SettingsError::Write(io::ErrorKind::PermissionDenied),
             SettingsError::Write(io::ErrorKind::NotFound),
             SettingsError::Write(io::ErrorKind::Other),
+            SettingsError::Unavailable,
         ];
         for error in errors {
             let message = error.to_string();
@@ -322,6 +356,46 @@ mod tests {
                 !message.contains('/') && !message.contains('\\'),
                 "{message}"
             );
+        }
+    }
+
+    #[test]
+    fn each_error_maps_to_its_code() {
+        let cases = [
+            (
+                SettingsError::IconSizeOutOfRange,
+                SettingsErrorCode::IconSizeOutOfRange,
+            ),
+            (
+                SettingsError::UnsupportedVersion,
+                SettingsErrorCode::UnsupportedVersion,
+            ),
+            (
+                SettingsError::Write(io::ErrorKind::PermissionDenied),
+                SettingsErrorCode::WriteFailed,
+            ),
+            (
+                SettingsError::Write(io::ErrorKind::NotFound),
+                SettingsErrorCode::WriteFailed,
+            ),
+            (SettingsError::Unavailable, SettingsErrorCode::NotReady),
+        ];
+        for (error, code) in cases {
+            assert_eq!(error.code(), code, "{error:?}");
+        }
+    }
+
+    #[test]
+    fn error_codes_serialize_to_the_names_the_interface_expects() {
+        // `SettingsErrorCode` in src/core/settings.ts.
+        let cases = [
+            (SettingsErrorCode::IconSizeOutOfRange, "iconSizeOutOfRange"),
+            (SettingsErrorCode::UnsupportedVersion, "unsupportedVersion"),
+            (SettingsErrorCode::WriteFailed, "writeFailed"),
+            (SettingsErrorCode::NotReady, "notReady"),
+        ];
+        for (code, name) in cases {
+            assert_eq!(serde_json::to_value(code).unwrap(), name);
         }
     }
 }

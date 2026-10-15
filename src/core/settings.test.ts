@@ -6,6 +6,7 @@ import {
   updateSettings,
   useSettings,
   type Settings,
+  type SettingsErrorCode,
 } from "./settings";
 
 type Handler = (event: { payload: Settings }) => void;
@@ -55,6 +56,7 @@ function deferred<T>() {
 describe("settings commands", () => {
   beforeEach(() => {
     invoke.mockReset();
+    log.warn.mockReset();
   });
 
   it("reads the settings with get_settings", async () => {
@@ -73,11 +75,35 @@ describe("settings commands", () => {
     });
   });
 
-  it("passes on the error of a rejected change", async () => {
-    invoke.mockRejectedValue("Não foi possível salvar.");
+  it.each([
+    "iconSizeOutOfRange",
+    "unsupportedVersion",
+    "writeFailed",
+    "notReady",
+  ] satisfies SettingsErrorCode[])(
+    "rejects with the code of a refused change: %s",
+    async (code) => {
+      invoke.mockRejectedValue({ code });
 
-    await expect(updateSettings(DARK)).rejects.toBe("Não foi possível salvar.");
-  });
+      await expect(updateSettings(DARK)).rejects.toEqual({ code });
+      expect(log.warn).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["a message from Tauri", "invalid args `settings` for command", "string"],
+    ["an unknown code", { code: "diskFull" }, "object"],
+    ["an Error", new TypeError("C:\\Users\\someone"), "TypeError"],
+    ["nothing", undefined, "undefined"],
+  ])(
+    "rejects with notReady and logs only the kind for %s",
+    async (_, error, kind) => {
+      invoke.mockRejectedValue(error);
+
+      await expect(updateSettings(DARK)).rejects.toEqual({ code: "notReady" });
+      expect(log.warn).toHaveBeenCalledWith(`settings: change failed: ${kind}`);
+    },
+  );
 });
 
 describe("useSettings", () => {

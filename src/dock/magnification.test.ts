@@ -1,48 +1,14 @@
 import { describe, expect, it } from "vitest";
 import css from "./Dock.css?raw";
-import {
-  MAGNIFICATION,
-  MAGNIFICATION_VARIABLES,
-  holdRects,
-  magnifiedRect,
-  magnifyRole,
-} from "./magnification";
-
-function expectRect(
-  actual: { x: number; y: number; width: number; height: number },
-  expected: { x: number; y: number; width: number; height: number },
-) {
-  expect(actual.x).toBeCloseTo(expected.x, 9);
-  expect(actual.y).toBeCloseTo(expected.y, 9);
-  expect(actual.width).toBeCloseTo(expected.width, 9);
-  expect(actual.height).toBeCloseTo(expected.height, 9);
-}
+import { MAGNIFICATION, magnificationOf, magnifyRole } from "./magnification";
 
 describe("magnification", () => {
-  it("uses the dock's magnification values", () => {
+  it("uses the DESIGN.md values: 1.4 lifted 6 px, neighbours 1.15", () => {
     expect(MAGNIFICATION.hovered).toEqual({ scale: 1.4, lift: 6 });
     expect(MAGNIFICATION.neighbor).toEqual({ scale: 1.15, lift: 0 });
   });
 
-  it("exposes the values to Dock.css as custom properties", () => {
-    expect(MAGNIFICATION_VARIABLES).toEqual({
-      "--dock-hovered-scale": "1.4",
-      "--dock-hovered-lift": "6",
-      "--dock-neighbor-scale": "1.15",
-      "--dock-neighbor-lift": "0",
-    });
-  });
-
-  it("keeps Dock.css on the shared values instead of its own numbers", () => {
-    for (const name of Object.keys(MAGNIFICATION_VARIABLES)) {
-      expect(css).toContain(`var(${name})`);
-    }
-    expect(css).toContain("transform-origin: center bottom");
-    expect(css).not.toMatch(/scale\(\s*\d/);
-    expect(css).not.toMatch(/translateY\(\s*-?\d/);
-  });
-
-  it("names the hovered item and its direct neighbours", () => {
+  it("names the magnified item and its direct neighbours", () => {
     expect(magnifyRole(1, 1)).toBe("hovered");
     expect(magnifyRole(0, 1)).toBe("neighbor");
     expect(magnifyRole(2, 1)).toBe("neighbor");
@@ -50,62 +16,64 @@ describe("magnification", () => {
     expect(magnifyRole(0, null)).toBeNull();
   });
 
-  it("grows the hovered rect from its bottom center and lifts it", () => {
-    const rect = { x: 16, y: 12, width: 100, height: 48 };
+  it("gives every item its scale and lift", () => {
+    expect(magnificationOf(1, 1)).toEqual(MAGNIFICATION.hovered);
+    expect(magnificationOf(0, 1)).toEqual(MAGNIFICATION.neighbor);
+    expect(magnificationOf(3, 1)).toEqual({ scale: 1, lift: 0 });
+    expect(magnificationOf(0, null)).toEqual({ scale: 1, lift: 0 });
+  });
+});
 
-    // 100 * 1.4 = 140 wide, centered on x = 66; 48 * 1.4 = 67.2 tall,
-    // bottom at 60 - 6 = 54.
-    expectRect(magnifiedRect(rect, MAGNIFICATION.hovered), {
-      x: -4,
-      y: 54 - 67.2,
-      width: 140,
-      height: 67.2,
-    });
+describe("Dock.css", () => {
+  const rule = (selector: string) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|\\n)${escaped} \\{([^}]*)\\}`).exec(css)?.[2] ?? "";
+  };
+
+  it("takes the magnification from the per-item values, not its own numbers", () => {
+    expect(rule(".dock-item")).toContain(
+      "width: calc(var(--icon) * var(--s, 1))",
+    );
+    expect(rule(".dock-tile")).toContain(
+      "transform: translateY(calc(var(--lift, 0px) * -1)) scale(var(--s, 1))",
+    );
+    expect(css).not.toMatch(/scale\(\s*\d/);
+    expect(css).not.toMatch(/translateY\(\s*-?\d/);
   });
 
-  it("grows a neighbour without lifting it", () => {
-    const rect = { x: 124, y: 12, width: 60, height: 48 };
-
-    expectRect(magnifiedRect(rect, MAGNIFICATION.neighbor), {
-      x: 154 - 34.5,
-      y: 60 - 55.2,
-      width: 69,
-      height: 55.2,
-    });
-  });
-
-  it("leaves a rect at scale 1 without lift unchanged", () => {
-    const rect = { x: 3.5, y: 7.25, width: 10, height: 20 };
-
-    expect(magnifiedRect(rect, { scale: 1, lift: 0 })).toEqual(rect);
-  });
-
-  it("holds the hovered item and its neighbours only", () => {
-    const first = { x: 0, y: 10, width: 50, height: 48 };
-    const second = { x: 58, y: 10, width: 50, height: 48 };
-    const third = { x: 116, y: 10, width: 50, height: 48 };
-    const fourth = { x: 174, y: 10, width: 50, height: 48 };
-
-    expect(holdRects([first, second, third, fourth], 1)).toEqual([
-      magnifiedRect(first, MAGNIFICATION.neighbor),
-      magnifiedRect(second, MAGNIFICATION.hovered),
-      magnifiedRect(third, MAGNIFICATION.neighbor),
-    ]);
-  });
-
-  it("holds nothing while no item is hovered", () => {
-    expect(holdRects([{ x: 0, y: 0, width: 10, height: 10 }], null)).toEqual(
-      [],
+  it("grows the tiles from the screen edge, mirrored on top", () => {
+    expect(rule(".dock-tile")).toContain("transform-origin: 50% 100%");
+    expect(rule(':root[data-edge="top"] .dock-tile')).toContain(
+      "transform-origin: 50% 0",
+    );
+    expect(rule(':root[data-edge="top"] .dock-tile')).toContain(
+      "transform: translateY(var(--lift, 0px)) scale(var(--s, 1))",
     );
   });
 
-  it("holds only the existing neighbour at the ends", () => {
-    const items = [
-      { x: 0, y: 0, width: 10, height: 10 },
-      { x: 20, y: 0, width: 10, height: 10 },
-    ];
+  it("animates with the motion tokens and stops with reduced motion", () => {
+    expect(rule(".dock-item")).toContain(
+      "transition: width var(--t-magnify) var(--ease)",
+    );
+    expect(rule(".dock-tile")).toContain(
+      "transition: transform var(--t-magnify) var(--ease)",
+    );
+    const reduced =
+      /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/.exec(
+        css,
+      )?.[1];
+    expect(reduced).toMatch(
+      /\.dock-item,\s*\.dock-tile,\s*\.dock-dot \{\s*transition: none;/,
+    );
+  });
 
-    expect(holdRects(items, 1)).toHaveLength(2);
-    expect(holdRects(items, 0)).toHaveLength(2);
+  it("lays the bar out as layout.ts computes it", () => {
+    const bar = rule(".dock-bar");
+    expect(bar).toContain("height: calc(var(--icon) + 2 * var(--pad))");
+    expect(bar).toContain("gap: var(--gap)");
+    expect(bar).toContain("box-sizing: border-box");
+    // 1 px border + pad − 1 px of padding: the items sit pad inside.
+    expect(bar).toContain("padding: calc(var(--pad) - 1px)");
+    expect(bar).toContain("border: 1px solid var(--hair)");
   });
 });

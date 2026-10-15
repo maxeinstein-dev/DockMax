@@ -37,12 +37,12 @@ DockMax será um dock personalizável para Windows, inspirado em aplicações de
 
 **Estimativa:** 1–2 semanas.
 
-- [ ] Implementar janela do dock e comportamento inicial.
-- [ ] Criar componentes visuais do dock, ícones e painel.
-- [ ] Definir tokens de tema com variáveis CSS.
-- [ ] Permitir abrir/fechar painéis.
-- [ ] Implementar configurações básicas de posição, tamanho e tema.
-- [ ] Definir tratamento de erros e logs sem informações sensíveis.
+- [x] Implementar janela do dock e comportamento inicial.
+- [x] Criar componentes visuais do dock, ícones e painel.
+- [x] Definir tokens de tema com variáveis CSS.
+- [x] Permitir abrir/fechar painéis.
+- [x] Implementar configurações básicas de posição, tamanho e tema.
+- [x] Definir tratamento de erros e logs sem informações sensíveis.
 
 **Critérios de aceitação**
 - Dock abre e fecha sem falhas.
@@ -50,6 +50,8 @@ DockMax será um dock personalizável para Windows, inspirado em aplicações de
 - Tema e preferências sobrevivem a reinicializações.
 - Interface continua utilizável em uma escala de tela comum.
 - Falhas de um painel não derrubam a janela principal.
+
+Critérios verificados em 2026-10-15 (spec 0002, verificações 1–21, e teste manual do autor no build de release).
 
 ### Fase 2 — Núcleo de widgets e persistência
 
@@ -78,6 +80,7 @@ DockMax será um dock personalizável para Windows, inspirado em aplicações de
 - [ ] Implementar Prateleira com drag-and-drop e referências a arquivos.
 - [ ] Definir o que ocorre quando um arquivo de referência é movido ou removido.
 - [ ] Restringir comandos nativos ao necessário.
+- [ ] Link do repositório no painel Sobre abrindo o navegador (hoje é texto selecionável), junto com o retorno do `opener`.
 
 **Critérios de aceitação**
 - Atalhos válidos abrem o destino esperado.
@@ -138,6 +141,10 @@ DockMax será um dock personalizável para Windows, inspirado em aplicações de
 - [ ] Música: sessão de mídia do Windows
 - [ ] Ventoinhas e temperaturas: somente com provedor compatível
 - [ ] Conta-gotas de cores
+
+### Personalização do dock
+- [ ] Cor de destaque escolhida pelo usuário (o token `--accent` já existe)
+- [ ] Ponto indicador personalizável: cor, forma e visibilidade
 
 ### Integrações
 - [ ] GitHub

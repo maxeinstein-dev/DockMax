@@ -1,8 +1,17 @@
 use std::error::Error;
+use std::fmt;
+use std::sync::{Mutex, MutexGuard};
+use std::time::Instant;
 
-use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent};
+use serde::Deserialize;
+use tauri::{
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent,
+};
 
-use super::{hit_test, panel};
+use super::hit_test::{self, HitRegion, RegionError};
+use super::panel::{self, LogicalRect, LogicalSize, MAX_LOGICAL, PanelId, PanelPayload, SizeError};
+use crate::commands;
+use crate::domain::settings::{DockEdge, DockSettings};
 
 pub const LABEL: &str = "dock";
 
@@ -11,27 +20,28 @@ pub const LABEL: &str = "dock";
 #[cfg(windows)]
 pub const LAYERING: super::native::Layering = super::native::Layering::Always;
 
-/// Gap between the visible bar and the work area edge, in logical pixels.
+/// Event sent to the dock asking it to open a panel anchored to its own
+/// item, with `{ "panelId": <id> }`: the tray's "Configurações", and the
+/// panel closed by a settings change that moved the dock, once it settled.
+pub const REQUEST_PANEL_EVENT: &str = "dock-request-panel";
+
+/// Gap between the dock window (and the bar, flush with its screen-facing
+/// edge) and the work area edge, in logical pixels.
 const MARGIN: f64 = 8.0;
-
-/// Transparent space added to the window, on the side away from the screen
-/// edge, for a hovered icon to grow into, in logical pixels.
-pub const HEADROOM: f64 = 40.0;
-
-/// Screen edge the dock sits on.
-pub const EDGE: Edge = Edge::Bottom;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Edge {
     Bottom,
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "top placement arrives with the dock settings in PR 3"
-        )
-    )]
     Top,
+}
+
+impl From<DockEdge> for Edge {
+    fn from(edge: DockEdge) -> Self {
+        match edge {
+            DockEdge::Bottom => Edge::Bottom,
+            DockEdge::Top => Edge::Top,
+        }
+    }
 }
 
 /// A rectangle in physical pixels.
@@ -58,17 +68,20 @@ pub fn saturate(value: i64) -> i32 {
     value.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
 }
 
-/// Physical rectangle of the dock window for a bar of `bar_size` logical
-/// pixels: centered horizontally in the work area, `HEADROOM` taller than
-/// the bar on the side away from the edge, with the bar's outer side
-/// `MARGIN` away from the given edge. Logical values are rounded the same
-/// way Tauri converts logical to physical pixels.
-pub fn dock_rect(work_area: Rect, scale_factor: f64, bar_size: (f64, f64), edge: Edge) -> Rect {
+/// Physical rectangle of the dock window of `window_size` logical pixels:
+/// centered horizontally in the work area, with its screen-facing side
+/// (where the page lays the bar, flush) `MARGIN` away from the given edge.
+/// The size is capped so the window stays inside the work area. Logical
+/// values are rounded the same way Tauri converts logical to physical
+/// pixels.
+pub fn dock_rect(work_area: Rect, scale_factor: f64, window_size: (f64, f64), edge: Edge) -> Rect {
     // Every term fits in i32/u32 (`as` saturates), so sums in i64 can't
     // overflow.
-    let width = (bar_size.0 * scale_factor).round() as u32;
-    let height = ((bar_size.1 + HEADROOM) * scale_factor).round() as u32;
     let margin = i64::from((MARGIN * scale_factor).round() as i32);
+    let max_height =
+        u32::try_from((i64::from(work_area.height) - margin).max(0)).unwrap_or(work_area.height);
+    let width = ((window_size.0 * scale_factor).round() as u32).min(work_area.width);
+    let height = ((window_size.1 * scale_factor).round() as u32).min(max_height);
     let x = i64::from(work_area.x) + (i64::from(work_area.width) - i64::from(width)).div_euclid(2);
     let y = match edge {
         Edge::Bottom => {
@@ -82,6 +95,163 @@ pub fn dock_rect(work_area: Rect, scale_factor: f64, bar_size: (f64, f64), edge:
         width,
         height,
     }
+}
+
+/// Largest icon the dock draws, in logical pixels.
+const MAX_ICON: u32 = crate::domain::settings::MAX_ICON_SIZE as u32;
+
+/// Padding around the icons in the bar, at most, in whole logical pixels:
+/// the presets use about 0.14 of the icon (DESIGN.md "Layout"), 0.15
+/// rounded up leaves room.
+const MAX_PAD: u32 = (MAX_ICON * 3).div_ceil(20);
+
+/// Tallest bar the page may report, in logical pixels: the largest icon
+/// and its padding.
+pub const MAX_BAR_HEIGHT: f64 = (MAX_ICON + 2 * MAX_PAD) as f64;
+
+/// Tallest window the page may ask for, in logical pixels, by the D1
+/// formula (`dockWindowSize` in `src/dock/layout.ts`): the padding, the
+/// largest icon magnified 1.4 (rounded up) and lifted 6 px, the label pill
+/// (10 px gap, 24 px tall) and 8 px of room. Across, the window is capped
+/// to the work area by `dock_rect`, and the hit test clips the bar to the
+/// window.
+pub const MAX_WINDOW_HEIGHT: f64 = (MAX_PAD + (MAX_ICON * 7).div_ceil(5) + 6 + 10 + 24 + 8) as f64;
+
+/// What the dock page reports whenever its layout changes
+/// (`DockLayout` in `src/core/dock.ts`), in logical pixels relative to its
+/// client area: where it paints (the bar and the magnified items) and the
+/// window size its content needs (bar, magnification and label).
+///
+/// Read from the frontend only through `validate`: a layout that fails it
+/// is rejected by the deserializer, before `set_dock_layout` runs.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(try_from = "RawDockLayout")]
+pub struct DockLayout {
+    pub bar: LogicalRect,
+    pub hold: Vec<LogicalRect>,
+    pub window: LogicalSize,
+}
+
+/// A `DockLayout` as the frontend sends it; its rects and size are checked
+/// on their own as they are read.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawDockLayout {
+    bar: LogicalRect,
+    hold: Vec<LogicalRect>,
+    window: LogicalSize,
+}
+
+impl TryFrom<RawDockLayout> for DockLayout {
+    type Error = LayoutError;
+
+    fn try_from(RawDockLayout { bar, hold, window }: RawDockLayout) -> Result<Self, LayoutError> {
+        let layout = DockLayout { bar, hold, window };
+        layout.validate()?;
+        Ok(layout)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LayoutError {
+    Region(RegionError),
+    Window(SizeError),
+    BarTooTall,
+    WindowTooTall,
+}
+
+impl fmt::Display for LayoutError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LayoutError::Region(error) => write!(f, "{error}"),
+            LayoutError::Window(error) => write!(f, "window: {error}"),
+            LayoutError::BarTooTall => {
+                write!(f, "bar: taller than {MAX_BAR_HEIGHT} logical pixels")
+            }
+            LayoutError::WindowTooTall => {
+                write!(f, "window: taller than {MAX_WINDOW_HEIGHT} logical pixels")
+            }
+        }
+    }
+}
+
+impl Error for LayoutError {}
+
+impl DockLayout {
+    /// Checks a layout received from the dock page: every rect valid, at
+    /// most `MAX_HOLD_RECTS` hold rects, a bar at most `MAX_BAR_HEIGHT`
+    /// tall and a window size from 1 to `MAX_LOGICAL` logical pixels, at
+    /// most `MAX_WINDOW_HEIGHT` tall.
+    fn validate(&self) -> Result<(), LayoutError> {
+        hit_test::validate_region(&self.bar, &self.hold).map_err(LayoutError::Region)?;
+        self.window
+            .validate(MAX_LOGICAL)
+            .map_err(LayoutError::Window)?;
+        if self.bar.height > MAX_BAR_HEIGHT {
+            return Err(LayoutError::BarTooTall);
+        }
+        if self.window.height > MAX_WINDOW_HEIGHT {
+            return Err(LayoutError::WindowTooTall);
+        }
+        Ok(())
+    }
+
+    /// The window size to give the dock, in logical pixels: what the page
+    /// asked for, grown to the bar's own size so the bar always fits.
+    /// Not to where the bar ends: the page lays the bar flush with the
+    /// window it is in now, so its far edge is that window's edge, and
+    /// growing to it would keep the window from ever shrinking.
+    /// `dock_rect` caps it to the work area.
+    pub fn window_size(&self) -> (f64, f64) {
+        (
+            self.window.width.max(self.bar.width),
+            self.window.height.max(self.bar.height),
+        )
+    }
+
+    fn into_region(self) -> HitRegion {
+        HitRegion {
+            bar: self.bar,
+            hold: self.hold,
+        }
+    }
+}
+
+/// Where the dock window was put, so a layout report that changes nothing
+/// doesn't move or resize it.
+#[derive(Debug, Default)]
+pub struct Placement {
+    /// Window size the page asked for, in logical pixels; until its first
+    /// report, the size declared in tauri.conf.json.
+    size: Option<(f64, f64)>,
+    /// Physical rectangle last given to the window.
+    applied: Option<Rect>,
+}
+
+impl Placement {
+    /// Whether the window must be moved or resized to `rect`.
+    fn needs(&self, rect: Rect, force: bool) -> bool {
+        force || self.applied != Some(rect)
+    }
+}
+
+fn placement(app: &AppHandle) -> MutexGuard<'_, Placement> {
+    app.state::<Mutex<Placement>>()
+        .inner()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The edge the dock sits on, from the settings.
+pub fn edge(app: &AppHandle) -> Edge {
+    commands::settings::current(app).dock.edge.into()
+}
+
+/// Whether a settings change moves the dock or its items: then the open
+/// panel, anchored to an item, is closed and reopened at the item's new
+/// place.
+pub fn moves_the_dock(before: &DockSettings, after: &DockSettings) -> bool {
+    before.edge != after.edge || before.icon_size != after.icon_size
 }
 
 /// Shows the dock on the primary monitor. Closing it (Alt+F4) hides it.
@@ -104,6 +274,52 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     show(&window)
 }
 
+/// The dock page reported a new layout (validated): resizes and moves the
+/// window when its size changed, and captures the mouse where it paints.
+/// Once a layout leaves the window as it was (the page laid it out for the
+/// window it is in), asks the dock to reopen the panel a settings change
+/// closed.
+pub fn set_layout(app: &AppHandle, layout: DockLayout) -> Result<(), Box<dyn Error>> {
+    let window = app
+        .get_webview_window(LABEL)
+        .ok_or("dock window is missing")?;
+    placement(app).size = Some(layout.window_size());
+    let placed = place(&window, false);
+    // Even when placing failed: the region is relative to the window.
+    hit_test::tracker(app).set_region(layout.into_region());
+    let window_changed = placed?;
+    let reopen = panel::lock(app).dock_settled(window_changed, Instant::now());
+    if let Some(panel_id) = reopen {
+        log::debug!("dock: settled after a move, reopening the panel");
+        request_panel(app, panel_id)?;
+    }
+    Ok(())
+}
+
+/// Asks the dock to open a panel anchored to its own item, as a click
+/// would (unless that panel is already open).
+pub fn request_panel(app: &AppHandle, panel_id: PanelId) -> tauri::Result<()> {
+    app.emit_to(LABEL, REQUEST_PANEL_EVENT, PanelPayload { panel_id })
+}
+
+/// The settings changed: when the dock moves (edge) or its items resize,
+/// closes the open panel, whose anchor moved, and places the dock again.
+/// The page reports the new layout after applying the settings; once the
+/// dock settles there, `set_layout` has the panel reopened at its item.
+pub fn settings_changed(app: &AppHandle, before: &DockSettings, after: &DockSettings) {
+    if !moves_the_dock(before, after) {
+        return;
+    }
+    panel::close_for_move(app);
+    let placed = app
+        .get_webview_window(LABEL)
+        .ok_or_else(|| Box::<dyn Error>::from("dock window is missing"))
+        .and_then(|window| place(&window, false));
+    if let Err(error) = placed {
+        log::warn!("dock: failed to place after a settings change: {error}");
+    }
+}
+
 /// Whether the dock window is on screen. `false` when it can't be told.
 pub fn is_visible(app: &AppHandle) -> bool {
     app.get_webview_window(LABEL)
@@ -123,8 +339,8 @@ pub fn toggle(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     }
 }
 
-/// Shows the dock if it is hidden (the app was launched again). Like every
-/// show, it doesn't take the foreground.
+/// Shows the dock if it is hidden (the app was launched again, or the tray
+/// asked for a panel). Like every show, it doesn't take the foreground.
 pub fn reveal(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let window = app
         .get_webview_window(LABEL)
@@ -138,7 +354,8 @@ pub fn reveal(app: &AppHandle) -> Result<(), Box<dyn Error>> {
 /// Places the dock and shows it without taking the foreground from the app
 /// in use.
 fn show(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
-    place(window)?;
+    // The work area may have changed while hidden.
+    place(window, true)?;
     // tao shows windows with SW_SHOW, which activates them unless they
     // can't take focus.
     window.set_focusable(false)?;
@@ -154,7 +371,7 @@ fn show(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
 /// Hides the dock and the open panel.
 fn hide(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let action = panel::lock(app).hide();
-    panel::apply(app, action, None)?;
+    panel::apply(app, action)?;
     app.get_webview_window(LABEL)
         .ok_or("dock window is missing")?
         .hide()?;
@@ -164,25 +381,34 @@ fn hide(app: &AppHandle) -> Result<(), Box<dyn Error>> {
 
 #[cfg(windows)]
 fn reposition(window: &WebviewWindow) {
-    if let Err(error) = place(window) {
+    // Forced: on a scale change tao has already moved the window itself.
+    if let Err(error) = place(window, true) {
         log::warn!("dock: failed to reposition: {error}");
     }
 }
 
-/// Moves and sizes the dock above the primary monitor's work area bottom.
-fn place(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
+/// Moves and sizes the dock on the edge of the primary monitor's work area
+/// the settings choose. Unless `force`d, leaves the window alone when it
+/// already has that rectangle. Returns whether the window was moved or
+/// resized.
+fn place(window: &WebviewWindow, force: bool) -> Result<bool, Box<dyn Error>> {
+    let app = window.app_handle();
     let (work_area, scale_factor) = primary_work_area(window)?;
-    let rect = dock_rect(
-        work_area,
-        scale_factor,
-        bar_size(window.app_handle())?,
-        EDGE,
-    );
+    let size = placement(app).size;
+    let size = match size {
+        Some(size) => size,
+        None => initial_size(app)?,
+    };
+    let rect = dock_rect(work_area, scale_factor, size, edge(app));
+    if !placement(app).needs(rect, force) {
+        return Ok(false);
+    }
     window.set_size(PhysicalSize::new(rect.width, rect.height))?;
     window.set_position(PhysicalPosition::new(rect.x, rect.y))?;
+    placement(app).applied = Some(rect);
     let origin = window.inner_position()?;
     let size = window.inner_size()?;
-    hit_test::tracker(window.app_handle()).set_window(
+    hit_test::tracker(app).set_window(
         Rect {
             x: origin.x,
             y: origin.y,
@@ -191,7 +417,7 @@ fn place(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
         },
         window.scale_factor()?,
     );
-    Ok(())
+    Ok(true)
 }
 
 /// The primary monitor's work area, in physical pixels, and its scale factor.
@@ -209,9 +435,9 @@ pub fn primary_work_area(window: &WebviewWindow) -> Result<(Rect, f64), Box<dyn 
     Ok((work_area, monitor.scale_factor()))
 }
 
-/// The bar size, in logical pixels: the dock size declared in
-/// tauri.conf.json. The window adds `HEADROOM` to it.
-fn bar_size(app: &AppHandle) -> Result<(f64, f64), Box<dyn Error>> {
+/// The window size before the page reports its layout, in logical pixels:
+/// the dock size declared in tauri.conf.json.
+fn initial_size(app: &AppHandle) -> Result<(f64, f64), Box<dyn Error>> {
     let config = app
         .config()
         .app
@@ -226,7 +452,9 @@ fn bar_size(app: &AppHandle) -> Result<(f64, f64), Box<dyn Error>> {
 mod tests {
     use super::*;
 
-    const SIZE: (f64, f64) = (240.0, 64.0);
+    /// A window of 240x104 logical pixels: a 64 px bar plus 40 px for the
+    /// magnification above it.
+    const SIZE: (f64, f64) = (240.0, 104.0);
 
     fn rect(x: i32, y: i32, width: u32, height: u32) -> Rect {
         Rect {
@@ -238,44 +466,74 @@ mod tests {
     }
 
     #[test]
-    fn bottom_at_100_percent_keeps_the_bar_8px_above_the_work_area() {
+    fn bottom_at_100_percent_puts_the_window_bottom_8px_above_the_work_area() {
         let work_area = rect(0, 0, 1920, 1032);
 
         let dock = dock_rect(work_area, 1.0, SIZE, Edge::Bottom);
 
-        // 64 px bar + 40 px headroom above it; the bar is the bottom 64 px.
         assert_eq!(dock, rect(840, 1032 - 8 - 104, 240, 104));
+        // The bar is flush with the window bottom.
         assert_eq!(dock.y + dock.height as i32, 1032 - 8);
     }
 
     #[test]
-    fn bottom_at_125_percent_scales_size_headroom_and_margin() {
+    fn bottom_at_125_percent_scales_size_and_margin() {
         let work_area = rect(0, 0, 2560, 1380);
 
         let dock = dock_rect(work_area, 1.25, SIZE, Edge::Bottom);
 
-        // (64 + 40) * 1.25 = 130, 8 * 1.25 = 10.
+        // 104 * 1.25 = 130, 240 * 1.25 = 300, 8 * 1.25 = 10.
         assert_eq!(dock, rect(1130, 1380 - 10 - 130, 300, 130));
     }
 
     #[test]
-    fn bottom_at_150_percent_scales_size_headroom_and_margin() {
+    fn bottom_at_150_percent_scales_size_and_margin() {
         let work_area = rect(0, 0, 2560, 1368);
 
         let dock = dock_rect(work_area, 1.5, SIZE, Edge::Bottom);
 
-        // (64 + 40) * 1.5 = 156, 8 * 1.5 = 12.
+        // 104 * 1.5 = 156, 8 * 1.5 = 12.
         assert_eq!(dock, rect(1100, 1368 - 12 - 156, 360, 156));
     }
 
     #[test]
-    fn top_edge_keeps_the_bar_8px_below_the_work_area_top() {
+    fn top_puts_the_window_top_8px_below_the_work_area_top_at_every_scale() {
         let work_area = rect(0, 0, 1920, 1032);
 
-        let dock = dock_rect(work_area, 1.5, SIZE, Edge::Top);
+        // The bar is flush with the window top; the rest hangs below it.
+        assert_eq!(
+            dock_rect(work_area, 1.0, SIZE, Edge::Top),
+            rect(840, 8, 240, 104)
+        );
+        assert_eq!(
+            dock_rect(work_area, 1.25, SIZE, Edge::Top),
+            rect(810, 10, 300, 130)
+        );
+        assert_eq!(
+            dock_rect(work_area, 1.5, SIZE, Edge::Top),
+            rect(780, 12, 360, 156)
+        );
+    }
 
-        // The bar is the top 96 px; the headroom hangs below it.
-        assert_eq!(dock, rect(780, 12, 360, 156));
+    #[test]
+    fn window_size_follows_the_layout() {
+        let work_area = rect(0, 0, 1920, 1032);
+
+        // A large dock with its label: 412x148 at 125%.
+        let dock = dock_rect(work_area, 1.25, (412.0, 148.0), Edge::Bottom);
+
+        assert_eq!(dock, rect((1920 - 515) / 2, 1032 - 10 - 185, 515, 185));
+    }
+
+    #[test]
+    fn window_larger_than_the_work_area_is_capped_inside_it() {
+        let work_area = rect(100, 50, 800, 600);
+
+        let bottom = dock_rect(work_area, 1.0, (5000.0, 5000.0), Edge::Bottom);
+        let top = dock_rect(work_area, 1.0, (5000.0, 5000.0), Edge::Top);
+
+        assert_eq!(bottom, rect(100, 50, 800, 592));
+        assert_eq!(top, rect(100, 58, 800, 592));
     }
 
     #[test]
@@ -312,13 +570,13 @@ mod tests {
     fn fractional_physical_sizes_round_half_away_from_zero() {
         let work_area = rect(0, 0, 1000, 1000);
 
-        // 161 * 1.25 = 201.25 -> 201, (63 + 40) * 1.25 = 128.75 -> 129,
-        // 161 * 1.5 = 241.5 -> 242, (63 + 40) * 1.5 = 154.5 -> 155,
-        // 8 * 1.75 = 14, (64 + 40) * 1.75 = 182.
-        let dock = dock_rect(work_area, 1.25, (161.0, 63.0), Edge::Bottom);
+        // 161 * 1.25 = 201.25 -> 201, 103 * 1.25 = 128.75 -> 129,
+        // 161 * 1.5 = 241.5 -> 242, 103 * 1.5 = 154.5 -> 155,
+        // 8 * 1.75 = 14, 104 * 1.75 = 182.
+        let dock = dock_rect(work_area, 1.25, (161.0, 103.0), Edge::Bottom);
         assert_eq!((dock.width, dock.height), (201, 129));
 
-        let dock = dock_rect(work_area, 1.5, (161.0, 63.0), Edge::Bottom);
+        let dock = dock_rect(work_area, 1.5, (161.0, 103.0), Edge::Bottom);
         assert_eq!((dock.width, dock.height), (242, 155));
 
         let dock = dock_rect(work_area, 1.75, SIZE, Edge::Bottom);
@@ -342,16 +600,24 @@ mod tests {
             (rect(i32::MAX - 10, 0, 100, 100), 3.0),
             (rect(0, 0, 1920, 1080), f64::MAX),
             (rect(0, 0, 1920, 1080), f64::NAN),
+            (rect(0, 0, 1920, 4), 1.0),
         ];
         for (work_area, scale_factor) in cases {
             for edge in [Edge::Bottom, Edge::Top] {
-                // Must not panic.
-                let _ = dock_rect(work_area, scale_factor, SIZE, edge);
+                for size in [SIZE, (f64::MAX, f64::MAX), (0.0, 0.0)] {
+                    // Must not panic.
+                    let _ = dock_rect(work_area, scale_factor, size, edge);
+                }
             }
         }
         assert_eq!(
             dock_rect(rect(i32::MAX, 0, u32::MAX, 1000), 1.0, SIZE, Edge::Top).x,
             i32::MAX
+        );
+        // A work area thinner than the margin gives an empty window.
+        assert_eq!(
+            dock_rect(rect(0, 0, 1920, 4), 1.0, SIZE, Edge::Bottom).height,
+            0
         );
     }
 
@@ -365,5 +631,345 @@ mod tests {
         assert!(!r.contains((0, 60)));
         assert!(!r.contains((-11, 30)));
         assert!(!r.contains((0, 19)));
+    }
+
+    #[test]
+    fn settings_edges_map_to_window_edges() {
+        assert_eq!(Edge::from(DockEdge::Bottom), Edge::Bottom);
+        assert_eq!(Edge::from(DockEdge::Top), Edge::Top);
+        assert_eq!(Edge::from(DockEdge::default()), Edge::Bottom);
+    }
+
+    #[test]
+    fn only_edge_and_size_changes_move_the_dock() {
+        let before = DockSettings::default();
+        let moved = |change: fn(&mut DockSettings)| {
+            let mut after = before.clone();
+            change(&mut after);
+            moves_the_dock(&before, &after)
+        };
+
+        assert!(!moved(|_| {}));
+        assert!(moved(|dock| dock.edge = DockEdge::Top));
+        assert!(moved(|dock| dock.icon_size = 64));
+        assert!(!moved(|dock| {
+            dock.opacity = crate::domain::settings::DockOpacity::Solid
+        }));
+    }
+
+    #[test]
+    fn placement_moves_the_window_only_when_its_rect_changes() {
+        let mut placement = Placement::default();
+        let first = rect(840, 920, 240, 104);
+
+        assert!(placement.needs(first, false));
+        placement.applied = Some(first);
+        assert!(!placement.needs(first, false));
+        assert!(placement.needs(first, true));
+        assert!(placement.needs(rect(840, 8, 240, 104), false));
+        assert!(placement.needs(rect(830, 900, 260, 124), false));
+    }
+
+    fn logical(x: f64, y: f64, width: f64, height: f64) -> LogicalRect {
+        LogicalRect {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+
+    const VALID: LogicalRect = LogicalRect {
+        x: 0.0,
+        y: 0.0,
+        width: 1.0,
+        height: 1.0,
+    };
+
+    fn layout(hold: Vec<LogicalRect>, width: f64, height: f64) -> DockLayout {
+        DockLayout {
+            bar: VALID,
+            hold,
+            window: LogicalSize { width, height },
+        }
+    }
+
+    #[test]
+    fn layout_is_read_from_the_frontend_json() {
+        let layout: DockLayout = serde_json::from_str(
+            r#"{"bar":{"x":20,"y":40,"width":200,"height":64},
+                "hold":[{"x":-4,"y":-13.2,"width":140,"height":67.2}],
+                "window":{"width":240,"height":104}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            layout,
+            DockLayout {
+                bar: logical(20.0, 40.0, 200.0, 64.0),
+                hold: vec![logical(-4.0, -13.2, 140.0, 67.2)],
+                window: LogicalSize {
+                    width: 240.0,
+                    height: 104.0
+                },
+            }
+        );
+        assert_eq!(layout.validate(), Ok(()));
+    }
+
+    #[test]
+    fn layout_with_missing_or_unknown_fields_is_rejected() {
+        let cases = [
+            // The old hit region, without the window size.
+            r#"{"bar":{"x":0,"y":0,"width":1,"height":1},"hold":[]}"#,
+            r#"{"bar":{"x":0,"y":0,"width":1,"height":1},"window":{"width":1,"height":1}}"#,
+            r#"{"bar":{"x":0,"y":0,"width":1,"height":1},"hold":[],
+                "window":{"width":1,"height":1},"edge":"top"}"#,
+            r#"{"bar":{"x":0,"y":0,"width":1,"height":1},"hold":[],
+                "window":{"width":1,"height":1,"scale":2}}"#,
+            r#"{"bar":{"x":0,"y":0,"width":1,"height":1,"left":0},"hold":[],
+                "window":{"width":1,"height":1}}"#,
+            r#"{"bar":{"x":0,"y":0,"width":1,"height":1},
+                "hold":[{"x":0,"y":0,"width":1,"height":1,"right":1}],
+                "window":{"width":1,"height":1}}"#,
+        ];
+        for json in cases {
+            assert!(serde_json::from_str::<DockLayout>(json).is_err(), "{json}");
+        }
+    }
+
+    #[test]
+    fn invalid_layouts_are_rejected_when_deserialized() {
+        let rect = r#"{"x":0,"y":0,"width":1,"height":1}"#;
+        let hold = |count: usize| vec![rect; count].join(",");
+        let cases = [
+            // A rect or the window out of bounds.
+            r#"{"bar":{"x":0,"y":0,"width":-1,"height":1},"hold":[],"window":{"width":1,"height":1}}"#
+                .to_string(),
+            format!(
+                r#"{{"bar":{rect},"hold":[{{"x":1e12,"y":0,"width":1,"height":1}}],"window":{{"width":1,"height":1}}}}"#
+            ),
+            format!(r#"{{"bar":{rect},"hold":[],"window":{{"width":0,"height":1}}}}"#),
+            format!(r#"{{"bar":{rect},"hold":[],"window":{{"width":1e300,"height":1}}}}"#),
+            // Taller than the largest icon needs.
+            format!(r#"{{"bar":{rect},"hold":[],"window":{{"width":240,"height":198.5}}}}"#),
+            r#"{"bar":{"x":0,"y":0,"width":240,"height":126.5},"hold":[],"window":{"width":240,"height":190}}"#
+                .to_string(),
+            // Too many magnified icons.
+            format!(
+                r#"{{"bar":{rect},"hold":[{}],"window":{{"width":1,"height":1}}}}"#,
+                hold(17)
+            ),
+            // Not a number, or an unknown field.
+            format!(r#"{{"bar":{rect},"hold":[],"window":{{"width":"NaN","height":1}}}}"#),
+            format!(r#"{{"bar":{rect},"hold":[],"window":{{"width":1,"height":1}},"edge":"top"}}"#),
+        ];
+        for json in &cases {
+            assert!(serde_json::from_str::<DockLayout>(json).is_err(), "{json}");
+        }
+        let largest = format!(
+            r#"{{"bar":{{"x":0,"y":0,"width":240,"height":{MAX_BAR_HEIGHT}}},"hold":[{}],"window":{{"width":100000,"height":{MAX_WINDOW_HEIGHT}}}}}"#,
+            hold(16)
+        );
+        assert!(serde_json::from_str::<DockLayout>(&largest).is_ok());
+    }
+
+    #[test]
+    fn layout_with_up_to_16_hold_rects_is_valid() {
+        for count in [0, 1, hit_test::MAX_HOLD_RECTS] {
+            assert_eq!(
+                layout(vec![VALID; count], 240.0, 104.0).validate(),
+                Ok(()),
+                "{count} hold rects"
+            );
+        }
+        assert_eq!(hit_test::MAX_HOLD_RECTS, 16);
+    }
+
+    #[test]
+    fn layout_with_too_many_hold_rects_is_rejected() {
+        let layout = layout(vec![VALID; hit_test::MAX_HOLD_RECTS + 1], 240.0, 104.0);
+
+        assert_eq!(
+            layout.validate(),
+            Err(LayoutError::Region(RegionError::TooManyHoldRects))
+        );
+    }
+
+    #[test]
+    fn layout_with_an_invalid_rect_is_rejected() {
+        use super::panel::RectError;
+        let bad = LogicalRect {
+            width: f64::NAN,
+            ..VALID
+        };
+        let huge = LogicalRect { x: 1e12, ..VALID };
+
+        assert_eq!(
+            DockLayout {
+                bar: bad,
+                ..layout(vec![], 240.0, 104.0)
+            }
+            .validate(),
+            Err(LayoutError::Region(RegionError::Bar(RectError::NotFinite)))
+        );
+        assert_eq!(
+            layout(vec![VALID, huge], 240.0, 104.0).validate(),
+            Err(LayoutError::Region(RegionError::Hold(
+                1,
+                RectError::TooLarge
+            )))
+        );
+    }
+
+    #[test]
+    fn layout_with_a_bad_window_size_is_rejected() {
+        let cases = [
+            (f64::NAN, 104.0, SizeError::NotFinite),
+            (240.0, f64::INFINITY, SizeError::NotFinite),
+            (0.0, 104.0, SizeError::NotPositive),
+            (240.0, -104.0, SizeError::NotPositive),
+            (240.0, 0.5, SizeError::NotPositive),
+            (MAX_LOGICAL + 1.0, 104.0, SizeError::TooLarge),
+            (240.0, f64::MAX, SizeError::TooLarge),
+        ];
+        for (width, height, expected) in cases {
+            assert_eq!(
+                layout(vec![], width, height).validate(),
+                Err(LayoutError::Window(expected)),
+                "{width}x{height}"
+            );
+        }
+    }
+
+    #[test]
+    fn dock_height_limits_follow_the_largest_icon() {
+        // D1 (src/dock/layout.ts) for a 96 px icon: a padding of 0.15 of
+        // it (14.4, up to 15), magnified 1.4 (134.4, up to 135) and lifted
+        // 6 px, the label pill (10 + 24) and the room around it (8).
+        assert_eq!(crate::domain::settings::MAX_ICON_SIZE, 96);
+        assert_eq!(MAX_BAR_HEIGHT, 96.0 + 2.0 * 15.0);
+        assert_eq!(MAX_WINDOW_HEIGHT, 15.0 + 135.0 + 6.0 + 10.0 + 24.0 + 8.0);
+    }
+
+    #[test]
+    fn height_limits_match_the_frontend_contract() {
+        // src/core/dock.ts repeats these limits so layout.test.ts can keep
+        // every preset within them; both sides must agree.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/core/dock.ts");
+        let source = std::fs::read_to_string(&path).expect("src/core/dock.ts must exist");
+        let value = |name: &str| -> f64 {
+            source
+                .split(&format!("export const {name} = "))
+                .nth(1)
+                .and_then(|rest| rest.split(';').next())
+                .and_then(|number| number.trim().parse().ok())
+                .unwrap_or_else(|| panic!("src/core/dock.ts: `{name}` not found"))
+        };
+
+        assert_eq!(value("MAX_DOCK_BAR_HEIGHT"), MAX_BAR_HEIGHT);
+        assert_eq!(value("MAX_DOCK_WINDOW_HEIGHT"), MAX_WINDOW_HEIGHT);
+    }
+
+    #[test]
+    fn layout_of_every_preset_is_within_the_limits() {
+        // Grande, the largest preset: a 82 px bar in a 147 px window.
+        let large = DockLayout {
+            bar: logical(12.0, 65.0, 166.0, 82.0),
+            ..layout(vec![], 190.0, 147.0)
+        };
+
+        assert_eq!(large.validate(), Ok(()));
+    }
+
+    #[test]
+    fn layout_taller_than_the_largest_icon_needs_is_rejected() {
+        let tall_window = layout(vec![], 240.0, MAX_WINDOW_HEIGHT + 1.0);
+        let tall_bar = DockLayout {
+            bar: logical(0.0, 0.0, 240.0, MAX_BAR_HEIGHT + 1.0),
+            ..layout(vec![], 240.0, 104.0)
+        };
+
+        assert_eq!(tall_window.validate(), Err(LayoutError::WindowTooTall));
+        assert_eq!(tall_bar.validate(), Err(LayoutError::BarTooTall));
+        // Wide is fine: `dock_rect` caps the window to the work area, and
+        // the hit test clips the bar to the window.
+        assert_eq!(
+            DockLayout {
+                bar: logical(0.0, 0.0, 50_000.0, 64.0),
+                ..layout(vec![], MAX_LOGICAL, MAX_WINDOW_HEIGHT)
+            }
+            .validate(),
+            Ok(())
+        );
+    }
+
+    /// What the page reports in a window whose client area is `viewport`:
+    /// the bar flush with the side facing the screen edge and centered
+    /// across (`placeDock` in `src/dock/layout.ts`), and the window it
+    /// needs.
+    fn page_layout(
+        viewport: (f64, f64),
+        bar: (f64, f64),
+        needed: (f64, f64),
+        edge: Edge,
+    ) -> DockLayout {
+        DockLayout {
+            bar: logical(
+                (viewport.0 - bar.0) / 2.0,
+                match edge {
+                    Edge::Bottom => viewport.1 - bar.1,
+                    Edge::Top => 0.0,
+                },
+                bar.0,
+                bar.1,
+            ),
+            hold: vec![],
+            window: LogicalSize {
+                width: needed.0,
+                height: needed.1,
+            },
+        }
+    }
+
+    #[test]
+    fn window_reaches_the_size_the_page_needs_growing_and_shrinking() {
+        // Grande and Pequeno (src/dock/layout.ts): bar and window needed.
+        let large = ((166.0, 82.0), (190.0, 147.0));
+        let small = ((104.0, 52.0), (128.0, 110.0));
+        for edge in [Edge::Bottom, Edge::Top] {
+            for (from, to) in [(large, small), (small, large)] {
+                // The window is where the previous size left it; the page
+                // reports for it, then for each window Rust gives it.
+                let mut viewport = from.1;
+                let mut steps = 0;
+                loop {
+                    let next = page_layout(viewport, to.0, to.1, edge).window_size();
+                    if next == viewport {
+                        break;
+                    }
+                    viewport = next;
+                    steps += 1;
+                    assert!(steps < 4, "{edge:?}: stuck at {viewport:?}");
+                }
+                assert_eq!(viewport, to.1, "{edge:?} from {:?}", from.1);
+            }
+        }
+    }
+
+    #[test]
+    fn window_size_grows_to_the_bar_size() {
+        let bar = logical(20.0, 40.0, 200.0, 64.0);
+        let roomy = DockLayout {
+            bar,
+            ..layout(vec![], 240.0, 104.0)
+        };
+        let cramped = DockLayout {
+            bar,
+            ..layout(vec![], 100.0, 50.0)
+        };
+
+        assert_eq!(roomy.window_size(), (240.0, 104.0));
+        assert_eq!(cramped.window_size(), (200.0, 64.0));
     }
 }

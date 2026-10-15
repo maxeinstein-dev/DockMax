@@ -7,7 +7,12 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Appearance from "../components/Appearance";
-import { applyAppearance, useAppearance } from "./appearance";
+import {
+  DEFAULT_DOCK_LOOK,
+  applyAppearance,
+  dockSize,
+  useAppearance,
+} from "./appearance";
 import { SETTINGS_CHANGED_EVENT, type Settings } from "./settings";
 
 type Handler = (event: { payload: Settings }) => void;
@@ -89,14 +94,58 @@ describe("applyAppearance", () => {
     expect(root.dataset.mode).toBe("dark");
   });
 
-  it("leaves size and edge alone (they are the dock layout's)", () => {
+  it("gives the dock its size preset and edge", () => {
     applyAppearance(
       root,
       { ...DEFAULTS, dock: { edge: "top", iconSize: 64, opacity: "solid" } },
       { window: "dock" },
     );
 
-    expect(Object.keys(root.dataset).sort()).toEqual(["opacity"]);
+    expect(root.dataset.size).toBe("l");
+    expect(root.dataset.edge).toBe("top");
+
+    applyAppearance(root, DEFAULTS, { window: "dock" });
+
+    expect(root.dataset.size).toBe("m");
+    expect(root.dataset.edge).toBe("bottom");
+  });
+
+  it("never gives the panel a size or edge", () => {
+    applyAppearance(
+      root,
+      { ...DEFAULTS, dock: { edge: "top", iconSize: 40, opacity: "solid" } },
+      { window: "panel" },
+    );
+
+    expect(Object.keys(root.dataset)).toEqual([]);
+  });
+});
+
+describe("dockSize", () => {
+  it.each([
+    [40, "s"],
+    [48, "m"],
+    [64, "l"],
+  ] as const)("maps the preset %i to %s", (iconSize, size) => {
+    expect(dockSize(iconSize)).toBe(size);
+  });
+
+  it.each([
+    [32, "s"],
+    [44, "s"],
+    [45, "m"],
+    [56, "m"],
+    [57, "l"],
+    [96, "l"],
+  ] as const)(
+    "draws any other size %i as the closest preset, %s",
+    (iconSize, size) => {
+      expect(dockSize(iconSize)).toBe(size);
+    },
+  );
+
+  it("is Médio at the bottom by default", () => {
+    expect(DEFAULT_DOCK_LOOK).toEqual({ size: "m", edge: "bottom" });
   });
 });
 
@@ -110,8 +159,9 @@ describe("useAppearance", () => {
   });
 
   afterEach(() => {
-    delete html.dataset.mode;
-    delete html.dataset.opacity;
+    for (const key of ["mode", "opacity", "size", "edge"]) {
+      delete html.dataset[key];
+    }
   });
 
   it("applies the settings in use to <html>, then each change", async () => {
@@ -120,6 +170,8 @@ describe("useAppearance", () => {
 
     await waitFor(() => expect(html.dataset.mode).toBe("light"));
     expect(html.dataset.opacity).toBe("solid");
+    expect(html.dataset.size).toBe("m");
+    expect(html.dataset.edge).toBe("bottom");
     expect(result.current?.theme).toBe("light");
 
     const handler = handlers.get(SETTINGS_CHANGED_EVENT);
@@ -134,6 +186,8 @@ describe("useAppearance", () => {
 
     await waitFor(() => expect(html.dataset.mode).toBe("light"));
     expect(html.hasAttribute("data-opacity")).toBe(false);
+    expect(html.hasAttribute("data-size")).toBe(false);
+    expect(html.hasAttribute("data-edge")).toBe(false);
   });
 
   it("stops following changes when unmounted", async () => {
@@ -156,8 +210,9 @@ describe("Appearance", () => {
   });
 
   afterEach(() => {
-    delete html.dataset.mode;
-    delete html.dataset.opacity;
+    for (const key of ["mode", "opacity", "size", "edge"]) {
+      delete html.dataset[key];
+    }
   });
 
   it("renders its children and applies the settings of its window", async () => {

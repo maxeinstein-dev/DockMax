@@ -1,6 +1,13 @@
-/* The window is taller than the bar: the transparent space above it is where
-   a hovered item grows. The bar sits on the screen-edge side (bottom). */
+/* The dock, variant B1 "Big Sur" (DESIGN.md "Components"; reference:
+   docs/design/dock-mock.html). Rust sizes the window from the layout the
+   dock reports (layout.ts), which follows the same rules as this file: the
+   bar sits flush with the window edge that faces the screen edge, centered
+   across it; the tiles and their label grow into the transparent rest of the
+   window. Per-item values come from Dock.tsx as custom properties set
+   through the CSSOM (--s, --lift, --tip-x, --tip-y), never as style
+   attributes. */
 .dock {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -10,80 +17,206 @@
   user-select: none;
 }
 
-/* Height matches the dock height in tauri.conf.json. The surface follows
-   DESIGN.md ("Dock bar"); the geometry is still the PR 1 one. */
+:root[data-edge="top"] .dock {
+  justify-content: flex-start;
+}
+
+/* Glass bar: icon + 2 × pad tall. The hairline of DESIGN.md is drawn as a
+   1 px border inside the box (with 1 px less padding) instead of an outer
+   ring, so the bar keeps exactly the size layout.ts reports. */
 .dock-bar {
   box-sizing: border-box;
-  height: 64px;
+  flex: none;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  /* 7 px + the 1 px border keep the items 8 px from the edge. The border is
-     the hairline of DESIGN.md, drawn inside the box instead of as an outer
-     0 0 0 1px ring so the bar keeps its size. */
-  padding: 7px;
+  align-items: flex-end;
+  gap: var(--gap);
+  height: calc(var(--icon) + 2 * var(--pad));
+  padding: calc(var(--pad) - 1px);
   border: 1px solid var(--hair);
   border-radius: var(--r-bar);
   background: rgb(var(--surface-rgb) / var(--surface-a));
-  /* Light edge on the side away from the screen edge. The window ends at
-     the bar's bottom, so the part of --shadow that falls below it is cut. */
+  /* The light edge faces away from the screen edge (The Light Edge Rule). */
   box-shadow:
     inset 0 1px 0 var(--hi),
     var(--shadow);
 }
 
-/* The button is the item's layout box and is never transformed, so the
-   frontend measures it as is; the face inside carries the magnification. */
-.dock-bar button {
-  display: block;
-  padding: 0;
-  border: 0;
-  border-radius: 12px;
-  font: inherit;
-  background: none;
-  cursor: pointer;
+:root[data-edge="top"] .dock-bar {
+  align-items: flex-start;
+  box-shadow:
+    inset 0 -1px 0 var(--hi),
+    var(--shadow);
 }
 
-.dock-bar button:focus-visible {
+/* Between groups only: a 1 px hairline inset 4 px, gap × 0.4 on each side
+   (layout.ts separatorWidth). */
+.dock-separator {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: 4px calc(var(--gap) * 0.4);
+  background: var(--hair);
+}
+
+/* The item's box widens with its magnification (--s), so it pushes its
+   neighbours apart instead of covering them. */
+.dock-item {
+  position: relative;
+  flex: none;
+  width: calc(var(--icon) * var(--s, 1));
+  height: var(--icon);
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: var(--glyph);
+  background: none;
+  cursor: pointer;
+  transition: width var(--t-magnify) var(--ease);
+}
+
+.dock-item:focus {
+  outline: none;
+}
+
+/* Glazed tile: grows from the middle of its screen-side edge and moves
+   --lift away from it. The drop shadow sits on this unmasked wrapper so it
+   follows the superellipse of the glaze below. */
+.dock-tile {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: var(--icon);
+  height: var(--icon);
+  margin-left: calc(var(--icon) / -2);
+  border-radius: var(--r-tile);
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.18))
+    drop-shadow(0 5px 6px rgb(0 0 0 / 0.16));
+  transform-origin: 50% 100%;
+  transform: translateY(calc(var(--lift, 0px) * -1)) scale(var(--s, 1));
+  transition: transform var(--t-magnify) var(--ease);
+}
+
+:root[data-edge="top"] .dock-tile {
+  top: 0;
+  bottom: auto;
+  transform-origin: 50% 0;
+  transform: translateY(var(--lift, 0px)) scale(var(--s, 1));
+}
+
+/* Two-tone glaze of the tile's hue (the static .t-* class) under a white
+   sheen, cut to a superellipse. */
+.dock-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      130% 70% at 50% -12%,
+      rgb(255 255 255 / 0.26),
+      transparent 58%
+    ),
+    linear-gradient(
+      180deg,
+      hsl(var(--h) calc(var(--sat) * var(--sat-k)) calc(var(--l) + 7%)),
+      hsl(var(--h) calc(var(--sat) * var(--sat-k)) calc(var(--l) - 5%))
+    );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.32),
+    inset 0 -1px 0 rgb(0 0 0 / 0.16);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z'/%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
+}
+
+.dock-glyph {
+  position: relative;
+  width: 54%;
+  height: 54%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Keyboard focus: cobalt outline following the tile's corners. */
+.dock-item:focus-visible .dock-tile {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
-.dock-item {
-  display: flex;
-  align-items: center;
-  height: 48px;
-  padding: 0 12px;
-  /* Concentric with the bar: its radius minus the 8 px inset. */
-  border-radius: 12px;
-  /* Provisional face until the glazed tiles of PR 3: a faint track tint
-     that reads on both themes. */
-  color: var(--ink);
-  background: var(--track);
-  /* Provisional magnification: grows away from the screen edge. The values
-     come from magnification.ts (set on the bar), which also computes the
-     hold region from this origin. */
-  transform-origin: center bottom;
-  transition: transform 120ms ease-out;
+.dock-item:active .dock-tile::before {
+  filter: brightness(0.84);
 }
 
-/* Hover is tracked in JS (data-magnify), not with :hover, so Rust can be
-   told exactly which items are magnified. */
-.dock-bar button[data-magnify="hovered"] .dock-item {
-  transform: translateY(calc(var(--dock-hovered-lift) * -1px))
-    scale(var(--dock-hovered-scale));
+.dock-item:active .dock-glyph {
+  opacity: 0.9;
 }
 
-.dock-bar button[data-magnify="neighbor"] .dock-item {
-  transform: translateY(calc(var(--dock-neighbor-lift) * -1px))
-    scale(var(--dock-neighbor-scale));
+/* Open-panel dot: 4 px of cobalt centered under the tile, 1 px from the
+   bar's screen-side edge. */
+.dock-dot {
+  position: absolute;
+  left: 50%;
+  bottom: calc(1px - var(--pad));
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: var(--r-dot);
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
 }
 
+:root[data-edge="top"] .dock-dot {
+  top: calc(1px - var(--pad));
+  bottom: auto;
+}
+
+.dock-item[aria-expanded="true"] .dock-dot {
+  opacity: 1;
+}
+
+/* Label pill: every item has one, laid out but hidden, so its width is
+   known (layout.ts sizes the window from it). The shown one is placed from
+   the final geometry: --tip-x/--tip-y are the middle of its edge nearest
+   the tile. Its height is TIP_HEIGHT in layout.ts: a 16 px line + 2 × 4 px. */
+.dock-tip {
+  position: absolute;
+  left: var(--tip-x, 0);
+  top: var(--tip-y, 0);
+  box-sizing: border-box;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  color: var(--tip-ink);
+  background: var(--tip-bg);
+  box-shadow:
+    0 0 0 1px var(--hair),
+    0 6px 16px -6px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+  visibility: hidden;
+  transform: translate(-50%, -100%);
+}
+
+:root[data-edge="top"] .dock-tip {
+  transform: translate(-50%, 0);
+}
+
+.dock-tip[data-visible] {
+  visibility: visible;
+}
+
+/* "Reduce motion": no transition (Dock.tsx turns the magnification off). */
 @media (prefers-reduced-motion: reduce) {
   .dock-item,
-  .dock-bar button[data-magnify="hovered"] .dock-item,
-  .dock-bar button[data-magnify="neighbor"] .dock-item {
-    transform: none;
+  .dock-tile,
+  .dock-dot {
     transition: none;
   }
 }
