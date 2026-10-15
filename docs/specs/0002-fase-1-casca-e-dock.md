@@ -1,6 +1,6 @@
 # Spec 0002 — Fase 1: casca do aplicativo e dock visual
 
-- **Status:** Aprovada; PR 1 implementado (resultados na §2.1.1)
+- **Status:** Implementada (PRs 1, 2 e 3; resultados do PR 1 na §2.1.1, do mock na §2.2.1)
 - **Data:** 2026-10-14
 - **Roadmap:** [Fase 1 — Casca do aplicativo e dock visual](../roadmap.md#fase-1--casca-do-aplicativo-e-dock-visual)
 - **Origem das decisões:** sessão de grill de 2026-10-14 (Q1–Q34), resumidas no fim deste documento.

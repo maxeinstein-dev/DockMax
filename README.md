@@ -4,7 +4,7 @@
 
 Aplicativo desktop para Windows inspirado em docks personalizáveis, com foco em produtividade, widgets integrados e integração progressiva com o sistema operacional.
 
-> **Status:** Fase 0 concluída: esqueleto do aplicativo compilando e abrindo localmente. O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O DockMax é um projeto independente e não é afiliado ao PrimoDock.
+> **Status:** Fase 1 concluída: dock flutuante acima da barra de tarefas, com painéis de Configurações e Sobre. O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O DockMax é um projeto independente e não é afiliado ao PrimoDock.
 
 ## Objetivos
 
@@ -95,7 +95,14 @@ cargo test --locked
 
 ## Estado atual
 
-Fase 0 concluída: o esqueleto Tauri 2 + React abre uma janela vazia e compila, e a CI verifica lint, formatação, tipos, testes e Rust a cada PR. A próxima etapa é a Fase 1 (casca do aplicativo e dock visual); veja o [roadmap](docs/roadmap.md).
+Fase 1 concluída. O DockMax abre um dock no estilo do macOS (visual B1 · Big Sur, ver [`DESIGN.md`](DESIGN.md)) acima da barra de tarefas do Windows:
+
+- ícones com ampliação, rótulo e ponto indicador; o clique atravessa a área transparente em volta do dock;
+- painel de **Configurações** (tema, posição, tamanho e opacidade, salvos em `%APPDATA%\dev.maxsueleinstein.dockmax\settings.json`) e painel **Sobre**;
+- ícone na bandeja para mostrar ou ocultar o dock, abrir as Configurações e sair;
+- logs em `%LOCALAPPDATA%\dev.maxsueleinstein.dockmax\logs`, sem dados pessoais.
+
+A próxima etapa é a Fase 2 (núcleo de widgets e persistência); veja o [roadmap](docs/roadmap.md).
 
 ## Licença
 
