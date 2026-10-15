@@ -56,7 +56,8 @@ describe("Dock", () => {
     // a change: the run's folder, never the user's DockMax.
     const database = join(dataDir(), "dockmax.db");
 
-    // Opened, and migrated, as the app starts; the dock may show first.
+    // Opened, and migrated, by the startup plugin before any window exists
+    // (`src-tauri/src/lib.rs`), so it is there by now; the wait is a margin.
     await browser.waitUntil(
       () => Promise.resolve(header(database) === SQLITE_HEADER),
       { timeoutMsg: `${database} was never made as a SQLite database` },

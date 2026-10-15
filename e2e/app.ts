@@ -32,7 +32,9 @@ export const APP_PATH = join(
 
 /**
  * Fails unless `APP_PATH` is a test build: a normal build would ignore the
- * data folder and use, or wake, the user's DockMax.
+ * data folder and use, or wake, the user's DockMax. The identifier proves the
+ * e2e config; the name of the data folder variable, read only by the code of
+ * the `e2e` feature (`src-tauri/src/e2e.rs`), proves the feature.
  */
 export function assertTestBuild() {
   let binary: Buffer;
@@ -46,6 +48,11 @@ export function assertTestBuild() {
   if (!binary.includes(E2E_IDENTIFIER)) {
     throw new Error(
       `${APP_PATH} is not a test build (no ${E2E_IDENTIFIER} inside); run \`pnpm test:e2e:build\`.`,
+    );
+  }
+  if (!binary.includes(DATA_DIR_VAR)) {
+    throw new Error(
+      `${APP_PATH} has the test identifier but was built without \`--features e2e\` (no ${DATA_DIR_VAR} inside), so it would ignore the run's data folder; run \`pnpm test:e2e:build\`.`,
     );
   }
 }
