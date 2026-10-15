@@ -167,7 +167,7 @@ Puro: não toca no banco, no Tauri nem no Windows. Um arquivo por tipo (`clock.r
 - **`src/widgets/registry.ts`** (chega no PR 2 da Fase 2): liga cada tipo à sua apresentação — nome (chave do i18n), classe do esmalte do ícone, conteúdo do ícone, painel e ajustes. Não guarda regra nem valida configuração.
 - **Regras de negócio em funções puras**, sem React e sem `invoke`, testadas no Vitest sem renderizar: formatação do relógio, períodos do Progresso e agenda do salvamento automático da Nota.
   - Relógio: um fuso que o `Intl` não conhece cai no do sistema, sinalizado; um fuso do sistema que o `Intl` não identifica (`Etc/Unknown`) formata sem `timeZone`. Nunca lança e nunca inventa um nome.
-  - Salvamento automático: prazo de 10 s por salvamento. Um que não responde vira `writeFailed` e a próxima mudança tenta de novo.
+  - Salvamento automático: prazo de 10 s por salvamento. Um que não responde vira `writeFailed` e a próxima mudança tenta de novo. Ele pode ter sido gravado mesmo assim, então o texto guardado passa a ser desconhecido e a próxima mudança salva qualquer texto, mesmo o confirmado antes.
 
 ### Contrato travado por teste
 
@@ -216,7 +216,7 @@ Tabelas da migração 1 (`STRICT`):
 
 - **Semente única:** o banco nasce com Relógio, Progresso do tempo e Nota, na mesma transação do esquema. Não volta depois de remover todos.
 - **Recuperação:** nenhum caminho apaga dados.
-  - Banco corrompido, ou `.db` ausente ou vazio com companheiros órfãos: renomeado para `dockmax.db.corrompido-AAAAMMDD-HHMMSS` (UTC; `-2`, `-3`... se o nome existir), com `-wal`, `-shm` e `-journal` junto, e substituído por um novo, com aviso. O aviso é gravado na transação do esquema.
+  - Banco corrompido, ou `.db` ausente ou vazio com companheiros órfãos com dados (`-wal` ou `-journal` com mais de 0 bytes; vazios ou um `-shm` sozinho não contam e dão um banco novo sem aviso): renomeado para `dockmax.db.corrompido-AAAAMMDD-HHMMSS` (UTC; `-2`, `-3`... se o nome existir), com `-wal`, `-shm` e `-journal` junto, e substituído por um novo, com aviso. O aviso é gravado na transação do esquema.
   - Migração que falha, banco mais novo que o app ou arquivo somente leitura: o arquivo não é tocado e os widgets ficam indisponíveis.
   - Antes de migrar um banco existente, `VACUUM INTO` grava `dockmax.db.bak-v<n>`, uma cópia por abertura. Uma cópia anterior nunca é substituída, e uma com os mesmos dados é reaproveitada.
 - **Tabelas novas** (lembretes e outras) entram por migração nova, quando houver código que as use.

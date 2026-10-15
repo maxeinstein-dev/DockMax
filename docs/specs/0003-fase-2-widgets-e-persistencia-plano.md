@@ -154,6 +154,16 @@ O primeiro commit do PR leva esta spec e este plano.
 
 Aceitos ou adiados: `config`/`body` gigantes desserializados antes do limite (aceito); ressincronizar o timer do dock em mudança de hora (PR 2); guarda Rust de logs com interpolação (proposta para depois). As pendências do PR 2 estão na spec §2.10.
 
+**Rodada 2 de revisão.** Os achados da rodada 1 estão todos corrigidos e provados. Corrigidos nesta rodada, cada um com teste que falhou antes e passou depois:
+
+- **N1** (`14818af`): depois de um salvamento que estoura o prazo, o texto guardado passa a ser desconhecido, e o próximo `change`/`flush` salva qualquer texto, mesmo o confirmado antes. Antes, voltar ao texto confirmado parecia salvo e o banco ficava com o texto do salvamento atrasado.
+- **N2** (`ba70208`): o contrato do IPC lê `#[tauri::command(...)]` com argumentos (inclusive `rename_all`) e os caminhos do `generate_handler!` pelo último segmento.
+- **N4** (`c9e26c0`): `-wal` ou `-journal` vazios, ou um `-shm` sozinho, não contam como companheiros órfãos. Apagar o `dockmax.db` depois de uma saída normal dá um banco novo, sem aviso de recuperação falso.
+- **N6** (`c84d28a`): a comparação de backups conta linhas repetidas (multiconjunto) e escapa o `_` do `LIKE 'sqlite\_%'`.
+- **Guarda do checkpoint** (`4ce5351`): `tests/guards.rs` exige o `.checkpoint()` do armazenamento no `RunEvent::Exit` de `lib.rs`.
+
+Aceitos: N3 (string literal no guard de ordem); N5 (o aviso se perde se a criação do banco novo falhar logo depois de renomear; raro); a ordem do salvamento abandonado (risco aceito: só acontece com um retry do IPC por `postMessage` depois de 10 s); a recusa de LRM/RLM/ALM no rótulo (decisão de produto). Pendência do PR 2: N7 (nota que não é UTF-8 válido: o painel não salva por cima).
+
 ## Mock visual (esboço)
 
 **M1** `[sequential]` **Mock dos widgets** (spec §2.9), depois do merge do PR 1.
