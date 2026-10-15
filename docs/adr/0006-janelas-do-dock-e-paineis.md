@@ -11,8 +11,17 @@ O dock precisa flutuar acima da barra de tarefas, sem atrapalhar os apps de trá
 
 ### Duas janelas
 
-- **`dock`**: sem borda, transparente, sempre no topo, sem redimensionar, fora da barra de tarefas e do Alt+Tab. Tem a barra visível (64 px lógicos) mais uma **folga transparente de 40 px** do lado oposto à borda da tela, para a ampliação. A borda de fora da barra fica a 8 px da área útil do monitor principal.
-- **`panel`**: uma única janela, criada oculta e reaproveitada. Abre ancorada ao item clicado, 8 px além da barra visível, contida na área útil. Fecha com Esc, com perda de foco, com novo clique no item e com Alt+F4.
+- **`dock`**: sem borda, transparente, sempre no topo, sem redimensionar pelo usuário, fora da barra de tarefas e do Alt+Tab. Mostra-se na borda escolhida nas configurações (embaixo ou em cima).
+- **`panel`**: uma única janela, criada oculta e reaproveitada. Abre ancorada ao item clicado, com o cartão visível 8 px além da barra, contida na área útil. Fecha com Esc, com perda de foco, com novo clique no item e com Alt+F4.
+
+### Tamanho e posição das janelas (PR 3)
+
+- **Dock dimensionado pelo frontend.** O tamanho depende dos ícones, da borda, da ampliação que empurra os vizinhos e do rótulo flutuante, e a geometria tem uma fonte só: os tokens CSS. A página calcula o espaço de que precisa e chama `set_dock_layout` com `{ layout: { bar, hold, window: { width, height } } }`, em px lógicos relativos à área cliente: a barra e os ícones ampliados (região de captura, como antes) e o tamanho da janela.
+- O Rust valida (campos desconhecidos rejeitados, retângulos finitos e até 100 000 px, no máximo 16 de ampliação, janela de 1 a 100 000 px), aumenta a janela se ela não contiver a barra inteira, limita à área útil e posiciona: **centrada na horizontal, com o lado voltado para a borda da tela a 8 px da área útil**. A página desenha a barra rente a esse lado: embaixo, base da janela = base da área útil − 8; em cima, topo da janela = topo da área útil + 8. A ampliação e o rótulo crescem para o lado oposto, dentro da janela.
+- Até o primeiro `set_dock_layout`, vale o tamanho do `tauri.conf.json`. A janela só é movida ou redimensionada quando o retângulo calculado muda; mudança de resolução, escala ou área útil reposiciona sempre.
+- Ao mudar a borda ou o tamanho nas configurações, o Rust reposiciona o dock e fecha o painel aberto (a âncora mudou); a página aplica o `settings-changed` e informa o novo layout.
+- **Painel só aparece depois de renderizado.** Ao abrir, o Rust oculta a janela, emite `panel-show` `{ panelId }` e espera `panel_ready` `{ panelId, size: { width, height }, inset }` (px lógicos: tamanho da janela e margem transparente em volta do cartão, de 0 a 32, tamanho até 4096). Com o sinal, dimensiona a janela, posiciona o cartão 8 px além da barra, do lado oposto à borda da tela, centrado no item e contido na área útil (só a margem transparente pode passar dela), e mostra. Sem sinal em 400 ms, mostra com o último tamanho conhecido do painel (ou o padrão). Um `panel_ready` de outro painel é ignorado; repetido para o painel aberto, reposiciona. Perda de foco durante a espera é ignorada: só o próprio ocultar pode tirá-lo.
+- **`panel-changed`** `{ panelId | null }` vai para o dock a cada mudança do painel aberto (abrir, trocar, fechar por clique, Esc, perda de foco, Alt+F4, dock oculto ou configurações), para o ponto indicador.
 - Uma janela transparente grande e única foi descartada: no Windows, a área transparente de uma WebView bloqueia o clique para os apps de trás.
 
 ### Comportamento nativo
@@ -20,12 +29,12 @@ O dock precisa flutuar acima da barra de tarefas, sem atrapalhar os apps de trá
 - **Alt+Tab (V3):** o `skipTaskbar` do Tauri só remove o botão da barra de tarefas, e o tao reescreve o estilo estendido inteiro a cada mudança. Um subclass Win32 (`windows/native.rs`) força `WS_EX_TOOLWINDOW` e remove `WS_EX_APPWINDOW` em `WM_STYLECHANGING`, nas duas janelas.
 - **Reposicionamento:** o Tauri não emite evento para mudança de resolução ou de área útil, e o `ScaleFactorChanged` chega antes de o tao mover a janela. O mesmo subclass reage a `WM_DPICHANGED`, `WM_DISPLAYCHANGE` e `WM_SETTINGCHANGE(SPI_SETWORKAREA)` e reposiciona depois, via `WM_APP+1`. O cálculo de posição é uma função pura com testes para 100/125/150/175%.
 - **Foco:** o `show()` do tao sempre ativa a janela, e o `set_focus` simula um Alt para roubar o primeiro plano. O dock aparece sem ativar (`focus: false` + `set_focusable(false)` só durante o `show`), e o painel só recebe foco quando o DockMax já está em primeiro plano, o que acontece no clique real no dock.
-- **Bandeja:** "Mostrar/ocultar dock" e "Sair". Alt+F4 no dock oculta; só "Sair" encerra.
+- **Bandeja:** "Mostrar/ocultar dock", "Configurações" e "Sair". "Configurações" mostra o dock se estiver oculto (sem roubar o foco) e emite `dock-request-panel` `{ panelId: "settings" }` para o dock, que abre o painel ancorado ao próprio item (a menos que ele já esteja aberto). Alt+F4 no dock oculta; só "Sair" encerra.
 
 ### Ampliação com clique atravessando a folga (V1: viável)
 
 - A janela do dock ignora o mouse por padrão. Uma thread lê `GetCursorPos` a cada 16 ms e alimenta uma função pura (`next_captured`): captura quando o cursor entra na barra; depois disso, mantém capturado só enquanto ele estiver **onde o dock desenha** (a barra ou um ícone ampliado) e libera em qualquer outro ponto, inclusive no resto transparente da janela. `set_ignore_cursor_events` só é chamado nas transições. Com o dock oculto, a thread fica parada.
-- O frontend controla o hover em JS (não só com `:hover`) e informa, pelo comando `set_dock_hit_region`, o retângulo da barra e os retângulos finais dos ícones ampliados (o do hover, escala 1,4 subindo 6 px a partir do centro da base, e os vizinhos, escala 1,15). Os retângulos são calculados a partir do layout e dos valores de ampliação, sem esperar a transição do CSS; os mesmos valores alimentam o CSS por variáveis. O comando valida cada retângulo e aceita no máximo 16 de ampliação. Com `prefers-reduced-motion: reduce` não há ampliação e a região é só a barra.
+- O frontend controla o hover em JS (não só com `:hover`) e informa, pelo comando `set_dock_layout` (até o PR 2, `set_dock_hit_region`), o retângulo da barra e os retângulos finais dos ícones ampliados (o do hover, escala 1,4 subindo 6 px a partir do centro da base, e os vizinhos, escala 1,15). Os retângulos são calculados a partir do layout e dos valores de ampliação, sem esperar a transição do CSS; os mesmos valores alimentam o CSS por variáveis. O comando valida cada retângulo e aceita no máximo 16 de ampliação. Com `prefers-reduced-motion: reduce` não há ampliação e a região é só a barra.
 - Ao liberar o mouse, o Rust emite `dock-released` para o dock: com a janela ignorando o mouse, a página pode não receber mais eventos de ponteiro, e o ícone ficaria ampliado. O frontend limpa o hover ao receber o evento.
 - Medido: CPU em repouso ~0,03–0,16% de um núcleo; `WindowFromPoint` na folga e na barra, em repouso, devolve o app de trás.
 - Captura só onde o dock desenha. A regra anterior mantinha a captura enquanto o cursor estivesse em qualquer ponto da janela, e no teste manual com mouse real isso fez cliques na folga acima da barra e ao lado dela não chegarem ao app de trás até o cursor se afastar mais de 40 px, o que não é aceitável. Agora, depois do hover, cliques acima das partes não ampliadas da barra, ao lado dela e acima do ícone ampliado passam para o app de trás; clicar no próprio ícone ampliado acerta o ícone.
@@ -44,8 +53,10 @@ O dock precisa flutuar acima da barra de tarefas, sem atrapalhar os apps de trá
 
   | Janela | Permissões | Uso |
   |---|---|---|
-  | `dock` | `core:event:allow-listen`, `core:event:allow-unlisten`, `allow-toggle-panel`, `allow-set-dock-hit-region`, `allow-get-settings`, `log:allow-log` | Clique nos itens, região de captura (barra e ícones ampliados), ouvir `dock-released`, ler as configurações (e ouvir `settings-changed`) e registrar no log do app. |
-  | `panel` | `core:event:allow-listen`, `core:event:allow-unlisten`, `allow-hide-panel`, `allow-get-settings`, `allow-update-settings`, `log:allow-log` | Ouvir `panel-show`, fechar com Esc, ler e alterar as configurações (a tela de Configurações fica no painel) e registrar no log do app. |
+  | `dock` | `core:event:allow-listen`, `core:event:allow-unlisten`, `allow-toggle-panel`, `allow-set-dock-layout`, `allow-get-settings`, `log:allow-log` | Clique nos itens, layout (região de captura e tamanho da janela), ouvir `dock-released`, `panel-changed` e `dock-request-panel`, ler as configurações (e ouvir `settings-changed`) e registrar no log do app. |
+  | `panel` | `core:event:allow-listen`, `core:event:allow-unlisten`, `allow-hide-panel`, `allow-panel-ready`, `allow-get-settings`, `allow-update-settings`, `log:allow-log` | Ouvir `panel-show`, confirmar que renderizou (`panel_ready`), fechar com Esc, ler e alterar as configurações (a tela de Configurações fica no painel) e registrar no log do app. |
+
+- `set_dock_layout` e `panel_ready` também conferem o rótulo da janela que chamou, além da capability.
 
 - Só o painel altera configurações: o dock lê e reage ao `settings-changed`, que o Rust emite para todas as janelas depois de validar e gravar. Chamado do dock, `update_settings` falha no IPC.
 - `log:allow-log` libera só o comando `log` do `tauri-plugin-log` (o frontend grava no mesmo arquivo do Rust, com o nível filtrado no Rust); não inclui ler nem apagar arquivos de log.
@@ -67,5 +78,6 @@ O dock precisa flutuar acima da barra de tarefas, sem atrapalhar os apps de trá
 
 - Comportamentos que dependem do Win32 ficam isolados em `windows/native.rs`, sob `#[cfg(windows)]`.
 - O painel aberto se sobrepõe a parte da folga do dock; ícones ampliados sob o painel ficam cobertos. A ampliação também sobrepõe vizinhos (o `transform` não empurra o layout). Ambos são tratados no visual do PR 3.
+- A margem transparente do painel (`inset`) fica dentro da janela, que bloqueia cliques: com `inset` maior que os 8 px de distância, ela cobre a beira da barra do dock e os cliques ali não chegam aos itens.
 - O "vidro" não desfoca o fundo; a legibilidade vem da opacidade, ajustável pelo usuário (Translúcido/Sólido).
 - Testar CSP exige build de release.
