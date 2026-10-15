@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DockMax — mock da Fase 1</title>
+<style>
+  /* ---------- Page chrome (the mock tool itself) ---------- */
+  :root {
+    --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    --p-bg: #f3f3f1;
+    --p-panel: #ffffff;
+    --p-ink: #1b1c20;
+    --p-ink-2: #5a5e68;
+    --p-line: #e1e2e5;
+    --p-accent: #2f5bd3;
+    --p-accent-ink: #1f45b3;
+    --p-soft: #e9eefb;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --p-bg: #141518; --p-panel: #1c1d21; --p-ink: #ececf0; --p-ink-2: #a2a6b0;
+      --p-line: #2c2e34; --p-accent: #8aa6ff; --p-accent-ink: #b3c4ff; --p-soft: #222839;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--p-bg); color: var(--p-ink); font: 14px/1.5 var(--font); }
+  ::selection { background: color-mix(in srgb, var(--p-accent) 28%, transparent); }
+  :focus-visible { outline: 2px solid var(--p-accent); outline-offset: 2px; }
+  a { color: var(--p-accent-ink); text-underline-offset: 3px; }
+
+  .app { display: grid; grid-template-columns: 272px minmax(0, 1fr); min-height: 100vh; }
+  .side {
+    border-right: 1px solid var(--p-line); background: var(--p-panel);
+    padding: 24px 20px 32px; display: grid; gap: 22px; align-content: start;
+  }
+  .side h1 { font: 600 20px/1.2 var(--font-display); margin: 0; letter-spacing: -.01em; }
+  .side p { margin: 0; color: var(--p-ink-2); font-size: 13px; }
+  .ctl { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+  .ctl legend { font-size: 12.5px; font-weight: 600; color: var(--p-ink); padding: 0; margin-bottom: 8px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 4px; }
+  .seg button {
+    font: inherit; font-size: 12.5px; color: var(--p-ink); background: transparent;
+    border: 1px solid var(--p-line); border-radius: 7px; padding: 5px 10px; cursor: pointer;
+  }
+  .seg button:hover { background: var(--p-soft); }
+  .seg button[aria-pressed="true"] { background: var(--p-soft); border-color: var(--p-accent); color: var(--p-accent-ink); font-weight: 600; }
+  .variant-note { font-size: 12.5px; color: var(--p-ink-2); }
+  .variant-note strong { color: var(--p-ink); font-weight: 600; }
+
+  .main { min-width: 0; padding: 24px 28px 48px; display: grid; gap: 28px; align-content: start; }
+  .head { display: grid; gap: 6px; max-width: 78ch; }
+  .head h2 { font: 600 24px/1.2 var(--font-display); margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+  .head p { margin: 0; color: var(--p-ink-2); }
+  h3 { font: 600 16px/1.3 var(--font-display); margin: 0; }
+
+  .stage-wrap, .table-wrap, .sheet-wrap {
+    overflow-x: auto; scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--p-ink-2) 45%, transparent) transparent;
+  }
+  .stage-wrap { border-radius: 12px; border: 1px solid var(--p-line); }
+  .notes { display: grid; gap: 28px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); align-items: start; }
+  .notes section, .states { display: grid; gap: 10px; min-width: 0; }
+  .notes p, .notes li, .states p { color: var(--p-ink-2); margin: 0; }
+  .notes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+  .table-wrap { border: 1px solid var(--p-line); border-radius: 10px; background: var(--p-panel); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--p-line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-weight: 600; color: var(--p-ink-2); font-size: 12px; }
+  .tokens td:first-child { font-family: "Cascadia Mono", Consolas, ui-monospace, monospace; font-size: 12px; white-space: nowrap; }
+  .tokens td { font-variant-numeric: tabular-nums; }
+  .tokens tr.group td { font-family: var(--font); font-weight: 600; color: var(--p-ink); background: var(--p-soft); font-size: 12px; }
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; border: 1px solid var(--p-line); }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .side { border-right: 0; border-bottom: 1px solid var(--p-line); }
+    .main { padding: 20px 16px 40px; }
+  }
+
+  /* ---------- Stage: a Windows 11 desktop at 1:1 ---------- */
+  .stage {
+    position: relative; height: 680px; min-width: 900px; overflow: hidden;
+    font-family: var(--font); isolation: isolate;
+  }
+  .wall { position: absolute; inset: 0; z-index: 0; }
+  [data-wall="soft"] > .wall, .cell[data-mode="light"] {
+    background:
+      radial-gradient(110% 80% at 72% 108%, #9db6ff 0%, transparent 56%),
+      radial-gradient(80% 70% at 18% -4%, #f4d6e6 0%, transparent 60%),
+      linear-gradient(160deg, #e8edf7, #d3ddf0);
+  }
+  [data-wall="deep"] > .wall, .cell[data-mode="dark"] {
+    background:
+      radial-gradient(110% 80% at 72% 108%, #2a4db4 0%, transparent 56%),
+      radial-gradient(80% 70% at 14% -4%, #3a2152 0%, transparent 60%),
+      linear-gradient(160deg, #0c1323, #0f1a33);
+  }
+  [data-wall="busy"] > .wall {
+    background:
+      radial-gradient(circle at 20% 30%, #ffffff 0 6%, transparent 6.5%),
+      radial-gradient(circle at 78% 64%, #111 0 7%, transparent 7.5%),
+      repeating-linear-gradient(45deg, #e2483d 0 14px, #f2c230 14px 28px, #2fb66b 28px 42px, #161616 42px 56px);
+  }
+
+  /* Synthetic app window behind the dock (Explorer-like), follows the Windows theme. */
+  .win {
+    position: absolute; z-index: 1; left: 7%; top: 6%; width: 64%; height: 84%;
+    border-radius: 8px; overflow: hidden; display: grid; grid-template-rows: 32px 1fr;
+    box-shadow: 0 0 0 1px var(--w-hair), 0 16px 48px -12px rgb(0 0 0 / .45);
+    background: var(--w-body); color: var(--w-ink); font-size: 12.5px;
+  }
+  .stage[data-mode="light"] { --w-body: #fafafa; --w-title: #f0f0f0; --w-ink: #1c1c1c; --w-ink-2: #616161; --w-hair: rgb(0 0 0 / .12); --w-row: #f0f0f0; --w-sel: #e5ecfb; }
+  .stage[data-mode="dark"]  { --w-body: #1f1f1f; --w-title: #2a2a2a; --w-ink: #ececec; --w-ink-2: #a8a8a8; --w-hair: rgb(255 255 255 / .1); --w-row: #282828; --w-sel: #2b3550; }
+  .win-title { background: var(--w-title); display: flex; align-items: center; justify-content: space-between; padding-left: 12px; }
+  .win-title span { font-size: 12px; color: var(--w-ink-2); }
+  .win-btns { display: flex; height: 100%; }
+  .win-btns i { width: 46px; display: grid; place-items: center; color: var(--w-ink-2); }
+  .win-btns svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 1; }
+  .win-body { display: grid; grid-template-columns: 180px 1fr; min-height: 0; }
+  .win-nav { border-right: 1px solid var(--w-hair); padding: 10px 8px; display: grid; gap: 2px; align-content: start; }
+  .win-nav div { padding: 6px 10px; border-radius: 5px; color: var(--w-ink); }
+  .win-nav div.on { background: var(--w-sel); }
+  .win-files { padding: 8px 12px; display: grid; align-content: start; }
+  .win-files div { display: grid; grid-template-columns: 1fr 130px 90px; padding: 7px 8px; border-radius: 4px; }
+  .win-files div:nth-child(odd) { background: var(--w-row); }
+  .win-files div span:not(:first-child) { color: var(--w-ink-2); font-variant-numeric: tabular-nums; }
+  .win-files div.h span { color: var(--w-ink-2); font-weight: 600; background: none; }
+
+  /* Windows 11 taskbar with transparency effects off: neutral, opaque. Generic glyphs, no brand marks. */
+  .taskbar {
+    position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: 48px;
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 12px;
+    background: var(--tb-bg); border-top: 1px solid var(--tb-hair); color: var(--tb-ink);
+  }
+  .stage[data-mode="light"] .taskbar { --tb-bg: #f3f3f3; --tb-hair: rgb(0 0 0 / .08); --tb-ink: #1c1c1c; }
+  .stage[data-mode="dark"] .taskbar  { --tb-bg: #202020; --tb-hair: rgb(255 255 255 / .07); --tb-ink: #ececec; }
+  .tb-apps { grid-column: 2; display: flex; gap: 4px; }
+  .tb-apps i, .tb-tray i { width: 40px; height: 40px; border-radius: 5px; display: grid; place-items: center; }
+  .tb-apps i.on { background: rgb(127 127 127 / .14); position: relative; }
+  .tb-apps i.on::after { content: ""; position: absolute; bottom: 2px; left: 50%; width: 6px; height: 3px; margin-left: -3px; border-radius: 2px; background: var(--tb-ink); opacity: .5; }
+  .tb-apps svg, .tb-tray svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .tb-tray { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 2px; }
+  .tb-tray i { width: 28px; }
+  .tb-tray svg { width: 16px; height: 16px; }
+  .clock { text-align: right; font-size: 12px; line-height: 1.35; padding: 0 8px; font-variant-numeric: tabular-nums; }
+
+  /* ---------- Dock tokens (any element carrying data-mode gets them) ---------- */
+  [data-mode="light"] {
+    --ink: #1d1e22; --ink-2: #5b5f69;
+    --surface-rgb: 247 247 249;
+    --shelf-rgb: 251 251 253; --shelf-front-rgb: 196 200 210;
+    --hair: rgb(0 0 0 / .09); --hi: rgb(255 255 255 / .8);
+    --shadow: 0 1px 2px rgb(16 20 32 / .10), 0 14px 32px -12px rgb(16 20 32 / .42);
+    --accent: #2f5bd3; --accent-ink: #1f45b3; --accent-soft: rgb(47 91 211 / .13);
+    --tip-bg: rgb(252 252 253 / .97); --tip-ink: #1d1e22;
+    --track: rgb(29 30 34 / .055); --kbd: rgb(29 30 34 / .07);
+  }
+  [data-mode="dark"] {
+    --ink: #ececf0; --ink-2: #a5a9b3;
+    --surface-rgb: 38 39 44;
+    --shelf-rgb: 74 76 86; --shelf-front-rgb: 30 31 37;
+    --hair: rgb(255 255 255 / .1); --hi: rgb(255 255 255 / .16);
+    --shadow: 0 1px 2px rgb(0 0 0 / .32), 0 16px 36px -12px rgb(0 0 0 / .7);
+    --accent: #7c9cff; --accent-ink: #b0c2ff; --accent-soft: rgb(124 156 255 / .17);
+    --tip-bg: rgb(50 51 57 / .97); --tip-ink: #f2f2f5;
+    --track: rgb(255 255 255 / .06); --kbd: rgb(255 255 255 / .09);
+  }
+  .dock-root[data-opacity="translucent"] { --surface-a: .8; }
+  .dock-root[data-opacity="solid"] { --surface-a: 1; }
+  .dock-root[data-size="s"] { --icon: 40px; --pad: 6px; --gap: 6px; --r-bar: 18px; }
+  .dock-root[data-size="m"] { --icon: 48px; --pad: 7px; --gap: 7px; --r-bar: 20px; }
+  .dock-root[data-size="l"] { --icon: 64px; --pad: 9px; --gap: 9px; --r-bar: 24px; }
+  .dock-root { --r-panel: 8px; --ease: cubic-bezier(.2, .8, .2, 1); --t-magnify: .16s; --t-pop: .18s; }
+  .dock-root[data-variant="b1"] { --r-tip: 999px; }
+  .dock-root[data-variant="b2"] { --r-tip: 4px; --pad-bottom: 11px; }
+
+  /* Own tile palette: desaturated glazes. Static classes, so the app's strict CSP needs no inline styles. */
+  .t-files    { --h: 150; --sat: 22%; --l: 44%; } /* sálvia */
+  .t-notes    { --h: 38;  --sat: 48%; --l: 40%; } /* ocre */
+  .t-clock    { --h: 192; --sat: 26%; --l: 40%; } /* petróleo */
+  .t-calendar { --h: 16;  --sat: 40%; --l: 44%; } /* argila */
+  .t-music    { --h: 318; --sat: 20%; --l: 43%; } /* ameixa */
+  .t-settings { --h: 222; --sat: 14%; --l: 34%; } /* tinta */
+  .t-about    { --h: 214; --sat: 22%; --l: 46%; } /* ardósia */
+
+  .dock-root { position: absolute; inset: 0 0 48px 0; z-index: 3; pointer-events: none; color: var(--ink); }
+  .dock { position: absolute; left: 50%; transform: translateX(-50%); bottom: 8px; pointer-events: auto; }
+  .dock-root[data-edge="top"] .dock { bottom: auto; top: 8px; }
+
+  .bar {
+    position: relative; display: flex; align-items: flex-end; gap: var(--gap);
+    padding: var(--pad); height: calc(var(--icon) + 2 * var(--pad));
+    border-radius: var(--r-bar);
+  }
+  .dock-root[data-edge="top"] .bar { align-items: flex-start; }
+  .dock-root[data-variant="b1"] .bar {
+    background: rgb(var(--surface-rgb) / var(--surface-a));
+    box-shadow: inset 0 1px 0 var(--hi), 0 0 0 1px var(--hair), var(--shadow);
+  }
+  .dock-root[data-edge="top"][data-variant="b1"] .bar { box-shadow: inset 0 -1px 0 var(--hi), 0 0 0 1px var(--hair), var(--shadow); }
+
+  .sep { flex: none; width: 1px; align-self: stretch; margin: 4px calc(var(--gap) * .4); background: var(--hair); }
+  .dock-root[data-variant="b2"] .sep { margin-bottom: calc(var(--pad) * -1 + 3px); }
+
+  .item {
+    position: relative; flex: none; width: calc(var(--icon) * var(--s, 1)); height: var(--icon);
+    border: 0; padding: 0; background: none; cursor: pointer; color: inherit; font: inherit;
+    transition: width var(--t-magnify) var(--ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .item:focus { outline: none; }
+
+  /* Tile: superellipse glaze (mask) with drop shadow on the unmasked wrapper. */
+  .tile {
+    position: absolute; left: 50%; bottom: 0; width: var(--icon); height: var(--icon); margin-left: calc(var(--icon) / -2);
+    border-radius: 23%; display: grid; place-items: center; color: #fff;
+    filter: drop-shadow(0 1px 1px rgb(0 0 0 / .18)) drop-shadow(0 5px 6px rgb(0 0 0 / .16));
+    transform-origin: 50% 100%;
+    transform: translateY(calc(var(--lift, 0px) * -1)) scale(var(--s, 1));
+    transition: transform var(--t-magnify) var(--ease);
+  }
+  .tile::before {
+    content: ""; position: absolute; inset: 0;
+    background:
+      radial-gradient(130% 70% at 50% -12%, rgb(255 255 255 / .26), transparent 58%),
+      linear-gradient(180deg,
+        hsl(var(--h) calc(var(--sat) * var(--sat-k, 1)) calc(var(--l) + 7%)),
+        hsl(var(--h) calc(var(--sat) * var(--sat-k, 1)) calc(var(--l) - 5%)));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .32), inset 0 -1px 0 rgb(0 0 0 / .16);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  }
+  .tile svg { position: relative; width: 54%; height: 54%; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .item.illustrative .tile { --sat-k: .55; }
+  .item:focus-visible .tile, .item.kb .tile { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .item:active .tile::before, .item.pressed .tile::before { filter: brightness(.84); }
+  .item:active .tile svg, .item.pressed .tile svg { opacity: .9; }
+  .dock-root[data-edge="top"] .tile { bottom: auto; top: 0; transform-origin: 50% 0; transform: translateY(var(--lift, 0px)) scale(var(--s, 1)); }
+
+  /* B2 follows the pointer continuously: no easing while tracking. */
+  .dock-root[data-variant="b2"] .dock.tracking .item,
+  .dock-root[data-variant="b2"] .dock.tracking .tile { transition: none; }
+
+  /* Open-panel indicator (the running-app indicator from Fase 4 on) */
+  .ind { position: absolute; left: 50%; pointer-events: none; opacity: 0; transition: opacity .15s; background: var(--accent); }
+  .item[aria-expanded="true"] .ind { opacity: 1; }
+  .dock-root[data-variant="b1"] .ind { width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; bottom: calc(var(--pad) * -1 + 1px); }
+  .dock-root[data-variant="b2"] .ind { width: 16px; height: 2px; margin-left: -8px; border-radius: 1px; bottom: calc(var(--pad-bottom) * -1 + 3px); }
+  .dock-root[data-edge="top"] .ind { bottom: auto; top: calc(var(--pad) * -1 + 1px); }
+
+  /* B2 shelf: icons stand on a glass shelf with a short reflection. */
+  .shelf { display: none; }
+  .dock-root[data-variant="b2"] .bar { padding-bottom: var(--pad-bottom); height: calc(var(--icon) + var(--pad) + var(--pad-bottom)); }
+  .dock-root[data-variant="b2"] .shelf {
+    display: block; position: absolute; left: -6px; right: -6px; bottom: 0; height: calc(var(--pad-bottom) + 14px);
+    clip-path: polygon(3% 0, 97% 0, 100% 100%, 0 100%);
+    background:
+      linear-gradient(180deg,
+        rgb(var(--shelf-rgb) / var(--surface-a)) 0%,
+        rgb(var(--shelf-rgb) / calc(var(--surface-a) * .9)) 66%,
+        rgb(var(--shelf-front-rgb) / var(--surface-a)) 66%,
+        rgb(var(--shelf-front-rgb) / calc(var(--surface-a) * .82)) 100%);
+    filter: drop-shadow(0 10px 14px rgb(0 0 0 / .3));
+  }
+  .dock-root[data-variant="b2"] .shelf::before {
+    content: ""; position: absolute; left: 3%; right: 3%; top: 0; height: 1px; background: var(--hi);
+  }
+  .dock-root[data-variant="b2"] .shelf::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 66%; height: 1px; background: var(--hi);
+  }
+  .reflect { display: none; }
+  .dock-root[data-variant="b2"][data-edge="bottom"] .reflect {
+    display: block; position: absolute; left: 50%; top: 100%; width: var(--icon); height: calc(var(--pad-bottom) + 2px);
+    margin-left: calc(var(--icon) / -2); overflow: hidden; pointer-events: none;
+    -webkit-mask-image: linear-gradient(180deg, rgb(0 0 0 / .55), transparent 92%); mask-image: linear-gradient(180deg, rgb(0 0 0 / .55), transparent 92%);
+  }
+  /* The mirrored tile hangs from the box's top edge: its bottom sits on the edge, flipped downward. */
+  .reflect .tile {
+    top: calc(var(--icon) * -1); bottom: auto; transform-origin: 50% 100%; filter: none;
+    transform: translateY(var(--lift, 0px)) scale(var(--s, 1), calc(var(--s, 1) * -1));
+  }
+  .dock-root[data-variant="b2"][data-edge="top"] .shelf { bottom: auto; top: 0; transform: scaleY(-1); }
+  .dock-root[data-variant="b2"][data-edge="top"] .bar { padding-bottom: var(--pad); padding-top: var(--pad-bottom); }
+
+  /* Tooltip */
+  .tip {
+    position: absolute; z-index: 5; pointer-events: none; white-space: nowrap;
+    font-size: 12.5px; font-weight: 600; color: var(--tip-ink); background: var(--tip-bg);
+    padding: 4px 10px; border-radius: var(--r-tip);
+    box-shadow: 0 0 0 1px var(--hair), 0 6px 16px -6px rgb(0 0 0 / .35);
+    transform: translate(-50%, -100%);
+  }
+  .dock-root[data-edge="top"] .tip { transform: translate(-50%, 0); }
+  .tip small { font-weight: 400; color: var(--ink-2); margin-left: 6px; }
+
+  /* Panel: always opaque (no backdrop blur exists to keep text behind it out of the way). */
+  .panel {
+    position: absolute; z-index: 4; pointer-events: auto; width: 320px;
+    background: rgb(var(--surface-rgb)); color: var(--ink);
+    border-radius: var(--r-panel); box-shadow: inset 0 1px 0 var(--hi), 0 0 0 1px var(--hair), var(--shadow);
+    padding: 16px 16px 12px; display: grid; gap: 14px;
+    transform-origin: 50% 100%; animation: pop var(--t-pop) var(--ease);
+  }
+  .panel[hidden], .tip[hidden] { display: none; }
+  .dock-root[data-edge="top"] .panel { transform-origin: 50% 0; }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+  .panel h2 { font: 600 15px/1.3 var(--font-display); margin: 0; }
+  .p-row { display: grid; gap: 6px; }
+  .p-row > span { font-size: 12.5px; color: var(--ink-2); }
+  .p-seg { display: flex; gap: 2px; padding: 2px; background: var(--track); border-radius: 6px; }
+  .p-seg button {
+    flex: 1; font: inherit; font-size: 12.5px; color: var(--ink); background: transparent; border: 0;
+    border-radius: 4px; padding: 6px 6px; cursor: pointer; white-space: nowrap;
+  }
+  .p-seg button:hover { background: var(--track); }
+  .p-seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+  .p-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .p-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--ink-2); border-top: 1px solid var(--hair); padding-top: 10px; }
+  kbd { font: 600 11px/1 var(--font); padding: 3px 6px; border-radius: 4px; background: var(--kbd); color: var(--ink); }
+  .about { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+  .about .tile { position: relative; left: auto; margin: 0; width: 56px; height: 56px; transform: none; }
+  .about h2 { font-size: 17px; }
+  .about p { margin: 2px 0 0; color: var(--ink-2); font-size: 12.5px; }
+  .about-list { display: grid; gap: 6px; font-size: 12.5px; }
+  .about-list div { display: flex; justify-content: space-between; gap: 12px; }
+  .about-list span:first-child { color: var(--ink-2); }
+  .about-list a { color: var(--accent-ink); }
+
+  /* ---------- State sheet: static, 1:1, B1 and B2 side by side ---------- */
+  .sheet { display: grid; grid-template-columns: 120px repeat(5, minmax(150px, 1fr)); gap: 8px; min-width: 920px; }
+  .sheet .rowlabel { align-self: center; font-weight: 600; font-size: 13px; }
+  .sheet .collabel { font-size: 12px; color: var(--p-ink-2); font-weight: 600; }
+  .cell { position: relative; height: 128px; border-radius: 10px; overflow: hidden; display: grid; place-items: end center; padding-bottom: 14px; }
+  .cell .dock-root { position: relative; inset: auto; z-index: auto; }
+  .cell .dock { position: relative; left: auto; bottom: auto; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .item, .tile, .panel, .ind { transition: none !important; animation: none !important; }
+  }
+  .dock-root.reduced .item, .dock-root.reduced .tile, .dock-root.reduced .panel { transition: none; animation: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Controles do mock">
+    <div>
+      <h1>DockMax · Fase 1</h1>
+      <p>Mock de decisão. O dock do palco funciona: passe o mouse, use Tab e as setas, clique nos itens e mude as opções dentro do painel de Configurações.</p>
+    </div>
+
+    <fieldset class="ctl">
+      <legend>Variante</legend>
+      <div class="seg" data-ctl="variant">
+        <button type="button" id="v-b1" data-v="b1" aria-pressed="true">B1 · Big Sur</button>
+        <button type="button" id="v-b2" data-v="b2" aria-pressed="false">B2 · Prateleira</button>
+      </div>
+      <p class="variant-note" id="variantNote"></p>
+    </fieldset>
+
+    <fieldset class="ctl">
+      <legend>Papel de parede</legend>
+      <div class="seg" data-ctl="wall">
+        <button type="button" id="w-soft" data-v="soft" aria-pressed="true">Claro</button>
+        <button type="button" id="w-deep" data-v="deep" aria-pressed="false">Escuro</button>
+        <button type="button" id="w-busy" data-v="busy" aria-pressed="false">Estresse</button>
+      </div>
+    </fieldset>
+
+    <fieldset class="ctl">
+      <legend>Itens</legend>
+      <div class="seg" data-ctl="items">
+        <button type="button" id="i-all" data-v="all" aria-pressed="true">Com ilustrativos</button>
+        <button type="button" id="i-f1" data-v="f1" aria-pressed="false">Só Fase 1</button>
+      </div>
+      <p class="variant-note">Arquivos, Notas, Relógio, Calendário e Música são ilustrativos (fases 2 e 3), em tons menos saturados. Na Fase 1 o dock tem só Configurações e Sobre.</p>
+    </fieldset>
+
+    <fieldset class="ctl">
+      <legend>Forçar estado</legend>
+      <div class="seg" data-ctl="forced">
+        <button type="button" id="f-none" data-v="none" aria-pressed="true">Nenhum</button>
+        <button type="button" id="f-hover" data-v="hover" aria-pressed="false">Hover</button>
+        <button type="button" id="f-focus" data-v="focus" aria-pressed="false">Foco</button>
+        <button type="button" id="f-reduced" data-v="reduced" aria-pressed="false">Reduzir movimento</button>
+      </div>
+    </fieldset>
+  </aside>
+
+  <main class="main">
+    <header class="head">
+      <h2>O dock no seu desktop, em tamanho real</h2>
+      <p>Escala 1:1 de um monitor a 100%. A janela e a barra de tarefas seguem o tema escolhido no painel, como faria o Windows com os efeitos de transparência desligados. O vidro é simulado (sem desfoque do fundo), como decidido no ADR 0006. A opção Translúcido/Sólido vale para o dock; o painel é sempre opaco, para o texto de trás nunca atrapalhar a leitura.</p>
+    </header>
+
+    <div class="stage-wrap">
+      <div class="stage" id="stage" data-mode="light" data-wall="soft">
+        <div class="wall" aria-hidden="true"></div>
+
+        <div class="win" aria-hidden="true">
+          <div class="win-title"><span>Documentos</span>
+            <div class="win-btns">
+              <i><svg viewBox="0 0 10 10"><path d="M1 5h8"/></svg></i>
+              <i><svg viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" rx="1"/></svg></i>
+              <i><svg viewBox="0 0 10 10"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></i>
+            </div>
+          </div>
+          <div class="win-body">
+            <div class="win-nav"><div>Início</div><div>Área de trabalho</div><div class="on">Documentos</div><div>Downloads</div><div>Imagens</div><div>Música</div></div>
+            <div class="win-files">
+              <div class="h"><span>Nome</span><span>Modificado</span><span>Tamanho</span></div>
+              <div><span>orcamento-2026.xlsx</span><span>12/10/2026 09:14</span><span>48 KB</span></div>
+              <div><span>notas-reuniao.docx</span><span>11/10/2026 16:02</span><span>22 KB</span></div>
+              <div><span>roteiro-viagem.pdf</span><span>09/10/2026 21:40</span><span>1,2 MB</span></div>
+              <div><span>capturas</span><span>08/10/2026 10:05</span><span>—</span></div>
+              <div><span>curriculo.pdf</span><span>02/10/2026 18:33</span><span>310 KB</span></div>
+              <div><span>contrato-aluguel.pdf</span><span>28/09/2026 11:20</span><span>540 KB</span></div>
+              <div><span>fotos-ferias</span><span>21/09/2026 08:47</span><span>—</span></div>
+              <div><span>leia-me.txt</span><span>15/09/2026 14:12</span><span>2 KB</span></div>
+              <div><span>planilha-gastos.csv</span><span>10/09/2026 19:58</span><span>16 KB</span></div>
+              <div><span>apresentacao.pptx</span><span>03/09/2026 15:30</span><span>4,8 MB</span></div>
+              <div><span>backup-config.zip</span><span>29/08/2026 22:01</span><span>12 MB</span></div>
+              <div><span>receitas.md</span><span>20/08/2026 12:44</span><span>9 KB</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dock-root" id="dockRoot" data-variant="b1" data-size="m" data-opacity="translucent" data-edge="bottom">
+          <div class="dock" id="dock">
+            <div class="shelf" aria-hidden="true"></div>
+            <nav class="bar" id="bar" aria-label="Dock"></nav>
+          </div>
+          <div class="tip" id="tip" role="tooltip" hidden></div>
+          <section class="panel" id="panel" hidden aria-labelledby="panelTitle"></section>
+        </div>
+
+        <div class="taskbar" aria-hidden="true">
+          <div class="tb-apps">
+            <i><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></i>
+            <i><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M15.5 15.5L20 20"/></svg></i>
+            <i class="on"><svg viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2h7.4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg></i>
+            <i><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17"/></svg></i>
+            <i><svg viewBox="0 0 24 24"><path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H10l-4 3.5v-3.5h0.5a2 2 0 0 1-2-2z"/></svg></i>
+            <i><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M7.5 10l2.5 2-2.5 2M12.5 15h4"/></svg></i>
+          </div>
+          <div class="tb-tray">
+            <i><svg viewBox="0 0 24 24"><path d="M7 14l5-5 5 5"/></svg></i>
+            <i><svg viewBox="0 0 24 24"><path d="M3 9.5a13 13 0 0 1 18 0M6 13a8.5 8.5 0 0 1 12 0M9 16.5a4 4 0 0 1 6 0"/><circle cx="12" cy="19.5" r=".6"/></svg></i>
+            <i><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg></i>
+            <div class="clock">18:42<br>14/10/2026</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="states" aria-labelledby="statesTitle">
+      <h3 id="statesTitle">Estados lado a lado</h3>
+      <p id="statesCaption"></p>
+      <div class="sheet-wrap"><div class="sheet" id="sheet"></div></div>
+    </section>
+
+    <div class="notes">
+      <section>
+        <h3>B1 e B2 lado a lado</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col"></th><th scope="col">B1 · Big Sur</th><th scope="col">B2 · Prateleira</th></tr></thead>
+            <tbody>
+              <tr><td>Superfície</td><td>Placa de vidro simulado com cantos grandes, como o dock do macOS</td><td>Ícones apoiados numa prateleira de vidro em perspectiva</td></tr>
+              <tr><td>Ampliação</td><td>Em degraus: o ícone sob o mouse e um pouco os vizinhos</td><td>Parabólica e contínua, segue o mouse (estilo Latte Dock)</td></tr>
+              <tr><td>Painel aberto</td><td>Ponto na cor de destaque sob o ícone</td><td>Traço na cor de destaque na borda da prateleira</td></tr>
+              <tr><td>Rótulo</td><td>Pílula acima do ícone</td><td>Etiqueta retangular acima do ícone</td></tr>
+              <tr><td>Reflexo</td><td>Nenhum</td><td>Curto e esmaecido, na face de cima da prateleira</td></tr>
+              <tr><td>Altura ampliada no tamanho Grande</td><td>~105 px acima da base</td><td>~120 px acima da base</td></tr>
+              <tr><td>Custo no app</td><td>Região de captura muda só quando o item sob o mouse muda</td><td>Região muda a cada movimento: mais mensagens ao Rust enquanto o mouse está no dock</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h3>Tokens da combinação atual</h3>
+        <p id="tokensCaption"></p>
+        <div class="table-wrap"><table class="tokens"><thead><tr><th scope="col">Token</th><th scope="col">Valor</th></tr></thead><tbody id="tokens"></tbody></table></div>
+      </section>
+
+      <section>
+        <h3>Consequências para os PRs 2 e 3</h3>
+        <ul>
+          <li>A ampliação empurra os vizinhos em vez de sobrepor. A barra cresce na horizontal, então a janela do dock precisa de folga lateral além da folga de cima.</li>
+          <li>A janela de hoje tem 104 px (barra de 64 + folga de 40). No tamanho Grande, o B1 ampliado chega a ~105 px e o B2 a ~120 px acima da base: o PR 2 precisa aumentar a folga conforme o tamanho ou limitar a ampliação no Grande.</li>
+          <li>Toda a identidade está nos tokens: trocar tema, opacidade, tamanho ou variante é trocar valores, não componentes. A paleta dos ícones já está em classes estáticas, compatíveis com a CSP do app.</li>
+          <li>A cor de destaque é um token só; a escolha de destaque pelo usuário pode entrar depois sem retrabalho.</li>
+          <li>Os ícones são glifos de traço sobre ladrilhos de uma paleta própria; nenhum ícone ou arquivo de tema de terceiros.</li>
+        </ul>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+(() => {
+  const ICONS = {
+    folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2h7.4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.5 10.5h17"/>',
+    notes: '<rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/><path d="M8 13.5h.01M12 13.5h.01M16 13.5h.01M8 17h.01M12 17h.01"/>',
+    music: '<path d="M9 17.5V6.5l10-2v11"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>',
+    settings: '<path d="M4 7.5h9.5M17.5 7.5H20M4 16.5h3.5M11.5 16.5H20"/><circle cx="15.5" cy="7.5" r="2"/><circle cx="9.5" cy="16.5" r="2"/>',
+    about: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><path d="M12 7.6h.01"/>'
+  };
+  // Mirrors the static .t-* classes in the stylesheet (shown in the token table).
+  const PALETTE = [
+    ["t-files", "sálvia", 150, 22, 44], ["t-notes", "ocre", 38, 48, 40], ["t-clock", "petróleo", 192, 26, 40],
+    ["t-calendar", "argila", 16, 40, 44], ["t-music", "ameixa", 318, 20, 43], ["t-settings", "tinta", 222, 14, 34], ["t-about", "ardósia", 214, 22, 46]
+  ];
+  const ITEMS = [
+    { id: "files", label: "Arquivos", icon: "folder", illustrative: true },
+    { id: "notes", label: "Notas", icon: "notes", illustrative: true },
+    { id: "clock", label: "Relógio", icon: "clock", illustrative: true },
+    { id: "calendar", label: "Calendário", icon: "calendar", illustrative: true },
+    { id: "music", label: "Música", icon: "music", illustrative: true },
+    "sep",
+    { id: "settings", label: "Configurações", icon: "settings", panel: "settings" },
+    { id: "about", label: "Sobre", icon: "about", panel: "about" }
+  ];
+  const MAG = {
+    b1: { hover: 1.4, neighbor: 1.15, lift: 6 },
+    b2: { max: 1.55, range: 2.6, lift: 10 }
+  };
+  const VARIANT_NOTES = {
+    b1: "<strong>Referências:</strong> dock do macOS Big Sur, tema WhiteSur e o dock do Zorin OS.",
+    b2: "<strong>Referências:</strong> Plank, Latte Dock e Cairo-Dock, com reflexo contido."
+  };
+
+  const state = { variant: "b1", wall: "soft", items: "all", forced: "none", theme: "system", edge: "bottom", size: "m", opacity: "translucent", panel: null, hover: -1 };
+  // Any state can come from the URL, e.g. ?variant=b2&theme=dark&wall=deep&panel=about
+  const params = new URLSearchParams(location.search);
+  const ALLOWED = { variant: ["b1", "b2"], wall: ["soft", "deep", "busy"], items: ["all", "f1"], forced: ["none", "hover", "focus", "reduced"],
+    theme: ["system", "light", "dark"], edge: ["bottom", "top"], size: ["s", "m", "l"], opacity: ["translucent", "solid"] };
+  for (const [key, values] of Object.entries(ALLOWED)) { const v = params.get(key); if (values.includes(v)) state[key] = v; }
+  const initialPanel = ["settings", "about", "none"].includes(params.get("panel")) ? params.get("panel") : "settings";
+
+  const stage = document.getElementById("stage");
+  const root = document.getElementById("dockRoot");
+  const dock = document.getElementById("dock");
+  const bar = document.getElementById("bar");
+  const tip = document.getElementById("tip");
+  const panel = document.getElementById("panel");
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const reducedMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  const svg = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+  const tile = (it) => `<span class="tile t-${it.id}">${svg(it.icon)}</span>`;
+  const itemHtml = (it, extra = "") => it === "sep" ? '<span class="sep" aria-hidden="true"></span>' :
+    `<button type="button" class="item${it.illustrative ? " illustrative" : ""}" data-id="${it.id}" aria-label="${it.label}${it.illustrative ? " (ilustrativo)" : ""}"` +
+    (it.panel ? ` aria-expanded="false" aria-controls="panel" data-panel="${it.panel}"` : "") + ` tabindex="-1"${extra}>` +
+    `${tile(it)}<span class="reflect" aria-hidden="true">${tile(it)}</span><span class="ind" aria-hidden="true"></span></button>`;
+
+  function renderBar() {
+    const list = ITEMS.filter((it) => it === "sep" || state.items === "all" || !it.illustrative);
+    const trimmed = list[0] === "sep" ? list.slice(1) : list;
+    bar.innerHTML = trimmed.map((it) => itemHtml(it)).join("");
+    const items = items_();
+    const start = items.findIndex((b) => b.dataset.id === "settings");
+    items.forEach((b, i) => b.tabIndex = i === start ? 0 : -1);
+    syncExpanded();
+  }
+  const items_ = () => [...bar.querySelectorAll(".item")];
+
+  const mode = () => state.theme === "system" ? (media.matches ? "dark" : "light") : state.theme;
+  const reduced = () => state.forced === "reduced" || reducedMedia.matches;
+
+  function applyRoot() {
+    stage.dataset.mode = mode();
+    stage.dataset.wall = state.wall;
+    Object.assign(root.dataset, { variant: state.variant, size: state.size, opacity: state.opacity, edge: state.edge });
+    root.classList.toggle("reduced", reduced());
+    document.getElementById("variantNote").innerHTML = VARIANT_NOTES[state.variant];
+  }
+
+  // ---------- Magnification (pure scale lists, applied to any bar) ----------
+  function stepScales(n, i) {
+    const s = [], l = [];
+    for (let k = 0; k < n; k++) {
+      s[k] = k === i ? MAG.b1.hover : Math.abs(k - i) === 1 ? MAG.b1.neighbor : 1;
+      l[k] = k === i ? MAG.b1.lift : 0;
+    }
+    return [s, l];
+  }
+  function parabolicScales(centers, icon, px) {
+    const range = MAG.b2.range * icon, s = [], l = [];
+    centers.forEach((c, k) => {
+      const t = Math.min(Math.abs(px - c) / range, 1), f = Math.cos(t * Math.PI / 2) ** 2;
+      s[k] = 1 + (MAG.b2.max - 1) * f; l[k] = MAG.b2.lift * f;
+    });
+    return [s, l];
+  }
+  function restCenters(barEl, rootEl) {
+    // Centers at rest, from the unscaled layout (icon + gap + separators).
+    const cs = getComputedStyle(rootEl);
+    const icon = parseFloat(cs.getPropertyValue("--icon")), gap = parseFloat(cs.getPropertyValue("--gap")), pad = parseFloat(cs.getPropertyValue("--pad"));
+    const centers = []; let x = pad;
+    [...barEl.children].forEach((el) => {
+      if (el.classList.contains("sep")) { x += 1 + gap * .8 + gap; return; }
+      centers.push(x + icon / 2); x += icon + gap;
+    });
+    return { centers, icon, pad };
+  }
+  function apply(barEl, [s, l]) {
+    [...barEl.querySelectorAll(".item")].forEach((b, i) => {
+      b.style.setProperty("--s", s[i] ?? 1);
+      b.style.setProperty("--lift", (l[i] ?? 0) + "px");
+    });
+  }
+  function rest() { apply(bar, [[], []]); state.hover = -1; hideTip(); }
+  function magnifyIndex(i) {
+    if (reduced() || i < 0) { apply(bar, [[], []]); return; }
+    if (state.variant === "b1") apply(bar, stepScales(items_().length, i));
+    else { const { centers, icon } = restCenters(bar, root); apply(bar, parabolicScales(centers, icon, centers[i])); }
+  }
+  function magnifyPointer(px) {
+    if (reduced()) return -1;
+    const { centers, icon } = restCenters(bar, root);
+    apply(bar, parabolicScales(centers, icon, px));
+    let best = -1, bestD = Infinity;
+    centers.forEach((c, k) => { const d = Math.abs(px - c); if (d < bestD) { bestD = d; best = k; } });
+    return bestD <= icon / 2 + 4 ? best : -1;
+  }
+  function restWidth() {
+    const { centers, icon, pad } = restCenters(bar, root);
+    return centers.length ? centers[centers.length - 1] + icon / 2 + pad : 0;
+  }
+
+  // ---------- Tooltip ----------
+  function showTip(i) {
+    const b = items_()[i];
+    if (!b || b.getAttribute("aria-expanded") === "true") { hideTip(); return; }
+    const it = ITEMS.find((x) => x.id === b.dataset.id);
+    tip.innerHTML = it.label + (it.illustrative ? "<small>ilustrativo</small>" : "");
+    tip.hidden = false;
+    const tileEl = b.querySelector(".tile");
+    const place = () => {
+      if (tip.hidden) return;
+      const st = stage.getBoundingClientRect(), t = tileEl.getBoundingClientRect();
+      tip.style.left = (t.left + t.width / 2 - st.left) + "px";
+      tip.style.top = (state.edge === "bottom" ? t.top - st.top - 10 : t.bottom - st.top + 10) + "px";
+    };
+    requestAnimationFrame(place);
+    // The tile may still be growing: settle the label once the magnification transition ends.
+    tileEl.addEventListener("transitionend", place, { once: true });
+  }
+  function hideTip() { tip.hidden = true; }
+
+  dock.addEventListener("pointermove", (e) => {
+    if (state.forced !== "none" && state.forced !== "reduced") return;
+    if (state.panel) return; // magnification freezes while a panel is open
+    if (state.variant === "b2") {
+      dock.classList.add("tracking");
+      const r = bar.getBoundingClientRect();
+      // Track against the resting layout so the parabola does not chase its own growth.
+      const restLeft = r.left + r.width / 2 - restWidth() / 2;
+      const i = magnifyPointer(e.clientX - restLeft);
+      if (i !== state.hover) { state.hover = i; i >= 0 ? showTip(i) : hideTip(); } else if (i >= 0) showTip(i);
+    } else {
+      const b = e.target.closest(".item");
+      const i = b ? items_().indexOf(b) : -1;
+      if (i !== state.hover) { state.hover = i; magnifyIndex(i); i >= 0 ? showTip(i) : hideTip(); }
+    }
+  });
+  dock.addEventListener("pointerleave", () => { dock.classList.remove("tracking"); if (state.forced === "none" || state.forced === "reduced") rest(); });
+
+  // ---------- Panel ----------
+  const seg = (name, label, options, current) =>
+    `<div class="p-row"><span id="lbl-${name}">${label}</span><div class="p-seg" role="group" aria-labelledby="lbl-${name}" data-set="${name}">` +
+    options.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${v === current}">${t}</button>`).join("") + `</div></div>`;
+
+  function renderPanel() {
+    if (!state.panel) { panel.hidden = true; return; }
+    if (state.panel === "settings") {
+      panel.style.width = "320px";
+      panel.innerHTML = `<h2 id="panelTitle">Configurações</h2>` +
+        seg("theme", "Tema", [["system", "Sistema"], ["light", "Claro"], ["dark", "Escuro"]], state.theme) +
+        seg("edge", "Posição", [["bottom", "Embaixo"], ["top", "Em cima"]], state.edge) +
+        seg("size", "Tamanho", [["s", "Pequeno"], ["m", "Médio"], ["l", "Grande"]], state.size) +
+        seg("opacity", "Opacidade do dock", [["translucent", "Translúcido"], ["solid", "Sólido"]], state.opacity) +
+        `<div class="p-foot"><span>Salvo automaticamente</span><span><kbd>Esc</kbd> fecha</span></div>`;
+    } else {
+      panel.style.width = "300px";
+      panel.innerHTML = `<div class="about">${tile(ITEMS.find((x) => x.id === "about"))}<div><h2 id="panelTitle">DockMax</h2><p>Dock para Windows 11, feito com Tauri.</p></div></div>` +
+        `<div class="about-list"><div><span>Versão</span><span>0.1.0</span></div><div><span>Licença</span><span>MIT</span></div>` +
+        `<div><span>Código</span><a href="https://github.com/maxeinstein-dev/DockMax" target="_blank" rel="noopener">github.com/maxeinstein-dev/DockMax</a></div></div>` +
+        `<div class="p-foot"><span>Projeto independente</span><span><kbd>Esc</kbd> fecha</span></div>`;
+    }
+    panel.hidden = false;
+    placePanel();
+  }
+  function placePanel() {
+    if (panel.hidden) return;
+    const b = bar.querySelector(`.item[data-panel="${state.panel}"]`);
+    if (!b) return;
+    const st = stage.getBoundingClientRect();
+    const itemR = b.getBoundingClientRect(), barR = bar.getBoundingClientRect();
+    const w = panel.offsetWidth, h = panel.offsetHeight, margin = 8;
+    let x = itemR.left + itemR.width / 2 - w / 2 - st.left;
+    x = Math.max(margin, Math.min(x, st.width - w - margin));
+    const y = state.edge === "bottom" ? barR.top - st.top - margin - h : barR.bottom - st.top + margin;
+    panel.style.left = x + "px"; panel.style.top = y + "px";
+  }
+  function syncExpanded() {
+    items_().forEach((b) => b.dataset.panel && b.setAttribute("aria-expanded", String(b.dataset.panel === state.panel)));
+  }
+  function togglePanel(name, focusBack) {
+    state.panel = state.panel === name ? null : name;
+    if (state.panel) { dock.classList.remove("tracking"); rest(); }
+    syncExpanded(); renderPanel(); hideTip();
+    if (!state.panel && focusBack) bar.querySelector(`.item[data-panel="${name}"]`)?.focus();
+  }
+
+  bar.addEventListener("click", (e) => {
+    const b = e.target.closest(".item");
+    if (b?.dataset.panel) togglePanel(b.dataset.panel);
+  });
+  bar.addEventListener("keydown", (e) => {
+    const items = items_(), i = items.indexOf(document.activeElement);
+    if (i < 0) return;
+    let n = -1;
+    if (e.key === "ArrowRight") n = Math.min(i + 1, items.length - 1);
+    if (e.key === "ArrowLeft") n = Math.max(i - 1, 0);
+    if (e.key === "Home") n = 0;
+    if (e.key === "End") n = items.length - 1;
+    if (n >= 0) { e.preventDefault(); items.forEach((b, k) => b.tabIndex = k === n ? 0 : -1); items[n].focus(); }
+  });
+  bar.addEventListener("focusin", (e) => {
+    const b = e.target.closest(".item"); if (!b || !b.matches(":focus-visible")) return;
+    const i = items_().indexOf(b);
+    if (!state.panel) magnifyIndex(i);
+    showTip(i);
+  });
+  bar.addEventListener("focusout", () => { if (state.forced === "none") rest(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && state.panel) togglePanel(state.panel, true);
+  });
+  stage.addEventListener("pointerdown", (e) => {
+    if (!state.panel) return;
+    if (panel.contains(e.target) || e.target.closest(".item")) return;
+    state.panel = null; syncExpanded(); renderPanel();
+  });
+  panel.addEventListener("click", (e) => {
+    const btn = e.target.closest(".p-seg button"); if (!btn) return;
+    state[btn.closest(".p-seg").dataset.set] = btn.dataset.v;
+    refresh();
+  });
+
+  // ---------- Mock controls ----------
+  document.querySelectorAll(".side .seg").forEach((group) => group.addEventListener("click", (e) => {
+    const btn = e.target.closest("button"); if (!btn) return;
+    state[group.dataset.ctl] = btn.dataset.v;
+    group.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+    if (group.dataset.ctl === "items") renderBar();
+    refresh();
+  }));
+
+  function applyForced() {
+    items_().forEach((b) => b.classList.remove("kb"));
+    rest();
+    const i = items_().findIndex((b) => b.dataset.id === "settings");
+    if (state.forced === "hover" || state.forced === "focus") {
+      if (state.panel) { state.panel = null; syncExpanded(); renderPanel(); }
+      magnifyIndex(i);
+      state.hover = i;
+      if (state.forced === "focus") items_()[i].classList.add("kb");
+      showTip(i);
+    }
+  }
+
+  // ---------- State sheet ----------
+  const SHEET_ITEMS = [ITEMS[6], ITEMS[7]]; // the Fase 1 items
+  const STATES = [["rest", "Repouso"], ["hover", "Hover"], ["focus", "Foco (teclado)"], ["pressed", "Pressionado"], ["open", "Painel aberto"]];
+  function renderSheet() {
+    const sheet = document.getElementById("sheet");
+    const m = mode();
+    let html = `<span></span>` + STATES.map(([, t]) => `<span class="collabel">${t}</span>`).join("");
+    for (const [variant, name] of [["b1", "B1 · Big Sur"], ["b2", "B2 · Prateleira"]]) {
+      html += `<span class="rowlabel">${name}</span>`;
+      for (const [st] of STATES) {
+        html += `<div class="cell" data-mode="${m}" data-state="${st}"><div class="dock-root" data-variant="${variant}" data-size="m" data-opacity="${state.opacity}" data-edge="bottom">` +
+          `<div class="dock"><div class="shelf" aria-hidden="true"></div><div class="bar" aria-hidden="true">${SHEET_ITEMS.map((it) => itemHtml(it, ' disabled')).join("")}</div></div></div></div>`;
+      }
+    }
+    sheet.innerHTML = html;
+    sheet.querySelectorAll(".cell").forEach((cell) => {
+      const sbar = cell.querySelector(".bar"), sroot = cell.querySelector(".dock-root");
+      const items = [...sbar.querySelectorAll(".item")], i = items.findIndex((b) => b.dataset.id === "settings");
+      const st = cell.dataset.state;
+      if (st === "hover" && !reduced()) {
+        if (sroot.dataset.variant === "b1") apply(sbar, stepScales(items.length, i));
+        else { const { centers, icon } = restCenters(sbar, sroot); apply(sbar, parabolicScales(centers, icon, centers[i])); }
+      }
+      if (st === "focus") items[i].classList.add("kb");
+      if (st === "pressed") items[i].classList.add("pressed");
+      if (st === "open") items[i].setAttribute("aria-expanded", "true");
+    });
+    document.getElementById("statesCaption").textContent =
+      `Itens da Fase 1; o estado é aplicado em Configurações. Tema ${m === "dark" ? "escuro" : "claro"}, ${state.opacity === "solid" ? "sólido" : "translúcido"}, tamanho médio. Acompanha o tema e a opacidade escolhidos no painel.`;
+  }
+
+  // ---------- Token table ----------
+  const TOKEN_NAMES = ["--icon", "--pad", "--gap", "--pad-bottom", "--r-bar", "--r-panel", "--r-tip", "--surface-rgb", "--surface-a", "--shelf-rgb", "--shelf-front-rgb",
+    "--hair", "--hi", "--shadow", "--ink", "--ink-2", "--accent", "--accent-ink", "--accent-soft", "--tip-bg", "--tip-ink", "--track", "--kbd", "--ease", "--t-magnify", "--t-pop"];
+  function renderTokens() {
+    const cs = getComputedStyle(root);
+    document.getElementById("tokensCaption").textContent =
+      `${state.variant === "b1" ? "B1 · Big Sur" : "B2 · Prateleira"}, tema ${mode() === "dark" ? "escuro" : "claro"}, ${state.opacity === "solid" ? "sólido" : "translúcido"}, tamanho ${({ s: "pequeno", m: "médio", l: "grande" })[state.size]}.`;
+    const row = (n, v, chip) => `<tr><td>${n}</td><td>${chip ? `<span class="swatch" style="background:${chip}"></span>` : ""}${v}</td></tr>`;
+    const group = (t) => `<tr class="group"><td colspan="2">${t}</td></tr>`;
+    let html = group("Superfície, cor e movimento");
+    TOKEN_NAMES.forEach((n) => {
+      const v = cs.getPropertyValue(n).trim(); if (!v) return;
+      const chip = n.endsWith("-rgb") ? `rgb(${v})` : /^(#|rgb)/.test(v) && !v.includes("px ") ? v : null;
+      html += row(n, v, chip);
+    });
+    html += group("Ampliação");
+    (state.variant === "b1"
+      ? [["magnify.hover", MAG.b1.hover], ["magnify.neighbor", MAG.b1.neighbor], ["magnify.lift", MAG.b1.lift + "px"]]
+      : [["magnify.max", MAG.b2.max], ["magnify.range", MAG.b2.range + " × ícone"], ["magnify.lift", MAG.b2.lift + "px"]]).forEach(([n, v]) => html += row(n, v));
+    html += group("Ladrilho dos ícones");
+    [["tile.shape", "superelipse (máscara SVG), contorno de foco com raio 23%"],
+     ["tile.glaze", "gradiente da matiz: luminosidade +7% no topo, −5% na base; brilho radial branco 26% no terço superior"],
+     ["tile.edge", "inset 0 1px 0 branco 32%; inset 0 −1px 0 preto 16%"],
+     ["tile.shadow", "drop-shadow(0 1px 1px preto 18%) drop-shadow(0 5px 6px preto 16%)"],
+     ["tile.glyph", "54% do ladrilho, traço 1,75 em 24 px, branco"],
+     ["tile.illustrative", "saturação × 0,55"]].forEach(([n, v]) => html += row(n, v));
+    html += group("Paleta dos ícones (hsl)");
+    PALETTE.forEach(([cls, name, h, s, l]) => html += row(`.${cls}`, `${name} · ${h} ${s}% ${l}%`, `hsl(${h} ${s}% ${l}%)`));
+    document.getElementById("tokens").innerHTML = html;
+  }
+
+  function refresh() {
+    applyRoot();
+    if (state.panel) renderPanel();
+    requestAnimationFrame(() => { applyForced(); placePanel(); renderTokens(); renderSheet(); });
+  }
+  media.addEventListener("change", refresh);
+  reducedMedia.addEventListener("change", refresh);
+  window.addEventListener("resize", placePanel);
+
+  document.querySelectorAll(".side .seg").forEach((group) =>
+    group.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === state[group.dataset.ctl]))));
+  renderBar();
+  state.panel = initialPanel === "none" ? null : initialPanel;
+  syncExpanded();
+  refresh();
+  renderPanel();
+})();
+</script>
+</body>
+</html>

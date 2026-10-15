@@ -1,0 +1,698 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-14T22:51:11.187Z",
+  "title": "Design System: DockMax",
+  "extensions": {
+    "colorMeta": {
+      "cobalto-light": {
+        "role": "primary",
+        "displayName": "Azul-cobalto (claro)",
+        "canonical": "#2f5bd3",
+        "tonalRamp": [
+          "hsl(224 65% 15%)",
+          "hsl(224 65% 26%)",
+          "hsl(224 65% 37%)",
+          "hsl(224 65% 48%)",
+          "hsl(224 65% 59%)",
+          "hsl(224 65% 70%)",
+          "hsl(224 65% 82%)",
+          "hsl(224 65% 95%)"
+        ]
+      },
+      "cobalto-dark": {
+        "role": "primary",
+        "displayName": "Azul-cobalto (escuro)",
+        "canonical": "#7c9cff",
+        "tonalRamp": [
+          "hsl(225 100% 15%)",
+          "hsl(225 100% 26%)",
+          "hsl(225 100% 37%)",
+          "hsl(225 100% 48%)",
+          "hsl(225 100% 59%)",
+          "hsl(225 100% 70%)",
+          "hsl(225 100% 82%)",
+          "hsl(225 100% 95%)"
+        ]
+      },
+      "cobalto-ink-light": {
+        "role": "primary",
+        "displayName": "Tinta de cobalto (claro)",
+        "canonical": "#1f45b3",
+        "tonalRamp": [
+          "hsl(225 70% 15%)",
+          "hsl(225 70% 26%)",
+          "hsl(225 70% 37%)",
+          "hsl(225 70% 48%)",
+          "hsl(225 70% 59%)",
+          "hsl(225 70% 70%)",
+          "hsl(225 70% 82%)",
+          "hsl(225 70% 95%)"
+        ]
+      },
+      "cobalto-ink-dark": {
+        "role": "primary",
+        "displayName": "Tinta de cobalto (escuro)",
+        "canonical": "#b0c2ff",
+        "tonalRamp": [
+          "hsl(226 100% 15%)",
+          "hsl(226 100% 26%)",
+          "hsl(226 100% 37%)",
+          "hsl(226 100% 48%)",
+          "hsl(226 100% 59%)",
+          "hsl(226 100% 70%)",
+          "hsl(226 100% 82%)",
+          "hsl(226 100% 95%)"
+        ]
+      },
+      "cobalto-soft-light": {
+        "role": "primary",
+        "displayName": "Véu de cobalto (claro)",
+        "canonical": "rgb(47 91 211 / .13)",
+        "tonalRamp": [
+          "hsl(224 65% 15%)",
+          "hsl(224 65% 26%)",
+          "hsl(224 65% 37%)",
+          "hsl(224 65% 48%)",
+          "hsl(224 65% 59%)",
+          "hsl(224 65% 70%)",
+          "hsl(224 65% 82%)",
+          "hsl(224 65% 95%)"
+        ]
+      },
+      "cobalto-soft-dark": {
+        "role": "primary",
+        "displayName": "Véu de cobalto (escuro)",
+        "canonical": "rgb(124 156 255 / .17)",
+        "tonalRamp": [
+          "hsl(225 100% 15%)",
+          "hsl(225 100% 26%)",
+          "hsl(225 100% 37%)",
+          "hsl(225 100% 48%)",
+          "hsl(225 100% 59%)",
+          "hsl(225 100% 70%)",
+          "hsl(225 100% 82%)",
+          "hsl(225 100% 95%)"
+        ]
+      },
+      "porcelana-surface": {
+        "role": "neutral",
+        "displayName": "Porcelana fosca",
+        "canonical": "rgb(var(--surface-rgb) / var(--surface-a)) com --surface-rgb: 247 247 249",
+        "tonalRamp": [
+          "hsl(240 14% 15%)",
+          "hsl(240 14% 26%)",
+          "hsl(240 14% 37%)",
+          "hsl(240 14% 48%)",
+          "hsl(240 14% 59%)",
+          "hsl(240 14% 70%)",
+          "hsl(240 14% 82%)",
+          "hsl(240 14% 95%)"
+        ]
+      },
+      "grafite-surface": {
+        "role": "neutral",
+        "displayName": "Grafite fosco",
+        "canonical": "rgb(var(--surface-rgb) / var(--surface-a)) com --surface-rgb: 38 39 44",
+        "tonalRamp": [
+          "hsl(230 7% 15%)",
+          "hsl(230 7% 26%)",
+          "hsl(230 7% 37%)",
+          "hsl(230 7% 48%)",
+          "hsl(230 7% 59%)",
+          "hsl(230 7% 70%)",
+          "hsl(230 7% 82%)",
+          "hsl(230 7% 95%)"
+        ]
+      },
+      "ink-light": {
+        "role": "neutral",
+        "displayName": "Tinta (claro)",
+        "canonical": "#1d1e22",
+        "tonalRamp": [
+          "hsl(228 8% 15%)",
+          "hsl(228 8% 26%)",
+          "hsl(228 8% 37%)",
+          "hsl(228 8% 48%)",
+          "hsl(228 8% 59%)",
+          "hsl(228 8% 70%)",
+          "hsl(228 8% 82%)",
+          "hsl(228 8% 95%)"
+        ]
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Tinta (escuro)",
+        "canonical": "#ececf0",
+        "tonalRamp": [
+          "hsl(240 12% 15%)",
+          "hsl(240 12% 26%)",
+          "hsl(240 12% 37%)",
+          "hsl(240 12% 48%)",
+          "hsl(240 12% 59%)",
+          "hsl(240 12% 70%)",
+          "hsl(240 12% 82%)",
+          "hsl(240 12% 95%)"
+        ]
+      },
+      "ink-2-light": {
+        "role": "neutral",
+        "displayName": "Tinta secundária (claro)",
+        "canonical": "#5b5f69",
+        "tonalRamp": [
+          "hsl(223 7% 15%)",
+          "hsl(223 7% 26%)",
+          "hsl(223 7% 37%)",
+          "hsl(223 7% 48%)",
+          "hsl(223 7% 59%)",
+          "hsl(223 7% 70%)",
+          "hsl(223 7% 82%)",
+          "hsl(223 7% 95%)"
+        ]
+      },
+      "ink-2-dark": {
+        "role": "neutral",
+        "displayName": "Tinta secundária (escuro)",
+        "canonical": "#a5a9b3",
+        "tonalRamp": [
+          "hsl(223 8% 15%)",
+          "hsl(223 8% 26%)",
+          "hsl(223 8% 37%)",
+          "hsl(223 8% 48%)",
+          "hsl(223 8% 59%)",
+          "hsl(223 8% 70%)",
+          "hsl(223 8% 82%)",
+          "hsl(223 8% 95%)"
+        ]
+      },
+      "hair-light": {
+        "role": "neutral",
+        "displayName": "Fio (claro)",
+        "canonical": "rgb(0 0 0 / .09)",
+        "tonalRamp": [
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 26%)",
+          "hsl(0 0% 37%)",
+          "hsl(0 0% 48%)",
+          "hsl(0 0% 59%)",
+          "hsl(0 0% 70%)",
+          "hsl(0 0% 82%)",
+          "hsl(0 0% 95%)"
+        ]
+      },
+      "hair-dark": {
+        "role": "neutral",
+        "displayName": "Fio (escuro)",
+        "canonical": "rgb(255 255 255 / .1)",
+        "tonalRamp": [
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 26%)",
+          "hsl(0 0% 37%)",
+          "hsl(0 0% 48%)",
+          "hsl(0 0% 59%)",
+          "hsl(0 0% 70%)",
+          "hsl(0 0% 82%)",
+          "hsl(0 0% 95%)"
+        ]
+      },
+      "hi-light": {
+        "role": "neutral",
+        "displayName": "Luz de borda (claro)",
+        "canonical": "rgb(255 255 255 / .8)",
+        "tonalRamp": [
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 26%)",
+          "hsl(0 0% 37%)",
+          "hsl(0 0% 48%)",
+          "hsl(0 0% 59%)",
+          "hsl(0 0% 70%)",
+          "hsl(0 0% 82%)",
+          "hsl(0 0% 95%)"
+        ]
+      },
+      "hi-dark": {
+        "role": "neutral",
+        "displayName": "Luz de borda (escuro)",
+        "canonical": "rgb(255 255 255 / .16)",
+        "tonalRamp": [
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 26%)",
+          "hsl(0 0% 37%)",
+          "hsl(0 0% 48%)",
+          "hsl(0 0% 59%)",
+          "hsl(0 0% 70%)",
+          "hsl(0 0% 82%)",
+          "hsl(0 0% 95%)"
+        ]
+      },
+      "tip-bg-light": {
+        "role": "neutral",
+        "displayName": "Pílula (claro)",
+        "canonical": "rgb(252 252 253 / .97)",
+        "tonalRamp": [
+          "hsl(240 20% 15%)",
+          "hsl(240 20% 26%)",
+          "hsl(240 20% 37%)",
+          "hsl(240 20% 48%)",
+          "hsl(240 20% 59%)",
+          "hsl(240 20% 70%)",
+          "hsl(240 20% 82%)",
+          "hsl(240 20% 95%)"
+        ]
+      },
+      "tip-bg-dark": {
+        "role": "neutral",
+        "displayName": "Pílula (escuro)",
+        "canonical": "rgb(50 51 57 / .97)",
+        "tonalRamp": [
+          "hsl(231 7% 15%)",
+          "hsl(231 7% 26%)",
+          "hsl(231 7% 37%)",
+          "hsl(231 7% 48%)",
+          "hsl(231 7% 59%)",
+          "hsl(231 7% 70%)",
+          "hsl(231 7% 82%)",
+          "hsl(231 7% 95%)"
+        ]
+      },
+      "tip-ink-light": {
+        "role": "neutral",
+        "displayName": "Texto da pílula (claro)",
+        "canonical": "#1d1e22",
+        "tonalRamp": [
+          "hsl(228 8% 15%)",
+          "hsl(228 8% 26%)",
+          "hsl(228 8% 37%)",
+          "hsl(228 8% 48%)",
+          "hsl(228 8% 59%)",
+          "hsl(228 8% 70%)",
+          "hsl(228 8% 82%)",
+          "hsl(228 8% 95%)"
+        ]
+      },
+      "tip-ink-dark": {
+        "role": "neutral",
+        "displayName": "Texto da pílula (escuro)",
+        "canonical": "#f2f2f5",
+        "tonalRamp": [
+          "hsl(240 13% 15%)",
+          "hsl(240 13% 26%)",
+          "hsl(240 13% 37%)",
+          "hsl(240 13% 48%)",
+          "hsl(240 13% 59%)",
+          "hsl(240 13% 70%)",
+          "hsl(240 13% 82%)",
+          "hsl(240 13% 95%)"
+        ]
+      },
+      "track-light": {
+        "role": "neutral",
+        "displayName": "Trilho (claro)",
+        "canonical": "rgb(29 30 34 / .055)",
+        "tonalRamp": [
+          "hsl(228 8% 15%)",
+          "hsl(228 8% 26%)",
+          "hsl(228 8% 37%)",
+          "hsl(228 8% 48%)",
+          "hsl(228 8% 59%)",
+          "hsl(228 8% 70%)",
+          "hsl(228 8% 82%)",
+          "hsl(228 8% 95%)"
+        ]
+      },
+      "track-dark": {
+        "role": "neutral",
+        "displayName": "Trilho (escuro)",
+        "canonical": "rgb(255 255 255 / .06)",
+        "tonalRamp": [
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 26%)",
+          "hsl(0 0% 37%)",
+          "hsl(0 0% 48%)",
+          "hsl(0 0% 59%)",
+          "hsl(0 0% 70%)",
+          "hsl(0 0% 82%)",
+          "hsl(0 0% 95%)"
+        ]
+      },
+      "kbd-light": {
+        "role": "neutral",
+        "displayName": "Tecla (claro)",
+        "canonical": "rgb(29 30 34 / .07)",
+        "tonalRamp": [
+          "hsl(228 8% 15%)",
+          "hsl(228 8% 26%)",
+          "hsl(228 8% 37%)",
+          "hsl(228 8% 48%)",
+          "hsl(228 8% 59%)",
+          "hsl(228 8% 70%)",
+          "hsl(228 8% 82%)",
+          "hsl(228 8% 95%)"
+        ]
+      },
+      "kbd-dark": {
+        "role": "neutral",
+        "displayName": "Tecla (escuro)",
+        "canonical": "rgb(255 255 255 / .09)",
+        "tonalRamp": [
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 26%)",
+          "hsl(0 0% 37%)",
+          "hsl(0 0% 48%)",
+          "hsl(0 0% 59%)",
+          "hsl(0 0% 70%)",
+          "hsl(0 0% 82%)",
+          "hsl(0 0% 95%)"
+        ]
+      },
+      "glifo": {
+        "role": "neutral",
+        "displayName": "Glifo branco",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 26%)",
+          "hsl(0 0% 37%)",
+          "hsl(0 0% 48%)",
+          "hsl(0 0% 59%)",
+          "hsl(0 0% 70%)",
+          "hsl(0 0% 82%)",
+          "hsl(0 0% 95%)"
+        ]
+      },
+      "salvia": {
+        "role": "tertiary",
+        "displayName": "Sálvia",
+        "canonical": ".t-files { --h: 150; --sat: 22%; --l: 44%; }",
+        "tonalRamp": [
+          "hsl(150 22% 15%)",
+          "hsl(150 22% 26%)",
+          "hsl(150 22% 37%)",
+          "hsl(150 22% 48%)",
+          "hsl(150 22% 59%)",
+          "hsl(150 22% 70%)",
+          "hsl(150 22% 82%)",
+          "hsl(150 22% 95%)"
+        ]
+      },
+      "ocre": {
+        "role": "tertiary",
+        "displayName": "Ocre",
+        "canonical": ".t-notes { --h: 38; --sat: 48%; --l: 40%; }",
+        "tonalRamp": [
+          "hsl(38 48% 15%)",
+          "hsl(38 48% 26%)",
+          "hsl(38 48% 37%)",
+          "hsl(38 48% 48%)",
+          "hsl(38 48% 59%)",
+          "hsl(38 48% 70%)",
+          "hsl(38 48% 82%)",
+          "hsl(38 48% 95%)"
+        ]
+      },
+      "petroleo": {
+        "role": "tertiary",
+        "displayName": "Petróleo",
+        "canonical": ".t-clock { --h: 192; --sat: 26%; --l: 40%; }",
+        "tonalRamp": [
+          "hsl(192 26% 15%)",
+          "hsl(192 26% 26%)",
+          "hsl(192 26% 37%)",
+          "hsl(192 26% 48%)",
+          "hsl(192 26% 59%)",
+          "hsl(192 26% 70%)",
+          "hsl(192 26% 82%)",
+          "hsl(192 26% 95%)"
+        ]
+      },
+      "argila": {
+        "role": "tertiary",
+        "displayName": "Argila",
+        "canonical": ".t-calendar { --h: 16; --sat: 40%; --l: 44%; }",
+        "tonalRamp": [
+          "hsl(16 40% 15%)",
+          "hsl(16 40% 26%)",
+          "hsl(16 40% 37%)",
+          "hsl(16 40% 48%)",
+          "hsl(16 40% 59%)",
+          "hsl(16 40% 70%)",
+          "hsl(16 40% 82%)",
+          "hsl(16 40% 95%)"
+        ]
+      },
+      "ameixa": {
+        "role": "tertiary",
+        "displayName": "Ameixa",
+        "canonical": ".t-music { --h: 318; --sat: 20%; --l: 43%; }",
+        "tonalRamp": [
+          "hsl(318 20% 15%)",
+          "hsl(318 20% 26%)",
+          "hsl(318 20% 37%)",
+          "hsl(318 20% 48%)",
+          "hsl(318 20% 59%)",
+          "hsl(318 20% 70%)",
+          "hsl(318 20% 82%)",
+          "hsl(318 20% 95%)"
+        ]
+      },
+      "tinta": {
+        "role": "tertiary",
+        "displayName": "Tinta (Configurações)",
+        "canonical": ".t-settings { --h: 222; --sat: 14%; --l: 34%; }",
+        "tonalRamp": [
+          "hsl(222 14% 15%)",
+          "hsl(222 14% 26%)",
+          "hsl(222 14% 37%)",
+          "hsl(222 14% 48%)",
+          "hsl(222 14% 59%)",
+          "hsl(222 14% 70%)",
+          "hsl(222 14% 82%)",
+          "hsl(222 14% 95%)"
+        ]
+      },
+      "ardosia": {
+        "role": "tertiary",
+        "displayName": "Ardósia (Sobre)",
+        "canonical": ".t-about { --h: 214; --sat: 22%; --l: 46%; }",
+        "tonalRamp": [
+          "hsl(214 22% 15%)",
+          "hsl(214 22% 26%)",
+          "hsl(214 22% 37%)",
+          "hsl(214 22% 48%)",
+          "hsl(214 22% 59%)",
+          "hsl(214 22% 70%)",
+          "hsl(214 22% 82%)",
+          "hsl(214 22% 95%)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Título do painel",
+        "purpose": "Título dos painéis (Configurações)."
+      },
+      "title-about": {
+        "displayName": "Título do Sobre",
+        "purpose": "Nome DockMax ao lado do ladrilho de 56 px no painel Sobre."
+      },
+      "label": {
+        "displayName": "Rótulo",
+        "purpose": "Rótulos das linhas, segmentos, lista do Sobre."
+      },
+      "label-strong": {
+        "displayName": "Rótulo forte",
+        "purpose": "Pílula do item e segmento selecionado."
+      },
+      "caption": {
+        "displayName": "Legenda",
+        "purpose": "Rodapé dos painéis."
+      },
+      "kbd": {
+        "displayName": "Tecla",
+        "purpose": "Dica de tecla (Esc)."
+      }
+    },
+    "shadows": [
+      {
+        "name": "surface-light",
+        "value": "0 1px 2px rgb(16 20 32 / .10), 0 14px 32px -12px rgb(16 20 32 / .42)",
+        "purpose": "--shadow do tema claro: barra e painel."
+      },
+      {
+        "name": "surface-dark",
+        "value": "0 1px 2px rgb(0 0 0 / .32), 0 16px 36px -12px rgb(0 0 0 / .7)",
+        "purpose": "--shadow do tema escuro: barra e painel."
+      },
+      {
+        "name": "surface-stack",
+        "value": "inset 0 1px 0 var(--hi), 0 0 0 1px var(--hair), var(--shadow)",
+        "purpose": "Pilha da barra e do painel; com o dock em cima a luz interna vira inset 0 -1px 0."
+      },
+      {
+        "name": "tooltip",
+        "value": "0 0 0 1px var(--hair), 0 6px 16px -6px rgb(0 0 0 / .35)",
+        "purpose": "Pílula do rótulo."
+      },
+      {
+        "name": "tile-drop",
+        "value": "drop-shadow(0 1px 1px rgb(0 0 0 / .18)) drop-shadow(0 5px 6px rgb(0 0 0 / .16))",
+        "purpose": "filter no invólucro do ladrilho, segue a superelipse."
+      },
+      {
+        "name": "tile-edges",
+        "value": "inset 0 1px 0 rgb(255 255 255 / .32), inset 0 -1px 0 rgb(0 0 0 / .16)",
+        "purpose": "Bordas do esmalte do ladrilho."
+      },
+      {
+        "name": "segment-selected-ring",
+        "value": "inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent)",
+        "purpose": "Anel do segmento selecionado."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(.2, .8, .2, 1)",
+        "purpose": "--ease: curva de toda transição do dock e do painel."
+      },
+      {
+        "name": "t-magnify",
+        "value": ".16s",
+        "purpose": "--t-magnify: largura do item e transform do ladrilho na ampliação."
+      },
+      {
+        "name": "t-pop",
+        "value": ".18s",
+        "purpose": "--t-pop: entrada do painel, de translateY(6px) scale(.98) e opacidade 0."
+      },
+      {
+        "name": "indicator-fade",
+        "value": "opacity .15s",
+        "purpose": "Ponto de painel aberto."
+      },
+      {
+        "name": "magnify-b1",
+        "value": "hover 1.4, vizinhos 1.15, lift 6px",
+        "purpose": "Ampliação em degraus; empurra os vizinhos; congela com painel aberto; desligada com reduzir movimento."
+      },
+      {
+        "name": "surface-opacity",
+        "value": "--surface-a: .8 (Translúcido) | 1 (Sólido)",
+        "purpose": "Opacidade do dock; o painel é sempre opaco."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Dock bar",
+      "kind": "nav",
+      "refersTo": "dock-bar-light",
+      "description": "Placa de vidro simulado (porcelana, translúcida 0,8) com ladrilhos, separador e ponto de painel aberto; ampliação no hover.",
+      "html": "<div class=\"ds-dm\"><nav class=\"ds-bar\" aria-label=\"Dock\"><button type=\"button\" class=\"ds-item\" aria-label=\"Arquivos\"><span class=\"ds-tile ds-t-files\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2h7.4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z\"/><path d=\"M3.5 10.5h17\"/></svg></span></button><button type=\"button\" class=\"ds-item\" aria-label=\"Notas\"><span class=\"ds-tile ds-t-notes\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"5\" y=\"3.5\" width=\"14\" height=\"17\" rx=\"2.5\"/><path d=\"M8.5 8.5h7M8.5 12h7M8.5 15.5h4\"/></svg></span></button><span class=\"ds-sep\"></span><button type=\"button\" class=\"ds-item\" aria-label=\"Configurações\" aria-expanded=\"true\"><span class=\"ds-tile ds-t-settings\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 7.5h9.5M17.5 7.5H20M4 16.5h3.5M11.5 16.5H20\"/><circle cx=\"15.5\" cy=\"7.5\" r=\"2\"/><circle cx=\"9.5\" cy=\"16.5\" r=\"2\"/></svg></span><span class=\"ds-ind\"></span></button><button type=\"button\" class=\"ds-item\" aria-label=\"Sobre\"><span class=\"ds-tile ds-t-about\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M12 11v5.5\"/><path d=\"M12 7.6h.01\"/></svg></span></button></nav></div>",
+      "css": ".ds-dm{--ink:#1d1e22;--ink-2:#5b5f69;--surface-rgb:247 247 249;--surface-a:.8;--hair:rgb(0 0 0 / .09);--hi:rgb(255 255 255 / .8);--shadow:0 1px 2px rgb(16 20 32 / .10),0 14px 32px -12px rgb(16 20 32 / .42);--accent:#2f5bd3;--accent-ink:#1f45b3;--accent-soft:rgb(47 91 211 / .13);--tip-bg:rgb(252 252 253 / .97);--tip-ink:#1d1e22;--track:rgb(29 30 34 / .055);--kbd:rgb(29 30 34 / .07);--icon:48px;--pad:7px;--gap:7px;--r-bar:20px;--r-panel:8px;--ease:cubic-bezier(.2,.8,.2,1);--t-magnify:.16s;--t-pop:.18s;font-family:\"Segoe UI Variable Text\",\"Segoe UI Variable\",\"Segoe UI\",system-ui,sans-serif;color:var(--ink);padding:24px;background:linear-gradient(160deg,#e8edf7,#d3ddf0);}.ds-tile{position:relative;display:grid;place-items:center;width:var(--icon);height:var(--icon);border-radius:23%;color:#fff;filter:drop-shadow(0 1px 1px rgb(0 0 0 / .18)) drop-shadow(0 5px 6px rgb(0 0 0 / .16));transform-origin:50% 100%;transition:transform var(--t-magnify) var(--ease);}.ds-tile::before{content:\"\";position:absolute;inset:0;background:radial-gradient(130% 70% at 50% -12%,rgb(255 255 255 / .26),transparent 58%),linear-gradient(180deg,hsl(var(--h) var(--sat) calc(var(--l) + 7%)),hsl(var(--h) var(--sat) calc(var(--l) - 5%)));box-shadow:inset 0 1px 0 rgb(255 255 255 / .32),inset 0 -1px 0 rgb(0 0 0 / .16);-webkit-mask:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z'/%3E%3C/svg%3E\") center / 100% 100% no-repeat;mask:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z'/%3E%3C/svg%3E\") center / 100% 100% no-repeat;}.ds-tile svg{position:relative;width:54%;height:54%;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;}.ds-t-settings{--h:222;--sat:14%;--l:34%;}.ds-t-about{--h:214;--sat:22%;--l:46%;}.ds-t-files{--h:150;--sat:22%;--l:44%;}.ds-t-notes{--h:38;--sat:48%;--l:40%;}.ds-bar{display:inline-flex;align-items:flex-end;gap:var(--gap);padding:var(--pad);height:calc(var(--icon) + 2 * var(--pad));border-radius:var(--r-bar);background:rgb(var(--surface-rgb) / var(--surface-a));box-shadow:inset 0 1px 0 var(--hi),0 0 0 1px var(--hair),var(--shadow);}.ds-item{position:relative;flex:none;width:var(--icon);height:var(--icon);border:0;padding:0;background:none;cursor:pointer;transition:width var(--t-magnify) var(--ease);}.ds-item .ds-tile{position:absolute;left:50%;bottom:0;margin-left:calc(var(--icon) / -2);}.ds-item:hover{width:calc(var(--icon) * 1.4);}.ds-item:hover .ds-tile{transform:translateY(-6px) scale(1.4);}.ds-item:focus{outline:none;}.ds-item:focus-visible .ds-tile{outline:2px solid var(--accent);outline-offset:3px;}.ds-item:active .ds-tile::before{filter:brightness(.84);}.ds-sep{flex:none;width:1px;align-self:stretch;margin:4px calc(var(--gap) * .4);background:var(--hair);}.ds-ind{position:absolute;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;bottom:calc(var(--pad) * -1 + 1px);background:var(--accent);}@media (prefers-reduced-motion: reduce){.ds-item,.ds-tile{transition:none;}.ds-item:hover{width:var(--icon);}.ds-item:hover .ds-tile{transform:none;}}"
+    },
+    {
+      "name": "Ladrilho esmaltado",
+      "kind": "custom",
+      "refersTo": "dock-tile",
+      "description": "Superelipse com esmalte de dois tons da mesma matiz, brilho radial no terço superior e glifo de traço branco 1,75.",
+      "html": "<div class=\"ds-dm ds-row-tiles\"><span class=\"ds-tile ds-t-settings\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 7.5h9.5M17.5 7.5H20M4 16.5h3.5M11.5 16.5H20\"/><circle cx=\"15.5\" cy=\"7.5\" r=\"2\"/><circle cx=\"9.5\" cy=\"16.5\" r=\"2\"/></svg></span><span class=\"ds-tile ds-t-about\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M12 11v5.5\"/><path d=\"M12 7.6h.01\"/></svg></span><span class=\"ds-tile ds-t-files\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2h7.4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z\"/><path d=\"M3.5 10.5h17\"/></svg></span><span class=\"ds-tile ds-t-notes\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"5\" y=\"3.5\" width=\"14\" height=\"17\" rx=\"2.5\"/><path d=\"M8.5 8.5h7M8.5 12h7M8.5 15.5h4\"/></svg></span></div>",
+      "css": ".ds-dm{--ink:#1d1e22;--ink-2:#5b5f69;--surface-rgb:247 247 249;--surface-a:.8;--hair:rgb(0 0 0 / .09);--hi:rgb(255 255 255 / .8);--shadow:0 1px 2px rgb(16 20 32 / .10),0 14px 32px -12px rgb(16 20 32 / .42);--accent:#2f5bd3;--accent-ink:#1f45b3;--accent-soft:rgb(47 91 211 / .13);--tip-bg:rgb(252 252 253 / .97);--tip-ink:#1d1e22;--track:rgb(29 30 34 / .055);--kbd:rgb(29 30 34 / .07);--icon:48px;--pad:7px;--gap:7px;--r-bar:20px;--r-panel:8px;--ease:cubic-bezier(.2,.8,.2,1);--t-magnify:.16s;--t-pop:.18s;font-family:\"Segoe UI Variable Text\",\"Segoe UI Variable\",\"Segoe UI\",system-ui,sans-serif;color:var(--ink);padding:24px;background:linear-gradient(160deg,#e8edf7,#d3ddf0);}.ds-tile{position:relative;display:grid;place-items:center;width:var(--icon);height:var(--icon);border-radius:23%;color:#fff;filter:drop-shadow(0 1px 1px rgb(0 0 0 / .18)) drop-shadow(0 5px 6px rgb(0 0 0 / .16));transform-origin:50% 100%;transition:transform var(--t-magnify) var(--ease);}.ds-tile::before{content:\"\";position:absolute;inset:0;background:radial-gradient(130% 70% at 50% -12%,rgb(255 255 255 / .26),transparent 58%),linear-gradient(180deg,hsl(var(--h) var(--sat) calc(var(--l) + 7%)),hsl(var(--h) var(--sat) calc(var(--l) - 5%)));box-shadow:inset 0 1px 0 rgb(255 255 255 / .32),inset 0 -1px 0 rgb(0 0 0 / .16);-webkit-mask:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z'/%3E%3C/svg%3E\") center / 100% 100% no-repeat;mask:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z'/%3E%3C/svg%3E\") center / 100% 100% no-repeat;}.ds-tile svg{position:relative;width:54%;height:54%;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;}.ds-t-settings{--h:222;--sat:14%;--l:34%;}.ds-t-about{--h:214;--sat:22%;--l:46%;}.ds-t-files{--h:150;--sat:22%;--l:44%;}.ds-t-notes{--h:38;--sat:48%;--l:40%;}.ds-row-tiles{display:flex;gap:12px;}"
+    },
+    {
+      "name": "Tooltip (pílula)",
+      "kind": "custom",
+      "refersTo": "tooltip-light",
+      "description": "Rótulo do item em pílula, 10 px além do ladrilho.",
+      "html": "<div class=\"ds-dm\"><span class=\"ds-tip\" role=\"tooltip\">Configurações</span></div>",
+      "css": ".ds-dm{--ink:#1d1e22;--ink-2:#5b5f69;--surface-rgb:247 247 249;--surface-a:.8;--hair:rgb(0 0 0 / .09);--hi:rgb(255 255 255 / .8);--shadow:0 1px 2px rgb(16 20 32 / .10),0 14px 32px -12px rgb(16 20 32 / .42);--accent:#2f5bd3;--accent-ink:#1f45b3;--accent-soft:rgb(47 91 211 / .13);--tip-bg:rgb(252 252 253 / .97);--tip-ink:#1d1e22;--track:rgb(29 30 34 / .055);--kbd:rgb(29 30 34 / .07);--icon:48px;--pad:7px;--gap:7px;--r-bar:20px;--r-panel:8px;--ease:cubic-bezier(.2,.8,.2,1);--t-magnify:.16s;--t-pop:.18s;font-family:\"Segoe UI Variable Text\",\"Segoe UI Variable\",\"Segoe UI\",system-ui,sans-serif;color:var(--ink);padding:24px;background:linear-gradient(160deg,#e8edf7,#d3ddf0);}.ds-tip{display:inline-block;white-space:nowrap;font-size:12.5px;font-weight:600;color:var(--tip-ink);background:var(--tip-bg);padding:4px 10px;border-radius:999px;box-shadow:0 0 0 1px var(--hair),0 6px 16px -6px rgb(0 0 0 / .35);}"
+    },
+    {
+      "name": "Controle segmentado",
+      "kind": "chip",
+      "refersTo": "segment-light-selected",
+      "description": "Trilho de 6 px com segmentos de 4 px; o selecionado leva o véu e a tinta de cobalto.",
+      "html": "<div class=\"ds-dm\"><div class=\"ds-row\"><span>Tamanho</span><div class=\"ds-seg\" role=\"group\"><button type=\"button\" aria-pressed=\"false\">Pequeno</button><button type=\"button\" aria-pressed=\"true\">Médio</button><button type=\"button\" aria-pressed=\"false\">Grande</button></div></div></div>",
+      "css": ".ds-dm{--ink:#1d1e22;--ink-2:#5b5f69;--surface-rgb:247 247 249;--surface-a:.8;--hair:rgb(0 0 0 / .09);--hi:rgb(255 255 255 / .8);--shadow:0 1px 2px rgb(16 20 32 / .10),0 14px 32px -12px rgb(16 20 32 / .42);--accent:#2f5bd3;--accent-ink:#1f45b3;--accent-soft:rgb(47 91 211 / .13);--tip-bg:rgb(252 252 253 / .97);--tip-ink:#1d1e22;--track:rgb(29 30 34 / .055);--kbd:rgb(29 30 34 / .07);--icon:48px;--pad:7px;--gap:7px;--r-bar:20px;--r-panel:8px;--ease:cubic-bezier(.2,.8,.2,1);--t-magnify:.16s;--t-pop:.18s;font-family:\"Segoe UI Variable Text\",\"Segoe UI Variable\",\"Segoe UI\",system-ui,sans-serif;color:var(--ink);padding:24px;background:linear-gradient(160deg,#e8edf7,#d3ddf0);}.ds-row{display:grid;gap:6px;}.ds-row>span{font-size:12.5px;color:var(--ink-2);}.ds-seg{display:flex;gap:2px;padding:2px;background:var(--track);border-radius:6px;}.ds-seg button{flex:1;font:inherit;font-size:12.5px;color:var(--ink);background:transparent;border:0;border-radius:4px;padding:6px;cursor:pointer;white-space:nowrap;}.ds-seg button:hover{background:var(--track);}.ds-seg button[aria-pressed=\"true\"]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent);}.ds-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}"
+    },
+    {
+      "name": "Painel de Configurações",
+      "kind": "card",
+      "refersTo": "panel-light",
+      "description": "Folha opaca de 8 px ancorada ao item, com quatro controles segmentados e rodapé.",
+      "html": "<div class=\"ds-dm\"><section class=\"ds-panel\" aria-label=\"Configurações\"><h2>Configurações</h2><div class=\"ds-row\"><span>Tema</span><div class=\"ds-seg\" role=\"group\"><button type=\"button\" aria-pressed=\"true\">Sistema</button><button type=\"button\" aria-pressed=\"false\">Claro</button><button type=\"button\" aria-pressed=\"false\">Escuro</button></div></div><div class=\"ds-row\"><span>Posição</span><div class=\"ds-seg\" role=\"group\"><button type=\"button\" aria-pressed=\"true\">Embaixo</button><button type=\"button\" aria-pressed=\"false\">Em cima</button></div></div><div class=\"ds-row\"><span>Tamanho</span><div class=\"ds-seg\" role=\"group\"><button type=\"button\" aria-pressed=\"false\">Pequeno</button><button type=\"button\" aria-pressed=\"true\">Médio</button><button type=\"button\" aria-pressed=\"false\">Grande</button></div></div><div class=\"ds-row\"><span>Opacidade do dock</span><div class=\"ds-seg\" role=\"group\"><button type=\"button\" aria-pressed=\"true\">Translúcido</button><button type=\"button\" aria-pressed=\"false\">Sólido</button></div></div><div class=\"ds-foot\"><span>Salvo automaticamente</span><span><kbd class=\"ds-kbd\">Esc</kbd> fecha</span></div></section></div>",
+      "css": ".ds-dm{--ink:#1d1e22;--ink-2:#5b5f69;--surface-rgb:247 247 249;--surface-a:.8;--hair:rgb(0 0 0 / .09);--hi:rgb(255 255 255 / .8);--shadow:0 1px 2px rgb(16 20 32 / .10),0 14px 32px -12px rgb(16 20 32 / .42);--accent:#2f5bd3;--accent-ink:#1f45b3;--accent-soft:rgb(47 91 211 / .13);--tip-bg:rgb(252 252 253 / .97);--tip-ink:#1d1e22;--track:rgb(29 30 34 / .055);--kbd:rgb(29 30 34 / .07);--icon:48px;--pad:7px;--gap:7px;--r-bar:20px;--r-panel:8px;--ease:cubic-bezier(.2,.8,.2,1);--t-magnify:.16s;--t-pop:.18s;font-family:\"Segoe UI Variable Text\",\"Segoe UI Variable\",\"Segoe UI\",system-ui,sans-serif;color:var(--ink);padding:24px;background:linear-gradient(160deg,#e8edf7,#d3ddf0);}.ds-panel{width:320px;background:rgb(var(--surface-rgb));color:var(--ink);border-radius:var(--r-panel);box-shadow:inset 0 1px 0 var(--hi),0 0 0 1px var(--hair),var(--shadow);padding:16px 16px 12px;display:grid;gap:14px;transform-origin:50% 100%;animation:ds-pop var(--t-pop) var(--ease);}@keyframes ds-pop{from{opacity:0;transform:translateY(6px) scale(.98);}}@media (prefers-reduced-motion: reduce){.ds-panel{animation:none;}}.ds-panel h2{font:600 15px/1.3 \"Segoe UI Variable Display\",\"Segoe UI Variable\",\"Segoe UI\",system-ui,sans-serif;margin:0;}.ds-foot{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink-2);border-top:1px solid var(--hair);padding-top:10px;}.ds-row{display:grid;gap:6px;}.ds-row>span{font-size:12.5px;color:var(--ink-2);}.ds-seg{display:flex;gap:2px;padding:2px;background:var(--track);border-radius:6px;}.ds-seg button{flex:1;font:inherit;font-size:12.5px;color:var(--ink);background:transparent;border:0;border-radius:4px;padding:6px;cursor:pointer;white-space:nowrap;}.ds-seg button:hover{background:var(--track);}.ds-seg button[aria-pressed=\"true\"]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent);}.ds-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}.ds-kbd{font-family:inherit;font-size:11px;font-weight:600;line-height:1;padding:3px 6px;border-radius:4px;background:var(--kbd);color:var(--ink);}"
+    },
+    {
+      "name": "Dica de tecla",
+      "kind": "custom",
+      "refersTo": "kbd-light",
+      "description": "Tecla em 11px/600 sobre fundo tênue, no rodapé dos painéis.",
+      "html": "<div class=\"ds-dm ds-foot-demo\"><kbd class=\"ds-kbd\">Esc</kbd> fecha</div>",
+      "css": ".ds-dm{--ink:#1d1e22;--ink-2:#5b5f69;--surface-rgb:247 247 249;--surface-a:.8;--hair:rgb(0 0 0 / .09);--hi:rgb(255 255 255 / .8);--shadow:0 1px 2px rgb(16 20 32 / .10),0 14px 32px -12px rgb(16 20 32 / .42);--accent:#2f5bd3;--accent-ink:#1f45b3;--accent-soft:rgb(47 91 211 / .13);--tip-bg:rgb(252 252 253 / .97);--tip-ink:#1d1e22;--track:rgb(29 30 34 / .055);--kbd:rgb(29 30 34 / .07);--icon:48px;--pad:7px;--gap:7px;--r-bar:20px;--r-panel:8px;--ease:cubic-bezier(.2,.8,.2,1);--t-magnify:.16s;--t-pop:.18s;font-family:\"Segoe UI Variable Text\",\"Segoe UI Variable\",\"Segoe UI\",system-ui,sans-serif;color:var(--ink);padding:24px;background:linear-gradient(160deg,#e8edf7,#d3ddf0);}.ds-kbd{font-family:inherit;font-size:11px;font-weight:600;line-height:1;padding:3px 6px;border-radius:4px;background:var(--kbd);color:var(--ink);}.ds-foot-demo{font-size:12px;color:var(--ink-2);}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Big Sur, nascido no Windows",
+    "overview": "O DockMax é o dock do macOS que o autor gosta, refeito como peça do Windows 11: a silhueta e a ampliação em degraus do Big Sur, com materiais e cantos que conversam com as janelas do Windows. A barra é uma placa de vidro simulado, \"porcelana fosca\" no tema claro e \"grafite fosco\" no escuro, com uma borda interna de 1 px que pega luz no lado oposto à borda da tela e uma sombra macia deslocada para fora. Sobre ela, os ícones são ladrilhos de cerâmica esmaltada numa paleta própria de tons terrosos e frios dessaturados, cada um com um glifo de traço branco.\n\nO sistema é discreto no uso diário e caprichado no detalhe: a identidade está no acabamento (esmalte, borda de luz, sombra), não no volume. Há um único destaque, azul-cobalto, e ele só aparece para dizer algo: foco, seleção, painel aberto. A ampliação é contida (1,4 no item, 1,15 nos vizinhos), congela enquanto um painel está aberto e some com \"reduzir movimento\".\n\nRecusas confirmadas: a barra escura genérica de launcher e o arco-íris de ícones da Apple. Não há desfoque real do fundo (ADR 0006): o vidro é simulado com uma camada tingida, e a legibilidade vem da opacidade. Toda a identidade vive em tokens CSS estáticos, porque a personalização é requisito do produto e o app roda com CSP estrita.\n\nEste sistema registra a variante **B1 \"Big Sur\"**, escolhida pelo usuário no mock de decisão `docs/design/dock-mock.html` (estados reproduzíveis por parâmetros de URL: `?variant=b1&theme=dark&size=l&opacity=solid&edge=top&panel=about&forced=focus`). A variante B2 \"Prateleira\" (ícones sobre prateleira de vidro em perspectiva, ampliação parabólica contínua, rótulo retangular, reflexo curto) foi avaliada e rejeitada; seus tokens não fazem parte do sistema.",
+    "keyCharacteristics": [
+      "Placa de vidro simulado com cantos grandes, proporcionais ao tamanho (18/20/24 px).",
+      "Ladrilhos em superelipse com esmalte de dois tons da mesma matiz e glifo de traço branco 1,75.",
+      "Destaque único azul-cobalto, reservado a foco, seleção e ponto de painel aberto.",
+      "Ampliação em degraus que empurra os vizinhos, com rótulo em pílula acima do ícone.",
+      "Painel sempre opaco, com cantos de 8 px como as janelas e flyouts do Windows 11.",
+      "Dois temas por `[data-mode]`, duas opacidades do dock, três tamanhos, duas bordas: tudo troca de valor, nunca de componente."
+    ],
+    "rules": [
+      {
+        "name": "The One Cobalt Rule",
+        "body": "O cobalto existe só para foco, seleção e painel aberto. Nunca em ladrilho, superfície, texto corrido ou decoração. Se um elemento azul não responde a uma dessas três perguntas, está errado.",
+        "section": "colors"
+      },
+      {
+        "name": "The Own Glaze Rule",
+        "body": "Todo ladrilho sai da paleta própria, em classe estática. Nenhum ícone, cor de marca ou arquivo de tema de terceiros; um item novo ganha uma matiz nova no mesmo registro dessaturado (saturação 14 a 48%, luminosidade 34 a 46%).",
+        "section": "colors"
+      },
+      {
+        "name": "The Swappable Identity Rule",
+        "body": "Toda cor é um token por tema em `[data-mode=\"light\"]` / `[data-mode=\"dark\"]`. O destaque é um token só, para que a escolha de destaque pelo usuário entre depois sem retrabalho.",
+        "section": "colors"
+      },
+      {
+        "name": "The Shell Font Rule",
+        "body": "Só Segoe UI Variable, em pesos 400 e 600. Display apenas em títulos de painel; o resto é Text.",
+        "section": "typography"
+      },
+      {
+        "name": "The Opaque Panel Rule",
+        "body": "O painel é sempre opaco (`rgb(var(--surface-rgb))`), qualquer que seja a opacidade do dock. Sem desfoque, texto translúcido sobre o Chrome de trás não se lê.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Light Edge Rule",
+        "body": "A luz de borda de 1 px fica sempre no lado oposto à borda da tela: em cima com o dock embaixo, embaixo com o dock em cima.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** guardar o cobalto (`--accent`) para foco, seleção e o ponto de painel aberto.",
+      "**Do** manter o painel opaco (`rgb(var(--surface-rgb))`) nas duas opacidades do dock.",
+      "**Do** escalar barra, ícone, padding, gap e raio juntos pelos presets s/m/l (40/48/64, 6/7/9, 6/7/9, 18/20/24).",
+      "**Do** usar 8 px nos cantos do painel, como as janelas e flyouts do Windows 11.",
+      "**Do** criar ladrilhos novos como classes estáticas `.t-*` com `--h`, `--sat`, `--l` no registro dessaturado da paleta, com glifo de traço branco 1,75 a 54%.",
+      "**Do** inverter a luz de borda e a origem da ampliação quando o dock vai para a borda de cima.",
+      "**Do** congelar a ampliação enquanto um painel está aberto e desligá-la com \"reduzir movimento\".",
+      "**Do** declarar tokens em CSS estático e aplicar valores por item via CSSOM (`setProperty`)."
+    ],
+    "donts": [
+      "**Don't** usar desfoque real do fundo (`backdrop-filter` ou backdrops do DWM); o vidro é simulado (ADR 0006).",
+      "**Don't** usar cobalto ou qualquer cor de marca nos ladrilhos.",
+      "**Don't** usar ícones, temas ou arquivos de terceiros (WhiteSur, Plank, Latte e afins são só referência).",
+      "**Don't** fazer a barra escura genérica de launcher nem o arco-íris saturado de ícones da Apple.",
+      "**Don't** carregar fontes web; a CSP estrita não permite e a fonte é a do sistema.",
+      "**Don't** injetar atributos `style` ou `<style>` em runtime.",
+      "**Don't** sobrepor ícones ao ampliar: a ampliação empurra os vizinhos."
+    ]
+  }
+}
