@@ -243,14 +243,11 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
 /// On release, tells the dock's page to clear its hover state.
 fn set_captured(window: &WebviewWindow, captured: bool, failures: &mut CaptureFailures) -> bool {
     let result = window.set_ignore_cursor_events(!captured);
-    match failures.record(result.is_ok()) {
-        Some(Transition::Failing) => {
-            if let Err(error) = &result {
-                log::warn!("dock: failed to change the mouse capture, retrying: {error}");
-            }
+    if let Some((level, message)) = capture_report(failures, result.is_ok()) {
+        match &result {
+            Err(error) => log::log!(level, "{message}: {error}"),
+            Ok(()) => log::log!(level, "{message}"),
         }
-        Some(Transition::Recovered) => log::info!("dock: mouse capture works again"),
-        None => {}
     }
     if result.is_err() {
         return false;
@@ -259,6 +256,23 @@ fn set_captured(window: &WebviewWindow, captured: bool, failures: &mut CaptureFa
         log::warn!("dock: failed to send the release event: {error}");
     }
     true
+}
+
+/// Records an attempt to change the mouse capture and returns what to log
+/// about it, if anything: a warning when it starts failing (the error is
+/// appended) and a note when it works again. `None` on every other attempt,
+/// so a failure retried at 60 Hz is not logged at 60 Hz.
+fn capture_report(
+    failures: &mut CaptureFailures,
+    succeeded: bool,
+) -> Option<(log::Level, &'static str)> {
+    match failures.record(succeeded)? {
+        Transition::Failing => Some((
+            log::Level::Warn,
+            "dock: failed to change the mouse capture, retrying",
+        )),
+        Transition::Recovered => Some((log::Level::Info, "dock: mouse capture works again")),
+    }
 }
 
 /// Remembers whether changing the mouse capture is failing, so a failure
@@ -667,6 +681,32 @@ mod tests {
         assert_eq!(failures.record(true), Some(Transition::Recovered));
         assert_eq!(failures.record(true), None);
         assert_eq!(failures.record(false), Some(Transition::Failing));
+    }
+
+    #[test]
+    fn a_failing_capture_is_logged_once_when_it_starts_and_once_when_it_ends() {
+        let mut failures = CaptureFailures::default();
+        // 60 Hz retries: ok, then 4 failures in a row, then ok twice.
+        let reports: Vec<_> = [true, false, false, false, false, true, true]
+            .into_iter()
+            .map(|succeeded| capture_report(&mut failures, succeeded))
+            .collect();
+
+        assert_eq!(
+            reports,
+            [
+                None,
+                Some((
+                    log::Level::Warn,
+                    "dock: failed to change the mouse capture, retrying"
+                )),
+                None,
+                None,
+                None,
+                Some((log::Level::Info, "dock: mouse capture works again")),
+                None,
+            ]
+        );
     }
 
     #[test]
