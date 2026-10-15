@@ -35,11 +35,13 @@ impl ClockConfig {
 /// writes it. The lookup ignores ASCII case, so the name it gives back is
 /// compared too: `america/sao_paulo` is rejected rather than stored in a
 /// spelling `Intl` may not take. `Etc/Unknown` has no IANA name and is
-/// rejected as well.
+/// rejected as well, and so is `Factory`: it is in the database, but it
+/// means "time zone not set", not a place.
 fn is_iana_time_zone(name: &str) -> bool {
-    TimeZoneDatabase::bundled()
-        .get(name)
-        .is_ok_and(|tz| tz.iana_name() == Some(name))
+    name != "Factory"
+        && TimeZoneDatabase::bundled()
+            .get(name)
+            .is_ok_and(|tz| tz.iana_name() == Some(name))
 }
 
 /// How hours are counted, named as in `Intl.DateTimeFormat`'s `hourCycle`.
@@ -105,6 +107,8 @@ mod tests {
             "AMERICA/SAO_PAULO",
             "utc",
             "Etc/Unknown",
+            // In the database, but not a place: it means "time zone not set".
+            "Factory",
             " America/Sao_Paulo",
             "America/Sao_Paulo ",
             "-03:00",
