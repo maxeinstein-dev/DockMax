@@ -4,6 +4,7 @@ use tauri::RunEvent;
 
 mod commands;
 mod domain;
+mod i18n;
 mod logging;
 mod persistence;
 mod tray;
