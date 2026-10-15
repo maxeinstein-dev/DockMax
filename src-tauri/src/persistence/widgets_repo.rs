@@ -1,12 +1,21 @@
 //! Widget instances in the `widget_instances` table (spec 0003 §2.1, §2.4).
 //!
 //! Positions are 0-based and contiguous after every write, which runs in one
-//! transaction. Reading never fails on a bad row: a config that can't be
-//! read gives the kind's default, and a row of an unknown kind or with a
-//! malformed ID is left out of the list. Either way the row stays as it is
-//! until the user changes it (§2.4 item 6).
+//! transaction. Reading never fails on a bad row (edited by hand, by another
+//! tool or by a newer DockMax):
+//!
+//! - a config that can't be read gives the kind's default;
+//! - a label that isn't text or breaks the label rules reads as no label;
+//! - a row of an unknown kind, of a kind not creatable in this version
+//!   (`shortcut`, `files`) or with a malformed ID is hidden: left out of the
+//!   list, it keeps its place, doesn't count towards the limit and can't be
+//!   moved, changed or removed.
+//!
+//! Either way the row stays as it is until the user changes it (§2.4 item
+//! 6), and the log gets only the kind of problem.
 
-use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use rusqlite::types::ValueRef;
+use rusqlite::{Connection, OptionalExtension, Row, Transaction, params};
 
 use super::database::{begin, now_ms, write_failed};
 use crate::domain::widgets::{
@@ -25,11 +34,14 @@ pub fn list(conn: &Connection) -> Result<Vec<WidgetInstance>, WidgetError> {
     let rows = statement
         .query_map([], |row| {
             Ok(StoredRow {
-                id: row.get(0)?,
-                kind: row.get(1)?,
-                label: row.get(2)?,
-                config: row.get(3)?,
-                config_version: row.get(4)?,
+                id: Text::read(row, 0)?,
+                kind: Text::read(row, 1)?,
+                label: Text::read(row, 2)?,
+                config: Text::read(row, 3)?,
+                config_version: match row.get_ref(4)? {
+                    ValueRef::Integer(version) => Some(version),
+                    _ => None,
+                },
             })
         })
         .map_err(write_failed)?;
@@ -50,7 +62,7 @@ pub fn add(conn: &mut Connection, kind: WidgetKind) -> Result<WidgetInstance, Wi
     }
     let tx = begin(conn)?;
     let order = order(&tx).map_err(write_failed)?;
-    if order.iter().filter(|entry| entry.visible).count() >= MAX_WIDGETS {
+    if order.iter().filter(|entry| entry.shown.is_some()).count() >= MAX_WIDGETS {
         return Err(WidgetError::LimitReached);
     }
     renumber(&tx, &order).map_err(write_failed)?;
@@ -85,10 +97,12 @@ pub fn move_widget(
     let mut order = order(&tx).map_err(write_failed)?;
     let index = find(&order, id)?;
     let neighbor = match direction {
-        MoveDirection::Up => order[..index].iter().rposition(|entry| entry.visible),
+        MoveDirection::Up => order[..index]
+            .iter()
+            .rposition(|entry| entry.shown.is_some()),
         MoveDirection::Down => order[index + 1..]
             .iter()
-            .position(|entry| entry.visible)
+            .position(|entry| entry.shown.is_some())
             .map(|offset| index + 1 + offset),
     };
     let Some(neighbor) = neighbor else {
@@ -133,17 +147,17 @@ pub fn update(
     })
 }
 
-/// The kind of the instance `id`, if it exists and its kind is known.
+/// The kind of the instance `id`, if it exists and the interface sees it.
 pub(super) fn kind_of(conn: &Connection, id: &WidgetId) -> Result<Option<WidgetKind>, WidgetError> {
-    let name: Option<String> = conn
+    let kind = conn
         .query_row(
             "SELECT kind FROM widget_instances WHERE id = ?1",
             params![id.as_str()],
-            |row| row.get(0),
+            |row| Text::read(row, 0),
         )
         .optional()
         .map_err(write_failed)?;
-    Ok(name.as_deref().and_then(WidgetKind::from_name))
+    Ok(kind.and_then(|kind| shown_kind(&kind).ok()))
 }
 
 /// Inserts a new instance of `kind` with the default config at `position`,
@@ -181,59 +195,133 @@ pub(super) fn insert(
     Ok(instance)
 }
 
+/// A TEXT column as stored. SQLite keeps whatever bytes it is given, so
+/// text that is not UTF-8 is possible and must not fail the whole read.
+enum Text {
+    Null,
+    Valid(String),
+    /// Not UTF-8, or not text at all.
+    Invalid,
+}
+
+impl Text {
+    fn read(row: &Row<'_>, index: usize) -> rusqlite::Result<Text> {
+        Ok(match row.get_ref(index)? {
+            ValueRef::Null => Text::Null,
+            ValueRef::Text(bytes) => match std::str::from_utf8(bytes) {
+                Ok(text) => Text::Valid(text.to_owned()),
+                Err(_) => Text::Invalid,
+            },
+            _ => Text::Invalid,
+        })
+    }
+}
+
+/// Why a row is hidden, for the log: never the stored value.
+#[derive(Debug, Clone, Copy)]
+enum Hidden {
+    UnreadableKind,
+    UnknownKind,
+    NotCreatable,
+    InvalidId,
+}
+
+impl Hidden {
+    fn log(self) {
+        let why = match self {
+            Hidden::UnreadableKind => "a kind that is not text",
+            Hidden::UnknownKind => "an unknown kind",
+            Hidden::NotCreatable => "a kind not available in this version",
+            Hidden::InvalidId => "an invalid ID",
+        };
+        log::warn!("widgets: ignored an instance with {why}");
+    }
+}
+
+/// The kind of a stored row, if the interface sees rows of it: known and
+/// creatable in this version.
+fn shown_kind(kind: &Text) -> Result<WidgetKind, Hidden> {
+    let Text::Valid(name) = kind else {
+        return Err(Hidden::UnreadableKind);
+    };
+    match WidgetKind::from_name(name) {
+        Some(kind) if kind.creatable() => Ok(kind),
+        Some(_) => Err(Hidden::NotCreatable),
+        None => Err(Hidden::UnknownKind),
+    }
+}
+
+/// The ID of a stored row, if it is one Rust makes.
+fn shown_id(id: &Text) -> Result<WidgetId, Hidden> {
+    match id {
+        Text::Valid(id) => WidgetId::parse(id).map_err(|_| Hidden::InvalidId),
+        _ => Err(Hidden::InvalidId),
+    }
+}
+
 /// A row as stored, before it is checked.
 struct StoredRow {
-    id: String,
-    kind: String,
-    label: Option<String>,
-    config: String,
-    config_version: i64,
+    id: Text,
+    kind: Text,
+    label: Text,
+    config: Text,
+    config_version: Option<i64>,
 }
 
 impl StoredRow {
     /// The instance the interface gets, or `None` for a row it can't use.
     /// Logs only the kind of problem, never the stored values.
     fn into_instance(self) -> Option<WidgetInstance> {
-        let Some(kind) = WidgetKind::from_name(&self.kind) else {
-            log::warn!("widgets: ignored an instance of an unknown kind");
-            return None;
+        let shown = shown_kind(&self.kind).and_then(|kind| Ok((kind, shown_id(&self.id)?)));
+        let (kind, id) = match shown {
+            Ok(shown) => shown,
+            Err(hidden) => {
+                hidden.log();
+                return None;
+            }
         };
-        let Ok(id) = WidgetId::parse(&self.id) else {
-            log::warn!("widgets: ignored an instance with an invalid ID");
-            return None;
+        let label = match self.label {
+            Text::Null => None,
+            Text::Valid(label) if validate_label(Some(&label)).is_ok() => Some(label),
+            Text::Valid(_) | Text::Invalid => {
+                log::warn!("widgets: ignored an invalid {kind} label");
+                None
+            }
         };
-        let config = u32::try_from(self.config_version)
-            .map_err(|_| WidgetError::InvalidConfig)
-            .and_then(|version| decode_config(kind, version, &self.config))
-            .unwrap_or_else(|error| {
-                log::warn!("widgets: using the default {kind} config: {error}");
-                WidgetConfig::default_for(kind)
-            });
-        Some(WidgetInstance {
-            id,
-            label: self.label,
-            config,
-        })
+        let config = match (self.config_version, &self.config) {
+            (Some(version), Text::Valid(json)) => u32::try_from(version)
+                .map_err(|_| WidgetError::InvalidConfig)
+                .and_then(|version| decode_config(kind, version, json)),
+            _ => Err(WidgetError::InvalidConfig),
+        }
+        .unwrap_or_else(|error| {
+            log::warn!("widgets: using the default {kind} config: {error}");
+            WidgetConfig::default_for(kind)
+        });
+        Some(WidgetInstance { id, label, config })
     }
 }
 
-/// A row in dock order, and whether the interface sees it.
+/// A row in dock order: its `rowid`, which names it even when its `id` is
+/// not valid text, and its ID if the interface sees it.
 struct Entry {
-    id: String,
-    visible: bool,
+    rowid: i64,
+    shown: Option<WidgetId>,
 }
 
 /// Every row, in dock order, including the ones the list leaves out: they
 /// keep a place, so positions stay contiguous over the whole table.
 fn order(conn: &Connection) -> rusqlite::Result<Vec<Entry>> {
     let mut statement = conn.prepare_cached(
-        "SELECT id, kind FROM widget_instances ORDER BY position, created_at, id",
+        "SELECT rowid, id, kind FROM widget_instances ORDER BY position, created_at, id",
     )?;
     let rows = statement.query_map([], |row| {
-        let id: String = row.get(0)?;
-        let kind: String = row.get(1)?;
-        let visible = WidgetKind::from_name(&kind).is_some() && WidgetId::parse(&id).is_ok();
-        Ok(Entry { id, visible })
+        let id = Text::read(row, 1)?;
+        let kind = Text::read(row, 2)?;
+        Ok(Entry {
+            rowid: row.get(0)?,
+            shown: shown_kind(&kind).and_then(|_| shown_id(&id)).ok(),
+        })
     })?;
     rows.collect()
 }
@@ -242,7 +330,7 @@ fn order(conn: &Connection) -> rusqlite::Result<Vec<Entry>> {
 fn find(order: &[Entry], id: &WidgetId) -> Result<usize, WidgetError> {
     order
         .iter()
-        .position(|entry| entry.visible && entry.id == id.as_str())
+        .position(|entry| entry.shown.as_ref() == Some(id))
         .ok_or(WidgetError::NotFound)
 }
 
@@ -250,10 +338,10 @@ fn find(order: &[Entry], id: &WidgetId) -> Result<usize, WidgetError> {
 /// position changes.
 fn renumber(tx: &Transaction<'_>, order: &[Entry]) -> rusqlite::Result<()> {
     let mut statement = tx.prepare_cached(
-        "UPDATE widget_instances SET position = ?1 WHERE id = ?2 AND position <> ?1",
+        "UPDATE widget_instances SET position = ?1 WHERE rowid = ?2 AND position <> ?1",
     )?;
     for (position, entry) in order.iter().enumerate() {
-        statement.execute(params![position as i64, entry.id])?;
+        statement.execute(params![position as i64, entry.rowid])?;
     }
     Ok(())
 }
@@ -626,6 +714,155 @@ mod tests {
             )
             .unwrap();
         assert_eq!(kept, 2);
+        assert_contiguous(conn);
+    }
+
+    /// Text that is not UTF-8, as a hand edit or another tool can store it.
+    const NOT_UTF8: &str = "CAST(x'ff' AS TEXT)";
+
+    #[test]
+    fn text_that_is_not_utf8_never_breaks_the_list() {
+        let dir = tempdir().unwrap();
+        let mut storage = open(&dir);
+        let conn = storage.connection().unwrap();
+        let [clock, progress, note]: [WidgetId; 3] = ids(conn).try_into().unwrap();
+        conn.execute(
+            &format!("UPDATE widget_instances SET label = {NOT_UTF8} WHERE id = ?1"),
+            [clock.as_str()],
+        )
+        .unwrap();
+        conn.execute(
+            &format!("UPDATE widget_instances SET config = {NOT_UTF8} WHERE id = ?1"),
+            [progress.as_str()],
+        )
+        .unwrap();
+        // A bad ID and a bad kind between the first and the second widget.
+        conn.execute(
+            "UPDATE widget_instances SET position = position + 2 WHERE position >= 1",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            &format!(
+                "INSERT INTO widget_instances \
+                 (id, kind, label, position, config, config_version, created_at) \
+                 VALUES ({NOT_UTF8}, 'clock', NULL, 1, '{{}}', 1, 0), \
+                 (?1, {NOT_UTF8}, NULL, 2, '{{}}', 1, 0)"
+            ),
+            [WidgetId::new().as_str()],
+        )
+        .unwrap();
+
+        let listed = list(conn).unwrap();
+
+        assert_eq!(ids(conn), [clock.clone(), progress.clone(), note.clone()]);
+        assert_eq!(listed[0].label, None);
+        assert_eq!(
+            listed[1].config,
+            WidgetConfig::default_for(WidgetKind::TimeProgress)
+        );
+        // Moving, removing and adding still work, around the hidden rows.
+        move_widget(conn, &note, MoveDirection::Up).unwrap();
+        assert_eq!(ids(conn), [clock.clone(), note, progress]);
+        remove(conn, &clock).unwrap();
+        add(conn, WidgetKind::Clock).unwrap();
+        assert_eq!(list(conn).unwrap().len(), 3);
+        assert_eq!(count(conn, "widget_instances"), 5);
+        assert_contiguous(conn);
+        let kept: i64 = conn
+            .query_row(
+                &format!(
+                    "SELECT count(*) FROM widget_instances \
+                     WHERE id = {NOT_UTF8} OR kind = {NOT_UTF8}"
+                ),
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(kept, 2);
+    }
+
+    #[test]
+    fn stored_label_that_breaks_the_rules_reads_as_none_and_stays() {
+        let dir = tempdir().unwrap();
+        let mut storage = open(&dir);
+        let conn = storage.connection().unwrap();
+        add(conn, WidgetKind::Clock).unwrap();
+        let ids = ids(conn);
+        let long = "x".repeat(10 * 1024);
+        let labels = ["", "\n", long.as_str()];
+        for (id, label) in ids.iter().zip(labels) {
+            conn.execute(
+                "UPDATE widget_instances SET label = ?1 WHERE id = ?2",
+                params![label, id.as_str()],
+            )
+            .unwrap();
+        }
+
+        let listed = list(conn).unwrap();
+
+        for (instance, label) in listed.iter().zip(labels) {
+            assert_eq!(instance.label, None, "{:?}", &label[..label.len().min(8)]);
+            let stored: String = conn
+                .query_row(
+                    "SELECT label FROM widget_instances WHERE id = ?1",
+                    [instance.id.as_str()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, label, "not rewritten");
+        }
+        // What the interface got can be saved back.
+        let clock = &listed[0];
+        assert_eq!(
+            update(conn, &clock.id, clock.label.clone(), clock.config.clone()),
+            Ok(clock.clone())
+        );
+    }
+
+    #[test]
+    fn kinds_not_creatable_yet_are_hidden_like_unknown_ones() {
+        let dir = tempdir().unwrap();
+        let mut storage = open(&dir);
+        let conn = storage.connection().unwrap();
+        let before = ids(conn);
+        conn.execute(
+            "UPDATE widget_instances SET position = position + 2 WHERE position >= 1",
+            [],
+        )
+        .unwrap();
+        let shortcut = WidgetId::new();
+        let files = WidgetId::new();
+        insert_raw(conn, shortcut.as_str(), "shortcut", 1);
+        insert_raw(conn, files.as_str(), "files", 2);
+
+        assert_eq!(ids(conn), before);
+        for (id, kind) in [
+            (&shortcut, WidgetKind::Shortcut),
+            (&files, WidgetKind::Files),
+        ] {
+            assert_eq!(remove(conn, id), Err(WidgetError::NotFound), "{kind}");
+            assert_eq!(
+                move_widget(conn, id, MoveDirection::Up),
+                Err(WidgetError::NotFound),
+                "{kind}"
+            );
+            assert_eq!(
+                update(conn, id, None, WidgetConfig::default_for(kind)),
+                Err(WidgetError::NotFound),
+                "{kind}"
+            );
+        }
+        move_widget(conn, &before[1], MoveDirection::Up).unwrap();
+        assert_eq!(
+            ids(conn),
+            [before[1].clone(), before[0].clone(), before[2].clone()]
+        );
+        for _ in 3..MAX_WIDGETS {
+            add(conn, WidgetKind::Clock).unwrap();
+        }
+        assert_eq!(add(conn, WidgetKind::Clock), Err(WidgetError::LimitReached));
+        assert_eq!(count(conn, "widget_instances"), MAX_WIDGETS as i64 + 2);
         assert_contiguous(conn);
     }
 
