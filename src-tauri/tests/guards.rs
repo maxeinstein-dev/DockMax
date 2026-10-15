@@ -444,6 +444,52 @@ fn logger_settings_and_widgets_start_before_the_windows() {
     );
 }
 
+/// The `{ ... }` block that follows the first `marker` of `code` not
+/// followed by an identifier character (`RunEvent::Exit`, not
+/// `RunEvent::ExitRequested`), without its braces.
+fn block_after<'a>(code: &'a str, marker: &str, file: &str) -> &'a str {
+    let start = code
+        .match_indices(marker)
+        .map(|(index, _)| index + marker.len())
+        .find(|&end| !code[end..].starts_with(is_ident_char))
+        .unwrap_or_else(|| panic!("{file}: `{marker}` not found"));
+    let rest = &code[start..];
+    let open = rest
+        .find('{')
+        .unwrap_or_else(|| panic!("{file}: no block after `{marker}`"));
+    let mut depth = 0usize;
+    for (index, c) in rest[open..].char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return &rest[open + 1..open + index];
+                }
+            }
+            _ => {}
+        }
+    }
+    panic!("{file}: the block after `{marker}` is not closed");
+}
+
+#[test]
+fn exit_checkpoints_the_widget_database() {
+    // The process ends without closing the widget database: without the
+    // checkpoint on `RunEvent::Exit`, the last changes stay only in the
+    // `-wal` (spec 0003 §2.4). Without comments: a commented-out call must
+    // not count.
+    let source = rust_code("src/lib.rs");
+    let exit = block_after(&source, "RunEvent::Exit", "src/lib.rs");
+    let checkpoint = exit.find(".checkpoint()").unwrap_or_else(|| {
+        panic!("src/lib.rs: `RunEvent::Exit` must call `.checkpoint()` on the widget storage")
+    });
+    assert!(
+        exit[..checkpoint].contains("persistence::database::Storage"),
+        "src/lib.rs: the `.checkpoint()` on `RunEvent::Exit` must be the widget storage's (`persistence::database::Storage`)"
+    );
+}
+
 /// The comma-separated items between `open` and the next `]` of `code`,
 /// which must appear exactly once.
 fn bracket_items<'a>(code: &'a str, open: &str, file: &str) -> Vec<&'a str> {
