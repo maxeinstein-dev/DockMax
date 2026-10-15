@@ -13,14 +13,18 @@ pub const MAX_PATH_UTF16_UNITS: usize = 32_767;
 /// - UNC: `\\server\share...`, with server and share not empty.
 ///
 /// `\` and `/` are both separators, as for Windows itself. Rejected: an
-/// empty path, a NUL character, more than [`MAX_PATH_UTF16_UNITS`], a
-/// relative path (`foo`, `.\foo`), a drive-relative one (`C:`, `C:foo`), a
+/// empty path, a control character (`char::is_control`: NUL, tab, line
+/// breaks, ESC, DEL, C1), more than [`MAX_PATH_UTF16_UNITS`], a relative
+/// path (`foo`, `.\foo`), a drive-relative one (`C:`, `C:foo`), a
 /// root-relative one (`\foo`) and the device and verbatim prefixes
 /// (`\\?\`, `\\.\`), which skip the normalization the rest of the app
 /// expects. Other characters that Windows forbids in names (`<>"|?*`) are
 /// left to the opener: the spec asks only for the shape.
+///
+/// DOS device names as a component (`C:\pasta\CON`, `NUL.txt`) pass here:
+/// they are checked in phase 3, where shortcuts and folders are opened.
 pub fn is_absolute_windows_path(path: &str) -> bool {
-    if path.is_empty() || path.contains('\0') {
+    if path.is_empty() || path.chars().any(char::is_control) {
         return false;
     }
     if path.encode_utf16().count() > MAX_PATH_UTF16_UNITS {
@@ -133,6 +137,23 @@ mod tests {
         assert!(!is_absolute_windows_path("C:\\foo\0"));
         assert!(!is_absolute_windows_path("C:\\fo\0o\\bar"));
         assert!(!is_absolute_windows_path("\\\\server\\sh\0are"));
+    }
+
+    #[test]
+    fn a_control_character_is_rejected_anywhere() {
+        let controls = [
+            '\u{1}', '\t', '\n', '\r', '\u{1b}', '\u{7f}', '\u{85}', '\u{9f}',
+        ];
+        for c in controls {
+            for path in [
+                format!(r"C:\foo{c}"),
+                format!(r"C:\fo{c}o\bar"),
+                format!(r"\\server\sh{c}are"),
+                format!(r"\\ser{c}ver\share"),
+            ] {
+                assert!(!is_absolute_windows_path(&path), "{path:?}");
+            }
+        }
     }
 
     #[test]
