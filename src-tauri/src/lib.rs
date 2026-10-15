@@ -1,6 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 
-use tauri::{RunEvent, Wry, plugin::TauriPlugin};
+use tauri::{Manager, RunEvent, Wry, plugin::TauriPlugin};
 
 mod commands;
 mod domain;
@@ -85,6 +85,14 @@ pub fn run() {
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 windows::hit_test::tracker(app).stop();
+                // The process ends without closing the widget database:
+                // leave the file complete on its own, `-wal` applied.
+                if let Some(storage) = app.try_state::<Mutex<persistence::database::Storage>>() {
+                    storage
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .checkpoint();
+                }
             }
         });
 }

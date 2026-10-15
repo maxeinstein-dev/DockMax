@@ -17,7 +17,7 @@
 use rusqlite::types::ValueRef;
 use rusqlite::{Connection, OptionalExtension, Row, Transaction, params};
 
-use super::database::{begin, now_ms, write_failed};
+use super::database::{begin, now_ms, read_failed, write_failed};
 use crate::domain::widgets::{
     MAX_WIDGETS, MoveDirection, WidgetConfig, WidgetError, WidgetId, WidgetInstance, WidgetKind,
     decode_config, encode_config, validate_label,
@@ -30,7 +30,7 @@ pub fn list(conn: &Connection) -> Result<Vec<WidgetInstance>, WidgetError> {
             "SELECT id, kind, label, config, config_version FROM widget_instances \
              ORDER BY position, created_at, id",
         )
-        .map_err(write_failed)?;
+        .map_err(read_failed)?;
     let rows = statement
         .query_map([], |row| {
             Ok(StoredRow {
@@ -44,10 +44,10 @@ pub fn list(conn: &Connection) -> Result<Vec<WidgetInstance>, WidgetError> {
                 },
             })
         })
-        .map_err(write_failed)?;
+        .map_err(read_failed)?;
     let mut instances = Vec::new();
     for row in rows {
-        if let Some(instance) = row.map_err(write_failed)?.into_instance() {
+        if let Some(instance) = row.map_err(read_failed)?.into_instance() {
             instances.push(instance);
         }
     }
@@ -61,7 +61,7 @@ pub fn add(conn: &mut Connection, kind: WidgetKind) -> Result<WidgetInstance, Wi
         return Err(WidgetError::NotCreatable);
     }
     let tx = begin(conn)?;
-    let order = order(&tx).map_err(write_failed)?;
+    let order = order(&tx).map_err(read_failed)?;
     if order.iter().filter(|entry| entry.shown.is_some()).count() >= MAX_WIDGETS {
         return Err(WidgetError::LimitReached);
     }
@@ -74,7 +74,7 @@ pub fn add(conn: &mut Connection, kind: WidgetKind) -> Result<WidgetInstance, Wi
 /// Removes an instance; a note's text goes with it (`ON DELETE CASCADE`).
 pub fn remove(conn: &mut Connection, id: &WidgetId) -> Result<(), WidgetError> {
     let tx = begin(conn)?;
-    let mut order = order(&tx).map_err(write_failed)?;
+    let mut order = order(&tx).map_err(read_failed)?;
     let index = find(&order, id)?;
     tx.execute(
         "DELETE FROM widget_instances WHERE id = ?1",
@@ -94,7 +94,7 @@ pub fn move_widget(
     direction: MoveDirection,
 ) -> Result<(), WidgetError> {
     let tx = begin(conn)?;
-    let mut order = order(&tx).map_err(write_failed)?;
+    let mut order = order(&tx).map_err(read_failed)?;
     let index = find(&order, id)?;
     let neighbor = match direction {
         MoveDirection::Up => order[..index]
@@ -156,7 +156,7 @@ pub(super) fn kind_of(conn: &Connection, id: &WidgetId) -> Result<Option<WidgetK
             |row| Text::read(row, 0),
         )
         .optional()
-        .map_err(write_failed)?;
+        .map_err(read_failed)?;
     Ok(kind.and_then(|kind| shown_kind(&kind).ok()))
 }
 

@@ -4,7 +4,7 @@
 
 use rusqlite::{Connection, OptionalExtension, params};
 
-use super::database::{begin, now_ms, write_failed};
+use super::database::{begin, now_ms, read_failed, write_failed};
 use super::widgets_repo::kind_of;
 use crate::domain::widgets::note::validate_note_body;
 use crate::domain::widgets::{WidgetError, WidgetId, WidgetKind};
@@ -19,7 +19,7 @@ pub fn read(conn: &Connection, id: &WidgetId) -> Result<String, WidgetError> {
             |row| row.get(0),
         )
         .optional()
-        .map_err(write_failed)?;
+        .map_err(read_failed)?;
     Ok(body.unwrap_or_default())
 }
 

@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rusqlite::config::DbConfig;
-use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, Transaction};
+use rusqlite::{Connection, ErrorCode, MAIN_DB, OpenFlags, OptionalExtension, Transaction};
 use rusqlite::{TransactionBehavior, params};
 use rusqlite_migration::{HookResult, M, Migrations};
 
@@ -42,8 +42,13 @@ use crate::domain::widgets::{
 /// Name of the widget database inside the app data folder.
 pub const FILE_NAME: &str = "dockmax.db";
 
-/// How long a statement waits for a lock held by another connection.
-const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long a statement waits for a lock held by another connection. Short
+/// on purpose: the commands run synchronously on the main thread, so every
+/// moment waiting freezes the dock. With the single-instance plugin the app
+/// holds the only connection of its own, so the lock can only be held by an
+/// outside tool (a SQLite browser, a backup program), and then failing fast
+/// with `writeFailed` beats freezing for seconds on every save.
+const BUSY_TIMEOUT: Duration = Duration::from_millis(250);
 
 /// SQL of migration 1, also used by the tests to build migration sets.
 const MIGRATION_1: &str = include_str!("../../migrations/0001_widgets.sql");
@@ -115,6 +120,24 @@ impl Storage {
             storage: self.status,
             widgets,
         })
+    }
+
+    /// Copies the `-wal` into the file and empties it
+    /// (`wal_checkpoint(TRUNCATE)`), so the file alone holds every change.
+    /// For when the app exits: the process ends without closing the
+    /// connection, which would do the same. A failure is only logged: the
+    /// `-wal` stays and SQLite applies it on the next open.
+    pub fn checkpoint(&self) {
+        let Some(conn) = &self.conn else {
+            return;
+        };
+        match conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+            row.get::<_, i64>(0)
+        }) {
+            Ok(0) => {}
+            Ok(_) => log::warn!("widgets: checkpoint blocked by another connection"),
+            Err(error) => log::warn!("widgets: checkpoint failed: {}", Cause::sqlite(&error)),
+        }
     }
 
     /// Removes the recovery notice: the status goes from `recovered` to
@@ -276,6 +299,25 @@ fn open_existing(path: &Path, migrations: &[&'static str]) -> Result<Storage, Ca
         }
     };
 
+    // SQLite opens a file it can't write read-only without saying so; every
+    // save would then fail. After the version check: a newer database says
+    // so whatever its permissions.
+    match conn.is_readonly(MAIN_DB) {
+        Ok(false) => {}
+        Ok(true) => {
+            return Ok(unavailable(
+                UnavailableReason::OpenFailed,
+                format_args!("the file is read-only"),
+            ));
+        }
+        Err(error) => {
+            return Ok(unavailable(
+                UnavailableReason::OpenFailed,
+                format_args!("could not check the file: {}", Cause::sqlite(&error)),
+            ));
+        }
+    }
+
     match quick_check(&conn) {
         Ok(true) => {}
         Ok(false) => return Err(Cause::IntegrityCheck),
@@ -393,17 +435,97 @@ fn quick_check(conn: &Connection) -> rusqlite::Result<bool> {
     Ok(first == "ok")
 }
 
-/// Copies the database to `dockmax.db.bak-v<version>` (or that name with a
-/// number after it, if taken: `VACUUM INTO` refuses an existing file).
+/// Copies the database to `dockmax.db.bak-v<version>`, or that name with a
+/// number after it if taken (`VACUUM INTO` refuses an existing file, and an
+/// earlier copy is never replaced). A copy already there with the same data,
+/// left by a migration that failed on an earlier start, is the backup: a
+/// migration failing on every start doesn't add a copy each time.
 fn backup(conn: &Connection, path: &Path, version: usize) -> Result<(), Cause> {
-    let target =
-        free_name(path, &format!(".bak-v{version}"), &[]).map_err(|e| Cause::Io(e.kind()))?;
-    let target = target
-        .to_str()
-        .ok_or(Cause::Io(io::ErrorKind::InvalidInput))?;
-    conn.execute("VACUUM INTO ?1", params![target])
-        .map_err(|error| Cause::sqlite(&error))?;
-    Ok(())
+    let base = with_suffix(path, &format!(".bak-v{version}"));
+    for n in 1..=MAX_NUMBER {
+        let candidate = numbered(&base, n);
+        if !candidate.try_exists().map_err(|e| Cause::Io(e.kind()))? {
+            let target = candidate
+                .to_str()
+                .ok_or(Cause::Io(io::ErrorKind::InvalidInput))?;
+            conn.execute("VACUUM INTO ?1", params![target])
+                .map_err(|error| Cause::sqlite(&error))?;
+            return Ok(());
+        }
+        if same_data(conn, &candidate) {
+            return Ok(());
+        }
+    }
+    Err(Cause::Io(io::ErrorKind::AlreadyExists))
+}
+
+/// True when the database file `other` has the same version, schema and
+/// rows as the open one. Anything that can't be compared (not a database,
+/// say) is not the same.
+fn same_data(conn: &Connection, other: &Path) -> bool {
+    let Some(other) = other.to_str() else {
+        return false;
+    };
+    if conn
+        .execute("ATTACH DATABASE ?1 AS previous", params![other])
+        .is_err()
+    {
+        return false;
+    }
+    let same = compare_with_previous(conn).unwrap_or(false);
+    if let Err(error) = conn.execute("DETACH DATABASE previous", []) {
+        log::warn!(
+            "widgets: could not detach the earlier backup: {}",
+            Cause::sqlite(&error)
+        );
+    }
+    same
+}
+
+/// [`same_data`] with the other database attached as `previous`.
+fn compare_with_previous(conn: &Connection) -> rusqlite::Result<bool> {
+    let version = |schema: &str| -> rusqlite::Result<i64> {
+        conn.query_row(&format!("PRAGMA {schema}.user_version"), [], |row| {
+            row.get(0)
+        })
+    };
+    if version("main")? != version("previous")? {
+        return Ok(false);
+    }
+    let schema_differs: bool = conn.query_row(
+        "SELECT EXISTS (SELECT type, name, tbl_name, sql FROM main.sqlite_schema \
+                        EXCEPT SELECT type, name, tbl_name, sql FROM previous.sqlite_schema) \
+             OR EXISTS (SELECT type, name, tbl_name, sql FROM previous.sqlite_schema \
+                        EXCEPT SELECT type, name, tbl_name, sql FROM main.sqlite_schema)",
+        [],
+        |row| row.get(0),
+    )?;
+    if schema_differs {
+        return Ok(false);
+    }
+    let tables: Vec<String> = conn
+        .prepare(
+            "SELECT name FROM main.sqlite_schema \
+             WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+        )?
+        .query_map([], |row| row.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    for table in tables {
+        let table = format!("\"{}\"", table.replace('"', "\"\""));
+        let differs: bool = conn.query_row(
+            &format!(
+                "SELECT (SELECT count(*) FROM main.{table}) <> (SELECT count(*) FROM previous.{table}) \
+                     OR EXISTS (SELECT * FROM main.{table} EXCEPT SELECT * FROM previous.{table}) \
+                     OR EXISTS (SELECT * FROM previous.{table} EXCEPT SELECT * FROM main.{table})"
+            ),
+            [],
+            |row| row.get(0),
+        )?;
+        if differs {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 /// The companion files SQLite keeps next to a database: `-wal` and `-shm`
@@ -465,12 +587,8 @@ fn set_aside(path: &Path, suffix: &str) -> io::Result<()> {
 /// replace it on Windows.
 fn free_name(path: &Path, suffix: &str, companions: &[&str]) -> io::Result<PathBuf> {
     let base = with_suffix(path, suffix);
-    for n in 1..=1000 {
-        let candidate = if n == 1 {
-            base.clone()
-        } else {
-            with_suffix(&base, &format!("-{n}"))
-        };
+    for n in 1..=MAX_NUMBER {
+        let candidate = numbered(&base, n);
         let mut taken = candidate.try_exists()?;
         for companion in companions {
             taken = taken || with_suffix(&candidate, companion).try_exists()?;
@@ -480,6 +598,18 @@ fn free_name(path: &Path, suffix: &str, companions: &[&str]) -> io::Result<PathB
         }
     }
     Err(io::Error::from(io::ErrorKind::AlreadyExists))
+}
+
+/// How far [`free_name`] and [`backup`] count before giving up.
+const MAX_NUMBER: u32 = 1000;
+
+/// `base` for the first, `base-2`, `base-3`... for the next ones.
+fn numbered(base: &Path, n: u32) -> PathBuf {
+    if n == 1 {
+        base.to_path_buf()
+    } else {
+        with_suffix(base, &format!("-{n}"))
+    }
 }
 
 fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
@@ -543,11 +673,25 @@ pub(super) fn begin(conn: &mut Connection) -> Result<Transaction<'_>, WidgetErro
         .map_err(write_failed)
 }
 
-/// Logs a SQLite error by its code and turns it into
+/// Logs a SQLite error in a write by its code and turns it into
 /// [`WidgetError::WriteFailed`]. SQLite's message is dropped: it can quote
 /// the file name.
 pub(super) fn write_failed(error: rusqlite::Error) -> WidgetError {
-    log::warn!("widgets: database error: {}", Cause::sqlite(&error));
+    log::warn!(
+        "widgets: could not write to the database: {}",
+        Cause::sqlite(&error)
+    );
+    WidgetError::WriteFailed
+}
+
+/// [`write_failed`] for a read, so the log says which one failed. The
+/// command still answers `writeFailed`: the contract has one code for "the
+/// database failed", read or write (`src/core/widgets.ts`).
+pub(super) fn read_failed(error: rusqlite::Error) -> WidgetError {
+    log::warn!(
+        "widgets: could not read the database: {}",
+        Cause::sqlite(&error)
+    );
     WidgetError::WriteFailed
 }
 
@@ -806,7 +950,7 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
 
         assert_eq!(mode, "wal");
         assert_eq!(foreign_keys, 1);
-        assert_eq!(timeout, 5000);
+        assert_eq!(timeout, 250);
     }
 
     #[test]
@@ -869,6 +1013,59 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
             .unwrap();
         assert_eq!(backed_up, 4);
         assert_ne!(fs::read(&path).unwrap(), original);
+    }
+
+    /// The `dockmax.db.bak-v*` files in `dir`.
+    fn backups(dir: &Path) -> Vec<String> {
+        file_names(dir)
+            .into_iter()
+            .filter(|name| name.starts_with("dockmax.db.bak-v"))
+            .collect()
+    }
+
+    #[test]
+    fn migration_failing_on_every_start_backs_up_only_once() {
+        let dir = tempdir().unwrap();
+        v1_database(&dir);
+        let migrations = failing_v2();
+
+        for _ in 0..3 {
+            let storage = open_with(dir.path(), &migrations);
+            assert_eq!(
+                storage.status(),
+                unavailable_with(UnavailableReason::MigrationFailed)
+            );
+        }
+
+        assert_eq!(backups(dir.path()), ["dockmax.db.bak-v1"]);
+    }
+
+    #[test]
+    fn backup_is_made_again_when_the_data_changed_since_the_last_one() {
+        let dir = tempdir().unwrap();
+        v1_database(&dir);
+        let migrations = failing_v2();
+        drop(open_with(dir.path(), &migrations));
+        // Back to a build that opens version 1, and a change there.
+        let mut storage = Storage::open(dir.path());
+        widgets_repo::add(storage.connection().unwrap(), WidgetKind::Note).unwrap();
+        drop(storage);
+
+        drop(open_with(dir.path(), &migrations));
+
+        assert_eq!(
+            backups(dir.path()),
+            ["dockmax.db.bak-v1", "dockmax.db.bak-v1-2"]
+        );
+        let widgets_in = |name: &str| -> i64 {
+            inspect(&dir.path().join(name))
+                .query_row("SELECT count(*) FROM widget_instances", [], |row| {
+                    row.get(0)
+                })
+                .unwrap()
+        };
+        assert_eq!(widgets_in("dockmax.db.bak-v1"), 4);
+        assert_eq!(widgets_in("dockmax.db.bak-v1-2"), 5);
     }
 
     #[test]
@@ -1206,6 +1403,77 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
         drop(held);
         assert_eq!(file_names(dir.path()), [FILE_NAME]);
         assert_eq!(fs::read_to_string(&path).unwrap(), "garbage".repeat(100));
+    }
+
+    /// Makes a file read-only and makes it writable again when dropped, even
+    /// if the test fails, so the temporary folder can be removed.
+    struct ReadOnly(PathBuf);
+
+    impl ReadOnly {
+        fn set(path: &Path) -> ReadOnly {
+            let mut permissions = fs::metadata(path).unwrap().permissions();
+            permissions.set_readonly(true);
+            fs::set_permissions(path, permissions).unwrap();
+            ReadOnly(path.to_path_buf())
+        }
+    }
+
+    impl Drop for ReadOnly {
+        fn drop(&mut self) {
+            if let Ok(metadata) = fs::metadata(&self.0) {
+                let mut permissions = metadata.permissions();
+                #[allow(clippy::permissions_set_readonly_false)]
+                permissions.set_readonly(false);
+                let _ = fs::set_permissions(&self.0, permissions);
+            }
+        }
+    }
+
+    #[test]
+    fn read_only_file_is_open_failed_and_untouched() {
+        let dir = tempdir().unwrap();
+        v1_database(&dir);
+        let path = db_path(&dir);
+        let bytes = fs::read(&path).unwrap();
+        let read_only = ReadOnly::set(&path);
+
+        let storage = Storage::open(dir.path());
+
+        assert_eq!(
+            storage.status(),
+            unavailable_with(UnavailableReason::OpenFailed)
+        );
+        drop(storage);
+        drop(read_only);
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+    }
+
+    #[test]
+    fn checkpoint_leaves_the_file_complete_on_its_own() {
+        let dir = tempdir().unwrap();
+        let mut storage = Storage::open(dir.path());
+        let note = widgets(&storage)[2].id.clone();
+        notes_repo::save(storage.connection().unwrap(), &note, "in the file").unwrap();
+        let path = db_path(&dir);
+        let wal = with_suffix(&path, "-wal");
+        assert!(fs::metadata(&wal).unwrap().len() > 0);
+
+        storage.checkpoint();
+
+        assert_eq!(fs::metadata(&wal).unwrap().len(), 0);
+        // Only the file, copied while the database is still open.
+        let copy = tempdir().unwrap();
+        fs::copy(&path, db_path(&copy)).unwrap();
+        drop(storage);
+        let body: String = inspect(&db_path(&copy))
+            .query_row("SELECT body FROM notes", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(body, "in the file");
+    }
+
+    #[test]
+    fn checkpoint_without_a_database_does_nothing() {
+        Storage::unavailable(UnavailableReason::OpenFailed).checkpoint();
     }
 
     #[test]
