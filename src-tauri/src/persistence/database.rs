@@ -509,20 +509,38 @@ fn compare_with_previous(conn: &Connection) -> rusqlite::Result<bool> {
     if schema_differs {
         return Ok(false);
     }
+    // `_` is a wildcard in LIKE: escaped, only SQLite's own tables are left
+    // out, not a table like `sqlitex`.
     let tables: Vec<String> = conn
         .prepare(
             "SELECT name FROM main.sqlite_schema \
-             WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+             WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'",
         )?
         .query_map([], |row| row.get(0))?
         .collect::<rusqlite::Result<_>>()?;
+    let quoted = |name: &str| format!("\"{}\"", name.replace('"', "\"\""));
     for table in tables {
-        let table = format!("\"{}\"", table.replace('"', "\"\""));
+        let table = quoted(&table);
+        let columns: Vec<String> = conn
+            .prepare(&format!("PRAGMA main.table_info({table})"))?
+            .query_map([], |row| row.get::<_, String>("name"))?
+            .collect::<rusqlite::Result<_>>()?;
+        // Each distinct row with how many times it is there: compared as
+        // multisets, so {a, a, b} is not {a, b, b} in a table without a key.
+        // Byte for byte, whatever the column's collation.
+        let columns = columns
+            .iter()
+            .map(|column| format!("{} COLLATE BINARY", quoted(column)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let rows = |schema: &str| {
+            format!("SELECT {columns}, count(*) FROM {schema}.{table} GROUP BY {columns}")
+        };
+        let (main, previous) = (rows("main"), rows("previous"));
         let differs: bool = conn.query_row(
             &format!(
-                "SELECT (SELECT count(*) FROM main.{table}) <> (SELECT count(*) FROM previous.{table}) \
-                     OR EXISTS (SELECT * FROM main.{table} EXCEPT SELECT * FROM previous.{table}) \
-                     OR EXISTS (SELECT * FROM previous.{table} EXCEPT SELECT * FROM main.{table})"
+                "SELECT EXISTS ({main} EXCEPT {previous}) \
+                     OR EXISTS ({previous} EXCEPT {main})"
             ),
             [],
             |row| row.get(0),
@@ -1623,6 +1641,60 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
                 widgets: vec![],
             })
         );
+    }
+
+    /// Two databases in `dir` made by `sql`, then each filled by its own
+    /// statements: the open first one and the path of the second.
+    fn two_databases(dir: &TempDir, sql: &str, main: &str, other: &str) -> (Connection, PathBuf) {
+        let other_path = dir.path().join("other.db");
+        let other_conn = Connection::open(&other_path).unwrap();
+        other_conn.execute_batch(sql).unwrap();
+        other_conn.execute_batch(other).unwrap();
+        drop(other_conn);
+        let conn = Connection::open(dir.path().join("main.db")).unwrap();
+        conn.execute_batch(sql).unwrap();
+        conn.execute_batch(main).unwrap();
+        (conn, other_path)
+    }
+
+    #[test]
+    fn same_data_counts_repeated_rows() {
+        let dir = tempdir().unwrap();
+        let table = "CREATE TABLE t (v TEXT);";
+        let (conn, other) = two_databases(
+            &dir,
+            table,
+            "INSERT INTO t VALUES ('a'), ('a'), ('b');",
+            "INSERT INTO t VALUES ('a'), ('b'), ('b');",
+        );
+        assert!(!same_data(&conn, &other), "{{a,a,b}} is not {{a,b,b}}");
+    }
+
+    #[test]
+    fn same_data_ignores_the_order_of_the_rows() {
+        let dir = tempdir().unwrap();
+        let table = "CREATE TABLE t (v TEXT);";
+        let (conn, other) = two_databases(
+            &dir,
+            table,
+            "INSERT INTO t VALUES ('a'), ('a'), ('b');",
+            "INSERT INTO t VALUES ('b'), ('a'), ('a');",
+        );
+        assert!(same_data(&conn, &other));
+    }
+
+    #[test]
+    fn same_data_compares_a_table_whose_name_only_looks_internal() {
+        // `_` in `LIKE 'sqlite_%'` matches any character.
+        let dir = tempdir().unwrap();
+        let table = "CREATE TABLE sqlitex (v TEXT);";
+        let (conn, other) = two_databases(
+            &dir,
+            table,
+            "INSERT INTO sqlitex VALUES ('a');",
+            "INSERT INTO sqlitex VALUES ('b');",
+        );
+        assert!(!same_data(&conn, &other));
     }
 
     #[test]
