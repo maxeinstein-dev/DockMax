@@ -16,7 +16,9 @@ export const MAX_WIDGETS = 12;
 /** Largest note text accepted, in UTF-8 bytes; checked in Rust. */
 export const MAX_NOTE_BYTES = 64 * 1024;
 
-/** Longest instance label accepted, in characters; checked in Rust. */
+/** Longest instance label accepted, in Unicode scalar values (code points),
+ * not UTF-16 units: `label.length` counts an emoji outside the BMP as 2, Rust
+ * as 1, so count with `[...label].length`. Checked in Rust. */
 export const MAX_LABEL_CHARS = 40;
 
 /** The kinds of widget: a closed set, no third-party widgets. */
@@ -182,7 +184,9 @@ export type WidgetErrorCode =
   | "invalidTarget"
   | "invalidFolder"
   | "noteTooLarge"
-  /** A stored config has another version or is not valid JSON. */
+  /** A stored config has another version or is not valid JSON, or the
+   * config given to `update_widget` is not exactly the canonical one (a
+   * missing, unknown or mistyped field). */
   | "invalidConfig"
   /** The widget database can't be used in this run. */
   | "unavailable"

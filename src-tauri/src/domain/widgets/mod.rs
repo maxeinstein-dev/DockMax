@@ -53,7 +53,10 @@ pub const MAX_WIDGETS: usize = 12;
 /// Largest note text accepted, in UTF-8 bytes (spec 0003 §2.2, Note).
 pub const MAX_NOTE_BYTES: usize = 64 * 1024;
 
-/// Longest instance label accepted, in characters (spec 0003 §2.1 item 6).
+/// Longest instance label accepted, in Unicode scalar values (code points,
+/// as `chars()` counts them), not bytes or graphemes (spec 0003 §2.1 item
+/// 6). JavaScript's `.length` counts UTF-16 units instead: an emoji outside
+/// the BMP is 1 here and 2 there.
 pub const MAX_LABEL_CHARS: usize = 40;
 
 /// Key in the `meta` table of the recovery notice: set to
@@ -532,7 +535,9 @@ pub enum WidgetErrorCode {
     InvalidFolder,
     /// The note is over [`MAX_NOTE_BYTES`].
     NoteTooLarge,
-    /// A stored config has another version or is not valid JSON.
+    /// A stored config has another version or is not valid JSON, or the
+    /// config `update_widget` got is not exactly the canonical one (a
+    /// missing, unknown or mistyped field).
     InvalidConfig,
     /// The widget database can't be used in this run.
     Unavailable,
