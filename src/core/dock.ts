@@ -32,3 +32,12 @@ export const DOCK_REQUEST_PANEL_EVENT = "dock-request-panel";
 export interface DockRequestPanel {
   panelId: PanelId;
 }
+
+/** The tallest bar and dock window Rust accepts in `set_dock_layout`
+ * (`MAX_BAR_HEIGHT` and `MAX_WINDOW_HEIGHT` in
+ * src-tauri/src/windows/dock.rs, derived there from the largest icon size).
+ * A layout beyond them is rejected and the dock stops resizing, so
+ * layout.test.ts keeps every preset within them and a Rust test keeps both
+ * sides equal. */
+export const MAX_DOCK_BAR_HEIGHT = 126;
+export const MAX_DOCK_WINDOW_HEIGHT = 198;

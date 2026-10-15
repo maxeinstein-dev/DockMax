@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DockSize } from "../core/appearance";
+import { MAX_DOCK_BAR_HEIGHT, MAX_DOCK_WINDOW_HEIGHT } from "../core/dock";
 import type { LogicalRect } from "../core/panels";
 import type { DockEdge } from "../core/settings";
 import tokens from "../themes/tokens.css?raw";
@@ -315,4 +316,23 @@ describe("the window fits everything the dock paints", () => {
       }
     }
   }
+});
+
+describe("dock size limits shared with Rust", () => {
+  it.each(["s", "m", "l"] as const)(
+    "keeps the %s preset within the heights Rust accepts",
+    (size) => {
+      const { icon, pad } = SIZE_GEOMETRY[size];
+      expect(icon + 2 * pad).toBeLessThanOrEqual(MAX_DOCK_BAR_HEIGHT);
+      for (const motion of [true, false]) {
+        const { height } = dockWindowSize({
+          size,
+          groups: GROUPS,
+          motion,
+          labelWidths: LABELS,
+        });
+        expect(height).toBeLessThanOrEqual(MAX_DOCK_WINDOW_HEIGHT);
+      }
+    },
+  );
 });

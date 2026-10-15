@@ -853,6 +853,25 @@ mod tests {
     }
 
     #[test]
+    fn height_limits_match_the_frontend_contract() {
+        // src/core/dock.ts repeats these limits so layout.test.ts can keep
+        // every preset within them; both sides must agree.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/core/dock.ts");
+        let source = std::fs::read_to_string(&path).expect("src/core/dock.ts must exist");
+        let value = |name: &str| -> f64 {
+            source
+                .split(&format!("export const {name} = "))
+                .nth(1)
+                .and_then(|rest| rest.split(';').next())
+                .and_then(|number| number.trim().parse().ok())
+                .unwrap_or_else(|| panic!("src/core/dock.ts: `{name}` not found"))
+        };
+
+        assert_eq!(value("MAX_DOCK_BAR_HEIGHT"), MAX_BAR_HEIGHT);
+        assert_eq!(value("MAX_DOCK_WINDOW_HEIGHT"), MAX_WINDOW_HEIGHT);
+    }
+
+    #[test]
     fn layout_of_every_preset_is_within_the_limits() {
         // Grande, the largest preset: a 82 px bar in a 147 px window.
         let large = DockLayout {
