@@ -24,7 +24,6 @@ const messages = {
       settings: "Configurações",
       about: "Sobre",
     },
-    underConstruction: "Em construção.",
     /** Shown in place of a panel that failed to render. */
     failed: "Não foi possível mostrar este painel.",
     /** Key hint at the right of every panel footer: `<kbd>key</kbd> action`. */

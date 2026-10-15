@@ -11,7 +11,6 @@ export const otherText: Messages = {
   },
   panel: {
     titles: { settings: "Settings", about: "About" },
-    underConstruction: "Under construction.",
     failed: "This panel could not be shown.",
     closeHint: { key: "Esc", action: "closes" },
   },
