@@ -726,3 +726,217 @@ mod tests {
         assert_eq!(storage.status(), StorageStatus::Ok);
     }
 }
+
+/// The names the frontend uses, pinned in `tests/fixtures/widgets/ipc.json`
+/// (spec 0003 §2.6): the event, each widget command and its arguments, as
+/// `src/core/widgets.ts` sends them. `widgets.contract.test.ts` checks the
+/// same file against the TS constants, so renaming one on one side alone
+/// breaks one of the two tests.
+///
+/// The commands are read from the source, as `tests/guards.rs` does: the
+/// `#[tauri::command]` functions of this file, the app manifest in
+/// `build.rs` and `generate_handler!` in `lib.rs`.
+#[cfg(test)]
+mod ipc_contract {
+    use std::collections::BTreeMap;
+    use std::fs;
+    use std::path::Path;
+
+    use serde_json::Value;
+
+    use super::CHANGED_EVENT;
+
+    /// Command name to its argument names, as the frontend sends them.
+    type Commands = BTreeMap<String, Vec<String>>;
+
+    fn read(relative: &str) -> String {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative);
+        fs::read_to_string(&path).unwrap_or_else(|error| panic!("{relative}: {error}"))
+    }
+
+    fn fixture() -> Value {
+        let text = read("tests/fixtures/widgets/ipc.json");
+        serde_json::from_str(&text).expect("ipc.json is valid JSON")
+    }
+
+    fn fixture_commands() -> Commands {
+        let commands = fixture()["commands"]
+            .as_object()
+            .expect("ipc.json has a `commands` object")
+            .clone();
+        commands
+            .into_iter()
+            .map(|(name, args)| {
+                let args = args
+                    .as_array()
+                    .unwrap_or_else(|| panic!("ipc.json: `{name}` lists its arguments"))
+                    .iter()
+                    .map(|arg| arg.as_str().expect("argument names are text").to_owned())
+                    .collect();
+                (name, args)
+            })
+            .collect()
+    }
+
+    /// `snake_case` to `camelCase`, as Tauri names a command's arguments by
+    /// default.
+    fn camel_case(name: &str) -> String {
+        let mut camel = String::with_capacity(name.len());
+        let mut upper = false;
+        for c in name.chars() {
+            if c == '_' {
+                upper = true;
+            } else if upper {
+                camel.extend(c.to_uppercase());
+                upper = false;
+            } else {
+                camel.push(c);
+            }
+        }
+        camel
+    }
+
+    /// Splits `text` at the commas outside `<>`, `()` and `[]`.
+    fn split_top_level(text: &str) -> Vec<&str> {
+        let mut parts = Vec::new();
+        let mut depth = 0usize;
+        let mut start = 0;
+        for (index, c) in text.char_indices() {
+            match c {
+                '<' | '(' | '[' => depth += 1,
+                '>' | ')' | ']' => depth = depth.saturating_sub(1),
+                ',' if depth == 0 => {
+                    parts.push(&text[start..index]);
+                    start = index + 1;
+                }
+                _ => {}
+            }
+        }
+        parts.push(&text[start..]);
+        parts
+            .into_iter()
+            .map(str::trim)
+            .filter(|part| !part.is_empty())
+            .collect()
+    }
+
+    /// The text between the `(` at the start of `text` and its matching `)`.
+    fn parenthesized(text: &str) -> &str {
+        let mut depth = 0usize;
+        for (index, c) in text.char_indices() {
+            match c {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return &text[1..index];
+                    }
+                }
+                _ => {}
+            }
+        }
+        panic!("unbalanced parentheses in {text:?}");
+    }
+
+    /// The `#[tauri::command]` functions of this file with the arguments the
+    /// frontend sends: what Tauri injects (`AppHandle`, `State`) is left out.
+    fn source_commands() -> Commands {
+        let source = read("src/commands/widgets.rs");
+        // Only the code above the tests, without comment lines.
+        let code: String = source
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap()
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        code.split("#[tauri::command]")
+            .skip(1)
+            .map(|item| {
+                let after_fn = item
+                    .split_once("fn ")
+                    .expect("a #[tauri::command] marks a function")
+                    .1;
+                let open = after_fn.find('(').expect("the function has parameters");
+                let name = after_fn[..open].trim().to_owned();
+                let args = split_top_level(parenthesized(&after_fn[open..]))
+                    .into_iter()
+                    .filter_map(|param| {
+                        let (arg, ty) = param.split_once(':').expect("`name: Type`");
+                        let ty = ty.trim();
+                        let injected = ty.starts_with("AppHandle") || ty.starts_with("State<");
+                        (!injected).then(|| camel_case(arg.trim()))
+                    })
+                    .collect();
+                (name, args)
+            })
+            .collect()
+    }
+
+    /// The commands the app manifest in `build.rs` declares.
+    fn manifest_commands() -> Vec<String> {
+        let source = read("build.rs");
+        let list = source
+            .split(".commands(&[")
+            .nth(1)
+            .and_then(|rest| rest.split("])").next())
+            .expect("build.rs declares the commands with `.commands(&[...])`");
+        list.split(',')
+            .map(|entry| entry.trim().trim_matches('"').to_owned())
+            .filter(|entry| !entry.is_empty())
+            .collect()
+    }
+
+    /// The widget commands `generate_handler!` registers in `lib.rs`.
+    fn registered_commands() -> Vec<String> {
+        let source = read("src/lib.rs");
+        let list = source
+            .split("generate_handler![")
+            .nth(1)
+            .and_then(|rest| rest.split(']').next())
+            .expect("lib.rs registers the commands with `generate_handler![...]`");
+        list.split(',')
+            .filter_map(|entry| entry.trim().strip_prefix("commands::widgets::"))
+            .map(str::to_owned)
+            .collect()
+    }
+
+    #[test]
+    fn camel_case_follows_tauri() {
+        assert_eq!(camel_case("id"), "id");
+        assert_eq!(camel_case("time_zone"), "timeZone");
+        assert_eq!(camel_case("a_b_c"), "aBC");
+    }
+
+    #[test]
+    fn the_event_is_the_one_in_the_fixture() {
+        assert_eq!(fixture()["event"], CHANGED_EVENT);
+    }
+
+    #[test]
+    fn every_command_and_argument_is_the_one_in_the_fixture() {
+        let expected = fixture_commands();
+        assert!(!expected.is_empty(), "ipc.json lists no command");
+        assert_eq!(source_commands(), expected);
+    }
+
+    #[test]
+    fn every_widget_command_is_declared_and_registered() {
+        let manifest = manifest_commands();
+        let mut registered = registered_commands();
+        registered.sort();
+        let expected: Vec<String> = fixture_commands().into_keys().collect();
+
+        for command in &expected {
+            assert!(
+                manifest.contains(command),
+                "build.rs: `{command}` is not in the app manifest"
+            );
+        }
+        assert_eq!(
+            registered, expected,
+            "lib.rs: generate_handler! must register exactly the widget commands"
+        );
+    }
+}

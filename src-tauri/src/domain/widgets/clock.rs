@@ -53,6 +53,8 @@ pub enum HourCycle {
     H12,
 }
 
+closed_set!(HourCycle { H23, H12 });
+
 #[cfg(test)]
 mod tests {
     use super::*;

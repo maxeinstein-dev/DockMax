@@ -23,14 +23,19 @@ export const MAX_LABEL_CHARS = 40;
 export type WidgetKind =
   "clock" | "time-progress" | "note" | "shortcut" | "files";
 
+/* Each closed set below has a tuple with every value, in the order of the
+ * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
+ * is exactly its type and matches `enums.json`, which Rust checks against
+ * its enums: a value added on one side alone breaks one of the two tests. */
+
 /** Every kind, in the order of `WidgetKind::ALL` in Rust. */
-export const WIDGET_KINDS: readonly WidgetKind[] = [
+export const WIDGET_KINDS = [
   "clock",
   "time-progress",
   "note",
   "shortcut",
   "files",
-];
+] as const;
 
 /** The kinds `add_widget` accepts in this phase; Shortcut and Files exist
  * only in the domain until phase 3. Must match `WidgetKind::creatable`. */
@@ -47,6 +52,8 @@ export type WidgetId = string;
 /** How hours are counted, named as in `Intl.DateTimeFormat`'s `hourCycle`. */
 export type HourCycle = "h23" | "h12";
 
+export const HOUR_CYCLES = ["h23", "h12"] as const;
+
 export interface ClockConfig {
   /** IANA time zone name, such as `America/Sao_Paulo`; null follows the
    * system time zone. */
@@ -58,8 +65,12 @@ export interface ClockConfig {
 
 export type Period = "day" | "week" | "month" | "year" | "workday";
 
+export const PERIODS = ["day", "week", "month", "year", "workday"] as const;
+
 /** First day of the week for the `week` period. */
 export type WeekStart = "monday" | "sunday";
+
+export const WEEK_STARTS = ["monday", "sunday"] as const;
 
 /** Workday hours, both on the same day, as local `HH:mm`. */
 export interface Workday {
@@ -83,6 +94,9 @@ export type NoteConfig = Record<string, never>;
 /** What a shortcut opens: an absolute Windows path or an http(s) URL. */
 export type ShortcutTarget =
   { type: "path"; path: string } | { type: "url"; url: string };
+
+/** Every `type` of a `ShortcutTarget`. */
+export const SHORTCUT_TARGET_TYPES = ["path", "url"] as const;
 
 export interface ShortcutConfig {
   target: ShortcutTarget;
@@ -124,6 +138,12 @@ export type WidgetInstance<K extends WidgetKind = WidgetKind> = {
 export type UnavailableReason =
   "newerVersion" | "migrationFailed" | "openFailed";
 
+export const UNAVAILABLE_REASONS = [
+  "newerVersion",
+  "migrationFailed",
+  "openFailed",
+] as const;
+
 /** Whether the widget database can be used in this run (spec 0003 §2.4
  * item 7). `recovered`: a corrupt database was set aside and a new one made;
  * the notice stays until `dismiss_storage_notice`. `unavailable`: the dock
@@ -132,6 +152,9 @@ export type StorageStatus =
   | { state: "ok" }
   | { state: "recovered" }
   | { state: "unavailable"; reason: UnavailableReason };
+
+/** Every `state` of a `StorageStatus`. */
+export const STORAGE_STATES = ["ok", "recovered", "unavailable"] as const;
 
 /** What `list_widgets` returns and `widgets-changed` carries. */
 export interface WidgetsSnapshot {
@@ -142,6 +165,8 @@ export interface WidgetsSnapshot {
 
 /** One place towards the start (`up`) or the end (`down`) of the dock. */
 export type MoveDirection = "up" | "down";
+
+export const MOVE_DIRECTIONS = ["up", "down"] as const;
 
 /** Why a widget command failed; must match `WidgetErrorCode` in
  * `src-tauri/src/domain/widgets/mod.rs`, plus `notReady`. */

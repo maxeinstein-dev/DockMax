@@ -6,6 +6,26 @@
 //! pins the shapes on both sides. Nothing here touches the database, Tauri
 //! or Windows.
 
+/// Gives a fieldless enum `ALL`: every variant, in the order listed, which
+/// is the order of `tests/fixtures/widgets/enums.json` (spec 0003 §2.6).
+/// The list is matched exhaustively, so a variant added to the enum but not
+/// to the list doesn't compile; the contract tests then compare `ALL` with
+/// `enums.json`, and the TS tests compare that file with the TS types.
+macro_rules! closed_set {
+    ($ty:ident { $($variant:ident),+ $(,)? }) => {
+        impl $ty {
+            /// Every value, in the order of `enums.json`.
+            #[allow(dead_code, reason = "most are read only by the contract tests")]
+            pub const ALL: [$ty; [$(stringify!($variant)),+].len()] = [$($ty::$variant),+];
+        }
+
+        // Never called: it only has to compile.
+        const _: fn($ty) = |value| match value {
+            $($ty::$variant => {})+
+        };
+    };
+}
+
 pub mod clock;
 #[cfg(test)]
 mod contract_tests;
@@ -56,15 +76,15 @@ pub enum WidgetKind {
     Files,
 }
 
-impl WidgetKind {
-    pub const ALL: [WidgetKind; 5] = [
-        WidgetKind::Clock,
-        WidgetKind::TimeProgress,
-        WidgetKind::Note,
-        WidgetKind::Shortcut,
-        WidgetKind::Files,
-    ];
+closed_set!(WidgetKind {
+    Clock,
+    TimeProgress,
+    Note,
+    Shortcut,
+    Files,
+});
 
+impl WidgetKind {
     /// Whether `add_widget` may create this kind in this phase. Shortcut and
     /// Files exist only in the domain until phase 3 (spec 0003 §2.5).
     pub const fn creatable(self) -> bool {
@@ -330,6 +350,12 @@ pub enum UnavailableReason {
     OpenFailed,
 }
 
+closed_set!(UnavailableReason {
+    NewerVersion,
+    MigrationFailed,
+    OpenFailed,
+});
+
 /// What `list_widgets` returns and `widgets-changed` carries: the storage
 /// status and every instance, in dock order.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -347,6 +373,8 @@ pub enum MoveDirection {
     Up,
     Down,
 }
+
+closed_set!(MoveDirection { Up, Down });
 
 /// Why a widget change was rejected or could not be saved.
 ///
@@ -443,24 +471,22 @@ pub enum WidgetErrorCode {
     WriteFailed,
 }
 
-impl WidgetErrorCode {
-    pub const ALL: [WidgetErrorCode; 14] = [
-        WidgetErrorCode::LimitReached,
-        WidgetErrorCode::NotCreatable,
-        WidgetErrorCode::NotFound,
-        WidgetErrorCode::KindMismatch,
-        WidgetErrorCode::InvalidLabel,
-        WidgetErrorCode::InvalidTimeZone,
-        WidgetErrorCode::InvalidPeriods,
-        WidgetErrorCode::InvalidWorkday,
-        WidgetErrorCode::InvalidTarget,
-        WidgetErrorCode::InvalidFolder,
-        WidgetErrorCode::NoteTooLarge,
-        WidgetErrorCode::InvalidConfig,
-        WidgetErrorCode::Unavailable,
-        WidgetErrorCode::WriteFailed,
-    ];
-}
+closed_set!(WidgetErrorCode {
+    LimitReached,
+    NotCreatable,
+    NotFound,
+    KindMismatch,
+    InvalidLabel,
+    InvalidTimeZone,
+    InvalidPeriods,
+    InvalidWorkday,
+    InvalidTarget,
+    InvalidFolder,
+    NoteTooLarge,
+    InvalidConfig,
+    Unavailable,
+    WriteFailed,
+});
 
 #[cfg(test)]
 mod tests {

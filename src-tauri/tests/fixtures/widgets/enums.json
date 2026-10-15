@@ -1,0 +1,58 @@
+{
+  "WidgetKind": [
+    "clock",
+    "time-progress",
+    "note",
+    "shortcut",
+    "files"
+  ],
+  "HourCycle": [
+    "h23",
+    "h12"
+  ],
+  "Period": [
+    "day",
+    "week",
+    "month",
+    "year",
+    "workday"
+  ],
+  "WeekStart": [
+    "monday",
+    "sunday"
+  ],
+  "MoveDirection": [
+    "up",
+    "down"
+  ],
+  "UnavailableReason": [
+    "newerVersion",
+    "migrationFailed",
+    "openFailed"
+  ],
+  "StorageState": [
+    "ok",
+    "recovered",
+    "unavailable"
+  ],
+  "ShortcutTargetType": [
+    "path",
+    "url"
+  ],
+  "WidgetErrorCode": [
+    "limitReached",
+    "notCreatable",
+    "notFound",
+    "kindMismatch",
+    "invalidLabel",
+    "invalidTimeZone",
+    "invalidPeriods",
+    "invalidWorkday",
+    "invalidTarget",
+    "invalidFolder",
+    "noteTooLarge",
+    "invalidConfig",
+    "unavailable",
+    "writeFailed"
+  ]
+}

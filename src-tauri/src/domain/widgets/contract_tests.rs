@@ -8,17 +8,23 @@
 //! crate.
 
 use std::collections::BTreeSet;
+use std::fmt::Debug;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use serde_json::Value;
+use serde_json::{Value, json};
 
+use super::clock::HourCycle;
+use super::shortcut::ShortcutTarget;
+use super::time_progress::{Period, WeekStart};
 use super::*;
 
 /// Fixtures that are not a widget instance, each with its own type.
-const ERROR_CODES: &str = "error-codes.json";
+/// `ipc.json` is checked in `commands/widgets.rs`, next to the commands.
+const ENUMS: &str = "enums.json";
+const IPC: &str = "ipc.json";
 const STORAGE_STATUSES: &str = "storage-statuses.json";
 const SNAPSHOT: &str = "snapshot-sample.json";
 
@@ -68,7 +74,7 @@ fn every_instance_fixture_round_trips_and_is_valid() {
     let mut kinds = BTreeSet::new();
     let instances: Vec<String> = fixture_names()
         .into_iter()
-        .filter(|name| ![ERROR_CODES, STORAGE_STATUSES, SNAPSHOT].contains(&name.as_str()))
+        .filter(|name| ![ENUMS, IPC, STORAGE_STATUSES, SNAPSHOT].contains(&name.as_str()))
         .collect();
     assert!(!instances.is_empty(), "no instance fixture found");
 
@@ -105,27 +111,88 @@ fn the_snapshot_fixture_round_trips_and_is_valid() {
     }
 }
 
-#[test]
-fn the_storage_status_fixture_round_trips_and_lists_every_status() {
-    let statuses: Vec<StorageStatus> = round_trip(STORAGE_STATUSES);
-    let expected = [
-        StorageStatus::Ok,
-        StorageStatus::Recovered,
-        StorageStatus::Unavailable {
-            reason: UnavailableReason::NewerVersion,
+/// Every storage status: each state, and `unavailable` with each reason.
+fn every_storage_status() -> Vec<StorageStatus> {
+    // Never called: a new status doesn't compile until it is listed below.
+    const _: fn(StorageStatus) = |status| match status {
+        StorageStatus::Ok | StorageStatus::Recovered | StorageStatus::Unavailable { .. } => {}
+    };
+    let mut all = vec![StorageStatus::Ok, StorageStatus::Recovered];
+    all.extend(
+        UnavailableReason::ALL
+            .into_iter()
+            .map(|reason| StorageStatus::Unavailable { reason }),
+    );
+    all
+}
+
+/// One target of each type.
+fn every_shortcut_target() -> Vec<ShortcutTarget> {
+    // Never called: a new type doesn't compile until it is listed below.
+    const _: fn(ShortcutTarget) = |target| match target {
+        ShortcutTarget::Path { .. } | ShortcutTarget::Url { .. } => {}
+    };
+    vec![
+        ShortcutTarget::default(),
+        ShortcutTarget::Url {
+            url: "https://example.com/".to_owned(),
         },
-        StorageStatus::Unavailable {
-            reason: UnavailableReason::MigrationFailed,
-        },
-        StorageStatus::Unavailable {
-            reason: UnavailableReason::OpenFailed,
-        },
-    ];
-    assert_eq!(statuses, expected);
+    ]
+}
+
+/// The value of the `field` tag of each of `values`, in order, each once.
+fn tags<T: Serialize>(values: &[T], field: &str) -> Vec<String> {
+    let mut tags: Vec<String> = Vec::new();
+    for value in values {
+        let tag = serde_json::to_value(value).unwrap()[field]
+            .as_str()
+            .unwrap_or_else(|| panic!("no `{field}` tag"))
+            .to_owned();
+        if !tags.contains(&tag) {
+            tags.push(tag);
+        }
+    }
+    tags
+}
+
+/// Reads the list `name` of `enums.json` as `T`s: it must be exactly `all`.
+fn assert_closed_set<T>(enums: &Value, name: &str, all: &[T])
+where
+    T: DeserializeOwned + PartialEq + Debug,
+{
+    let listed: Vec<T> = serde_json::from_value(enums[name].clone())
+        .unwrap_or_else(|error| panic!("{ENUMS}: {name} doesn't read as the Rust enum: {error}"));
+    assert_eq!(listed, all, "{ENUMS}: {name}");
 }
 
 #[test]
-fn the_error_code_fixture_is_every_code_in_order() {
-    let codes: Vec<WidgetErrorCode> = round_trip(ERROR_CODES);
-    assert_eq!(codes, WidgetErrorCode::ALL);
+fn the_storage_status_fixture_round_trips_and_lists_every_status() {
+    let statuses: Vec<StorageStatus> = round_trip(STORAGE_STATUSES);
+    assert_eq!(statuses, every_storage_status());
+}
+
+#[test]
+fn the_enum_fixture_is_every_value_of_each_closed_set_in_order() {
+    let enums = read_fixture(ENUMS);
+    let expected = json!({
+        "WidgetKind": WidgetKind::ALL,
+        "HourCycle": HourCycle::ALL,
+        "Period": Period::ALL,
+        "WeekStart": WeekStart::ALL,
+        "MoveDirection": MoveDirection::ALL,
+        "UnavailableReason": UnavailableReason::ALL,
+        "StorageState": tags(&every_storage_status(), "state"),
+        "ShortcutTargetType": tags(&every_shortcut_target(), "type"),
+        "WidgetErrorCode": WidgetErrorCode::ALL,
+    });
+    assert_eq!(enums, expected, "{ENUMS} doesn't match the Rust enums");
+
+    // And every name in it reads back as the same value.
+    assert_closed_set(&enums, "WidgetKind", &WidgetKind::ALL);
+    assert_closed_set(&enums, "HourCycle", &HourCycle::ALL);
+    assert_closed_set(&enums, "Period", &Period::ALL);
+    assert_closed_set(&enums, "WeekStart", &WeekStart::ALL);
+    assert_closed_set(&enums, "MoveDirection", &MoveDirection::ALL);
+    assert_closed_set(&enums, "UnavailableReason", &UnavailableReason::ALL);
+    assert_closed_set(&enums, "WidgetErrorCode", &WidgetErrorCode::ALL);
 }

@@ -1,0 +1,29 @@
+{
+  "event": "widgets-changed",
+  "commands": {
+    "list_widgets": [],
+    "add_widget": [
+      "kind"
+    ],
+    "remove_widget": [
+      "id"
+    ],
+    "move_widget": [
+      "id",
+      "direction"
+    ],
+    "update_widget": [
+      "id",
+      "label",
+      "config"
+    ],
+    "get_note": [
+      "id"
+    ],
+    "save_note": [
+      "id",
+      "body"
+    ],
+    "dismiss_storage_notice": []
+  }
+}

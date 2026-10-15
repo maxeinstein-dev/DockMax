@@ -1,8 +1,19 @@
-import type {
-  StorageStatus,
-  WidgetErrorCode,
-  WidgetInstance,
-  WidgetsSnapshot,
+import {
+  HOUR_CYCLES,
+  MOVE_DIRECTIONS,
+  PERIODS,
+  SHORTCUT_TARGET_TYPES,
+  STORAGE_STATES,
+  UNAVAILABLE_REASONS,
+  WEEK_STARTS,
+  WIDGET_ERROR_CODES,
+  WIDGET_KINDS,
+  WIDGETS_CHANGED_EVENT,
+  type StorageStatus,
+  type WidgetCommand,
+  type WidgetCommandSignatures,
+  type WidgetInstance,
+  type WidgetsSnapshot,
 } from "./widgets";
 
 /* The contract fixtures, typed: each entry is the JSON file of the same
@@ -25,8 +36,26 @@ const NOTE_DEFAULT = {
   config: {},
 } satisfies WidgetInstance<"note">;
 
-/** Codes Rust can send: every `WidgetErrorCode` but the TS-only one. */
-type RustErrorCode = Exclude<WidgetErrorCode, "notReady">;
+/** One example of the arguments of each widget command, with every key.
+ * The keys are what `invoke` sends: `satisfies` makes a key too many a type
+ * error, and `Required<>` a key left out (even an optional one), so the
+ * argument names below are those of the `*Args` types. */
+export const COMMAND_ARGS_SAMPLES = {
+  list_widgets: {},
+  add_widget: { kind: "clock" },
+  remove_widget: { id: CLOCK_DEFAULT.id },
+  move_widget: { id: CLOCK_DEFAULT.id, direction: "up" },
+  update_widget: {
+    id: NOTE_DEFAULT.id,
+    label: null,
+    config: { kind: "note", config: {} },
+  },
+  get_note: { id: NOTE_DEFAULT.id },
+  save_note: { id: NOTE_DEFAULT.id, body: "" },
+  dismiss_storage_notice: {},
+} satisfies {
+  [C in WidgetCommand]: Required<WidgetCommandSignatures[C]["args"]>;
+};
 
 export const WIDGET_FIXTURES = {
   "clock-default": CLOCK_DEFAULT,
@@ -102,22 +131,30 @@ export const WIDGET_FIXTURES = {
     { state: "unavailable", reason: "openFailed" },
   ] satisfies StorageStatus[],
 
-  "error-codes": [
-    "limitReached",
-    "notCreatable",
-    "notFound",
-    "kindMismatch",
-    "invalidLabel",
-    "invalidTimeZone",
-    "invalidPeriods",
-    "invalidWorkday",
-    "invalidTarget",
-    "invalidFolder",
-    "noteTooLarge",
-    "invalidConfig",
-    "unavailable",
-    "writeFailed",
-  ] satisfies RustErrorCode[],
+  /* Every value of each closed set; `WidgetErrorCode` without the TS-only
+   * `notReady`, which Rust never sends. */
+  enums: {
+    WidgetKind: WIDGET_KINDS,
+    HourCycle: HOUR_CYCLES,
+    Period: PERIODS,
+    WeekStart: WEEK_STARTS,
+    MoveDirection: MOVE_DIRECTIONS,
+    UnavailableReason: UNAVAILABLE_REASONS,
+    StorageState: STORAGE_STATES,
+    ShortcutTargetType: SHORTCUT_TARGET_TYPES,
+    WidgetErrorCode: WIDGET_ERROR_CODES.filter((code) => code !== "notReady"),
+  },
+
+  /* The event and, for each command, the names of its arguments. */
+  ipc: {
+    event: WIDGETS_CHANGED_EVENT,
+    commands: Object.fromEntries(
+      Object.entries(COMMAND_ARGS_SAMPLES).map(([command, args]) => [
+        command,
+        Object.keys(args),
+      ]),
+    ),
+  },
 };
 
 export type WidgetFixtureName = keyof typeof WIDGET_FIXTURES;

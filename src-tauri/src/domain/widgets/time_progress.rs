@@ -59,6 +59,14 @@ pub enum Period {
     Workday,
 }
 
+closed_set!(Period {
+    Day,
+    Week,
+    Month,
+    Year,
+    Workday,
+});
+
 /// First day of the week for [`Period::Week`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -67,6 +75,8 @@ pub enum WeekStart {
     Monday,
     Sunday,
 }
+
+closed_set!(WeekStart { Monday, Sunday });
 
 /// Workday hours, both on the same day, as local `HH:mm` text. Kept as text
 /// so a config edited by hand still reads; the format is a validation rule.
