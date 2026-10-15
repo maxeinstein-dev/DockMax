@@ -123,15 +123,56 @@ Refinado em 2026-10-15, depois do mock (`DESIGN.md`) e com o código do PR 1 em 
 
 - **F8** `[sequential]` ADR 0007 (configurações em arquivo, validação no Rust, i18n tipado, logs); verificação 10–16 da spec no app real (persistência após reiniciar, arquivo apagado/corrompido, inspeção do log, instância única); revisão adversarial; PR.
 
-## PR 3 — Dock e painéis (esboço; refinar depois do mock)
+## PR 3 — Dock e painéis (branch `feat/fase-1-dock-paineis`)
 
-- Componentes do dock na variante escolhida (rótulo flutuante, ponto indicador, separador, ampliação se V1 passou).
-- Painéis Configurações e Sobre; bandeja completa; dock em cima.
-- Acessibilidade (teclado, rótulos, contraste AA, reduzir movimento).
-- Roadmap da Fase 1 marcado; verificação 17–21; revisão e PR.
-- Pendência herdada do PR 1: o `panel-show` é emitido antes de o listener do painel estar pronto na primeira abertura, e na troca de painel o conteúdo anterior aparece por um instante. Mostrar a janela só depois de o painel confirmar que renderizou o conteúdo pedido.
-- Pendência da revisão do PR 2: hoje `update_settings` devolve a mensagem do erro em inglês. Antes de a tela de Configurações mostrá-la, o erro vira um código serializável, e o frontend traduz esse código por `pt-BR.ts`.
-- Pendência da revisão do PR 2: "salvar a cada mudança" com um controle deslizante de tamanho gravaria o arquivo a cada passo, e o `sync_all` roda na thread principal (o comando é síncrono). A interface agrupa as mudanças (debounce) ou o comando passa a ser assíncrono.
+Refinado em 2026-10-15, com o PR 2 em `main`.
+
+### Análise: spec × plano × realidade
+
+| Achado | Ajuste |
+|---|---|
+| A janela do dock tem tamanho fixo (240×64 + 40 de folga no `tauri.conf.json`), mas passa a depender do tamanho dos ícones, da borda, da ampliação que empurra os vizinhos e do rótulo flutuante | O frontend calcula o espaço que ocupa (barra, ampliação, rótulo) e o informa junto com a região de captura; o Rust só dimensiona e posiciona. A geometria tem uma fonte só: os tokens CSS |
+| O dock não sabe qual painel está aberto, mas o ponto indicador precisa disso | O Rust emite `panel-changed` (painel aberto ou nenhum) para o dock |
+| Pendência do PR 1: corrida do `panel-show` na primeira abertura e conteúdo anterior aparecendo na troca | O painel confirma que renderizou (`panel_ready`); o Rust só mostra a janela depois, com tempo-limite de segurança |
+| Pendência do PR 2: debounce da gravação por causa de um controle deslizante | Não há controle deslizante: o tamanho são 3 presets (Q7). Gravar a cada clique é seguro; o comando segue síncrono |
+| Pendência do PR 2: erro de `update_settings` em inglês | Erro vira código serializável, traduzido pelo `pt-BR.ts` |
+| Geometria do PR 1 diferente do `DESIGN.md` (gap 8, barra 64, transição 120 ms, título 16 px) | Com a janela dinâmica, o dock adota os valores do `DESIGN.md` |
+| Várias lanes precisariam de textos novos no mesmo `pt-BR.ts` | Um passo inicial (C0) define textos e contratos; as lanes só consomem |
+| Teclado: o dock não aparece no Alt+Tab e não há atalho global (Q21) | A navegação por Tab e setas vale depois que o dock recebe o foco (clique). Atalho global segue no backlog |
+
+### Batch 0 — contratos
+
+- **C0** `[sequential]` Textos e tipos que as lanes vão consumir:
+  - `src/i18n/pt-BR.ts`: rótulos do painel Configurações (grupos e opções), do Sobre, dos erros de configuração (um por código), dicas de rótulo;
+  - `src-tauri/src/i18n.rs`: item "Configurações" da bandeja;
+  - `src/core/`: tipos do evento `panel-changed`, do código de erro de configuração e do payload do dock (região de captura + tamanho necessário da janela);
+  - Rust: o código de erro serializável no domínio de configurações e o comando devolvendo `{ code }`; nomes de eventos como constantes.
+
+### Batch A — paralelo (sem arquivos compartilhados)
+
+- **D1** `[parallel-safe]` **Dock** (`src/dock/`, `src/themes/tokens.css`):
+  - ladrilhos B1 em superelipse com glifos próprios (Configurações, Sobre), rótulo em pílula, ponto indicador ligado ao `panel-changed`, separador;
+  - ampliação com os valores do `DESIGN.md`, empurrando os vizinhos; desligada com "reduzir movimento";
+  - tamanho (`data-size`) e borda (`data-edge`, com ampliação e rótulo invertidos em cima) vindos das configurações;
+  - navegação por teclado com tabindex itinerante e setas, foco visível;
+  - informa ao Rust a região de captura e o tamanho que precisa (barra + ampliação + rótulo).
+- **P2** `[parallel-safe]` **Painéis** (`src/panel/`):
+  - Configurações: Tema, Posição, Tamanho e Opacidade como grupos de opções acessíveis (setas entre opções), aplicando e salvando a cada clique; em erro, mostra a mensagem traduzida e volta ao valor anterior;
+  - Sobre: versão, licença MIT e link para o repositório;
+  - confirma ao Rust (`panel_ready`) quando o conteúdo pedido renderizou.
+- **R1** `[parallel-safe]` **Rust: janelas e bandeja** (`src-tauri/src/windows/`, `commands/`, `tray.rs`, `build.rs`, capabilities, `tests/guards.rs`, `lib.rs`):
+  - a janela do dock passa a ter o tamanho informado pelo frontend (com limites) e a borda das configurações; reposiciona ao mudar tamanho ou borda;
+  - `panel_ready` + tempo-limite antes de mostrar o painel; `panel-changed` para o dock;
+  - bandeja com "Configurações", que mostra o dock se estiver oculto e abre o painel;
+  - permissões mínimas para os comandos novos, com o guarda atualizado.
+
+### Batch B — integração e acabamento
+
+- **I1** `[sequential]` Liga as três lanes no app real, ajusta o que não casar, ADR 0006 atualizado (janela dinâmica, confirmação do painel), verificação de contraste AA nos dois temas e nas duas opacidades.
+
+### Batch C — fechamento
+
+- **F9** `[sequential]` Roadmap da Fase 1 marcado; verificação 17–21 da spec; revisão adversarial; teste manual do usuário no build de release; PR.
 
 ## Rastreabilidade (spec → tarefa)
 
