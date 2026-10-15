@@ -1,13 +1,26 @@
+/* Always opaque, whatever the dock opacity (DESIGN.md, The Opaque Panel
+   Rule). */
 .panel {
   box-sizing: border-box;
   height: 100%;
   padding: 16px 20px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--glass-radius);
-  color: #f2f2f2;
-  background: var(--glass-sheen), var(--glass-surface);
-  /* The panel fills its window: no room for the outer shadow. */
-  box-shadow: var(--glass-highlight);
+  /* The hairline is a border instead of the outer 0 0 0 1px ring of
+     DESIGN.md: the panel fills its window, so a ring outside it would be
+     cut off. */
+  border: 1px solid var(--hair);
+  border-radius: var(--r-panel);
+  color: var(--ink);
+  background: rgb(var(--surface-rgb));
+  /* Same stack as the dock bar. The panel fills its window, so the outer
+     --shadow has no room yet; it shows once the window gets a margin. */
+  box-shadow:
+    inset 0 1px 0 var(--hi),
+    var(--shadow);
+}
+
+.panel :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .panel h1 {
@@ -18,4 +31,5 @@
 
 .panel p {
   margin: 0;
+  color: var(--ink-2);
 }

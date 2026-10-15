@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "../themes/tokens.css";
 import "../themes/base.css";
 import Dock from "./Dock";
 
