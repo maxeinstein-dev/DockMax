@@ -6,6 +6,10 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+/** A call to the frontend log: `log.error|warn|info(...)`. */
+const LOG_CALL =
+  'CallExpression[callee.type="MemberExpression"][callee.object.name="log"][callee.property.name=/^(error|warn|info)$/]';
+
 export default defineConfig(
   globalIgnores(["dist", "src-tauri", "node_modules", "docs"]),
   {
@@ -22,6 +26,32 @@ export default defineConfig(
   {
     files: ["**/*.tsx"],
     extends: [reactRefresh.configs.vite()],
+  },
+  {
+    // Frontend logs name the capability and the kind of error only (ADR
+    // 0007): a message is one string literal, or a template literal whose
+    // only interpolations are `errorKind(...)`. Pinned by
+    // src/core/log.lint.test.ts.
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: `${LOG_CALL}[arguments.length!=1]`,
+          message: "A log call takes exactly one message.",
+        },
+        {
+          selector: `${LOG_CALL}[arguments.length=1][arguments.0.type!=/^(Literal|TemplateLiteral)$/]`,
+          message:
+            "Log messages must be a string or template literal, so what they carry stays visible.",
+        },
+        {
+          selector: `${LOG_CALL} > TemplateLiteral > :not(TemplateElement, CallExpression[callee.name="errorKind"])`,
+          message:
+            "Log only the kind of an error, through errorKind(...): never its message, a path, settings or other data.",
+        },
+      ],
+    },
   },
   {
     files: ["vite.config.ts", "eslint.config.js"],
