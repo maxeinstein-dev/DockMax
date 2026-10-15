@@ -294,6 +294,127 @@ describe("daylight saving: the day's real length", () => {
   });
 });
 
+describe("daylight saving at midnight: America/Santiago", () => {
+  // Chile changes the clock at local midnight. On 6 September 2026 00:00
+  // doesn't exist (the day starts at 01:00 and lasts 23 h); on 4 April 2026
+  // the clock goes from 24:00 back to 23:00, so that day lasts 25 h.
+  inZone("America/Santiago");
+
+  it("runs in Santiago time", () => {
+    expect(at(2026, 7, 15).getTimezoneOffset()).toBe(240);
+    expect(at(2026, 1, 15).getTimezoneOffset()).toBe(180);
+  });
+
+  describe("6 September 2026, without a midnight", () => {
+    // The first instant of the day: 00:00 −04 is 01:00 −03.
+    const dayStart = Date.UTC(2026, 8, 6, 4);
+
+    it("day: starts at 01:00 and lasts 23 h", () => {
+      const { start, end } = periodBounds("day", at(2026, 9, 6, 12), config())!;
+      expect(start.getTime()).toBe(dayStart);
+      expect(start.getHours()).toBe(1);
+      expect(end).toEqual(at(2026, 9, 7));
+      expect(end.getTime() - start.getTime()).toBe(23 * HOUR);
+      // 12:00 is 11 real hours in, 12 left.
+      expect(running("day", at(2026, 9, 6, 12))).toEqual({
+        state: "running",
+        fraction: 11 / 23,
+        remainingMs: 12 * HOUR,
+      });
+    });
+
+    it("day: the day before ends where this one starts", () => {
+      expect(running("day", new Date(dayStart - 1))).toMatchObject({
+        remainingMs: 1,
+      });
+      expect(running("day", new Date(dayStart))).toEqual({
+        state: "running",
+        fraction: 0,
+        remainingMs: 23 * HOUR,
+      });
+    });
+
+    it("week: a Monday week holds 7 days less an hour", () => {
+      const { start, end } = periodBounds(
+        "week",
+        at(2026, 9, 6, 12),
+        config(),
+      )!;
+      expect(start).toEqual(at(2026, 8, 31));
+      expect(end).toEqual(at(2026, 9, 7));
+      expect(end.getTime() - start.getTime()).toBe(7 * DAY - HOUR);
+    });
+
+    it("week: a Sunday week starts at 01:00, at exactly 0", () => {
+      const sunday = config({ weekStart: "sunday" });
+      const { start, end } = periodBounds("week", at(2026, 9, 6, 12), sunday)!;
+      expect(start.getTime()).toBe(dayStart);
+      expect(end).toEqual(at(2026, 9, 13));
+      expect(running("week", new Date(dayStart), sunday).fraction).toBe(0);
+    });
+
+    it("month: September holds 30 days less an hour", () => {
+      const { start, end } = periodBounds("month", at(2026, 9, 6), config())!;
+      expect(start).toEqual(at(2026, 9, 1));
+      expect(end).toEqual(at(2026, 10, 1));
+      expect(end.getTime() - start.getTime()).toBe(30 * DAY - HOUR);
+    });
+  });
+
+  describe("4 April 2026, with a repeated hour before midnight", () => {
+    // The second 23:30 of the day, at −04.
+    const secondLateHour = new Date(Date.UTC(2026, 3, 5, 3, 30));
+
+    it("day: lasts 25 h", () => {
+      const { start, end } = periodBounds("day", at(2026, 4, 4, 12), config())!;
+      expect(start).toEqual(at(2026, 4, 4));
+      expect(end).toEqual(at(2026, 4, 5));
+      expect(end.getTime() - start.getTime()).toBe(25 * HOUR);
+      expect(running("day", at(2026, 4, 4, 12))).toEqual({
+        state: "running",
+        fraction: 12 / 25,
+        remainingMs: 13 * HOUR,
+      });
+    });
+
+    it("day: the repeated hour still belongs to 4 April", () => {
+      expect(secondLateHour.getDate()).toBe(4);
+      expect(running("day", secondLateHour)).toEqual({
+        state: "running",
+        fraction: 24.5 / 25,
+        remainingMs: HOUR / 2,
+      });
+    });
+
+    it("week: holds the extra hour", () => {
+      // 4 April 2026 is a Saturday.
+      const monday = periodBounds("week", secondLateHour, config())!;
+      expect(monday.start).toEqual(at(2026, 3, 30));
+      expect(monday.end).toEqual(at(2026, 4, 6));
+      expect(monday.end.getTime() - monday.start.getTime()).toBe(
+        7 * DAY + HOUR,
+      );
+      const sunday = periodBounds(
+        "week",
+        secondLateHour,
+        config({ weekStart: "sunday" }),
+      )!;
+      expect(sunday.start).toEqual(at(2026, 3, 29));
+      expect(sunday.end).toEqual(at(2026, 4, 5));
+      expect(sunday.end.getTime() - sunday.start.getTime()).toBe(
+        7 * DAY + HOUR,
+      );
+    });
+
+    it("month: April holds 30 days and an hour", () => {
+      const { start, end } = periodBounds("month", secondLateHour, config())!;
+      expect(start).toEqual(at(2026, 4, 1));
+      expect(end).toEqual(at(2026, 5, 1));
+      expect(end.getTime() - start.getTime()).toBe(30 * DAY + HOUR);
+    });
+  });
+});
+
 describe("remainingParts", () => {
   const MIN = 60_000;
 
