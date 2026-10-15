@@ -17,9 +17,11 @@
 //!   `dockmax.db.corrompido-<UTC date>` (never deleted), along with its
 //!   `-wal`, `-shm` and `-journal` files, and a new seeded database takes its
 //!   place with a recovery notice in `meta` until the user dismisses it.
-//! - Companion files with no database (missing, or an empty file) are set
-//!   aside the same way: SQLite would delete them, and the last changes can
-//!   be only in the `-wal`.
+//! - Companion files with data and no database (missing, or an empty file)
+//!   are set aside the same way: SQLite would delete them, and the last
+//!   changes can be only in the `-wal`. An empty `-wal` or `-journal`, or a
+//!   `-shm` alone, holds no data (every normal exit leaves an empty `-wal`
+//!   and the `-shm`): a new database is made, without a recovery notice.
 
 use std::ffi::OsString;
 use std::fmt;
@@ -171,14 +173,18 @@ pub(super) fn open_with(dir: &Path, migrations: &[&'static str]) -> Storage {
         }
     };
 
-    // Companions with no database to go with them (no file, or an empty
-    // one) hold changes SQLite would delete on opening: SQLite itself never
-    // leaves them so, so they are set aside like a corrupt database.
+    // Companions with data and no database to go with them (no file, or an
+    // empty one) hold changes SQLite would delete on opening, so they are
+    // set aside like a corrupt database. Only a `-wal` or `-journal` with
+    // bytes in it counts: every normal exit leaves an empty `-wal` (the
+    // checkpoint empties it) and the `-shm`, which never holds the user's
+    // data, and a user who deletes the database to start over gets a new
+    // one, without a recovery notice. SQLite deals with the empty ones.
     let empty = found
         .as_ref()
         .is_none_or(|metadata| metadata.is_file() && metadata.len() == 0);
     if empty {
-        match has_companions(&path) {
+        match has_orphan_data(&path) {
             Ok(false) => {}
             Ok(true) => return recover(dir, &path, migrations, Cause::OrphanCompanions),
             Err(error) => {
@@ -551,6 +557,21 @@ fn has_companions(path: &Path) -> io::Result<bool> {
     for companion in COMPANIONS {
         if with_suffix(path, companion).try_exists()? {
             return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// True when a companion may hold changes: a `-wal` or `-journal` that is
+/// anything but an empty file. The `-shm` is only an index of the `-wal`,
+/// rebuilt by the first connection.
+fn has_orphan_data(path: &Path) -> io::Result<bool> {
+    for companion in ["-wal", "-journal"] {
+        match fs::symlink_metadata(with_suffix(path, companion)) {
+            Ok(metadata) if metadata.is_file() && metadata.len() == 0 => {}
+            Ok(_) => return Ok(true),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
         }
     }
     Ok(false)
@@ -1307,6 +1328,97 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
         assert_companions_kept(dir.path(), &companions);
         let aside = set_aside_name(dir.path());
         assert_eq!(fs::read(dir.path().join(&aside)).unwrap(), b"");
+    }
+
+    /// What a normal exit leaves next to the database: the checkpoint
+    /// empties the `-wal`, and the process ends without closing, so the
+    /// `-wal` (0 bytes) and the `-shm` stay.
+    fn copy_companions_after_exit(dir: &TempDir) {
+        let live = tempdir().unwrap();
+        let mut storage = Storage::open(live.path());
+        let note = widgets(&storage)[2].id.clone();
+        notes_repo::save(storage.connection().unwrap(), &note, "in the file").unwrap();
+        storage.checkpoint();
+        for companion in ["-wal", "-shm"] {
+            fs::copy(
+                with_suffix(&db_path(&live), companion),
+                with_suffix(&db_path(dir), companion),
+            )
+            .unwrap();
+        }
+        assert_eq!(fs::read(with_suffix(&db_path(dir), "-wal")).unwrap(), b"");
+        drop(storage);
+    }
+
+    #[test]
+    fn deleted_database_with_the_companions_of_an_exit_is_a_new_database() {
+        // The user deleted `dockmax.db` to start over: what the exit left
+        // holds no data, so there is nothing to recover.
+        let dir = tempdir().unwrap();
+        copy_companions_after_exit(&dir);
+
+        let storage = Storage::open(dir.path());
+
+        assert_eq!(storage.status(), StorageStatus::Ok);
+        assert_eq!(widgets(&storage).len(), 3, "a new, seeded database");
+        drop(storage);
+        assert!(
+            !file_names(dir.path())
+                .iter()
+                .any(|name| name.contains(".corrompido-")),
+            "nothing set aside: {:?}",
+            file_names(dir.path())
+        );
+    }
+
+    #[test]
+    fn empty_companions_and_a_lone_shm_are_no_data() {
+        let cases: [&[(&str, &str)]; 4] = [
+            &[("-shm", "old shm")],
+            &[("-wal", ""), ("-shm", "old shm")],
+            &[("-journal", "")],
+            &[("", ""), ("-wal", ""), ("-shm", "old shm")],
+        ];
+        for files in cases {
+            let dir = tempdir().unwrap();
+            for (suffix, content) in files {
+                fs::write(with_suffix(&db_path(&dir), suffix), content).unwrap();
+            }
+
+            let storage = Storage::open(dir.path());
+
+            assert_eq!(storage.status(), StorageStatus::Ok, "{files:?}");
+            assert_eq!(widgets(&storage).len(), 3, "{files:?}");
+            drop(storage);
+            assert!(
+                !file_names(dir.path())
+                    .iter()
+                    .any(|name| name.contains(".corrompido-")),
+                "{files:?}: {:?}",
+                file_names(dir.path())
+            );
+        }
+    }
+
+    #[test]
+    fn a_journal_with_data_and_no_database_is_set_aside_and_recovered() {
+        let dir = tempdir().unwrap();
+        fs::write(with_suffix(&db_path(&dir), "-journal"), "old journal").unwrap();
+
+        let storage = Storage::open(dir.path());
+
+        assert_eq!(storage.status(), StorageStatus::Recovered);
+        drop(storage);
+        let aside: Vec<String> = file_names(dir.path())
+            .into_iter()
+            .filter(|name| name.starts_with("dockmax.db.corrompido-"))
+            .collect();
+        assert_eq!(aside.len(), 1, "{aside:?}");
+        assert!(aside[0].ends_with("-journal"), "{aside:?}");
+        assert_eq!(
+            fs::read(dir.path().join(&aside[0])).unwrap(),
+            b"old journal"
+        );
     }
 
     #[test]
