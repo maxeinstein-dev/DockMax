@@ -23,8 +23,10 @@ const FILE_NAME: &str = "dockmax";
 /// Size at which the log file is rotated, in bytes.
 const MAX_FILE_SIZE: u128 = 1024 * 1024;
 
-/// Log files kept, the active one included: at most ~5 MB on disk.
-const KEPT_FILES: usize = 5;
+/// Rotated files kept besides the active one. In plugin 2.10.1
+/// `KeepSome(n)` keeps n rotated files plus the active one, so 4 + 1 = 5
+/// files of up to 1 MiB: about 5 MB on disk.
+const ARCHIVED_FILES: usize = 4;
 
 /// Level of DockMax's own messages, from Rust and from the webviews.
 const APP_LEVEL: LevelFilter = if cfg!(debug_assertions) {
@@ -69,7 +71,7 @@ fn builder(outputs: &[Output]) -> Builder {
     let mut builder = Builder::new()
         .clear_targets()
         .max_file_size(MAX_FILE_SIZE)
-        .rotation_strategy(RotationStrategy::KeepSome(KEPT_FILES))
+        .rotation_strategy(RotationStrategy::KeepSome(ARCHIVED_FILES))
         .timezone_strategy(TimezoneStrategy::UseLocal)
         .level(DEPENDENCY_LEVEL);
     for (target, level) in LEVELS {
@@ -147,6 +149,19 @@ mod tests {
     use std::io;
 
     use super::*;
+
+    const MIB: u128 = 1024 * 1024;
+
+    #[test]
+    fn rotation_keeps_about_5_mib_in_5_files() {
+        assert_eq!(MAX_FILE_SIZE, MIB);
+        // Plugin 2.10.1: `KeepSome(n)` keeps n rotated files besides the
+        // active one.
+        assert_eq!(ARCHIVED_FILES, 4);
+        let files = ARCHIVED_FILES as u128 + 1;
+        assert_eq!(files, 5);
+        assert_eq!(files * MAX_FILE_SIZE, 5 * MIB);
+    }
 
     #[test]
     fn dockmax_and_the_webviews_log_more_than_the_dependencies() {

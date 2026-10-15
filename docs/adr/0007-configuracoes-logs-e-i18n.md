@@ -24,7 +24,7 @@ O PR 2 da Fase 1 traz o primeiro código de domínio do DockMax: preferências q
 
 ### Logs em arquivo
 
-- `tauri-plugin-log` com arquivo em `%LOCALAPPDATA%\dev.maxsueleinstein.dockmax\logs\dockmax.log`, girando a cada 1 MiB e mantendo 5 arquivos.
+- `tauri-plugin-log` com arquivo em `%LOCALAPPDATA%\dev.maxsueleinstein.dockmax\logs\dockmax.log`, girando a cada 1 MiB. Ficam o arquivo ativo e mais 4 girados, cerca de 5 MB no total (`KeepSome(4)`: na versão 2.10.1 do plugin, `KeepSome(n)` guarda n arquivos girados além do ativo).
 - Níveis: o código do DockMax e o webview registram `Debug` no build de debug e `Info` no de release. As dependências registram só `Warn` ou acima, porque suas mensagens não foram revisadas quanto a dados pessoais.
 - O frontend escreve no mesmo arquivo pelo plugin (`log:allow-log` nas duas janelas).
 - **O log nunca impede o app de abrir.** O plugin é registrado sem logger, só pelo comando `log` das janelas, e o logger é montado no início do `setup` com `Builder::split`. Se o arquivo não abrir (travado durante a rotação, pasta sem permissão), o app segue com um logger sem o arquivo: stdout no debug, nenhum no release. Antes, essa falha derrubava o app inteiro no `build().expect` com `panic = "abort"`.
@@ -51,6 +51,8 @@ O PR 2 da Fase 1 traz o primeiro código de domínio do DockMax: preferências q
 ### Isolamento de falhas por painel
 
 O conteúdo de cada painel fica dentro de um error boundary (`PanelBoundary`) com `resetKey` igual ao id do painel. Uma falha de renderização mostra um alerta no lugar do conteúdo, mantém o título e o Esc funcionando, e trocar de painel recupera.
+
+O React imprime no console, mesmo em produção, a mensagem e a pilha de todo erro de renderização, inclusive os capturados por um boundary. Por isso as raízes das duas janelas são criadas com `ROOT_OPTIONS` (`src/core/reactRoot.ts`): um erro capturado é registrado só pelo boundary (`onError`), e um erro não capturado ou recuperável vai para o log como `react: ...: <tipo>`, sem nada no console.
 
 ## Alternativas consideradas
 

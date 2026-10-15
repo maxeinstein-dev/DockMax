@@ -17,8 +17,10 @@ type PanelBoundaryState = {
 
 /**
  * Isolates a panel failure: the panel shows `fallback` and the rest of the
- * app keeps running. Logs nothing by itself, to keep error details out of
- * the console; reporting goes through `onError`.
+ * app keeps running. Logs nothing by itself: reporting goes through
+ * `onError`. React would still print the caught error, message and stack,
+ * on the console; the root options of both windows (`ROOT_OPTIONS` in
+ * `src/core/reactRoot.ts`) turn that off.
  */
 class PanelBoundary extends Component<PanelBoundaryProps, PanelBoundaryState> {
   state: PanelBoundaryState = {
