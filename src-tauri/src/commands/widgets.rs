@@ -843,22 +843,41 @@ mod ipc_contract {
         panic!("unbalanced parentheses in {text:?}");
     }
 
-    /// The `#[tauri::command]` functions of this file with the arguments the
-    /// frontend sends: what Tauri injects (`AppHandle`, `State`) is left out.
-    fn source_commands() -> Commands {
-        let source = read("src/commands/widgets.rs");
-        // Only the code above the tests, without comment lines.
-        let code: String = source
+    /// The code of `source` above the tests, without comment lines.
+    fn code_above_tests(source: &str) -> String {
+        source
             .split("#[cfg(test)]")
             .next()
             .unwrap()
             .lines()
             .filter(|line| !line.trim_start().starts_with("//"))
             .collect::<Vec<_>>()
-            .join("\n");
-        code.split("#[tauri::command]")
+            .join("\n")
+    }
+
+    /// The `#[tauri::command]` functions of this file with the arguments the
+    /// frontend sends.
+    fn source_commands() -> Commands {
+        commands_in(&read("src/commands/widgets.rs"))
+    }
+
+    /// The `#[tauri::command]` functions of `source` with the arguments the
+    /// frontend sends: what Tauri injects (`AppHandle`, `State`) is left out.
+    /// Also `#[tauri::command(...)]`: arguments to the attribute
+    /// (`rename_all`, `async`) don't hide a command from the contract.
+    fn commands_in(source: &str) -> Commands {
+        let code = code_above_tests(source);
+        code.split("#[tauri::command")
             .skip(1)
             .map(|item| {
+                let (attribute, item) = item
+                    .split_once(']')
+                    .expect("a #[tauri::command] attribute is closed");
+                assert!(
+                    attribute.is_empty() || attribute.starts_with('('),
+                    "not a #[tauri::command] attribute: `#[tauri::command{attribute}]`"
+                );
+                let rename = argument_case(attribute);
                 let after_fn = item
                     .split_once("fn ")
                     .expect("a #[tauri::command] marks a function")
@@ -871,12 +890,30 @@ mod ipc_contract {
                         let (arg, ty) = param.split_once(':').expect("`name: Type`");
                         let ty = ty.trim();
                         let injected = ty.starts_with("AppHandle") || ty.starts_with("State<");
-                        (!injected).then(|| camel_case(arg.trim()))
+                        (!injected).then(|| rename(arg.trim()))
                     })
                     .collect();
                 (name, args)
             })
             .collect()
+    }
+
+    /// How Tauri names the arguments of a command whose attribute takes
+    /// `attribute` (`""` or `"(...)"`): `camelCase` unless `rename_all` says
+    /// otherwise.
+    fn argument_case(attribute: &str) -> fn(&str) -> String {
+        let Some((_, rest)) = attribute.split_once("rename_all") else {
+            return camel_case;
+        };
+        let case = rest
+            .split('"')
+            .nth(1)
+            .unwrap_or_else(|| panic!("`rename_all` without a quoted case: {attribute}"));
+        match case {
+            "camelCase" => camel_case,
+            "snake_case" => str::to_owned,
+            other => panic!("ipc contract: `rename_all = \"{other}\"` is not supported here"),
+        }
     }
 
     /// The commands the app manifest in `build.rs` declares.
@@ -895,16 +932,76 @@ mod ipc_contract {
 
     /// The widget commands `generate_handler!` registers in `lib.rs`.
     fn registered_commands() -> Vec<String> {
-        let source = read("src/lib.rs");
-        let list = source
+        widget_commands_in(&read("src/lib.rs"), &read("src/commands/widgets.rs"))
+    }
+
+    /// The functions of `widgets` (the source of this file) that
+    /// `generate_handler!` registers in `lib`, by any path
+    /// (`commands::widgets::x`, `crate::commands::widgets::x`, `x`): each
+    /// entry counts by its last segment, as `tests/guards.rs` reads it.
+    fn widget_commands_in(lib: &str, widgets: &str) -> Vec<String> {
+        let code = code_above_tests(widgets);
+        let words: Vec<&str> = code
+            .split(|c: char| !(c.is_alphanumeric() || c == '_'))
+            .filter(|word| !word.is_empty())
+            .collect();
+        let functions: Vec<&str> = words
+            .windows(2)
+            .filter(|pair| pair[0] == "fn")
+            .map(|pair| pair[1])
+            .collect();
+        let list = lib
             .split("generate_handler![")
             .nth(1)
             .and_then(|rest| rest.split(']').next())
             .expect("lib.rs registers the commands with `generate_handler![...]`");
         list.split(',')
-            .filter_map(|entry| entry.trim().strip_prefix("commands::widgets::"))
+            .map(|entry| entry.trim())
+            .filter(|entry| !entry.is_empty())
+            .map(|path| path.rsplit("::").next().unwrap_or(path).trim())
+            .filter(|name| functions.contains(name))
             .map(str::to_owned)
             .collect()
+    }
+
+    #[test]
+    fn commands_in_reads_a_command_attribute_with_arguments() {
+        let source = r#"
+            #[tauri::command]
+            pub fn plain(app: AppHandle, time_zone: String) {}
+
+            #[tauri::command(rename_all = "snake_case")]
+            pub fn renamed(state: State<'_, Store>, time_zone: String) {}
+        "#;
+        let expected: Commands = [
+            ("plain".to_owned(), vec!["timeZone".to_owned()]),
+            ("renamed".to_owned(), vec!["time_zone".to_owned()]),
+        ]
+        .into();
+        assert_eq!(commands_in(source), expected);
+    }
+
+    #[test]
+    fn widget_commands_in_reads_any_path_to_this_file() {
+        let widgets = "
+            #[tauri::command]
+            pub fn first() {}
+            #[tauri::command]
+            pub fn second() {}
+            #[tauri::command]
+            pub fn third() {}
+        ";
+        let lib = "
+            tauri::generate_handler![
+                commands::settings::get_settings,
+                commands::widgets::first,
+                crate::commands::widgets::second,
+                widgets::third
+            ]
+        ";
+        let mut registered = widget_commands_in(lib, widgets);
+        registered.sort();
+        assert_eq!(registered, ["first", "second", "third"]);
     }
 
     #[test]
