@@ -14,8 +14,11 @@
 //!   was and the widgets are unavailable in this run.
 //! - A file SQLite says is not a database or is corrupt is renamed to
 //!   `dockmax.db.corrompido-<UTC date>` (never deleted), along with its
-//!   `-wal` and `-shm` files, and a new seeded database takes its place with
-//!   a recovery notice in `meta` until the user dismisses it.
+//!   `-wal`, `-shm` and `-journal` files, and a new seeded database takes its
+//!   place with a recovery notice in `meta` until the user dismisses it.
+//! - Companion files with no database (missing, or an empty file) are set
+//!   aside the same way: SQLite would delete them, and the last changes can
+//!   be only in the `-wal`.
 
 use std::ffi::OsString;
 use std::fmt;
@@ -127,18 +130,42 @@ impl Storage {
 /// need a database "from a newer version" and a migration that fails.
 pub(super) fn open_with<'m>(dir: &Path, migrations: &'m [M<'m>]) -> Storage {
     let path = dir.join(FILE_NAME);
-    match fs::symlink_metadata(&path) {
-        Ok(_) => match open_existing(&path, migrations) {
-            Ok(storage) => storage,
-            Err(cause) => recover(dir, &path, migrations, cause),
-        },
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {
-            create(dir, &path, migrations, false)
+    let found = match fs::symlink_metadata(&path) {
+        Ok(metadata) => Some(metadata),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => {
+            return unavailable(
+                UnavailableReason::OpenFailed,
+                format_args!("could not check the file: {}", Cause::Io(error.kind())),
+            );
         }
-        Err(error) => unavailable(
-            UnavailableReason::OpenFailed,
-            format_args!("could not check the file: {}", Cause::Io(error.kind())),
-        ),
+    };
+
+    // Companions with no database to go with them (no file, or an empty
+    // one) hold changes SQLite would delete on opening: SQLite itself never
+    // leaves them so, so they are set aside like a corrupt database.
+    let empty = found
+        .as_ref()
+        .is_none_or(|metadata| metadata.is_file() && metadata.len() == 0);
+    if empty {
+        match has_companions(&path) {
+            Ok(false) => {}
+            Ok(true) => return recover(dir, &path, migrations, Cause::OrphanCompanions),
+            Err(error) => {
+                return unavailable(
+                    UnavailableReason::OpenFailed,
+                    format_args!("could not check the file: {}", Cause::Io(error.kind())),
+                );
+            }
+        }
+    }
+
+    if found.is_none() {
+        return create(dir, &path, migrations, false);
+    }
+    match open_existing(&path, migrations) {
+        Ok(storage) => storage,
+        Err(cause) => recover(dir, &path, migrations, cause),
     }
 }
 
@@ -322,7 +349,7 @@ fn prepare<'m>(
 
 /// Sets the corrupt database at `path` aside and makes a new one.
 fn recover<'m>(dir: &Path, path: &Path, migrations: &'m [M<'m>], cause: Cause) -> Storage {
-    log::warn!("widgets: database is corrupt, setting it aside: {cause}");
+    log::warn!("widgets: database can't be used, setting it aside: {cause}");
     let stamp = jiff::Timestamp::now().strftime("%Y%m%d-%H%M%S").to_string();
     match set_aside(path, &format!(".corrompido-{stamp}")) {
         Ok(()) => create(dir, path, migrations, true),
@@ -379,9 +406,11 @@ fn backup(conn: &Connection, path: &Path, version: usize) -> Result<(), Cause> {
     Ok(())
 }
 
-/// The companion files SQLite keeps next to a database in WAL mode. They
-/// belong to it: left behind, they would be read into the new database.
-const COMPANIONS: [&str; 2] = ["-wal", "-shm"];
+/// The companion files SQLite keeps next to a database: `-wal` and `-shm`
+/// in WAL mode, `-journal` in rollback mode (a file switching modes, or
+/// from another tool). They belong to it: left behind, they would be read
+/// into the new database.
+const COMPANIONS: [&str; 3] = ["-wal", "-shm", "-journal"];
 
 /// The first bytes of every SQLite database file.
 const SQLITE_HEADER: &[u8; 16] = b"SQLite format 3\0";
@@ -405,12 +434,13 @@ fn has_companions(path: &Path) -> io::Result<bool> {
     Ok(false)
 }
 
-/// Renames `path` and its companion files to `path` + `suffix` (+ a number,
-/// if taken). All or nothing: if one rename fails, the ones done are undone.
+/// Renames `path` and its companion files, those that exist, to `path` +
+/// `suffix` (+ a number, if taken). All or nothing: if one rename fails, the
+/// ones done are undone.
 fn set_aside(path: &Path, suffix: &str) -> io::Result<()> {
     let target = free_name(path, suffix, &COMPANIONS)?;
-    let mut moves = vec![(path.to_path_buf(), target.clone())];
-    for companion in COMPANIONS {
+    let mut moves = Vec::new();
+    for companion in std::iter::once("").chain(COMPANIONS) {
         let from = with_suffix(path, companion);
         if from.try_exists()? {
             moves.push((from, with_suffix(&target, companion)));
@@ -526,6 +556,7 @@ enum Cause {
     Io(io::ErrorKind),
     NotSqlite,
     IntegrityCheck,
+    OrphanCompanions,
     Migration(&'static str),
 }
 
@@ -553,6 +584,7 @@ impl fmt::Display for Cause {
             Cause::Io(kind) => write!(f, "{kind}"),
             Cause::NotSqlite => f.write_str("not a SQLite file"),
             Cause::IntegrityCheck => f.write_str("integrity check failed"),
+            Cause::OrphanCompanions => f.write_str("companion files without a database"),
             Cause::Migration(kind) => write!(f, "migration {kind} error"),
         }
     }
@@ -566,6 +598,7 @@ mod tests {
 
     use super::*;
     use crate::domain::widgets::{WidgetConfig, WidgetInstance};
+    use crate::persistence::notes_repo;
 
     /// A second migration, for a database "from a newer version" and for
     /// migrating an existing one.
@@ -878,7 +911,11 @@ mod tests {
         let names: Vec<String> = file_names(dir)
             .into_iter()
             .filter(|name| name.starts_with("dockmax.db.corrompido-"))
-            .filter(|name| !name.ends_with("-wal") && !name.ends_with("-shm"))
+            .filter(|name| {
+                !["-wal", "-shm", "-journal"]
+                    .iter()
+                    .any(|c| name.ends_with(c))
+            })
             .collect();
         assert_eq!(names.len(), 1, "{names:?}");
         let stamp = names[0].trim_start_matches("dockmax.db.corrompido-");
@@ -902,6 +939,7 @@ mod tests {
         fs::write(&path, &garbage).unwrap();
         fs::write(with_suffix(&path, "-wal"), "old wal").unwrap();
         fs::write(with_suffix(&path, "-shm"), "old shm").unwrap();
+        fs::write(with_suffix(&path, "-journal"), "old journal").unwrap();
 
         let storage = Storage::open(dir.path());
 
@@ -928,7 +966,93 @@ mod tests {
             fs::read_to_string(dir.path().join(format!("{aside}-shm"))).unwrap(),
             "old shm"
         );
+        assert_eq!(
+            fs::read_to_string(dir.path().join(format!("{aside}-journal"))).unwrap(),
+            "old journal"
+        );
         assert_eq!(user_version(&path), 1);
+    }
+
+    /// The `-wal` and `-shm` of a live database with a saved note, copied
+    /// into `dir` while it is open: the note is only in the `-wal`.
+    fn copy_live_companions(dir: &TempDir) -> Vec<(&'static str, Vec<u8>)> {
+        let live = tempdir().unwrap();
+        let mut storage = Storage::open(live.path());
+        let note = widgets(&storage)[2].id.clone();
+        notes_repo::save(storage.connection().unwrap(), &note, "only in the wal").unwrap();
+        let copied: Vec<(&str, Vec<u8>)> = ["-wal", "-shm"]
+            .into_iter()
+            .map(|companion| {
+                let bytes = fs::read(with_suffix(&db_path(&live), companion)).unwrap();
+                fs::write(with_suffix(&db_path(dir), companion), &bytes).unwrap();
+                (companion, bytes)
+            })
+            .collect();
+        assert!(!copied[0].1.is_empty(), "the -wal holds the note");
+        drop(storage);
+        copied
+    }
+
+    /// Each companion's bytes are still in some file of `dir`.
+    fn assert_companions_kept(dir: &Path, companions: &[(&str, Vec<u8>)]) {
+        let contents: Vec<Vec<u8>> = file_names(dir)
+            .iter()
+            .map(|name| fs::read(dir.join(name)).unwrap())
+            .collect();
+        for (companion, bytes) in companions {
+            assert!(
+                contents.contains(bytes),
+                "the {companion} is gone: {:?}",
+                file_names(dir)
+            );
+        }
+    }
+
+    #[test]
+    fn orphan_wal_without_a_database_is_set_aside_and_recovered() {
+        let dir = tempdir().unwrap();
+        let companions = copy_live_companions(&dir);
+
+        let storage = Storage::open(dir.path());
+
+        assert_eq!(storage.status(), StorageStatus::Recovered);
+        assert_eq!(widgets(&storage).len(), 3, "a new, seeded database");
+        drop(storage);
+        assert_companions_kept(dir.path(), &companions);
+        let aside: Vec<String> = file_names(dir.path())
+            .into_iter()
+            .filter(|name| name.starts_with("dockmax.db.corrompido-"))
+            .collect();
+        assert_eq!(aside.len(), 2, "the -wal and the -shm: {aside:?}");
+    }
+
+    #[test]
+    fn empty_database_file_with_a_wal_is_set_aside_and_recovered() {
+        let dir = tempdir().unwrap();
+        let companions = copy_live_companions(&dir);
+        fs::write(db_path(&dir), "").unwrap();
+
+        let storage = Storage::open(dir.path());
+
+        assert_eq!(storage.status(), StorageStatus::Recovered);
+        assert_eq!(widgets(&storage).len(), 3, "a new, seeded database");
+        drop(storage);
+        assert_companions_kept(dir.path(), &companions);
+        let aside = set_aside_name(dir.path());
+        assert_eq!(fs::read(dir.path().join(&aside)).unwrap(), b"");
+    }
+
+    #[test]
+    fn empty_database_file_alone_is_a_new_database() {
+        let dir = tempdir().unwrap();
+        fs::write(db_path(&dir), "").unwrap();
+
+        let storage = Storage::open(dir.path());
+
+        assert_eq!(storage.status(), StorageStatus::Ok);
+        assert_eq!(widgets(&storage).len(), 3);
+        drop(storage);
+        assert_eq!(file_names(dir.path()), [FILE_NAME]);
     }
 
     #[test]
@@ -1080,6 +1204,7 @@ mod tests {
             Cause::Io(io::ErrorKind::PermissionDenied),
             Cause::NotSqlite,
             Cause::IntegrityCheck,
+            Cause::OrphanCompanions,
             Cause::Migration("definition"),
         ];
         for cause in causes {
