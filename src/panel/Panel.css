@@ -1,21 +1,65 @@
-/* Always opaque, whatever the dock opacity (DESIGN.md, The Opaque Panel
-   Rule). */
+/* The panel window holds the frame: the visible card plus a transparent
+   margin on every side for its shadow. The window is sized to the frame
+   (panel_ready), so the card sits centered with --panel-inset around it.
+   --panel-inset must match PANEL_INSET in geometry.ts. */
+.panel-frame {
+  --panel-inset: 16px;
+  box-sizing: border-box;
+  width: max-content;
+  padding: var(--panel-inset);
+}
+
+/* The card (DESIGN.md "Painel"). Always opaque, whatever the dock opacity
+   (The Opaque Panel Rule). Its width is fixed, so the text wraps the same
+   whatever the window size was before panel_ready. */
 .panel {
   box-sizing: border-box;
-  height: 100%;
-  padding: 16px 20px;
-  /* The hairline is a border instead of the outer 0 0 0 1px ring of
-     DESIGN.md: the panel fills its window, so a ring outside it would be
-     cut off. */
-  border: 1px solid var(--hair);
+  width: 320px;
+  display: grid;
+  gap: 14px;
+  padding: 16px 16px 12px;
   border-radius: var(--r-panel);
   color: var(--ink);
   background: rgb(var(--surface-rgb));
-  /* Same stack as the dock bar. The panel fills its window, so the outer
-     --shadow has no room yet; it shows once the window gets a margin. */
+  /* Same stack as the dock bar: light edge, hairline ring, shadow. */
   box-shadow:
     inset 0 1px 0 var(--hi),
+    0 0 0 1px var(--hair),
     var(--shadow);
+  cursor: default;
+  user-select: none;
+  /* Grows from the edge facing the dock. */
+  transform-origin: 50% 100%;
+  animation: panel-pop var(--t-pop) var(--ease);
+}
+
+.panel[data-panel="about"] {
+  width: 300px;
+}
+
+.panel-frame[data-edge="top"] .panel {
+  transform-origin: 50% 0;
+  animation-name: panel-pop-down;
+}
+
+@keyframes panel-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+@keyframes panel-pop-down {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
 }
 
 .panel :focus-visible {
@@ -23,13 +67,170 @@
   outline-offset: 1px;
 }
 
+/* Title (DESIGN.md "Typography": Title). */
 .panel h1 {
-  margin: 0 0 8px;
-  font-size: 16px;
-  font-weight: 600;
+  margin: 0;
+  font: 600 15px/1.3 var(--font-display);
 }
 
-.panel p {
-  margin: 0;
+/* Settings: a label over a segmented control per row. */
+.option-row {
+  display: grid;
+  gap: 6px;
+}
+
+.option-label {
+  font-size: 12.5px;
   color: var(--ink-2);
+}
+
+/* Segmented control (DESIGN.md "Controle segmentado"). */
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-track);
+  background: var(--track);
+}
+
+.segmented button {
+  flex: 1 1 0;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--r-segment);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  background: transparent;
+  cursor: pointer;
+}
+
+.segmented button:hover {
+  background: var(--track);
+}
+
+.segmented button[aria-pressed="true"] {
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* Footer (DESIGN.md "Rodapé"): caption at the left, key hint at the
+   right. */
+.panel-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hair);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ink-2);
+}
+
+/* A footer that reports failures keeps room for a two-line message, so
+   the card never outgrows its window when one appears. */
+.panel-foot.status {
+  min-height: calc(2 * 1.35em);
+}
+
+.panel-foot [role="alert"] {
+  margin: 0;
+  color: var(--ink);
+}
+
+kbd {
+  padding: 3px 6px;
+  border-radius: var(--r-kbd);
+  font: 600 11px/1 var(--font);
+  color: var(--ink);
+  background: var(--kbd);
+}
+
+/* About: tile, name and description. */
+.about-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.about-head h2 {
+  margin: 0;
+  font: 600 17px/1.3 var(--font-display);
+}
+
+.about-head p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+/* The app tile, as on the dock (DESIGN.md "Dock item / ladrilho"), at
+   56 px and with a rounded square for the superellipse. The glaze comes
+   from the static .t-about class in tokens.css. */
+.about-tile {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--r-tile);
+  color: var(--glyph);
+  background:
+    radial-gradient(
+      130% 70% at 50% -12%,
+      rgb(255 255 255 / 0.26),
+      transparent 58%
+    ),
+    linear-gradient(
+      180deg,
+      hsl(var(--h) calc(var(--sat) * var(--sat-k)) calc(var(--l) + 7%)),
+      hsl(var(--h) calc(var(--sat) * var(--sat-k)) calc(var(--l) - 5%))
+    );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.32),
+    inset 0 -1px 0 rgb(0 0 0 / 0.16);
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.18))
+    drop-shadow(0 5px 6px rgb(0 0 0 / 0.16));
+}
+
+.about-tile svg {
+  width: 54%;
+  height: 54%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Key/value list: keys in the secondary ink. */
+.about-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.about-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.about-list dt {
+  color: var(--ink-2);
+}
+
+.about-list dd {
+  margin: 0;
+}
+
+/* Not a link (see AboutPanel.tsx): one click selects it whole, to copy. */
+.about-code {
+  cursor: text;
+  user-select: all;
 }

@@ -1,12 +1,19 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PanelShowPayload } from "../core/panels";
+import type { PanelReadyArgs, PanelShowPayload } from "../core/panels";
+import type { Settings } from "../core/settings";
 import { ptBR } from "../i18n/pt-BR";
 import Panel from "./Panel";
 
 const text = ptBR.panel;
 
-type Handler = (event: { payload: PanelShowPayload }) => void;
+const SETTINGS: Settings = {
+  version: 1,
+  theme: "system",
+  dock: { edge: "bottom", iconSize: 48, opacity: "translucent" },
+};
+
+type Handler = (event: { payload: unknown }) => void;
 
 const { invoke, listen, handlers, unlisten } = vi.hoisted(() => {
   const handlers = new Map<string, Handler>();
@@ -37,7 +44,7 @@ vi.mock("./PanelContent", async (importOriginal) => {
   const { default: Real } =
     await importOriginal<typeof import("./PanelContent")>();
   return {
-    default: (props: { panelId: PanelShowPayload["panelId"] }) => {
+    default: (props: Parameters<typeof Real>[0]) => {
       if (props.panelId === failing.panelId) {
         // The message carries a path that must never reach the log.
         throw new TypeError("C:\\Users\\someone\\settings.json");
@@ -47,19 +54,54 @@ vi.mock("./PanelContent", async (importOriginal) => {
   };
 });
 
+/** Frame sizes the fake layout gives each content, so a size sent for the
+ * wrong panel shows. */
+const SIZES = {
+  settings: { width: 352, height: 361.4 },
+  about: { width: 332, height: 251.2 },
+  failed: { width: 352, height: 120 },
+};
+
+/** What the frame held each time it was measured. */
+const measured: string[] = [];
+
+function fakeLayout(this: HTMLElement): DOMRect {
+  const rect = (size: { width: number; height: number }) =>
+    ({ x: 0, y: 0, top: 0, left: 0, ...size }) as DOMRect;
+  if (!this.classList.contains("panel-frame")) return rect(SIZES.failed);
+  measured.push(this.textContent);
+  if (this.querySelector(".segmented")) return rect(SIZES.settings);
+  if (this.querySelector(".about-head")) return rect(SIZES.about);
+  return rect(SIZES.failed);
+}
+
 function show(panelId: PanelShowPayload["panelId"]) {
   const handler = handlers.get("panel-show");
   if (!handler) throw new Error("panel-show listener not registered");
   act(() => handler({ payload: { panelId } }));
 }
 
+/** The `panel_ready` calls so far, in order. */
+function readyCalls(): PanelReadyArgs[] {
+  return invoke.mock.calls
+    .filter(([command]) => command === "panel_ready")
+    .map(([, args]) => args as PanelReadyArgs);
+}
+
 describe("Panel", () => {
   beforeEach(() => {
     handlers.clear();
+    measured.length = 0;
     invoke.mockReset();
-    invoke.mockResolvedValue(undefined);
+    invoke.mockImplementation((command: string) =>
+      Promise.resolve(command === "get_settings" ? SETTINGS : undefined),
+    );
+    unlisten.mockReset();
     log.error.mockReset();
     failing.panelId = null;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      fakeLayout,
+    );
   });
 
   afterEach(() => {
@@ -79,12 +121,16 @@ describe("Panel", () => {
     expect(
       screen.getByRole("heading", { name: text.titles.settings }),
     ).toBeInTheDocument();
-    expect(screen.getByText(text.underConstruction)).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: ptBR.settings.groups.theme }),
+    ).toBeInTheDocument();
 
     show("about");
     expect(
       screen.getByRole("heading", { name: text.titles.about }),
     ).toBeInTheDocument();
+    expect(screen.getByText(ptBR.about.footer)).toBeInTheDocument();
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
   });
 
   it("shows its texts in PT-BR", () => {
@@ -95,10 +141,103 @@ describe("Panel", () => {
     expect(
       screen.getByRole("heading", { name: "Configurações" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Em construção.")).toBeInTheDocument();
+    expect(screen.getByText("Salvo automaticamente")).toBeInTheDocument();
 
     show("about");
     expect(screen.getByRole("heading", { name: "Sobre" })).toBeInTheDocument();
+    expect(screen.getByText("Projeto independente")).toBeInTheDocument();
+  });
+
+  it("shows the settings in use", async () => {
+    render(<Panel />);
+    await act(() => Promise.resolve());
+
+    show("settings");
+
+    expect(screen.getByRole("button", { name: "Sistema" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Médio" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  describe("panel_ready", () => {
+    it("is not sent before a panel is shown", () => {
+      render(<Panel />);
+
+      expect(readyCalls()).toEqual([]);
+    });
+
+    it("is sent once per panel-show, with the frame size and inset", () => {
+      render(<Panel />);
+
+      show("settings");
+
+      expect(readyCalls()).toEqual([
+        {
+          panelId: "settings",
+          size: { width: 352, height: 362 },
+          inset: 16,
+        },
+      ]);
+    });
+
+    it("is sent again on switching, measured on the new content only", () => {
+      render(<Panel />);
+      show("settings");
+
+      show("about");
+
+      expect(readyCalls()).toEqual([
+        { panelId: "settings", size: { width: 352, height: 362 }, inset: 16 },
+        { panelId: "about", size: { width: 332, height: 252 }, inset: 16 },
+      ]);
+      // The about measurement never saw the settings content.
+      expect(measured).toHaveLength(2);
+      expect(measured[1]).not.toContain(ptBR.settings.groups.theme);
+      expect(measured[1]).toContain(ptBR.about.footer);
+    });
+
+    it("is sent again when the same panel is shown again", () => {
+      render(<Panel />);
+      show("about");
+
+      show("about");
+
+      expect(readyCalls().map((args) => args.panelId)).toEqual([
+        "about",
+        "about",
+      ]);
+    });
+
+    it("is sent for a panel whose content failed, with the failure's size", () => {
+      failing.panelId = "settings";
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      render(<Panel />);
+
+      show("settings");
+
+      expect(readyCalls()).toEqual([
+        { panelId: "settings", size: { width: 352, height: 120 }, inset: 16 },
+      ]);
+    });
+
+    it("logs only the kind of error when it fails", async () => {
+      invoke.mockImplementation((command: string) =>
+        command === "panel_ready"
+          ? Promise.reject(new Error("C:\\Users\\someone"))
+          : Promise.resolve(command === "get_settings" ? SETTINGS : undefined),
+      );
+      render(<Panel />);
+
+      show("about");
+      await act(() => Promise.resolve());
+
+      expect(log.error).toHaveBeenCalledWith("panel: ready failed: Error");
+    });
   });
 
   it("asks to hide the panel on Escape", () => {
@@ -115,7 +254,7 @@ describe("Panel", () => {
 
     fireEvent.keyDown(window, { key: "Enter" });
 
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalledWith("hide_panel");
   });
 
   it("removes its keydown listener when unmounted", () => {
@@ -129,16 +268,20 @@ describe("Panel", () => {
 
     expect(remove).toHaveBeenCalledWith("keydown", added?.[1]);
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalledWith("hide_panel");
   });
 
-  it("stops listening when unmounted", async () => {
+  it("stops listening to panel-show and settings-changed when unmounted", async () => {
     const { unmount } = render(<Panel />);
+    expect([...handlers.keys()].sort()).toEqual([
+      "panel-show",
+      "settings-changed",
+    ]);
 
     unmount();
-    await Promise.resolve();
+    await act(() => Promise.resolve());
 
-    expect(unlisten).toHaveBeenCalled();
+    expect(unlisten).toHaveBeenCalledTimes(2);
   });
 
   describe("when a panel's content fails", () => {
@@ -159,9 +302,7 @@ describe("Panel", () => {
       expect(
         screen.getByRole("heading", { name: text.titles.settings }),
       ).toBeInTheDocument();
-      expect(
-        screen.queryByText(text.underConstruction),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(ptBR.settings.footer)).not.toBeInTheDocument();
     });
 
     it("still hides on Escape", () => {
@@ -192,7 +333,7 @@ describe("Panel", () => {
       expect(
         screen.getByRole("heading", { name: text.titles.about }),
       ).toBeInTheDocument();
-      expect(screen.getByText(text.underConstruction)).toBeInTheDocument();
+      expect(screen.getByText(ptBR.about.footer)).toBeInTheDocument();
     });
   });
 });
