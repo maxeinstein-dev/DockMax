@@ -258,3 +258,28 @@ fn log_plugin_cannot_fail_startup() {
         "src/logging.rs: `logging::plugin` must build the log plugin with `.skip_logger()`; the logger is attached in `logging::setup`"
     );
 }
+
+#[test]
+fn logger_and_settings_start_before_the_windows() {
+    // Tauri creates the windows of tauri.conf.json before the app's `setup`
+    // runs, but initializes plugins earlier, in `Builder::build`. Loading the
+    // settings (or attaching the logger) in `setup` let the dock call
+    // `get_settings` before the state existed, so it never got its theme.
+    let source = std::fs::read_to_string(manifest_dir().join("src").join("lib.rs"))
+        .expect("src/lib.rs must exist");
+    let app_setup = source
+        .split(".setup(|app|")
+        .nth(1)
+        .and_then(|rest| rest.split(".invoke_handler(").next())
+        .unwrap_or_else(|| panic!("src/lib.rs: the app's `.setup(|app| ...)` was not found"));
+    for call in ["logging::setup", "commands::settings::setup"] {
+        assert!(
+            !app_setup.contains(call),
+            "src/lib.rs: `{call}` must run in the `startup` plugin, not in the app's `setup` (the windows already exist there)"
+        );
+    }
+    assert!(
+        source.contains(".plugin(startup())"),
+        "src/lib.rs: the `startup` plugin, which attaches the logger and loads the settings, must be registered"
+    );
+}

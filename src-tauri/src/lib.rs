@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tauri::RunEvent;
+use tauri::{RunEvent, Wry, plugin::TauriPlugin};
 
 mod commands;
 mod domain;
@@ -9,6 +9,22 @@ mod logging;
 mod persistence;
 mod tray;
 mod windows;
+
+/// Attaches the logger and loads the settings before any page can use them.
+/// Tauri creates the windows of `tauri.conf.json` before the app's `setup`
+/// runs, so a page could call `get_settings` (or log) before either existed;
+/// plugins, on the other hand, are initialized in `Builder::build`, before
+/// any window. Never fails.
+fn startup() -> TauriPlugin<Wry> {
+    tauri::plugin::Builder::new("dockmax-startup")
+        .setup(|app, _api| {
+            // First, so the settings can report a bad file.
+            logging::setup(app);
+            commands::settings::setup(app);
+            Ok(())
+        })
+        .build()
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,11 +39,8 @@ pub fn run() {
         }))
         .plugin(logging::plugin())
         .manage(Arc::new(windows::hit_test::Tracker::default()))
+        .plugin(startup())
         .setup(|app| {
-            // First, so the settings can report a bad file. Never fails.
-            logging::setup(app.handle());
-            // Next: the windows may ask for the settings as soon as they load.
-            commands::settings::setup(app.handle());
             windows::panel::setup(app.handle())?;
             windows::dock::setup(app.handle())?;
             tray::setup(app.handle())?;

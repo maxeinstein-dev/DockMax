@@ -31,6 +31,10 @@ O PR 2 da Fase 1 traz o primeiro código de domínio do DockMax: preferências q
 - **Regra de conteúdo:** uma linha de log nomeia a capacidade afetada e o tipo do erro (`settings: using the defaults: settings file is not valid JSON`, `panel: render failed: TypeError`). Nunca grava caminhos, conteúdo de configurações, argv, payloads nem a mensagem de um erro do frontend, que pode carregar qualquer um desses. No frontend, uma regra do ESLint (`no-restricted-syntax`, travada por `src/core/log.lint.test.ts`) aceita em `log.error|warn|info` só um literal de texto ou um template cujas interpolações sejam `errorKind(...)`.
 - Falhas que se repetem a cada ciclo, como a captura do mouse a 60 Hz, são registradas só na transição de sucesso para falha e na recuperação.
 
+### Ordem de inicialização
+
+O logger e o carregamento das configurações rodam no setup de um plugin próprio (`dockmax-startup`), e não no `setup` do app. O Tauri cria as janelas do `tauri.conf.json` **antes** do `setup` do app, mas inicializa os plugins antes disso, no `Builder::build`. Com o carregamento no `setup`, a página do dock chamava `get_settings` antes de o estado existir e ficava sem tema no build de release; o painel, que carrega depois, escapava. Achado no teste manual do PR 2 e travado por teste-guarda.
+
 ### Instância única
 
 `tauri-plugin-single-instance`, registrado primeiro: uma segunda execução mostra o dock da primeira (sem roubar o foco) e encerra. Argv e cwd são ignorados.
