@@ -45,8 +45,23 @@ function token(theme: keyof typeof THEMES, name: string): string {
   return value;
 }
 
-/** `#rrggbb`, `rgb(r g b / a)` or a bare `r g b` triplet. */
+/** `#rrggbb`, `rgb(r g b / a)`, `hsl(h s% l% / a)` or a bare `r g b`
+ * triplet. */
 function parse(value: string): Rgba {
+  const hslMatch =
+    /^hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*(?:\/\s*([\d.]+))?\s*\)$/.exec(
+      value,
+    );
+  if (hslMatch) {
+    return {
+      rgb: hsl(
+        Number(hslMatch[1]),
+        Number(hslMatch[2]) / 100,
+        Number(hslMatch[3]) / 100,
+      ),
+      alpha: hslMatch[4] === undefined ? 1 : Number(hslMatch[4]),
+    };
+  }
   const hex = /^#([0-9a-f]{6})$/i.exec(value);
   if (hex?.[1]) {
     const n = parseInt(hex[1], 16);
@@ -121,6 +136,8 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
   const track = over(color(theme, "--track"), surface);
   const tipInk = color(theme, "--tip-ink").rgb;
   const tipBg = color(theme, "--tip-bg");
+  const danger = over(color(theme, "--danger"), surface);
+  const dangerSoft = over(color(theme, "--danger-soft"), surface);
   return [
     { name: "--ink on the panel", ratio: contrast(ink, surface), min: TEXT },
     { name: "--ink-2 on the panel", ratio: contrast(ink2, surface), min: TEXT },
@@ -146,6 +163,35 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
       min: TEXT,
     },
     {
+      // "Remover nota", inside the confirmation.
+      name: "--danger-ink on --danger",
+      ratio: contrast(color(theme, "--danger-ink").rgb, danger),
+      min: TEXT,
+    },
+    {
+      // "Remover do dock" and the note's save error.
+      name: "--danger on the panel",
+      ratio: contrast(danger, surface),
+      min: TEXT,
+    },
+    {
+      // The hovered "Remover do dock".
+      name: "--danger on --danger-soft",
+      ratio: contrast(danger, dangerSoft),
+      min: TEXT,
+    },
+    {
+      // The text of the inline confirmation.
+      name: "--ink on --danger-soft",
+      ratio: contrast(ink, dangerSoft),
+      min: TEXT,
+    },
+    {
+      name: "--ink in a text field (--field)",
+      ratio: contrast(ink, over(color(theme, "--field"), surface)),
+      min: TEXT,
+    },
+    {
       name: "--tip-ink on --tip-bg over black",
       ratio: contrast(tipInk, over(tipBg, BLACK)),
       min: TEXT,
@@ -154,6 +200,28 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
       name: "--tip-ink on --tip-bg over white",
       ratio: contrast(tipInk, over(tipBg, WHITE)),
       min: TEXT,
+    },
+  ];
+}
+
+/** Non-text marks the user must see (WCAG 1.4.11). */
+function graphicPairs(theme: keyof typeof THEMES): Pair[] {
+  const surface = color(theme, "--surface-rgb").rgb;
+  const track = over(color(theme, "--pg-track"), surface);
+  return [
+    {
+      name: "--pg-fill on --pg-track",
+      ratio: contrast(over(color(theme, "--pg-fill"), track), track),
+      min: GRAPHIC,
+    },
+    {
+      // The bottom line is what marks a text field as one.
+      name: "--field-line under a text field",
+      ratio: contrast(
+        over(color(theme, "--field-line"), surface),
+        over(color(theme, "--field"), surface),
+      ),
+      min: GRAPHIC,
     },
   ];
 }
@@ -182,7 +250,7 @@ function glazeTops(): { name: string; rgb: Rgb }[] {
 describe("contrast (WCAG AA)", () => {
   for (const theme of ["light", "dark"] as const) {
     describe(`${theme} theme`, () => {
-      it.each(textPairs(theme).map(shown))(
+      it.each([...textPairs(theme), ...graphicPairs(theme)].map(shown))(
         "$name: $shown:1, at least $min:1",
         ({ ratio, min }) => {
           expect(ratio).toBeGreaterThanOrEqual(min);

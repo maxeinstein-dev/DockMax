@@ -93,6 +93,13 @@ const MODE_COLORS: Record<string, string> = {
   "--tip-ink": "tip-ink",
   "--track": "track",
   "--kbd": "kbd",
+  "--danger": "perigo",
+  "--danger-ink": "perigo-ink",
+  "--danger-soft": "perigo-soft",
+  "--field": "field",
+  "--field-line": "field-line",
+  "--pg-fill": "pg-fill",
+  "--pg-track": "pg-track",
 };
 
 const SURFACES = { light: "porcelana-surface", dark: "grafite-surface" };
@@ -227,7 +234,7 @@ describe("tokens.css", () => {
   });
 
   it("has a static class per tile glaze", () => {
-    expect(tertiary).toHaveLength(7);
+    expect(tertiary).toHaveLength(8);
     for (const [name, meta] of tertiary) {
       const match =
         /^(\.t-[\w-]+) \{ --h: (\d+); --sat: (\d+%); --l: (\d+%); \}$/.exec(
