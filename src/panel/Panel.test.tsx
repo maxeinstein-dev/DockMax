@@ -307,17 +307,18 @@ describe("Panel", () => {
     expect(invoke).not.toHaveBeenCalledWith("hide_panel");
   });
 
-  it("stops listening to panel-show and settings-changed when unmounted", async () => {
+  it("stops listening to panel-show, settings-changed and widgets-changed when unmounted", async () => {
     const { unmount } = render(<Panel />);
     expect([...handlers.keys()].sort()).toEqual([
       "panel-show",
       "settings-changed",
+      "widgets-changed",
     ]);
 
     unmount();
     await act(() => Promise.resolve());
 
-    expect(unlisten).toHaveBeenCalledTimes(2);
+    expect(unlisten).toHaveBeenCalledTimes(3);
   });
 
   describe("when a panel's content fails", () => {

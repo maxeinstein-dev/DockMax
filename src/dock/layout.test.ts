@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DockSize } from "../core/appearance";
 import { MAX_DOCK_BAR_HEIGHT, MAX_DOCK_WINDOW_HEIGHT } from "../core/dock";
+import { MAX_WIDGETS } from "../core/widgets";
 import type { LogicalRect } from "../core/panels";
 import type { DockEdge } from "../core/settings";
 import tokens from "../themes/tokens.css?raw";
@@ -335,4 +336,69 @@ describe("dock size limits shared with Rust", () => {
       }
     },
   );
+});
+
+describe("a full dock: 12 widgets and the system items", () => {
+  /** MAX_WIDGETS widgets, a separator, Configurações and Sobre. */
+  const FULL = [MAX_WIDGETS, 2];
+  /** Long pills: a 40-character label is about 260 px wide. */
+  const WIDE_LABELS = Array.from({ length: MAX_WIDGETS + 2 }, () => 260);
+  /** Rust's limits (`set_dock_layout`): hold rects and the window side. */
+  const MAX_HOLD_RECTS = 16;
+  const MAX_LOGICAL = 100_000;
+
+  it.each([true, false])(
+    "stays within what set_dock_layout accepts on Grande (motion %s)",
+    (motion) => {
+      const window = dockWindowSize({
+        size: "l",
+        groups: FULL,
+        motion,
+        labelWidths: WIDE_LABELS,
+      });
+      expect(window.width).toBeLessThanOrEqual(MAX_LOGICAL);
+      expect(window.height).toBeLessThanOrEqual(MAX_DOCK_WINDOW_HEIGHT);
+      const states = motion
+        ? Array.from({ length: MAX_WIDGETS + 2 }, (_, i) => i)
+        : [null];
+      for (const magnified of [null, ...states]) {
+        const placement = placeDock({
+          size: "l",
+          groups: FULL,
+          edge: "bottom",
+          magnified,
+          viewport: window,
+        });
+        const layout = dockLayout(placement, window);
+        expect(layout.hold.length).toBeLessThanOrEqual(MAX_HOLD_RECTS);
+        expect(placement.bar.height).toBeLessThanOrEqual(MAX_DOCK_BAR_HEIGHT);
+        expect(placement.items).toHaveLength(MAX_WIDGETS + 2);
+      }
+    },
+  );
+
+  it("is about 1050 px at rest on Grande, within a 1366 px screen", () => {
+    const { bar } = placeDock({
+      size: "l",
+      groups: FULL,
+      edge: "bottom",
+      magnified: null,
+      viewport: { width: 1366, height: 200 },
+    });
+    // 14 icons of 64, 13 gaps of 9, the separator with its own gap, and
+    // the padding.
+    expect(bar.width).toBeCloseTo(
+      14 * 64 + 13 * 9 + separatorWidth(9) + 9 + 2 * 9,
+      6,
+    );
+    expect(bar.width).toBeGreaterThan(1000);
+    expect(bar.width).toBeLessThan(1100);
+    const window = dockWindowSize({
+      size: "l",
+      groups: FULL,
+      motion: true,
+      labelWidths: WIDE_LABELS,
+    });
+    expect(window.width).toBeLessThanOrEqual(1366);
+  });
 });
