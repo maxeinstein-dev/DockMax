@@ -36,7 +36,7 @@ import {
   type WidgetInstance,
   type WidgetsSnapshot,
 } from "../core/widgets";
-import { useT, type Messages } from "../i18n";
+import { format, useT, type Messages } from "../i18n";
 import { widgetName } from "../widgets/names";
 import { MINUTE_MS, useNow } from "../widgets/now";
 import { definitionOf, isCreatableInstance } from "../widgets/registry";
@@ -67,8 +67,8 @@ interface DockEntry {
   panelId: PanelId;
   /** `panelKey`: React key and identity across changes of the list. */
   key: string;
-  /** The item's name: its `aria-label` and its label pill. Never the time
-   * (spec 0003 §2.3 item 4). */
+  /** The item's name: its `aria-label` (plus "(com aviso)" while badged)
+   * and its label pill. Never the time (spec 0003 §2.3 item 4). */
   name: string;
   /** The widget it shows, for its live face; null for a system item. */
   instance: WidgetInstance<CreatableKind> | null;
@@ -403,6 +403,8 @@ function Dock() {
 
   const item = (entry: DockEntry, index: number) => {
     const { scale, lift } = magnificationOf(index, magnified);
+    // The badge is aria-hidden: the name says it instead.
+    const badged = badge && entry.panelId === "settings";
     return (
       <button
         key={entry.key}
@@ -411,7 +413,11 @@ function Dock() {
         }}
         type="button"
         className="dock-item"
-        aria-label={entry.name}
+        aria-label={
+          badged
+            ? format(t.widgets.withNotice, { name: entry.name })
+            : entry.name
+        }
         // No aria-controls: the panel is in another window, which an IDREF
         // can't reach.
         aria-expanded={samePanel(open, entry.panelId)}
@@ -429,9 +435,7 @@ function Dock() {
       >
         <span className={`dock-tile ${glazeOf(entry)}`}>
           <TileFace entry={entry} now={now} />
-          {badge && entry.panelId === "settings" ? (
-            <span className="dock-badge" aria-hidden="true" />
-          ) : null}
+          {badged ? <span className="dock-badge" aria-hidden="true" /> : null}
         </span>
         <span className="dock-dot" aria-hidden="true" />
       </button>

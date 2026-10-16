@@ -723,7 +723,7 @@ describe("Dock", () => {
         reason: "newerVersion",
       });
       await renderDock();
-      expect(names()).toEqual(["Configurações", "Sobre"]);
+      expect(names()).toEqual(["Configurações (com aviso)", "Sobre"]);
       expect(document.querySelector(".dock-separator")).toBeNull();
     });
 
@@ -789,10 +789,20 @@ describe("Dock", () => {
         const view = await renderDock();
         const badges = document.querySelectorAll(".dock-badge");
         expect(badges, storage.state).toHaveLength(badged ? 1 : 0);
+        // The badge is hidden; the item's name says it.
+        const item = screen.getByRole("button", {
+          name: badged ? "Configurações (com aviso)" : "Configurações",
+        });
         if (badged) {
-          expect(settings().contains(badges[0] as Node)).toBe(true);
+          expect(item.contains(badges[0] as Node)).toBe(true);
           expect(badges[0]).toHaveAttribute("aria-hidden", "true");
         }
+        // The pill keeps the plain name.
+        expect(
+          [...document.querySelectorAll(".dock-tip")].map(
+            (tip) => tip.textContent,
+          ),
+        ).toContain("Configurações");
         view.unmount();
       }
     });
@@ -808,7 +818,12 @@ describe("Dock", () => {
         }),
       );
 
-      expect(names()).toEqual(["Lisboa", "Nota", "Configurações", "Sobre"]);
+      expect(names()).toEqual([
+        "Lisboa",
+        "Nota",
+        "Configurações (com aviso)",
+        "Sobre",
+      ]);
       expect(document.querySelector(".dock-badge")).not.toBeNull();
     });
 
