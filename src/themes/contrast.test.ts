@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import parts from "../panel/parts/parts.css?raw";
 import css from "./tokens.css?raw";
 
 // WCAG 2.x contrast of the text and glyphs DockMax draws, computed from the
@@ -84,6 +85,15 @@ function color(theme: keyof typeof THEMES, name: string): Rgba {
   return parse(token(theme, name));
 }
 
+/** The opacity of the text field's placeholder, as parts.css sets it. */
+function placeholderOpacity(): number {
+  const match = /\.field-input::placeholder\s*\{[^}]*?opacity:\s*([\d.]+)/.exec(
+    parts,
+  );
+  if (!match) throw new Error("no placeholder opacity in parts.css");
+  return Number(match[1]);
+}
+
 /** `top` painted over the opaque `bottom`. */
 function over(top: Rgba, bottom: Rgb): Rgb {
   return top.rgb.map(
@@ -137,6 +147,11 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
   const tipInk = color(theme, "--tip-ink").rgb;
   const tipBg = color(theme, "--tip-bg");
   const danger = over(color(theme, "--danger"), surface);
+  const field = over(color(theme, "--field"), surface);
+  const inkColor = color(theme, "--ink");
+  // `color-mix(in srgb, var(--ink) 9%, transparent)`: the ink at 9 % of
+  // its alpha.
+  const navHover = over({ ...inkColor, alpha: inkColor.alpha * 0.09 }, surface);
   const dangerSoft = over(color(theme, "--danger-soft"), surface);
   return [
     { name: "--ink on the panel", ratio: contrast(ink, surface), min: TEXT },
@@ -188,7 +203,30 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
     },
     {
       name: "--ink in a text field (--field)",
-      ratio: contrast(ink, over(color(theme, "--field"), surface)),
+      ratio: contrast(ink, field),
+      min: TEXT,
+    },
+    {
+      // The kind's name in an empty "Rótulo".
+      name: "the placeholder (--ink-2) in a text field (--field)",
+      ratio: contrast(
+        over(
+          { ...color(theme, "--ink-2"), alpha: placeholderOpacity() },
+          field,
+        ),
+        field,
+      ),
+      min: TEXT,
+    },
+    {
+      // A quiet or icon button's text, and the value of a navigation row.
+      name: "--ink-2 on --track",
+      ratio: contrast(ink2, track),
+      min: TEXT,
+    },
+    {
+      name: "--ink-2 on a hovered navigation row",
+      ratio: contrast(ink2, navHover),
       min: TEXT,
     },
     {
@@ -231,6 +269,14 @@ function shown(pair: Pair): Pair & { shown: string } {
   return { ...pair, shown: (Math.floor(pair.ratio * 100) / 100).toFixed(2) };
 }
 
+/** A tile glaze's middle colour: halfway between the top (+7 %) and the
+ * bottom (-5 %), under the sheen, which is transparent by then. */
+function glazeMiddle(name: string): Rgb {
+  const props = rule(css, `.${name}`);
+  const number = (prop: string) => parseFloat(props.get(prop) ?? "NaN");
+  return hsl(number("--h"), number("--sat") / 100, (number("--l") + 1) / 100);
+}
+
 /** Each tile glaze's top colour (DESIGN.md "Dock item / ladrilho": the
  * hue's lightness + 7% at the top, where the glaze is lightest). */
 function glazeTops(): { name: string; rgb: Rgb }[] {
@@ -266,6 +312,19 @@ describe("contrast (WCAG AA)", () => {
     ),
   )(
     "white glyph on the top of $name: $shown:1, at least $min:1",
+    ({ ratio, min }) => {
+      expect(ratio).toBeGreaterThanOrEqual(min);
+    },
+  );
+
+  // The live icons write text on the glaze: the clock's time, the
+  // progress's percentage.
+  it.each(
+    ["t-clock", "t-progress"].map((name) =>
+      shown({ name, ratio: contrast(glyph, glazeMiddle(name)), min: TEXT }),
+    ),
+  )(
+    "white text in the middle of $name: $shown:1, at least $min:1",
     ({ ratio, min }) => {
       expect(ratio).toBeGreaterThanOrEqual(min);
     },

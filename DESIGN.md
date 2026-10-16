@@ -563,8 +563,9 @@ Botão de largura total que leva a uma subtela: `--track`, raio 6 px, padding 8p
 
 ### Inputs / Fields
 O campo de texto do Windows 11.
-- **Estilo:** `--field`, borda de 1 px em `--hair` com o fio inferior em `--field-line`, raio 4 px, padding 6px 8px, Label em `--ink`; placeholder em `--ink-2` a 80%. Rótulo acima em Label `--ink-2`, 6 px de intervalo. Vale para texto, lista (select), hora e a Nota.
+- **Estilo:** `--field`, borda de 1 px em `--hair` com o fio inferior em `--field-line`, raio 4 px, padding 6px 8px, Label em `--ink`; placeholder em `--ink-2` cheio (a 80% ficava em ~3,98:1 sobre `--field`, abaixo de 4,5:1). Rótulo acima em Label `--ink-2`, 6 px de intervalo. Vale para texto, lista (select), hora e a Nota.
 - **Foco:** sem outline; o fio inferior vira `--accent` com 1 px interno a mais (2 px no total), cursor em `--accent`.
+- **Recusado** (`aria-invalid`): o fio inferior vira `--ink` com 1 px interno a mais; a mensagem vai para o rodapé do painel, em `--ink`. Nunca `--danger` (The Danger Only Rule): recusa de validação não é erro de salvamento.
 - **Caixa de seleção:** nativa, 15 px, `accent-color: var(--accent)`.
 
 ### Aviso inline (notice)
