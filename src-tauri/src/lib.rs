@@ -1,16 +1,19 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 
-use tauri::{RunEvent, Wry, plugin::TauriPlugin};
+use tauri::{Manager, RunEvent, Wry, plugin::TauriPlugin};
 
 mod commands;
 mod domain;
+#[cfg(feature = "e2e")]
+mod e2e;
 mod i18n;
 mod logging;
 mod persistence;
 mod tray;
 mod windows;
 
-/// Attaches the logger and loads the settings before any page can use them.
+/// Attaches the logger, loads the settings and opens the widget database
+/// before any page can use them.
 /// Tauri creates the windows of `tauri.conf.json` before the app's `setup`
 /// runs, so a page could call `get_settings` (or log) before either existed;
 /// plugins, on the other hand, are initialized in `Builder::build`, before
@@ -21,6 +24,9 @@ fn startup() -> TauriPlugin<Wry> {
             // First, so the settings can report a bad file.
             logging::setup(app);
             commands::settings::setup(app);
+            // After the settings: the dock and Settings work even when the
+            // widget database can't be used.
+            commands::widgets::setup(app);
             Ok(())
         })
         .build()
@@ -28,7 +34,13 @@ fn startup() -> TauriPlugin<Wry> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    #[cfg_attr(not(feature = "e2e"), expect(unused_mut))]
+    let mut context = tauri::generate_context!();
+    // Test build only: before anything reads the identifier or a folder.
+    #[cfg(feature = "e2e")]
+    e2e::isolate(&mut context);
+
+    let builder = tauri::Builder::default()
         // First: a second launch exits here, before creating anything, and
         // shows the dock of the running instance. Its argv and working
         // folder are ignored and never logged.
@@ -53,13 +65,34 @@ pub fn run() {
             commands::panel::panel_ready,
             commands::dock::set_dock_layout,
             commands::settings::get_settings,
-            commands::settings::update_settings
-        ])
-        .build(tauri::generate_context!())
+            commands::settings::update_settings,
+            commands::widgets::list_widgets,
+            commands::widgets::add_widget,
+            commands::widgets::remove_widget,
+            commands::widgets::move_widget,
+            commands::widgets::update_widget,
+            commands::widgets::get_note,
+            commands::widgets::save_note,
+            commands::widgets::dismiss_storage_notice
+        ]);
+    // Test build only: the WebDriver server the E2E suite drives the windows
+    // through, on the port in `TAURI_WEBDRIVER_PORT` (4445 by default).
+    #[cfg(feature = "e2e")]
+    let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+    builder
+        .build(context)
         .expect("error while building tauri application")
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 windows::hit_test::tracker(app).stop();
+                // The process ends without closing the widget database:
+                // leave the file complete on its own, `-wal` applied.
+                if let Some(storage) = app.try_state::<Mutex<persistence::database::Storage>>() {
+                    storage
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .checkpoint();
+                }
             }
         });
 }

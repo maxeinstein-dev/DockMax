@@ -68,6 +68,21 @@ jobs:
         working-directory: src-tauri
         run: cargo fmt --check
 
+      # Spec 0003, Verificação 8: the WebDriver server comes only with the `e2e`
+      # feature. A failing `cargo tree` fails the step too (`-e`, `pipefail`).
+      - name: Release build has no WebDriver
+        working-directory: src-tauri
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree --locked -e normal)"
+          if hits="$(grep -Ei 'wdio|webdriver' <<<"$tree")"; then
+            echo "::error::the dependency tree without the e2e feature has the WebDriver plugin:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "No wdio/webdriver crate in the release dependency tree."
+
       - name: cargo clippy
         working-directory: src-tauri
         run: cargo clippy --all-targets --locked -- -D warnings
@@ -75,3 +90,61 @@ jobs:
       - name: cargo test
         working-directory: src-tauri
         run: cargo test --locked
+
+  # Spec 0003 §2.8: drives a test build of the app (own identifier, data in a
+  # temporary folder per run, WebDriver server embedded) with WebdriverIO.
+  e2e:
+    name: e2e
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No `version`: the action reads `packageManager` from package.json.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # With no arguments, rustup installs the channel and components from rust-toolchain.toml.
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install
+          rustup show
+
+      # Own key: the `e2e` feature compiles a different dependency set than
+      # the `checks` job.
+      - name: Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri -> target
+          key: e2e
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `tauri::generate_context!` requires `frontendDist` (../dist) at compile time.
+      - name: Build frontend
+        run: pnpm build
+
+      # Before the app build, so `--locked` proves Cargo.lock covers the feature.
+      - name: cargo clippy (e2e)
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --locked --features e2e -- -D warnings
+
+      - name: cargo test (e2e)
+        working-directory: src-tauri
+        run: cargo test --locked --features e2e
+
+      - name: Build test app
+        run: pnpm test:e2e:build
+
+      - name: E2E
+        run: pnpm test:e2e

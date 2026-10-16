@@ -2,3 +2,4 @@
 //! touches the file system, Tauri or Windows.
 
 pub mod settings;
+pub mod widgets;

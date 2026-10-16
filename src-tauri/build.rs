@@ -9,6 +9,14 @@ fn main() {
             "set_dock_layout",
             "get_settings",
             "update_settings",
+            "list_widgets",
+            "add_widget",
+            "remove_widget",
+            "move_widget",
+            "update_widget",
+            "get_note",
+            "save_note",
+            "dismiss_storage_notice",
         ]),
     ))
     .expect("failed to run tauri-build");

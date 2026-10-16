@@ -81,5 +81,13 @@ export default defineConfig(
       globals: globals.node,
     },
   },
+  {
+    // E2E suite: runs in Node under WebdriverIO's Mocha runner; only the
+    // callbacks given to `browser.execute` run in the page.
+    files: ["e2e/**/*.ts"],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.mocha },
+    },
+  },
   eslintConfigPrettier,
 );
