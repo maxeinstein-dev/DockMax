@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { getNote, saveNote, type WidgetId } from "../../core/widgets";
+import { saveNote, type WidgetId } from "../../core/widgets";
 import { useT } from "../../i18n";
 import PanelFooter from "../../panel/PanelFooter";
 import { PANEL_TITLE_ID } from "../../panel/parts/focus";
@@ -8,6 +8,7 @@ import PanelHeader from "../../panel/parts/PanelHeader";
 import type { WidgetPanelProps } from "../contract";
 import { widgetName } from "../names";
 import { createAutosave, type Autosave, type AutosaveStatus } from "./autosave";
+import { holdReads, readNote } from "./memory";
 import "./notes.css";
 
 /** Where the reading of the note stands, for one instance. */
@@ -65,7 +66,7 @@ function NotePanel({
 
   useEffect(() => {
     let active = true;
-    getNote({ id }).then(
+    readNote(id).then(
       (text) => {
         if (active) setRead({ id, state: "ready", text });
       },
@@ -163,8 +164,12 @@ function NoteEditor({
       autosave.current = null;
       flushRef.current = null;
       // Keep what was typed: save it first (`flush` always resolves),
-      // then stop the timers.
-      void instance.flush().then(() => instance.dispose());
+      // then stop the timers. The next read of this note (shown again,
+      // Ajustes) waits for it.
+      holdReads(
+        id,
+        instance.flush().then(() => instance.dispose()),
+      );
     };
   }, [id, savedText, flushRef]);
 

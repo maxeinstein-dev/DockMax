@@ -38,6 +38,19 @@ const LIST: WidgetsSnapshot = { storage: { state: "ok" }, widgets: [NOTE] };
 const errors = ptBR.widgets.errors;
 const common = ptBR.widgets.common;
 
+interface Deferred {
+  promise: Promise<void>;
+  resolve: () => void;
+}
+
+function deferred(): Deferred {
+  let resolve!: () => void;
+  const promise = new Promise<void>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 /** The Rust side of the note: `stored` is what `get_note` reads; `save`
  * answers each `save_note` (and may write `stored` itself). */
 let stored = "";
@@ -130,5 +143,37 @@ describe("a note whose save fails", () => {
     await settle();
     expect(stored).toBe("Pão");
     expect(screen.getByRole("button", { name: common.remove })).toBeVisible();
+  });
+});
+
+describe("showing the note again while a save runs", () => {
+  it("reads the note only after the saves of the last show, so the editor has the newest text", async () => {
+    // Writes on the call and answers later: the first save hangs.
+    const first = deferred();
+    let count = 0;
+    save = (body) => {
+      stored = body;
+      return ++count === 1 ? first.promise : Promise.resolve();
+    };
+    const editor = await openNote();
+    fireEvent.change(editor, { target: { value: "a" } });
+    await settle(500);
+    fireEvent.change(editor, { target: { value: "ab" } });
+
+    // A new show remounts the content: the old editor saves "ab" once "a"
+    // answers, and the new one reads the note.
+    show({ widget: NOTE.id });
+    await settle();
+    first.resolve();
+    await settle();
+
+    expect(stored).toBe("ab");
+    expect(screen.getByRole("textbox", { name: "Mercado" })).toHaveValue("ab");
+    // Typing then saves over the newest text, not over an older one.
+    fireEvent.change(screen.getByRole("textbox", { name: "Mercado" }), {
+      target: { value: "abc" },
+    });
+    await settle(500);
+    expect(stored).toBe("abc");
   });
 });

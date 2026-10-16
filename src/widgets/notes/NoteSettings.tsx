@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   MAX_LABEL_CHARS,
-  getNote,
   isWidgetCommandError,
   labelLength,
   type WidgetErrorCode,
@@ -14,6 +13,7 @@ import PanelHeader from "../../panel/parts/PanelHeader";
 import RemoveButton from "../../panel/parts/RemoveButton";
 import TextField from "../../panel/parts/TextField";
 import type { WidgetSettingsProps } from "../contract";
+import { readNote } from "./memory";
 
 /** The code of a failed command; anything else reads as `writeFailed`. */
 function codeOf(error: unknown): WidgetErrorCode {
@@ -21,14 +21,15 @@ function codeOf(error: unknown): WidgetErrorCode {
 }
 
 /** Whether the stored note has text, for one instance: null while it is
- * read, or when it can't be (both ask before removing). */
+ * read, or when it can't be (both ask before removing). Read once the saves
+ * of the main view have ended. */
 function useHasText(id: WidgetId): boolean | null {
   const [read, setRead] = useState<{ id: WidgetId; hasText: boolean } | null>(
     null,
   );
   useEffect(() => {
     let active = true;
-    getNote({ id }).then(
+    readNote(id).then(
       (text) => {
         if (active) setRead({ id, hasText: text !== "" });
       },
