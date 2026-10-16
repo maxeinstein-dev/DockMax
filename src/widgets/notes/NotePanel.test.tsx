@@ -378,3 +378,72 @@ describe("notes.css", () => {
     expect(used.filter((token) => !defined.has(token))).toEqual([]);
   });
 });
+
+describe("Ajustes", () => {
+  it("saves the pending text before opening Ajustes, which reads the stored note", async () => {
+    const save = deferred<void>();
+    backend({ save: () => save.promise });
+    const { editor, onAdjust } = await openNote();
+    fireEvent.change(editor, { target: { value: "Pão" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Ajustes" }));
+    await settle();
+
+    // Saved at once, not after the pause; Ajustes waits for it.
+    expect(saves()).toEqual(["Pão"]);
+    expect(onAdjust).not.toHaveBeenCalled();
+    // A second click while saving asks once.
+    fireEvent.click(screen.getByRole("button", { name: "Ajustes" }));
+
+    save.resolve();
+    await settle();
+    expect(onAdjust).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for a running save and the newer text typed during it", async () => {
+    const first = deferred<void>();
+    const second = deferred<void>();
+    const pending = [first, second];
+    backend({ save: () => pending.shift()!.promise });
+    const { editor, onAdjust } = await openNote();
+    fireEvent.change(editor, { target: { value: "" } });
+    fireEvent.change(editor, { target: { value: "a" } });
+    await settle(500);
+    fireEvent.change(editor, { target: { value: "ab" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Ajustes" }));
+    first.resolve();
+    await settle();
+    expect(onAdjust).not.toHaveBeenCalled();
+    expect(saves()).toEqual(["a", "ab"]);
+
+    second.resolve();
+    await settle();
+    expect(onAdjust).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens Ajustes even when the save fails: the text stays on screen", async () => {
+    backend({ save: () => Promise.reject({ code: "writeFailed" }) });
+    const { editor, onAdjust } = await openNote();
+    fireEvent.change(editor, { target: { value: "Pão" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Ajustes" }));
+    await settle();
+
+    expect(onAdjust).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not open Ajustes after the panel went away", async () => {
+    const save = deferred<void>();
+    backend({ save: () => save.promise });
+    const { editor, onAdjust, unmount } = await openNote();
+    fireEvent.change(editor, { target: { value: "Pão" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ajustes" }));
+
+    unmount();
+    save.resolve();
+    await settle();
+
+    expect(onAdjust).not.toHaveBeenCalled();
+  });
+});

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { getNote, saveNote, type WidgetId } from "../../core/widgets";
 import { useT } from "../../i18n";
 import PanelFooter from "../../panel/PanelFooter";
@@ -18,9 +18,16 @@ type Read =
    * §2.10, N7). */
   | { id: WidgetId; state: "unreadable" };
 
+/** Saves what the editor holds and resolves once saved (or failed); null
+ * when there is nothing to save. */
+type Flush = () => Promise<void> | null;
+
 /** The main view of a note panel (spec 0003 §2.2, Nota): the text in a
  * 210 px editor that saves itself, and the save state in the footer. No
- * editor until `get_note` answers. */
+ * editor until `get_note` answers. "Ajustes" waits for the pending text to
+ * be saved first: Ajustes reads the stored note to know whether removing
+ * it must ask, and must never read a version older than the screen's (an
+ * empty one would remove the note without asking). */
 function NotePanel({
   instance,
   onAdjust,
@@ -29,6 +36,30 @@ function NotePanel({
   const t = useT();
   const [read, setRead] = useState<Read | null>(null);
   const { id } = instance;
+  const flush = useRef<Flush | null>(null);
+  const mounted = useRef(true);
+  const adjusting = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const adjust = () => {
+    if (adjusting.current) return;
+    const saving = flush.current?.() ?? null;
+    if (saving === null) {
+      onAdjust();
+      return;
+    }
+    adjusting.current = true;
+    void saving.then(() => {
+      adjusting.current = false;
+      if (mounted.current) onAdjust();
+    });
+  };
 
   useEffect(() => {
     let active = true;
@@ -54,7 +85,7 @@ function NotePanel({
     <>
       <PanelHeader
         title={widgetName(t, instance)}
-        onAdjust={onAdjust}
+        onAdjust={adjust}
         focusAction={returnedFromSettings}
       />
       {current === null ? (
@@ -70,7 +101,12 @@ function NotePanel({
           <PanelFooter alert={null}>{null}</PanelFooter>
         </>
       ) : (
-        <NoteEditor key={id} id={id} savedText={current.text} />
+        <NoteEditor
+          key={id}
+          id={id}
+          savedText={current.text}
+          flushRef={flush}
+        />
       )}
     </>
   );
@@ -83,7 +119,16 @@ const IDLE: AutosaveStatus = { state: "idle", error: null };
  * with its 10 s deadline), and at once when the editor or the window loses
  * the focus, when the window hides and when it unmounts (another panel,
  * Ajustes, closing). */
-function NoteEditor({ id, savedText }: { id: WidgetId; savedText: string }) {
+function NoteEditor({
+  id,
+  savedText,
+  flushRef,
+}: {
+  id: WidgetId;
+  savedText: string;
+  /** Set to this editor's `Flush` while it is mounted. */
+  flushRef: RefObject<Flush | null>;
+}) {
   const t = useT();
   const [text, setText] = useState(savedText);
   const [status, setStatus] = useState<AutosaveStatus>(IDLE);
@@ -95,6 +140,10 @@ function NoteEditor({ id, savedText }: { id: WidgetId; savedText: string }) {
       savedText,
     });
     autosave.current = instance;
+    flushRef.current = () => {
+      const { state, error } = instance.getStatus();
+      return state === "idle" && error === null ? null : instance.flush();
+    };
     const unsubscribe = instance.subscribe(() =>
       setStatus(instance.getStatus()),
     );
@@ -109,11 +158,12 @@ function NoteEditor({ id, savedText }: { id: WidgetId; savedText: string }) {
       document.removeEventListener("visibilitychange", onVisibility);
       unsubscribe();
       autosave.current = null;
+      flushRef.current = null;
       // Keep what was typed: save it first (`flush` always resolves),
       // then stop the timers.
       void instance.flush().then(() => instance.dispose());
     };
-  }, [id, savedText]);
+  }, [id, savedText, flushRef]);
 
   const error = status.error;
   const state = error === null ? status.state : "error";
