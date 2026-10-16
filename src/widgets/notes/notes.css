@@ -1,0 +1,69 @@
+/* The note's panel (DESIGN.md "Nota"): the Windows 11 field of
+   parts.css (`field-input`), 210 px high in Note Body, and the save state
+   in the footer. Only tokens from tokens.css. */
+
+/* The editor, and the boxes that take its place while the text is read or
+   when it can't be: the same height, so the card never changes size. */
+.note-editor,
+.note-placeholder,
+.note-locked {
+  box-sizing: border-box;
+  height: 210px;
+}
+
+.note-editor {
+  display: block;
+  resize: none;
+  padding: 8px 10px;
+  line-height: 1.5;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-2) 50%, transparent) transparent;
+}
+
+.note-locked {
+  display: grid;
+  align-content: start;
+}
+
+/* The save state: a 6 px dot in the text's color, then the text. */
+.note-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.note-save::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-dot);
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.note-save[data-state="saving"]::before {
+  animation: note-save-blink 1s ease-in-out infinite;
+}
+
+/* An error may take two lines, in the danger ink, with the dot full. */
+.note-save[data-state="error"] {
+  color: var(--danger);
+  white-space: normal;
+}
+
+.note-save[data-state="error"]::before {
+  opacity: 1;
+}
+
+@keyframes note-save-blink {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-save[data-state="saving"]::before {
+    animation: none;
+  }
+}
