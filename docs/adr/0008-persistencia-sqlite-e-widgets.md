@@ -155,5 +155,5 @@ Migração 1 (`src-tauri/migrations/0001_widgets.sql`), com tabelas `STRICT` par
 - Mudar a forma de um widget exige mexer no Rust, no TS e nas fixtures juntos; os testes de contrato cobram isso.
 - Uma configuração antiga ou editada à mão nunca bloqueia a inicialização, mas pode voltar ao padrão em silêncio para o usuário (o aviso fica só no log).
 - Comandos novos continuam passando pela permissão por janela e pelo teste-guarda das capabilities (ADR 0006).
-- O SQLite embutido e a base de fusos aumentam o executável e o tempo de build. Medido no PR 1: o `dockmax.exe` de release foi de 4.699.136 para 7.143.936 bytes (+2,44 MB; o SQLite responde por cerca de 1,7 MB e o `jiff` por cerca de 0,3 MB), e o build de release levou 133 s com as dependências em cache. Detalhes na spec 0003 §2.10.
+- O SQLite embutido e a base de fusos aumentam o executável e o tempo de build. Medido no PR 1: o `dockmax.exe` de release foi de 4.699.136 para 7.144.960 bytes (+2,45 MB; o SQLite responde por cerca de 1,7 MB e o `jiff` por cerca de 0,3 MB), e o build de release levou de 127 a 133 s com as dependências em cache. Detalhes na spec 0003 §2.10.
 - O E2E depende de um build de debug com a feature `e2e`; o build de release não muda. Rodar localmente abre um segundo dock na tela.
