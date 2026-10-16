@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Settings } from "../core/settings";
+import type { WidgetInstance, WidgetsSnapshot } from "../core/widgets";
 import { ptBR } from "../i18n/pt-BR";
 import SettingsPanel from "./SettingsPanel";
 
@@ -366,5 +367,133 @@ describe("SettingsPanel", () => {
         "-1",
       );
     });
+  });
+});
+
+describe("SettingsPanel › Itens do dock row", () => {
+  const items = ptBR.widgets.items;
+  const CLOCK: WidgetInstance = {
+    id: "c1",
+    label: null,
+    kind: "clock",
+    config: {
+      timeZone: null,
+      hourCycle: "h23",
+      showSeconds: false,
+      iconStyle: "digital",
+    },
+  };
+
+  function widgets(
+    count: number,
+    storage: WidgetsSnapshot["storage"] = { state: "ok" },
+  ): WidgetsSnapshot {
+    return {
+      storage,
+      widgets: Array.from({ length: count }, (_, i) => ({
+        ...CLOCK,
+        id: `c${i}`,
+      })),
+    };
+  }
+
+  function row() {
+    return screen.getByRole("button", { name: new RegExp(items.title) });
+  }
+
+  it("comes after the four groups, with the count, and opens the subview", () => {
+    const onOpenItems = vi.fn();
+    render(
+      <SettingsPanel
+        settings={SETTINGS}
+        widgets={widgets(3)}
+        onOpenItems={onOpenItems}
+      />,
+    );
+
+    expect(row()).toHaveTextContent("3 de 12");
+    expect(row()).not.toHaveTextContent(ptBR.widgets.notice);
+    expect(
+      group(text.groups.opacity).compareDocumentPosition(row()) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    fireEvent.click(row());
+    expect(onOpenItems).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("marks the row while the storage was recovered", () => {
+    render(
+      <SettingsPanel
+        settings={SETTINGS}
+        widgets={widgets(2, { state: "recovered" })}
+        onOpenItems={vi.fn()}
+      />,
+    );
+
+    expect(row()).toHaveTextContent("2 de 12");
+    expect(row()).toHaveTextContent(ptBR.widgets.notice);
+    expect(row().querySelector(".warning-dot")).not.toBeNull();
+  });
+
+  it("says Indisponível, marked, while the storage can't be used", () => {
+    render(
+      <SettingsPanel
+        settings={SETTINGS}
+        widgets={widgets(0, { state: "unavailable", reason: "openFailed" })}
+        onOpenItems={vi.fn()}
+      />,
+    );
+
+    expect(row()).toHaveTextContent(items.unavailable);
+    expect(row()).not.toHaveTextContent("de 12");
+    expect(row()).toHaveTextContent(ptBR.widgets.notice);
+  });
+
+  it("says Indisponível, unmarked, while the widgets can't be read", () => {
+    render(
+      <SettingsPanel
+        settings={SETTINGS}
+        widgets={null}
+        onOpenItems={vi.fn()}
+      />,
+    );
+
+    expect(row()).toHaveTextContent(items.unavailable);
+    expect(row()).not.toHaveTextContent(ptBR.widgets.notice);
+  });
+
+  it("takes the focus coming back from the subview", () => {
+    render(
+      <SettingsPanel
+        settings={SETTINGS}
+        widgets={widgets(1)}
+        onOpenItems={vi.fn()}
+        focusItemsRow
+      />,
+    );
+
+    expect(row()).toHaveFocus();
+  });
+
+  it("leaves the focus alone otherwise", () => {
+    render(
+      <SettingsPanel
+        settings={SETTINGS}
+        widgets={widgets(1)}
+        onOpenItems={vi.fn()}
+      />,
+    );
+
+    expect(row()).not.toHaveFocus();
+  });
+
+  it("has no row without a way to open the subview", () => {
+    render(<SettingsPanel settings={SETTINGS} widgets={widgets(1)} />);
+
+    expect(
+      screen.queryByRole("button", { name: new RegExp(items.title) }),
+    ).toBeNull();
   });
 });
