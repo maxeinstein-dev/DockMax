@@ -87,6 +87,23 @@ describe("useNow", () => {
     );
   });
 
+  it("follows the system clock set back within RESYNC_MS", async () => {
+    const { last } = renderProbe(MINUTE_MS);
+    await act(() => vi.advanceTimersByTimeAsync(19_750));
+    expect(last()).toBe(Date.UTC(2026, 9, 16, 12, 1, 0));
+
+    // The clock is set 3 h back, mid-minute: a face that only moved
+    // forward would stay on 12:01.
+    const earlier = Date.UTC(2026, 9, 16, 9, 1, 0, 0) + 100;
+    vi.setSystemTime(earlier);
+    await act(() => vi.advanceTimersByTimeAsync(RESYNC_MS));
+
+    expect(last()).toBeGreaterThanOrEqual(earlier);
+    expect(Math.floor(last()! / MINUTE_MS)).toBe(
+      Math.floor(earlier / MINUTE_MS),
+    );
+  });
+
   it("checks again as soon as the page becomes visible", async () => {
     const { last } = renderProbe(MINUTE_MS);
     // Back from sleep: the clock moved on, the timer did not fire.
