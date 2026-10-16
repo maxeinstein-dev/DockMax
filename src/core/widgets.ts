@@ -18,8 +18,18 @@ export const MAX_NOTE_BYTES = 64 * 1024;
 
 /** Longest instance label accepted, in Unicode scalar values (code points),
  * not UTF-16 units: `label.length` counts an emoji outside the BMP as 2, Rust
- * as 1, so count with `[...label].length`. Checked in Rust. */
+ * as 1, so count with `labelLength`. Checked in Rust. */
 export const MAX_LABEL_CHARS = 40;
+
+/** Length of `label` as Rust counts it for `MAX_LABEL_CHARS`: Unicode
+ * scalar values (code points), not UTF-16 units and not graphemes. An emoji
+ * outside the BMP is 1 (`.length` says 2); "é" written as "e" plus a
+ * combining accent is 2. A lone surrogate counts as 1, as `[...label]`
+ * yields it; Rust never receives one (the IPC carries UTF-8). */
+export function labelLength(label: string): number {
+  // A string's iterator walks it by code points.
+  return Array.from(label).length;
+}
 
 /** The kinds of widget: a closed set, no third-party widgets. */
 export type WidgetKind =
@@ -56,6 +66,12 @@ export type HourCycle = "h23" | "h12";
 
 export const HOUR_CYCLES = ["h23", "h12"] as const;
 
+/** How a clock's dock icon shows the time: `digital` (`HH:mm`, or `h:mm`
+ * in 12 h without AM/PM) or `analog` (white hands on the glaze). */
+export type ClockIconStyle = "digital" | "analog";
+
+export const CLOCK_ICON_STYLES = ["digital", "analog"] as const;
+
 export interface ClockConfig {
   /** IANA time zone name, such as `America/Sao_Paulo`; null follows the
    * system time zone. */
@@ -63,6 +79,9 @@ export interface ClockConfig {
   hourCycle: HourCycle;
   /** Seconds in the panel only; the dock icon never shows them. */
   showSeconds: boolean;
+  /** How the dock icon shows the time. Rust reads a stored clock without
+   * it as `digital`; the interface always gets and sends it. */
+  iconStyle: ClockIconStyle;
 }
 
 export type Period = "day" | "week" | "month" | "year" | "workday";

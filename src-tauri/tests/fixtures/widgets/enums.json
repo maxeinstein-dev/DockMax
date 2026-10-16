@@ -10,6 +10,10 @@
     "h23",
     "h12"
   ],
+  "ClockIconStyle": [
+    "digital",
+    "analog"
+  ],
   "Period": [
     "day",
     "week",

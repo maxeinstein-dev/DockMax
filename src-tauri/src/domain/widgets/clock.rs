@@ -1,5 +1,6 @@
 //! Clock widget config (spec 0003 §2.2, Clock): which time zone, 24 h or
-//! 12 h, and whether the panel shows seconds.
+//! 12 h, whether the panel shows seconds and how the dock icon draws the
+//! time.
 
 use jiff::tz::TimeZoneDatabase;
 use serde::{Deserialize, Serialize};
@@ -16,12 +17,17 @@ pub struct ClockConfig {
     pub hour_cycle: HourCycle,
     /// Seconds in the panel only; the dock icon never shows them.
     pub show_seconds: bool,
+    /// How the dock icon shows the time. Added after the first release of
+    /// this config (spec 0003 §2.11): a stored config without it reads as
+    /// [`ClockIconStyle::Digital`], through `#[serde(default)]`.
+    pub icon_style: ClockIconStyle,
 }
 
 impl ClockConfig {
     /// Checks the time zone name against the IANA database bundled in the
     /// binary (never the system's, so the answer is the same on every
-    /// machine). `hour_cycle` and `show_seconds` are closed by their types.
+    /// machine). `hour_cycle`, `show_seconds` and `icon_style` are closed by
+    /// their types.
     pub fn validate(&self) -> Result<(), WidgetError> {
         match &self.time_zone {
             None => Ok(()),
@@ -57,6 +63,19 @@ pub enum HourCycle {
 
 closed_set!(HourCycle { H23, H12 });
 
+/// How the dock icon of a clock shows the time (spec 0003 §2.2).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ClockIconStyle {
+    /// `HH:mm` (or `h:mm` in 12 h, without AM/PM).
+    #[default]
+    Digital,
+    /// White hands on the glaze, without numbers.
+    Analog,
+}
+
+closed_set!(ClockIconStyle { Digital, Analog });
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -74,7 +93,27 @@ mod tests {
         assert_eq!(config.time_zone, None);
         assert_eq!(config.hour_cycle, HourCycle::H23);
         assert!(!config.show_seconds);
+        assert_eq!(config.icon_style, ClockIconStyle::Digital);
         assert_eq!(config.validate(), Ok(()));
+    }
+
+    #[test]
+    fn icon_styles_use_lowercase_names_in_json() {
+        assert_eq!(
+            serde_json::to_string(&ClockIconStyle::ALL).unwrap(),
+            r#"["digital","analog"]"#
+        );
+        assert!(serde_json::from_str::<ClockIconStyle>(r#""Analog""#).is_err());
+    }
+
+    #[test]
+    fn a_stored_config_without_the_icon_style_reads_as_digital() {
+        let config: ClockConfig =
+            serde_json::from_str(r#"{"timeZone":null,"hourCycle":"h12","showSeconds":true}"#)
+                .unwrap();
+        assert_eq!(config.icon_style, ClockIconStyle::Digital);
+        assert_eq!(config.hour_cycle, HourCycle::H12);
+        assert!(config.show_seconds);
     }
 
     #[test]

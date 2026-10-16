@@ -1,4 +1,5 @@
 import {
+  CLOCK_ICON_STYLES,
   HOUR_CYCLES,
   MOVE_DIRECTIONS,
   PERIODS,
@@ -26,7 +27,12 @@ const CLOCK_DEFAULT = {
   id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6071",
   label: null,
   kind: "clock",
-  config: { timeZone: null, hourCycle: "h23", showSeconds: false },
+  config: {
+    timeZone: null,
+    hourCycle: "h23",
+    showSeconds: false,
+    iconStyle: "digital",
+  },
 } satisfies WidgetInstance<"clock">;
 
 const NOTE_DEFAULT = {
@@ -68,6 +74,7 @@ export const WIDGET_FIXTURES = {
       timeZone: "America/Sao_Paulo",
       hourCycle: "h12",
       showSeconds: true,
+      iconStyle: "analog",
     },
   } satisfies WidgetInstance<"clock">,
 
@@ -136,6 +143,7 @@ export const WIDGET_FIXTURES = {
   enums: {
     WidgetKind: WIDGET_KINDS,
     HourCycle: HOUR_CYCLES,
+    ClockIconStyle: CLOCK_ICON_STYLES,
     Period: PERIODS,
     WeekStart: WEEK_STARTS,
     MoveDirection: MOVE_DIRECTIONS,

@@ -28,6 +28,7 @@ const clock = (config: Partial<ClockConfig> = {}): ClockConfig => ({
   timeZone: "America/Sao_Paulo",
   hourCycle: "h23",
   showSeconds: false,
+  iconStyle: "digital",
   ...config,
 });
 

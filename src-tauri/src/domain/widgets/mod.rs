@@ -566,7 +566,7 @@ closed_set!(WidgetErrorCode {
 mod tests {
     use serde_json::{Value, json};
 
-    use super::clock::HourCycle;
+    use super::clock::{ClockIconStyle, HourCycle};
     use super::shortcut::ShortcutTarget;
     use super::time_progress::{Period, WeekStart, Workday};
     use super::*;
@@ -681,7 +681,12 @@ mod tests {
                 "id": ID,
                 "label": null,
                 "kind": "clock",
-                "config": { "timeZone": null, "hourCycle": "h23", "showSeconds": false }
+                "config": {
+                    "timeZone": null,
+                    "hourCycle": "h23",
+                    "showSeconds": false,
+                    "iconStyle": "digital"
+                }
             })
         );
         assert_eq!(
@@ -724,10 +729,16 @@ mod tests {
             time_zone: Some("America/Sao_Paulo".to_owned()),
             hour_cycle: HourCycle::H12,
             show_seconds: true,
+            icon_style: ClockIconStyle::Analog,
         };
         assert_eq!(
             to_json(&clock),
-            json!({ "timeZone": "America/Sao_Paulo", "hourCycle": "h12", "showSeconds": true })
+            json!({
+                "timeZone": "America/Sao_Paulo",
+                "hourCycle": "h12",
+                "showSeconds": true,
+                "iconStyle": "analog"
+            })
         );
 
         let progress = TimeProgressConfig {
@@ -874,6 +885,20 @@ mod tests {
             ),
             Ok(WidgetConfig::Clock(ClockConfig {
                 show_seconds: true,
+                ..ClockConfig::default()
+            }))
+        );
+        // A clock stored before the icon style existed reads as digital.
+        assert_eq!(
+            decode_config(
+                WidgetKind::Clock,
+                1,
+                r#"{"timeZone":"Europe/Lisbon","hourCycle":"h12","showSeconds":false}"#
+            ),
+            Ok(WidgetConfig::Clock(ClockConfig {
+                time_zone: Some("Europe/Lisbon".to_owned()),
+                hour_cycle: HourCycle::H12,
+                icon_style: ClockIconStyle::Digital,
                 ..ClockConfig::default()
             }))
         );

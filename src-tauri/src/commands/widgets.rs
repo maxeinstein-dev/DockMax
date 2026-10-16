@@ -390,7 +390,7 @@ mod tests {
     fn clock_config() -> Value {
         json!({
             "kind": "clock",
-            "config": { "timeZone": "America/Sao_Paulo", "hourCycle": "h12", "showSeconds": true }
+            "config": { "timeZone": "America/Sao_Paulo", "hourCycle": "h12", "showSeconds": true, "iconStyle": "analog" }
         })
     }
 
@@ -604,26 +604,31 @@ mod tests {
 
         let rejected = [
             // Missing fields: never filled with their defaults.
-            json!({ "kind": "clock", "config": { "hourCycle": "h12", "showSeconds": true } }),
-            json!({ "kind": "clock", "config": { "timeZone": null, "showSeconds": true } }),
+            json!({ "kind": "clock", "config": { "hourCycle": "h12", "showSeconds": true, "iconStyle": "digital" } }),
+            json!({ "kind": "clock", "config": { "timeZone": null, "showSeconds": true, "iconStyle": "digital" } }),
+            json!({ "kind": "clock",
+                    "config": { "timeZone": null, "hourCycle": "h23", "showSeconds": false } }),
             json!({ "kind": "clock", "config": {} }),
             json!({ "kind": "clock" }),
-            json!({ "config": { "timeZone": null, "hourCycle": "h23", "showSeconds": false } }),
+            json!({ "config": { "timeZone": null, "hourCycle": "h23", "showSeconds": false, "iconStyle": "digital" } }),
             // Unknown fields: never dropped.
             json!({ "kind": "clock",
                     "config": { "timeZone": null, "hourCycle": "h23", "showSeconds": false,
-                                "format": "long" } }),
+                                "iconStyle": "digital", "format": "long" } }),
             json!({ "kind": "clock",
-                    "config": { "timeZone": null, "hourCycle": "h23", "show_seconds": false } }),
+                    "config": { "timeZone": null, "hourCycle": "h23", "show_seconds": false, "iconStyle": "digital" } }),
             json!({ "kind": "clock", "label": "x",
-                    "config": { "timeZone": null, "hourCycle": "h23", "showSeconds": false } }),
+                    "config": { "timeZone": null, "hourCycle": "h23", "showSeconds": false, "iconStyle": "digital" } }),
             // Mistyped fields and unknown names.
             json!({ "kind": "clock",
-                    "config": { "timeZone": null, "hourCycle": "h23", "showSeconds": "yes" } }),
+                    "config": { "timeZone": null, "hourCycle": "h23", "showSeconds": "yes", "iconStyle": "digital" } }),
             json!({ "kind": "clock",
-                    "config": { "timeZone": 3, "hourCycle": "h23", "showSeconds": false } }),
+                    "config": { "timeZone": 3, "hourCycle": "h23", "showSeconds": false, "iconStyle": "digital" } }),
             json!({ "kind": "clock",
-                    "config": { "timeZone": null, "hourCycle": "h24", "showSeconds": false } }),
+                    "config": { "timeZone": null, "hourCycle": "h24", "showSeconds": false, "iconStyle": "digital" } }),
+            json!({ "kind": "clock",
+                    "config": { "timeZone": null, "hourCycle": "h23", "showSeconds": false,
+                                "iconStyle": "Analog" } }),
             json!({ "kind": "weather", "config": {} }),
             json!(null),
             json!([]),
@@ -658,7 +663,7 @@ mod tests {
         );
         let unknown_zone = json!({
             "kind": "clock",
-            "config": { "timeZone": "Mars/Olympus", "hourCycle": "h23", "showSeconds": false }
+            "config": { "timeZone": "Mars/Olympus", "hourCycle": "h23", "showSeconds": false, "iconStyle": "digital" }
         });
         assert_eq!(
             update(&mut storage, &clock, Value::Null, unknown_zone).map(|_| ()),

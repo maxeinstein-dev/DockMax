@@ -5,6 +5,7 @@
   "config": {
     "timeZone": "America/Sao_Paulo",
     "hourCycle": "h12",
-    "showSeconds": true
+    "showSeconds": true,
+    "iconStyle": "analog"
   }
 }
