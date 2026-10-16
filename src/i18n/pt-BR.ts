@@ -139,8 +139,11 @@ const messages = {
       systemZoneOption: "Do sistema ({zone})",
       /** The same option when `Intl` can't name the system zone. */
       systemZoneOptionUnknown: "Do sistema",
-      /** Any other option: a city name and the IANA name. */
-      zoneOption: "{city} · {zone}",
+      /** Any other option: the zone's offset now, a city name and the IANA
+       * name, as `UTC−3 · Sao Paulo · America/Sao_Paulo`. */
+      zoneOption: "{offset} · {city} · {zone}",
+      /** A configured zone this WebView doesn't know: no offset to show. */
+      zoneOptionUnknown: "{city} · {zone}",
       hourCycle: "Formato",
       hourCycles: {
         h23: "24 horas",

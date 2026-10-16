@@ -8,6 +8,7 @@ import type {
 import { ptBR } from "../../i18n/pt-BR";
 import type { WidgetUpdate } from "../contract";
 import ClockSettings from "./ClockSettings";
+import { ianaTimeZones } from "./zones";
 
 // `src` doesn't load the Node types; only `TZ` is needed here.
 declare const process: { env: Record<string, string | undefined> };
@@ -282,16 +283,35 @@ describe("the label", () => {
 describe("the time zone", () => {
   inZone("America/Sao_Paulo");
 
-  it("starts with the system zone, then Intl's IANA list", () => {
-    renderSettings(clock());
+  it("starts with the system zone, then Intl's IANA list by offset", () => {
+    // 2026-07-15 12:00 UTC: summer in Lisbon (UTC+1).
+    vi.useFakeTimers({ now: Date.UTC(2026, 6, 15, 12), toFake: ["Date"] });
+    try {
+      renderSettings(clock());
+    } finally {
+      vi.useRealTimers();
+    }
 
     const options = [...zoneField().options];
     expect(options[0]).toHaveValue("");
     expect(options[0]).toHaveTextContent("Do sistema (Sao Paulo)");
-    const tokyo = options.find((o) => o.value === "Asia/Tokyo");
-    expect(tokyo).toHaveTextContent("Tokyo · Asia/Tokyo");
-    // The exact spelling of the base, never lower-cased or rewritten.
-    expect(options.some((o) => o.value === "America/Sao_Paulo")).toBe(true);
+    const label = (zone: string) =>
+      options.find((o) => o.value === zone)?.textContent;
+    expect(label("Asia/Tokyo")).toBe("UTC+9 · Tokyo · Asia/Tokyo");
+    expect(label("America/Sao_Paulo")).toBe(
+      "UTC−3 · Sao Paulo · America/Sao_Paulo",
+    );
+    expect(label("Europe/Lisbon")).toBe("UTC+1 · Lisbon · Europe/Lisbon");
+    // Every IANA name once, spelled exactly as Intl gives it, ordered from
+    // the most negative offset to the most positive.
+    const values = options.slice(1).map((o) => o.value);
+    expect([...values].sort()).toEqual([...ianaTimeZones()].sort());
+    const at = (zone: string) => values.indexOf(zone);
+    expect(at("Pacific/Honolulu")).toBeLessThan(at("America/Sao_Paulo"));
+    expect(at("America/Sao_Paulo")).toBeLessThan(at("Europe/Lisbon"));
+    expect(at("Europe/Lisbon")).toBeLessThan(at("Asia/Tokyo"));
+    // Same offset: by place name.
+    expect(at("America/Fortaleza")).toBeLessThan(at("America/Sao_Paulo"));
   });
 
   it("selects the system zone for a clock that follows it", () => {
@@ -327,7 +347,11 @@ describe("the time zone", () => {
 
     expect(zoneField()).toHaveValue("Mars/Olympus");
     const options = [...zoneField().options];
-    expect(options.filter((o) => o.value === "Mars/Olympus")).toHaveLength(1);
+    const unknown = options.filter((o) => o.value === "Mars/Olympus");
+    expect(unknown).toHaveLength(1);
+    // Right after the system zone, with no offset to show.
+    expect(options[1]).toBe(unknown[0]);
+    expect(unknown[0]).toHaveTextContent(/^Olympus · Mars\/Olympus$/);
   });
 
   it("goes back to the saved zone when Rust refuses it", async () => {

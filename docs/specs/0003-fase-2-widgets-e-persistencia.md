@@ -44,7 +44,7 @@ A Fase 2 é entregue em **dois PRs**, com um **mock visual aprovado** entre eles
   - **analógico**: ponteiros brancos sobre o esmalte, sem números.
 - O painel mostra hora, data e o fuso.
 - Ajustes por instância:
-  - fuso: o do sistema (padrão) ou um nome IANA;
+  - fuso: o do sistema (padrão) ou um nome IANA. Na lista, depois de "Do sistema", os fusos vêm ordenados pelo deslocamento UTC, do mais negativo ao mais positivo, e pelo nome do lugar dentro do mesmo deslocamento; cada opção começa pelo deslocamento (`UTC−3 · Sao Paulo · America/Sao_Paulo`). O deslocamento é o vigente no instante em que os Ajustes abrem, com horário de verão: Lisboa fica em `UTC+1` no verão e em `UTC` no inverno, e a ordem acompanha. O valor gravado é sempre o nome IANA na grafia exata (pedido do teste manual de 2026-10-16);
   - formato 24 h (padrão) ou 12 h;
   - segundos no painel (padrão desligado);
   - estilo do ícone: digital (padrão) ou analógico. Campo novo na configuração do Relógio; na leitura, um registro sem ele vale digital.

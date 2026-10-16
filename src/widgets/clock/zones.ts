@@ -27,6 +27,58 @@ export function utcOffset(instant: Instant, timeZone: string): string {
   return name.replace(/^GMT/, "UTC").replace("-", "−");
 }
 
+/** The offset of `timeZone` at `instant` in minutes east of UTC (São Paulo
+ * −180, Kolkata 330), read from the same text as `utcOffset`, so the order
+ * and the text can't disagree. */
+export function utcOffsetMinutes(instant: Instant, timeZone: string): number {
+  const match = /^UTC(?:([+−])(\d{1,2})(?::(\d{2}))?)?$/.exec(
+    utcOffset(instant, timeZone),
+  );
+  if (!match?.[1]) return 0;
+  const minutes = Number(match[2]) * 60 + Number(match[3] ?? 0);
+  return match[1] === "−" ? -minutes : minutes;
+}
+
+/** A zone with its offset at one instant. */
+export interface ZoneAtInstant {
+  /** The IANA name, exactly as given. */
+  timeZone: string;
+  /** The offset as `utcOffset` writes it, as `UTC−3`. */
+  offset: string;
+  /** The same offset in minutes east of UTC. */
+  minutes: number;
+}
+
+/** `zones` ordered by their offset at `instant`, from the most negative to
+ * the most positive, and by place name (`zoneCity`), then by IANA name,
+ * within the same offset. The offset is the one in force at `instant`,
+ * daylight saving time included: Lisbon is `UTC+1` in July and `UTC` in
+ * January, so the order of a list read at another instant may differ. */
+export function zonesByOffset(
+  instant: Instant,
+  zones: readonly string[],
+): ZoneAtInstant[] {
+  return zones
+    .map((timeZone) => ({
+      timeZone,
+      offset: utcOffset(instant, timeZone),
+      minutes: utcOffsetMinutes(instant, timeZone),
+      city: zoneCity(timeZone),
+    }))
+    .sort(
+      (a, b) =>
+        a.minutes - b.minutes ||
+        compareText(a.city, b.city) ||
+        compareText(a.timeZone, b.timeZone),
+    )
+    .map(({ timeZone, offset, minutes }) => ({ timeZone, offset, minutes }));
+}
+
+/** Plain code-unit order: the same on every machine, whatever its locale. */
+function compareText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 // `Intl.supportedValuesOf` is ES2022; the project's lib is ES2020.
 type IntlWithValues = typeof Intl & {
   supportedValuesOf?: (key: "timeZone") => string[];

@@ -20,7 +20,7 @@ import { labelFromDraft } from "../../panel/parts/label";
 import type { WidgetSettingsProps, WidgetUpdate } from "../contract";
 import "./clock.css";
 import { systemTimeZone } from "./format";
-import { ianaTimeZones, zoneCity } from "./zones";
+import { ianaTimeZones, zoneCity, zonesByOffset } from "./zones";
 
 /** The zone list's value for "follow the system" (`timeZone: null`): no
  * IANA name is empty. */
@@ -47,10 +47,16 @@ function errorCode(error: unknown): WidgetErrorCode {
   return isWidgetCommandError(error) ? error.code : "writeFailed";
 }
 
-/** The zone list: the system zone first, then `Intl`'s IANA names as
- * written, plus a configured zone `Intl` doesn't list (Rust accepted it),
- * so the list always shows the clock's own value. */
-function zoneOptions(t: Messages, configured: string | null): SelectOption[] {
+/** The zone list: the system zone first, then a configured zone `Intl`
+ * doesn't list (Rust accepted it), so the list always shows the clock's own
+ * value, then `Intl`'s IANA names ordered by their offset at `instant`,
+ * from the most negative to the most positive, and by place name within
+ * one offset (`zonesByOffset`). Each value is the IANA name as written. */
+function zoneOptions(
+  t: Messages,
+  configured: string | null,
+  instant: number,
+): SelectOption[] {
   const text = t.widgets.clock;
   const system = systemTimeZone();
   const options: SelectOption[] = [
@@ -66,16 +72,20 @@ function zoneOptions(t: Messages, configured: string | null): SelectOption[] {
   if (configured !== null && !zones.includes(configured)) {
     options.push({
       value: configured,
-      label: format(text.zoneOption, {
+      label: format(text.zoneOptionUnknown, {
         city: zoneCity(configured),
         zone: configured,
       }),
     });
   }
-  for (const zone of zones) {
+  for (const { timeZone, offset } of zonesByOffset(instant, zones)) {
     options.push({
-      value: zone,
-      label: format(text.zoneOption, { city: zoneCity(zone), zone }),
+      value: timeZone,
+      label: format(text.zoneOption, {
+        offset,
+        city: zoneCity(timeZone),
+        zone: timeZone,
+      }),
     });
   }
   return options;
@@ -129,9 +139,13 @@ function ClockSettings({
 
   const current: Update = pending?.update ?? updateOf(instance);
   const config = current.config;
+  /** The instant the zone list is ordered at: when the view opened. The
+   * offsets are the ones in force then (daylight saving time included);
+   * the list doesn't reorder while it is open. */
+  const [openedAt] = useState(() => Date.now());
   const zones = useMemo(
-    () => zoneOptions(t, config.timeZone),
-    [t, config.timeZone],
+    () => zoneOptions(t, config.timeZone, openedAt),
+    [t, config.timeZone, openedAt],
   );
   const labelText = labelDraft ?? current.label ?? "";
 
