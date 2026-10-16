@@ -39,12 +39,15 @@ A Fase 2 é entregue em **dois PRs**, com um **mock visual aprovado** entre eles
 ### 2.2 Widgets
 
 **Relógio** (Q5)
-- O ícone do dock mostra a hora viva (`HH:mm`, sem segundos), legível no tamanho Pequeno (40 px) (Q2).
+- O ícone do dock mostra a hora viva, legível no tamanho Pequeno (40 px) (Q2), em um de dois estilos (decisão do mock, §2.11):
+  - **digital** (padrão): `HH:mm`, sem segundos; em 12 h, `h:mm` sem AM/PM, que fica no painel;
+  - **analógico**: ponteiros brancos sobre o esmalte, sem números.
 - O painel mostra hora, data e o fuso.
 - Ajustes por instância:
   - fuso: o do sistema (padrão) ou um nome IANA;
   - formato 24 h (padrão) ou 12 h;
-  - segundos no painel (padrão desligado).
+  - segundos no painel (padrão desligado);
+  - estilo do ícone: digital (padrão) ou analógico. Campo novo na configuração do Relógio; na leitura, um registro sem ele vale digital.
 - O nome do fuso é validado no Rust contra a base IANA, na grafia exata da base. `Factory` é recusado: está na base, mas quer dizer "fuso não configurado", não um lugar.
 - A interface formata com `Intl`. Se o WebView não conhecer um fuso que o Rust aceitou, o relógio usa o fuso do sistema e indica isso no painel, sem inventar a hora.
 - Se nem o fuso do sistema for identificado (o `Intl` informa `Etc/Unknown` e depois o recusa como `timeZone`), o relógio formata sem `timeZone`, no padrão do próprio `Intl`, e o painel diz que o fuso do sistema não foi identificado. A formatação nunca lança e nunca inventa um nome.
@@ -179,6 +182,8 @@ Nomes e cargas foram fechados no passo de contratos do PR 1 (C1):
 
 Depois de aprovado, o `DESIGN.md` ganha os componentes novos.
 
+Resultado: §2.11.
+
 **PR 2 — Widgets**
 1. Relógio, Progresso e Nota completos, com o registro de apresentação (`src/widgets/registry.ts`).
 2. Itens do dock, Ajustes e "Remover do dock".
@@ -212,6 +217,21 @@ Depois de aprovado, o `DESIGN.md` ganha os componentes novos.
 - O timer único do dock ressincroniza quando a hora do sistema muda (relógio ajustado, volta da suspensão), em vez de confiar só em `msUntilNextMinute`.
 - O limite do rótulo na interface conta code points (`[...label].length`), como o Rust, e não `.length`.
 - `config` e `body` gigantes são desserializados pelo Tauri antes de o Rust aplicar o limite. Aceito: só o JS do próprio painel, sob CSP estrita, consegue mandar isso.
+
+### 2.11 Resultado do mock (2026-10-16)
+
+- Mock aprovado em `docs/design/widgets-mock.html`, com os estados reproduzíveis por parâmetros na URL. O `DESIGN.md` e o `.impeccable/design.json` ganharam os componentes novos.
+- Decisões que o mock acrescentou, aprovadas pelo usuário:
+  - **estilo do ícone do Relógio** como ajuste de cada relógio: digital (padrão) ou analógico (§2.2);
+  - **Progresso**: anel com percentual no centro; no tamanho Pequeno, só o anel; período "fora do expediente" no primeiro lugar mostra o anel vazio e um traço;
+  - **esmalte novo "musgo"** (`.t-progress`) para o Progresso;
+  - **token de perigo** (`--danger`), só para a confirmação de remover nota, o erro de salvamento e o selo de aviso; o cobalto continua só para foco, seleção e painel aberto;
+  - **selo no ícone de Configurações** enquanto o banco estiver recuperado (até dispensar o aviso) ou indisponível;
+  - **Configurações › Itens do dock como subtela**, com Voltar, no mesmo padrão de Ajustes, para o painel caber acima do dock; a lista rola com muitos widgets;
+  - horários do expediente editados na própria linha do período, visíveis só quando ele está marcado;
+  - larguras de painel: Relógio 300 px, Progresso 320 px, Nota 340 px; Configurações e Sobre como na Fase 1.
+- Com 12 widgets no tamanho Grande o dock tem cerca de 1.050 px em repouso e cabe numa tela de 1366 px.
+- A revisão final de acabamento do mock foi dispensada pelo usuário; o código do PR 2 passa pela revisão adversarial completa.
 
 ## 3. O que esta spec deliberadamente NÃO entrega
 

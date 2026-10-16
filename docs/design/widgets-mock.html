@@ -1,0 +1,1057 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DockMax — mock dos widgets (Fase 2)</title>
+<style>
+  /* ---------- Page chrome (the mock tool itself) ---------- */
+  :root {
+    --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    --p-bg: #f3f3f1; --p-panel: #ffffff; --p-ink: #1b1c20; --p-ink-2: #5a5e68;
+    --p-line: #e1e2e5; --p-accent: #2f5bd3; --p-accent-ink: #1f45b3; --p-soft: #e9eefb;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --p-bg: #141518; --p-panel: #1c1d21; --p-ink: #ececf0; --p-ink-2: #a2a6b0;
+      --p-line: #2c2e34; --p-accent: #8aa6ff; --p-accent-ink: #b3c4ff; --p-soft: #222839;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--p-bg); color: var(--p-ink); font: 14px/1.5 var(--font); }
+  ::selection { background: color-mix(in srgb, var(--p-accent) 28%, transparent); }
+  :focus-visible { outline: 2px solid var(--p-accent); outline-offset: 2px; }
+
+  .app { display: grid; grid-template-columns: 284px minmax(0, 1fr); min-height: 100vh; }
+  .side {
+    border-right: 1px solid var(--p-line); background: var(--p-panel);
+    padding: 24px 20px 32px; display: grid; gap: 20px; align-content: start;
+  }
+  .side h1 { font: 600 20px/1.2 var(--font-display); margin: 0; letter-spacing: -.01em; }
+  .side p { margin: 0; color: var(--p-ink-2); font-size: 13px; }
+  .ctl { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+  .ctl legend { font-size: 12.5px; font-weight: 600; color: var(--p-ink); padding: 0; margin-bottom: 8px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 4px; }
+  .seg button {
+    font: inherit; font-size: 12.5px; color: var(--p-ink); background: transparent;
+    border: 1px solid var(--p-line); border-radius: 7px; padding: 5px 10px; cursor: pointer;
+  }
+  .seg button:hover { background: var(--p-soft); }
+  .seg button[aria-pressed="true"] { background: var(--p-soft); border-color: var(--p-accent); color: var(--p-accent-ink); font-weight: 600; }
+  .ctl-note { font-size: 12.5px; color: var(--p-ink-2); margin: 0; }
+
+  .main { min-width: 0; padding: 24px 28px 48px; display: grid; gap: 28px; align-content: start; }
+  .head { display: grid; gap: 6px; max-width: 78ch; }
+  .head h2 { font: 600 24px/1.2 var(--font-display); margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+  .head p { margin: 0; color: var(--p-ink-2); }
+  h3 { font: 600 16px/1.3 var(--font-display); margin: 0; }
+
+  .stage-wrap, .table-wrap, .sheet-wrap {
+    overflow-x: auto; scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--p-ink-2) 45%, transparent) transparent;
+  }
+  .stage-wrap { border-radius: 12px; border: 1px solid var(--p-line); }
+  .measure { margin: -16px 0 0; font-size: 12.5px; color: var(--p-ink-2); font-variant-numeric: tabular-nums; }
+  .notes { display: grid; gap: 28px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); align-items: start; }
+  .notes section, .states { display: grid; gap: 10px; min-width: 0; }
+  .notes p, .notes li, .states p { color: var(--p-ink-2); margin: 0; }
+  .notes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+  .notes li strong { color: var(--p-ink); font-weight: 600; }
+  .table-wrap { border: 1px solid var(--p-line); border-radius: 10px; background: var(--p-panel); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--p-line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-weight: 600; color: var(--p-ink-2); font-size: 12px; }
+  .tokens td:first-child { font-family: "Cascadia Mono", Consolas, ui-monospace, monospace; font-size: 12px; white-space: nowrap; }
+  .tokens td { font-variant-numeric: tabular-nums; }
+  .tokens tr.group td { font-family: var(--font); font-weight: 600; color: var(--p-ink); background: var(--p-soft); font-size: 12px; }
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; border: 1px solid var(--p-line); }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .side { border-right: 0; border-bottom: 1px solid var(--p-line); }
+    .main { padding: 20px 16px 40px; }
+  }
+
+  /* ---------- Stage: a Windows 11 desktop at 1:1 ---------- */
+  .stage { position: relative; height: 760px; min-width: 900px; overflow: hidden; font-family: var(--font); isolation: isolate; }
+  .stage[data-width="1366"] { width: 1366px; }
+  .wall { position: absolute; inset: 0; z-index: 0; }
+  [data-wall="soft"] > .wall, .cell[data-mode="light"] {
+    background:
+      radial-gradient(110% 80% at 72% 108%, #9db6ff 0%, transparent 56%),
+      radial-gradient(80% 70% at 18% -4%, #f4d6e6 0%, transparent 60%),
+      linear-gradient(160deg, #e8edf7, #d3ddf0);
+  }
+  [data-wall="deep"] > .wall, .cell[data-mode="dark"] {
+    background:
+      radial-gradient(110% 80% at 72% 108%, #2a4db4 0%, transparent 56%),
+      radial-gradient(80% 70% at 14% -4%, #3a2152 0%, transparent 60%),
+      linear-gradient(160deg, #0c1323, #0f1a33);
+  }
+  [data-wall="busy"] > .wall {
+    background:
+      radial-gradient(circle at 20% 30%, #ffffff 0 6%, transparent 6.5%),
+      radial-gradient(circle at 78% 64%, #111 0 7%, transparent 7.5%),
+      repeating-linear-gradient(45deg, #e2483d 0 14px, #f2c230 14px 28px, #2fb66b 28px 42px, #161616 42px 56px);
+  }
+
+  /* Synthetic app window behind the dock (Explorer-like), follows the Windows theme. */
+  .win {
+    position: absolute; z-index: 1; left: 5%; top: 5%; width: 58%; height: 84%;
+    border-radius: 8px; overflow: hidden; display: grid; grid-template-rows: 32px 1fr;
+    box-shadow: 0 0 0 1px var(--w-hair), 0 16px 48px -12px rgb(0 0 0 / .45);
+    background: var(--w-body); color: var(--w-ink); font-size: 12.5px;
+  }
+  .stage[data-mode="light"] { --w-body: #fafafa; --w-title: #f0f0f0; --w-ink: #1c1c1c; --w-ink-2: #616161; --w-hair: rgb(0 0 0 / .12); --w-row: #f0f0f0; --w-sel: #e5ecfb; }
+  .stage[data-mode="dark"]  { --w-body: #1f1f1f; --w-title: #2a2a2a; --w-ink: #ececec; --w-ink-2: #a8a8a8; --w-hair: rgb(255 255 255 / .1); --w-row: #282828; --w-sel: #2b3550; }
+  .win-title { background: var(--w-title); display: flex; align-items: center; justify-content: space-between; padding-left: 12px; }
+  .win-title span { font-size: 12px; color: var(--w-ink-2); }
+  .win-btns { display: flex; height: 100%; }
+  .win-btns i { width: 46px; display: grid; place-items: center; color: var(--w-ink-2); }
+  .win-btns svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 1; }
+  .win-body { display: grid; grid-template-columns: 170px 1fr; min-height: 0; }
+  .win-nav { border-right: 1px solid var(--w-hair); padding: 10px 8px; display: grid; gap: 2px; align-content: start; }
+  .win-nav div { padding: 6px 10px; border-radius: 5px; }
+  .win-nav div.on { background: var(--w-sel); }
+  .win-files { padding: 8px 12px; display: grid; align-content: start; }
+  .win-files div { display: grid; grid-template-columns: 1fr 130px 80px; padding: 7px 8px; border-radius: 4px; }
+  .win-files div:nth-child(odd) { background: var(--w-row); }
+  .win-files div span:not(:first-child) { color: var(--w-ink-2); font-variant-numeric: tabular-nums; }
+  .win-files div.h span { color: var(--w-ink-2); font-weight: 600; }
+
+  .taskbar {
+    position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: 48px;
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 12px;
+    background: var(--tb-bg); border-top: 1px solid var(--tb-hair); color: var(--tb-ink);
+  }
+  .stage[data-mode="light"] .taskbar { --tb-bg: #f3f3f3; --tb-hair: rgb(0 0 0 / .08); --tb-ink: #1c1c1c; }
+  .stage[data-mode="dark"] .taskbar  { --tb-bg: #202020; --tb-hair: rgb(255 255 255 / .07); --tb-ink: #ececec; }
+  .tb-apps { grid-column: 2; display: flex; gap: 4px; }
+  .tb-apps i, .tb-tray i { width: 40px; height: 40px; border-radius: 5px; display: grid; place-items: center; }
+  .tb-apps i.on { background: rgb(127 127 127 / .14); position: relative; }
+  .tb-apps i.on::after { content: ""; position: absolute; bottom: 2px; left: 50%; width: 6px; height: 3px; margin-left: -3px; border-radius: 2px; background: var(--tb-ink); opacity: .5; }
+  .tb-apps svg, .tb-tray svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .tb-tray { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 2px; }
+  .tb-tray i { width: 28px; }
+  .tb-tray svg { width: 16px; height: 16px; }
+  .tb-clock { text-align: right; font-size: 12px; line-height: 1.35; padding: 0 8px; font-variant-numeric: tabular-nums; }
+
+  /* ---------- Dock tokens (any element carrying data-mode gets them) ---------- */
+  [data-mode="light"] {
+    --ink: #1d1e22; --ink-2: #5b5f69;
+    --surface-rgb: 247 247 249;
+    --hair: rgb(0 0 0 / .09); --hi: rgb(255 255 255 / .8);
+    --shadow: 0 1px 2px rgb(16 20 32 / .10), 0 14px 32px -12px rgb(16 20 32 / .42);
+    --shadow-panel: 0 1px 2px rgb(16 20 32 / .10), 0 2px 8px -2px rgb(16 20 32 / .24);
+    --accent: #2f5bd3; --accent-ink: #1f45b3; --accent-soft: rgb(47 91 211 / .13);
+    --tip-bg: rgb(252 252 253 / .97); --tip-ink: #1d1e22;
+    --track: rgb(29 30 34 / .055); --kbd: rgb(29 30 34 / .07);
+    /* Fase 2 */
+    --field: rgb(255 255 255 / .85); --field-line: rgb(29 30 34 / .5);
+    --danger: hsl(10 62% 40%); --danger-ink: #ffffff; --danger-soft: hsl(10 62% 40% / .1);
+    --pg-fill: hsl(84 26% 38%); --pg-track: rgb(29 30 34 / .08);
+  }
+  [data-mode="dark"] {
+    --ink: #ececf0; --ink-2: #a5a9b3;
+    --surface-rgb: 38 39 44;
+    --hair: rgb(255 255 255 / .1); --hi: rgb(255 255 255 / .16);
+    --shadow: 0 1px 2px rgb(0 0 0 / .32), 0 16px 36px -12px rgb(0 0 0 / .7);
+    --shadow-panel: 0 1px 2px rgb(0 0 0 / .32), 0 2px 8px -2px rgb(0 0 0 / .5);
+    --accent: #7c9cff; --accent-ink: #b0c2ff; --accent-soft: rgb(124 156 255 / .17);
+    --tip-bg: rgb(50 51 57 / .97); --tip-ink: #f2f2f5;
+    --track: rgb(255 255 255 / .06); --kbd: rgb(255 255 255 / .09);
+    --field: rgb(255 255 255 / .045); --field-line: rgb(255 255 255 / .4);
+    --danger: hsl(10 86% 72%); --danger-ink: #1d1e22; --danger-soft: hsl(10 86% 72% / .14);
+    --pg-fill: hsl(84 30% 62%); --pg-track: rgb(255 255 255 / .09);
+  }
+  .dock-root[data-opacity="translucent"] { --surface-a: .8; }
+  .dock-root[data-opacity="solid"] { --surface-a: 1; }
+  .dock-root[data-size="s"] { --icon: 40px; --pad: 6px; --gap: 6px; --r-bar: 18px; }
+  .dock-root[data-size="m"] { --icon: 48px; --pad: 7px; --gap: 7px; --r-bar: 20px; }
+  .dock-root[data-size="l"] { --icon: 64px; --pad: 9px; --gap: 9px; --r-bar: 24px; }
+  .dock-root { --r-panel: 8px; --ease: cubic-bezier(.2, .8, .2, 1); --t-magnify: .16s; --t-pop: .18s; }
+
+  /* Own tile palette: desaturated glazes, static classes (strict CSP, no inline styles). */
+  .t-files    { --h: 150; --sat: 22%; --l: 44%; } /* sálvia */
+  .t-notes    { --h: 38;  --sat: 48%; --l: 40%; } /* ocre */
+  .t-clock    { --h: 192; --sat: 26%; --l: 40%; } /* petróleo */
+  .t-progress { --h: 84;  --sat: 22%; --l: 38%; } /* musgo (novo na Fase 2) */
+  .t-settings { --h: 222; --sat: 14%; --l: 34%; } /* tinta */
+  .t-about    { --h: 214; --sat: 22%; --l: 46%; } /* ardósia */
+
+  .dock-root { position: absolute; inset: 0 0 48px 0; z-index: 3; pointer-events: none; color: var(--ink); }
+  .dock { position: absolute; left: 50%; transform: translateX(-50%); bottom: 8px; pointer-events: auto; }
+  .dock-root[data-edge="top"] .dock { bottom: auto; top: 8px; }
+
+  .bar {
+    position: relative; display: flex; align-items: flex-end; gap: var(--gap);
+    padding: var(--pad); height: calc(var(--icon) + 2 * var(--pad)); border-radius: var(--r-bar);
+    background: rgb(var(--surface-rgb) / var(--surface-a));
+    box-shadow: inset 0 1px 0 var(--hi), 0 0 0 1px var(--hair), var(--shadow);
+  }
+  .dock-root[data-edge="top"] .bar { align-items: flex-start; box-shadow: inset 0 -1px 0 var(--hi), 0 0 0 1px var(--hair), var(--shadow); }
+  .sep { flex: none; width: 1px; align-self: stretch; margin: 4px calc(var(--gap) * .4); background: var(--hair); }
+
+  .item {
+    position: relative; flex: none; width: calc(var(--icon) * var(--s, 1)); height: var(--icon);
+    border: 0; padding: 0; background: none; cursor: pointer; color: inherit; font: inherit;
+    transition: width var(--t-magnify) var(--ease); -webkit-tap-highlight-color: transparent;
+  }
+  .item:focus { outline: none; }
+
+  /* Tile: superellipse glaze (mask) with drop shadow on the unmasked wrapper. */
+  .tile {
+    position: absolute; left: 50%; bottom: 0; width: var(--icon); height: var(--icon); margin-left: calc(var(--icon) / -2);
+    border-radius: 23%; display: grid; place-items: center; color: #fff;
+    filter: drop-shadow(0 1px 1px rgb(0 0 0 / .18)) drop-shadow(0 5px 6px rgb(0 0 0 / .16));
+    transform-origin: 50% 100%;
+    transform: translateY(calc(var(--lift, 0px) * -1)) scale(var(--s, 1));
+    transition: transform var(--t-magnify) var(--ease);
+  }
+  .tile::before {
+    content: ""; position: absolute; inset: 0;
+    background:
+      radial-gradient(130% 70% at 50% -12%, rgb(255 255 255 / .26), transparent 58%),
+      linear-gradient(180deg, hsl(var(--h) var(--sat) calc(var(--l) + 7%)), hsl(var(--h) var(--sat) calc(var(--l) - 5%)));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .32), inset 0 -1px 0 rgb(0 0 0 / .16);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  }
+  .tile > svg { position: relative; width: 54%; height: 54%; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .item:focus-visible .tile, .item.kb .tile { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .item:active .tile::before { filter: brightness(.84); }
+  .dock-root[data-edge="top"] .tile { bottom: auto; top: 0; transform-origin: 50% 0; transform: translateY(var(--lift, 0px)) scale(var(--s, 1)); }
+
+  /* Live tile faces (Fase 2) */
+  .live { position: relative; display: grid; place-items: center; width: 100%; height: 100%; }
+  .t-time {
+    font: 600 calc(var(--icon) * .28) / 1 var(--font-display); letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 1px 1px rgb(0 0 0 / .18);
+  }
+  .live svg { position: absolute; inset: 0; margin: auto; fill: none; stroke: #fff; stroke-linecap: round; }
+  .live .face { width: 76%; height: 76%; }
+  .live .ring { width: 78%; height: 78%; }
+  .ring .trk { stroke: rgb(255 255 255 / .28); }
+  .t-pct { position: relative; font: 600 calc(var(--icon) * .23) / 1 var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -.02em; color: #fff; }
+  .t-pct small { font-size: .7em; font-weight: 600; margin-left: .04em; opacity: .85; }
+  .dock-root[data-size="s"] .t-pct, .tile.mini .t-pct { display: none; }
+
+  /* Attention badge on a tile: storage recovered or unavailable. */
+  .badge {
+    position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--danger); box-shadow: 0 0 0 2px rgb(var(--surface-rgb));
+  }
+
+  .ind { position: absolute; left: 50%; pointer-events: none; opacity: 0; transition: opacity .15s; background: var(--accent);
+    width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; bottom: calc(var(--pad) * -1 + 1px); }
+  .item[aria-expanded="true"] .ind { opacity: 1; }
+  .dock-root[data-edge="top"] .ind { bottom: auto; top: calc(var(--pad) * -1 + 1px); }
+
+  .tip {
+    position: absolute; z-index: 5; pointer-events: none; white-space: nowrap;
+    font-size: 12.5px; font-weight: 600; color: var(--tip-ink); background: var(--tip-bg);
+    padding: 4px 10px; border-radius: 999px;
+    box-shadow: 0 0 0 1px var(--hair), 0 6px 16px -6px rgb(0 0 0 / .35);
+    transform: translate(-50%, -100%);
+  }
+  .dock-root[data-edge="top"] .tip { transform: translate(-50%, 0); }
+
+  /* ---------- Panel: always opaque ---------- */
+  .panel {
+    position: absolute; z-index: 4; pointer-events: auto; width: 320px;
+    background: rgb(var(--surface-rgb)); color: var(--ink);
+    border-radius: var(--r-panel); box-shadow: inset 0 1px 0 var(--hi), 0 0 0 1px var(--hair), var(--shadow-panel);
+    padding: 16px 16px 12px; display: grid; gap: 14px;
+    transform-origin: 50% 100%; animation: pop var(--t-pop) var(--ease);
+  }
+  [data-mode="light"] .panel { color-scheme: light; }
+  [data-mode="dark"] .panel { color-scheme: dark; }
+  .panel[hidden], .tip[hidden] { display: none; }
+  .dock-root[data-edge="top"] .panel { transform-origin: 50% 0; }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+  .panel ::selection { background: var(--accent-soft); }
+  .panel h2 { font: 600 15px/1.3 var(--font-display); margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .p-head { display: flex; align-items: center; gap: 6px; min-height: 24px; }
+  .p-head h2 { flex: 1; }
+  .p-row { display: grid; gap: 6px; }
+  .p-row > span, .fld > span, .p-label { font-size: 12.5px; color: var(--ink-2); }
+  .p-seg { display: flex; gap: 2px; padding: 2px; background: var(--track); border-radius: 6px; }
+  .p-seg button {
+    flex: 1; font: inherit; font-size: 12.5px; color: var(--ink); background: transparent; border: 0;
+    border-radius: 4px; padding: 6px; cursor: pointer; white-space: nowrap;
+  }
+  .p-seg button:hover { background: var(--track); }
+  .p-seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+  .p-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; color: var(--ink-2); border-top: 1px solid var(--hair); padding-top: 10px; }
+  .p-foot > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .p-foot > span:last-child { flex: none; white-space: nowrap; }
+  kbd { font: 600 11px/1 var(--font); padding: 3px 6px; border-radius: 4px; background: var(--kbd); color: var(--ink); }
+  .panel button:focus-visible, .panel input:focus-visible, .panel select:focus-visible, .panel textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* Buttons inside panels */
+  .q-btn, .i-btn, .btn, .d-btn, .x-btn {
+    font: inherit; font-size: 12.5px; border: 0; border-radius: 4px; cursor: pointer; background: transparent; color: var(--ink);
+  }
+  .q-btn { color: var(--ink-2); padding: 4px 8px; display: inline-flex; align-items: center; gap: 5px; }
+  .q-btn:hover, .i-btn:hover { background: var(--track); color: var(--ink); }
+  .q-btn svg, .i-btn svg, .btn svg, .x-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .i-btn { width: 26px; height: 26px; display: grid; place-items: center; color: var(--ink-2); padding: 0; flex: none; }
+  .i-btn:disabled { opacity: .32; cursor: default; background: transparent; }
+  .btn { background: var(--track); padding: 6px 10px; display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 11%, transparent); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .d-btn { background: var(--danger); color: var(--danger-ink); font-weight: 600; padding: 6px 12px; }
+  .d-btn:hover { filter: brightness(1.08); }
+  .x-btn { color: var(--danger); padding: 6px 8px; display: inline-flex; align-items: center; gap: 6px; justify-self: start; }
+  .x-btn:hover { background: var(--danger-soft); }
+
+  /* Windows 11 text fields */
+  .fld { display: grid; gap: 6px; min-width: 0; }
+  .inp {
+    font: inherit; font-size: 12.5px; color: var(--ink); background: var(--field); width: 100%; min-width: 0;
+    border: 1px solid var(--hair); border-bottom-color: var(--field-line); border-radius: 4px; padding: 6px 8px;
+    caret-color: var(--accent);
+  }
+  .inp::placeholder { color: var(--ink-2); opacity: .8; }
+  .panel .inp:focus-visible, .panel .inp:focus { outline: none; border-bottom-color: var(--accent); box-shadow: inset 0 -1px 0 var(--accent); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .hint { font-size: 12px; color: var(--ink-2); margin: -2px 0 0; }
+
+  /* Clock panel */
+  .clk { display: grid; gap: 2px; }
+  .clk-time { font: 600 40px/1.05 var(--font-display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 2px; }
+  .clk-time .sec { font-size: 22px; color: var(--ink-2); letter-spacing: 0; }
+  .clk-time .ap { font-size: 15px; color: var(--ink-2); margin-left: 6px; letter-spacing: 0; }
+  .clk-date { font-size: 12.5px; color: var(--ink-2); }
+  .clk-date::first-letter { text-transform: uppercase; }
+
+  /* Time-progress panel */
+  .pg { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .pg li { display: grid; grid-template-columns: 78px 1fr 42px; column-gap: 10px; row-gap: 3px; align-items: center; font-size: 12.5px; }
+  .pg .bar-t { height: 6px; border-radius: 3px; background: var(--pg-track); overflow: hidden; }
+  .pg .bar-t i { display: block; height: 100%; width: calc(var(--f, 0) * 100%); background: var(--pg-fill); border-radius: 3px; }
+  .pg .pct { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .pg .left { grid-column: 2 / 4; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .pg li.off .name, .pg li.off .left { color: var(--ink-2); }
+  .pg li.off .left { grid-column: 2 / 4; grid-row: 1; }
+
+  /* Note panel */
+  .note {
+    resize: none; height: 210px; line-height: 1.5; padding: 8px 10px;
+    scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink-2) 50%, transparent) transparent;
+  }
+  .save { display: inline-flex; align-items: center; gap: 6px; }
+  .save::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .55; }
+  .save[data-state="saving"]::before { animation: blink 1s ease-in-out infinite; }
+  .save[data-state="error"] { color: var(--danger); white-space: normal; }
+  .save[data-state="error"]::before { opacity: 1; }
+  @keyframes blink { 50% { opacity: .15; } }
+
+  /* Confirm and notices (inline, never a modal) */
+  .confirm { display: grid; gap: 10px; padding: 12px; border-radius: 6px; background: var(--danger-soft); font-size: 12.5px; }
+  .confirm p { margin: 0; }
+  .confirm strong { font-weight: 600; }
+  .confirm .row { display: flex; justify-content: flex-end; gap: 6px; }
+  .notice { display: grid; grid-template-columns: 16px 1fr; gap: 4px 8px; padding: 10px 12px; border-radius: 6px; background: var(--track); font-size: 12.5px; }
+  .notice svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; color: var(--danger); margin-top: 1px; }
+  .notice p { margin: 0; color: var(--ink-2); }
+  .notice p strong { color: var(--ink); font-weight: 600; }
+  .notice code { font: 600 12.5px var(--font); color: var(--ink); overflow-wrap: anywhere; }
+  .notice .btn { grid-column: 2; justify-self: start; margin-top: 4px; }
+
+  /* Settings: link row and the dock items list */
+  .nav-row {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font: inherit; font-size: 12.5px; color: var(--ink);
+    background: var(--track); border: 0; border-radius: 6px; padding: 8px 8px 8px 10px; cursor: pointer;
+  }
+  .nav-row:hover { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+  .nav-row .lbl { flex: 1; font-weight: 600; }
+  .nav-row .val { color: var(--ink-2); font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; }
+  .nav-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+  .nav-row svg { width: 16px; height: 16px; fill: none; stroke: var(--ink-2); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .wl { list-style: none; margin: 0; padding: 0 2px 0 0; display: grid; max-height: 268px; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink-2) 50%, transparent) transparent; }
+  .wl li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 6px 2px; border-bottom: 1px solid var(--hair); }
+  .wl li:last-child { border-bottom: 0; }
+  .wl .t1 { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wl .t2 { font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tile.mini, .tile.static { position: relative; left: auto; bottom: auto; margin: 0; transform: none; transition: none; }
+  .tile.mini { --icon: 26px; width: 26px; height: 26px; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .2)); }
+  .tile.mini > svg { width: 60%; height: 60%; stroke-width: 2; }
+  .tile.static { width: 56px; height: 56px; }
+  .add { display: grid; gap: 8px; }
+  .add-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  .add-btns .btn .tile.mini { --icon: 18px; width: 18px; height: 18px; filter: none; }
+  .add-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .add-head .p-label { font-weight: 600; color: var(--ink); }
+  .count { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .periods { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .periods li { display: flex; align-items: center; gap: 8px; padding: 2px 0 2px 2px; font-size: 12.5px; }
+  .periods label { flex: 1; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .periods input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+  .periods .hours { display: flex; align-items: center; gap: 6px; padding: 0 0 4px 23px; font-size: 12px; color: var(--ink-2); }
+  .periods .hours .inp { width: 84px; padding: 4px 6px; }
+  .empty { margin: 0; font-size: 12.5px; color: var(--ink-2); }
+
+  .about { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+  .about h2 { font-size: 17px; white-space: normal; }
+  .about p { margin: 2px 0 0; color: var(--ink-2); font-size: 12.5px; }
+  .about-list { display: grid; gap: 6px; font-size: 12.5px; }
+  .about-list div { display: flex; justify-content: space-between; gap: 12px; }
+  .about-list span:first-child { color: var(--ink-2); }
+
+  /* ---------- State sheet ---------- */
+  .sheet { display: grid; grid-template-columns: 150px repeat(3, minmax(230px, 1fr)); gap: 8px; min-width: 900px; }
+  .sheet .rowlabel { align-self: center; font-weight: 600; font-size: 13px; }
+  .sheet .collabel { font-size: 12px; color: var(--p-ink-2); font-weight: 600; }
+  .cell { position: relative; height: 112px; border-radius: 10px; overflow: hidden; display: grid; place-items: end center; padding-bottom: 14px; }
+  .cell .dock-root { position: relative; inset: auto; z-index: auto; }
+  .cell .dock { position: relative; left: auto; bottom: auto; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .item, .tile, .panel, .ind, .save::before { transition: none !important; animation: none !important; }
+  }
+  .dock-root.reduced .item, .dock-root.reduced .tile, .dock-root.reduced .panel, .dock-root.reduced .save::before { transition: none; animation: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Controles do mock">
+    <div>
+      <h1>DockMax · Widgets</h1>
+      <p>Mock da Fase 2 sobre o sistema B1 · Big Sur. O dock e os painéis funcionam: passe o mouse, abra os widgets, entre em Ajustes, reordene em Configurações › Itens do dock e escreva na nota.</p>
+    </div>
+    <fieldset class="ctl"><legend>Painel aberto</legend>
+      <div class="seg" data-ctl="open">
+        <button type="button" data-v="none">Nenhum</button><button type="button" data-v="clock">Relógio</button>
+        <button type="button" data-v="progress">Progresso</button><button type="button" data-v="note">Nota</button>
+        <button type="button" data-v="settings">Configurações</button><button type="button" data-v="items">Itens do dock</button>
+        <button type="button" data-v="about">Sobre</button>
+      </div></fieldset>
+    <fieldset class="ctl"><legend>Visão do widget</legend>
+      <div class="seg" data-ctl="view">
+        <button type="button" data-v="main">Normal</button><button type="button" data-v="adjust">Ajustes</button><button type="button" data-v="confirm">Confirmar remoção</button>
+      </div><p class="ctl-note">"Confirmar remoção" vale para a Nota com texto; nota vazia sai sem perguntar.</p></fieldset>
+    <fieldset class="ctl"><legend>Widgets no dock</legend>
+      <div class="seg" data-ctl="set">
+        <button type="button" data-v="default">Primeiro uso (3)</button><button type="button" data-v="twelve">Limite (12)</button><button type="button" data-v="empty">Nenhum</button>
+      </div></fieldset>
+    <fieldset class="ctl"><legend>Ícone do relógio</legend>
+      <div class="seg" data-ctl="face"><button type="button" data-v="digital">Digital</button><button type="button" data-v="analog">Analógico</button></div>
+      <p class="ctl-note">Vira ajuste de cada relógio (Ajustes › Ícone). Aqui muda todos de uma vez.</p></fieldset>
+    <fieldset class="ctl"><legend>Banco de dados</legend>
+      <div class="seg" data-ctl="storage"><button type="button" data-v="ok">Normal</button><button type="button" data-v="recovered">Recuperado</button><button type="button" data-v="unavailable">Indisponível</button></div></fieldset>
+    <fieldset class="ctl"><legend>Salvamento da nota</legend>
+      <div class="seg" data-ctl="save"><button type="button" data-v="saved">Salvo</button><button type="button" data-v="saving">Salvando</button><button type="button" data-v="error">Acima de 64 KB</button></div></fieldset>
+    <fieldset class="ctl"><legend>Aparência do dock</legend>
+      <div class="seg" data-ctl="theme"><button type="button" data-v="system">Sistema</button><button type="button" data-v="light">Claro</button><button type="button" data-v="dark">Escuro</button></div>
+      <div class="seg" data-ctl="size"><button type="button" data-v="s">Pequeno</button><button type="button" data-v="m">Médio</button><button type="button" data-v="l">Grande</button></div>
+      <div class="seg" data-ctl="opacity"><button type="button" data-v="translucent">Translúcido</button><button type="button" data-v="solid">Sólido</button></div>
+      <div class="seg" data-ctl="edge"><button type="button" data-v="bottom">Embaixo</button><button type="button" data-v="top">Em cima</button></div></fieldset>
+    <fieldset class="ctl"><legend>Palco</legend>
+      <div class="seg" data-ctl="wall"><button type="button" data-v="soft">Papel claro</button><button type="button" data-v="deep">Papel escuro</button><button type="button" data-v="busy">Estresse</button></div>
+      <div class="seg" data-ctl="width"><button type="button" data-v="fit">Largura da janela</button><button type="button" data-v="1366">Tela de 1366 px</button></div>
+      <div class="seg" data-ctl="time"><button type="button" data-v="live">Hora real</button><button type="button" data-v="18:42">18:42 fixa</button></div>
+      <div class="seg" data-ctl="forced"><button type="button" data-v="none">Sem forçar</button><button type="button" data-v="hover">Hover</button><button type="button" data-v="focus">Foco</button><button type="button" data-v="reduced">Reduzir movimento</button></div></fieldset>
+  </aside>
+
+  <main class="main">
+    <header class="head">
+      <h2>Os widgets no seu desktop, em tamanho real</h2>
+      <p>Cada widget é um item do dock que abre o próprio painel. O Relógio e o Progresso mostram o valor vivo no ícone, atualizado a cada minuto; a Nota tem ícone fixo. Os textos e as notas de exemplo são sintéticos. Todo estado pode vir da URL, por exemplo <code>?open=note&amp;view=confirm&amp;theme=dark&amp;time=18:42</code>.</p>
+    </header>
+
+    <div class="stage-wrap">
+      <div class="stage" id="stage" data-mode="light" data-wall="soft" data-width="fit">
+        <div class="wall" aria-hidden="true"></div>
+        <div class="win" aria-hidden="true">
+          <div class="win-title"><span>Documentos</span>
+            <div class="win-btns"><i><svg viewBox="0 0 10 10"><path d="M1 5h8"/></svg></i><i><svg viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" rx="1"/></svg></i><i><svg viewBox="0 0 10 10"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></i></div>
+          </div>
+          <div class="win-body">
+            <div class="win-nav"><div>Início</div><div>Área de trabalho</div><div class="on">Documentos</div><div>Downloads</div><div>Imagens</div></div>
+            <div class="win-files">
+              <div class="h"><span>Nome</span><span>Modificado</span><span>Tamanho</span></div>
+              <div><span>orcamento-2026.xlsx</span><span>12/10/2026 09:14</span><span>48 KB</span></div>
+              <div><span>notas-reuniao.docx</span><span>11/10/2026 16:02</span><span>22 KB</span></div>
+              <div><span>roteiro-viagem.pdf</span><span>09/10/2026 21:40</span><span>1,2 MB</span></div>
+              <div><span>capturas</span><span>08/10/2026 10:05</span><span>—</span></div>
+              <div><span>curriculo.pdf</span><span>02/10/2026 18:33</span><span>310 KB</span></div>
+              <div><span>contrato-aluguel.pdf</span><span>28/09/2026 11:20</span><span>540 KB</span></div>
+              <div><span>fotos-ferias</span><span>21/09/2026 08:47</span><span>—</span></div>
+              <div><span>leia-me.txt</span><span>15/09/2026 14:12</span><span>2 KB</span></div>
+              <div><span>planilha-gastos.csv</span><span>10/09/2026 19:58</span><span>16 KB</span></div>
+              <div><span>apresentacao.pptx</span><span>03/09/2026 15:30</span><span>4,8 MB</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="dock-root" id="dockRoot" data-size="m" data-opacity="translucent" data-edge="bottom">
+          <div class="dock" id="dock"><nav class="bar" id="bar" aria-label="Dock"></nav></div>
+          <div class="tip" id="tip" role="tooltip" hidden></div>
+          <section class="panel" id="panel" hidden aria-labelledby="panelTitle"></section>
+        </div>
+        <div class="taskbar" aria-hidden="true">
+          <div class="tb-apps">
+            <i><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></i>
+            <i><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M15.5 15.5L20 20"/></svg></i>
+            <i class="on"><svg viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2h7.4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg></i>
+            <i><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17"/></svg></i>
+            <i><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M7.5 10l2.5 2-2.5 2M12.5 15h4"/></svg></i>
+          </div>
+          <div class="tb-tray">
+            <i><svg viewBox="0 0 24 24"><path d="M7 14l5-5 5 5"/></svg></i>
+            <i><svg viewBox="0 0 24 24"><path d="M3 9.5a13 13 0 0 1 18 0M6 13a8.5 8.5 0 0 1 12 0M9 16.5a4 4 0 0 1 6 0"/><circle cx="12" cy="19.5" r=".6"/></svg></i>
+            <i><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg></i>
+            <div class="tb-clock" id="tbClock"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="measure" id="measure"></p>
+
+    <section class="states" aria-labelledby="statesTitle">
+      <h3 id="statesTitle">Ícones vivos nos três tamanhos</h3>
+      <p>Relógio digital, relógio analógico e Progresso do dia, nos dois temas e nas duas opacidades, com a hora do palco. No Pequeno o anel aparece sem o número.</p>
+      <div class="sheet-wrap"><div class="sheet" id="sheet"></div></div>
+    </section>
+
+    <div class="notes">
+      <section>
+        <h3>Decisões que este mock pede</h3>
+        <ul>
+          <li><strong>Ícone do relógio é um ajuste</strong>: Digital (padrão) ou Analógico, por relógio. Entra um campo novo na configuração do Relógio.</li>
+          <li><strong>Esmalte novo, musgo</strong> (<code>.t-progress</code>, hsl 84 22% 38%), para o Progresso não se confundir com Arquivos (sálvia).</li>
+          <li><strong>Token de perigo</strong> (<code>--danger</code>), só para confirmar a remoção da nota, para o erro de salvamento e para o selo de aviso. Nunca decorativo; o cobalto continua só para foco, seleção e painel aberto.</li>
+          <li><strong>Selo no ícone de Configurações</strong> quando o banco foi recuperado ou está indisponível, porque o aviso mora em Configurações › Itens do dock.</li>
+          <li><strong>Itens do dock como subtela</strong> de Configurações, com Voltar, no mesmo padrão do modo Ajustes: o painel cabe acima do dock mesmo com 12 widgets (a lista rola).</li>
+          <li><strong>Relógio em 12 h</strong> mostra só <code>h:mm</code> no ícone; AM/PM fica no painel.</li>
+          <li><strong>Larguras de painel</strong>: Relógio 300 px, Progresso 320 px, Nota 340 px; Configurações e Sobre como na Fase 1.</li>
+        </ul>
+      </section>
+      <section>
+        <h3>Tokens novos da Fase 2</h3>
+        <p id="tokensCaption"></p>
+        <div class="table-wrap"><table class="tokens"><thead><tr><th scope="col">Token</th><th scope="col">Valor</th></tr></thead><tbody id="tokens"></tbody></table></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+(() => {
+  const I = {
+    notes: '<rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    progress: '<circle cx="12" cy="12" r="8.5" opacity=".4"/><path d="M12 3.5a8.5 8.5 0 0 1 8 11.4"/>',
+    settings: '<path d="M4 7.5h9.5M17.5 7.5H20M4 16.5h3.5M11.5 16.5H20"/><circle cx="15.5" cy="7.5" r="2"/><circle cx="9.5" cy="16.5" r="2"/>',
+    about: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><path d="M12 7.6h.01"/>',
+    up: '<path d="M7 14.5l5-5 5 5"/>', down: '<path d="M7 9.5l5 5 5-5"/>', back: '<path d="M14.5 6.5l-5.5 5.5 5.5 5.5"/>', next: '<path d="M9.5 6.5l5.5 5.5-5.5 5.5"/>',
+    sliders: '<path d="M4 7.5h9.5M17.5 7.5H20M4 16.5h3.5M11.5 16.5H20"/><circle cx="15.5" cy="7.5" r="2"/><circle cx="9.5" cy="16.5" r="2"/>',
+    plus: '<path d="M12 6v12M6 12h12"/>', trash: '<path d="M5 7.5h14M10 7.5V5.5h4v2M7 7.5l.8 11a1.5 1.5 0 0 0 1.5 1.4h5.4a1.5 1.5 0 0 0 1.5-1.4l.8-11"/>',
+    warn: '<path d="M12 4.5l8.5 15h-17z"/><path d="M12 10v4"/><path d="M12 16.8h.01"/>'
+  };
+  const svg = (n, cls = "") => `<svg viewBox="0 0 24 24" aria-hidden="true"${cls ? ` class="${cls}"` : ""}>${I[n]}</svg>`;
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+  const KIND = {
+    clock: { name: "Relógio", glaze: "t-clock", icon: "clock", width: 300 },
+    progress: { name: "Progresso do tempo", glaze: "t-progress", icon: "progress", width: 320 },
+    note: { name: "Nota", glaze: "t-notes", icon: "notes", width: 340 },
+    settings: { name: "Configurações", glaze: "t-settings", icon: "settings", width: 320 },
+    about: { name: "Sobre", glaze: "t-about", icon: "about", width: 300 }
+  };
+  const PERIODS = { day: "Dia", week: "Semana", month: "Mês", year: "Ano", workday: "Expediente" };
+  const ZONES = [["America/Sao_Paulo", "São Paulo"], ["America/New_York", "Nova York"], ["Europe/Lisbon", "Lisboa"], ["Europe/London", "Londres"], ["Asia/Tokyo", "Tóquio"], ["UTC", "UTC"]];
+  const zoneName = (tz) => (ZONES.find(([z]) => z === tz) || [tz, tz.split("/").pop().replace(/_/g, " ")])[1];
+  const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const SAMPLE_NOTE = "Comprar café e filtro\nLigar para o contador até sexta\nIdeia: atalho para a pasta de capturas (Fase 3)";
+
+  const DEFAULTS = {
+    clock: () => ({ timeZone: null, hourCycle: "h23", showSeconds: false, face: "digital" }),
+    progress: () => ({ periods: ["day", "week", "month", "year"], weekStart: "monday", workday: { start: "09:00", end: "18:00" } }),
+    note: () => ({ text: "" })
+  };
+  let seq = 0;
+  const mk = (kind, label = null, cfg = {}) => ({ id: "w" + (++seq), kind, label, config: { ...DEFAULTS[kind](), ...cfg } });
+  const SETS = {
+    default: () => [mk("clock"), mk("progress"), mk("note", null, { text: SAMPLE_NOTE })],
+    twelve: () => [
+      mk("clock"), mk("clock", "Lisboa", { timeZone: "Europe/Lisbon" }), mk("clock", "Tóquio", { timeZone: "Asia/Tokyo", hourCycle: "h12" }),
+      mk("clock", "Nova York", { timeZone: "America/New_York" }),
+      mk("progress", "Expediente", { periods: ["workday", "day", "week"] }), mk("progress"), mk("progress", "Ano", { periods: ["year", "month"] }),
+      mk("note", null, { text: SAMPLE_NOTE }), mk("note", "Mercado", { text: "Pão\nLeite\nCafé" }), mk("note", "Reunião de segunda", { text: "Pauta: orçamento, viagem" }),
+      mk("note", "Ideias", { text: "Calendário no dock" }), mk("note", "Leituras", { text: "" })
+    ],
+    empty: () => []
+  };
+
+  const state = { open: "settings", view: "main", set: "default", face: "digital", storage: "ok", save: "saved", theme: "system", size: "m",
+    opacity: "translucent", edge: "bottom", wall: "soft", width: "fit", time: "live", forced: "none" };
+  const params = new URLSearchParams(location.search);
+  const ALLOWED = {
+    open: ["none", "clock", "progress", "note", "settings", "items", "about"], view: ["main", "adjust", "confirm"], set: ["default", "twelve", "empty"],
+    face: ["digital", "analog"], storage: ["ok", "recovered", "unavailable"], save: ["saved", "saving", "error"], theme: ["system", "light", "dark"],
+    size: ["s", "m", "l"], opacity: ["translucent", "solid"], edge: ["bottom", "top"], wall: ["soft", "deep", "busy"], width: ["fit", "1366"],
+    time: ["live", "18:42"], forced: ["none", "hover", "focus", "reduced"]
+  };
+  for (const [k, vs] of Object.entries(ALLOWED)) { const v = params.get(k); if (vs.includes(v)) state[k] = v; }
+
+  let widgets = [];
+  const ui = { panel: null, view: "main", hover: -1 }; // panel: a widget id, "settings", "about" or null; view: main | adjust | confirm | items
+
+  const stage = document.getElementById("stage"), root = document.getElementById("dockRoot"), dock = document.getElementById("dock");
+  const bar = document.getElementById("bar"), tip = document.getElementById("tip"), panel = document.getElementById("panel");
+  const media = matchMedia("(prefers-color-scheme: dark)"), reducedMedia = matchMedia("(prefers-reduced-motion: reduce)");
+  const mode = () => state.theme === "system" ? (media.matches ? "dark" : "light") : state.theme;
+  const reduced = () => state.forced === "reduced" || reducedMedia.matches;
+  const available = () => state.storage !== "unavailable";
+
+  // ---------- Time ----------
+  function now() {
+    if (state.time === "live") return new Date();
+    const d = new Date(); d.setHours(18, 42, 7, 0); return d;
+  }
+  function clockParts(cfg, d) {
+    const tz = cfg.timeZone || undefined;
+    const p = Object.fromEntries(new Intl.DateTimeFormat("pt-BR", { timeZone: tz, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })
+      .formatToParts(d).filter((x) => x.type !== "literal").map((x) => [x.type, x.value]));
+    const h24 = Number(p.hour), m = p.minute;
+    const h12 = cfg.hourCycle === "h12" ? ((h24 + 11) % 12) + 1 : null;
+    const date = new Intl.DateTimeFormat("pt-BR", { timeZone: tz, weekday: "long", day: "numeric", month: "long" }).format(d);
+    const off = (new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "shortOffset" }).formatToParts(d).find((x) => x.type === "timeZoneName") || {}).value || "";
+    return {
+      icon: h12 ? `${h12}:${m}` : `${p.hour}:${m}`, time: h12 ? `${h12}:${m}` : `${p.hour}:${m}`, sec: p.second,
+      ap: h12 ? (h24 < 12 ? "AM" : "PM") : null, date, h24, min: Number(m),
+      zone: cfg.timeZone ? zoneName(cfg.timeZone) : `Fuso do sistema: ${zoneName(SYSTEM_TZ)}`, utc: off.replace("GMT", "UTC").replace("-", "−") || "UTC"
+    };
+  }
+  function bounds(period, d, cfg) {
+    const y = d.getFullYear(), mo = d.getMonth(), dd = d.getDate();
+    if (period === "day") return [new Date(y, mo, dd), new Date(y, mo, dd + 1)];
+    if (period === "week") { const back = (d.getDay() - (cfg.weekStart === "monday" ? 1 : 0) + 7) % 7; return [new Date(y, mo, dd - back), new Date(y, mo, dd - back + 7)]; }
+    if (period === "month") return [new Date(y, mo, 1), new Date(y, mo + 1, 1)];
+    if (period === "year") return [new Date(y, 0, 1), new Date(y + 1, 0, 1)];
+    const dow = d.getDay(); if (dow === 0 || dow === 6) return null;
+    const [sh, sm] = cfg.workday.start.split(":").map(Number), [eh, em] = cfg.workday.end.split(":").map(Number);
+    const s = new Date(y, mo, dd, sh, sm), e = new Date(y, mo, dd, eh, em);
+    return d < s || d > e ? null : [s, e];
+  }
+  function progress(period, d, cfg) {
+    const b = bounds(period, d, cfg); if (!b) return null;
+    return { f: Math.min(1, Math.max(0, (d - b[0]) / (b[1] - b[0]))), left: b[1] - d };
+  }
+  function leftText(ms) {
+    const min = Math.ceil(ms / 60000), days = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60;
+    const parts = days ? [`${days} ${days === 1 ? "dia" : "dias"}`, h ? `${h} h` : ""] : h ? [`${h} h`, m ? `${m} min` : ""] : [`${m} min`];
+    return "faltam " + parts.filter(Boolean).join(" ");
+  }
+
+  // ---------- Tiles ----------
+  const C = 2 * Math.PI * 9;
+  function liveFace(w, d) {
+    if (w.kind === "clock") {
+      const c = clockParts(w.config, d);
+      if (w.config.face === "analog") {
+        const ha = ((c.h24 % 12) + c.min / 60) * 30, ma = c.min * 6;
+        const hand = (a, len) => { const r = a * Math.PI / 180; return `x2="${(12 + len * Math.sin(r)).toFixed(2)}" y2="${(12 - len * Math.cos(r)).toFixed(2)}"`; };
+        return `<svg viewBox="0 0 24 24" class="face" aria-hidden="true">` +
+          [[12, 2.6], [21.4, 12], [12, 21.4], [2.6, 12]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".75" fill="#fff" stroke="none" opacity=".75"/>`).join("") +
+          `<line x1="12" y1="12" ${hand(ha, 5)} stroke-width="2.1"/><line x1="12" y1="12" ${hand(ma, 7.6)} stroke-width="1.5"/>` +
+          `<circle cx="12" cy="12" r="1.25" fill="#fff" stroke="none"/></svg>`;
+      }
+      return `<span class="t-time">${c.icon}</span>`;
+    }
+    if (w.kind === "progress") {
+      const p = progress(w.config.periods[0], d, w.config);
+      const f = p ? p.f : 0;
+      return `<svg viewBox="0 0 24 24" class="ring" aria-hidden="true"><circle class="trk" cx="12" cy="12" r="9" stroke-width="2.2"/>` +
+        (p ? `<circle cx="12" cy="12" r="9" stroke-width="2.2" stroke-dasharray="${(f * C).toFixed(2)} ${C.toFixed(2)}" transform="rotate(-90 12 12)"/>` : "") +
+        `</svg><span class="t-pct">${p ? Math.floor(f * 100) : "–"}${p ? "<small>%</small>" : ""}</span>`;
+    }
+    return null;
+  }
+  function tileHtml(it, d, extra = "") {
+    const face = it.kind === "clock" || it.kind === "progress" ? liveFace(it, d) : null;
+    const badge = it.kind === "settings" && state.storage !== "ok" ? '<span class="badge" aria-hidden="true"></span>' : "";
+    return `<span class="tile ${KIND[it.kind].glaze}${extra}">${face ? `<span class="live">${face}</span>` : svg(KIND[it.kind].icon)}${badge}</span>`;
+  }
+  const miniTile = (kind) => `<span class="tile mini ${KIND[kind].glaze}">${svg(KIND[kind].icon)}</span>`;
+  const nameOf = (it) => it.label || KIND[it.kind].name;
+
+  // ---------- Dock ----------
+  function dockItems() {
+    const ws = available() ? widgets : [];
+    const sys = [{ id: "settings", kind: "settings" }, { id: "about", kind: "about" }];
+    return ws.length ? [...ws, "sep", ...sys] : sys;
+  }
+  const items_ = () => [...bar.querySelectorAll(".item")];
+  function renderBar() {
+    const d = now(), focusedId = document.activeElement?.closest?.(".item")?.dataset.id;
+    bar.innerHTML = dockItems().map((it) => it === "sep" ? '<span class="sep" aria-hidden="true"></span>' :
+      `<button type="button" class="item" data-id="${it.id}" aria-label="${esc(nameOf(it))}${it.kind === "settings" && state.storage !== "ok" ? " (com aviso)" : ""}" aria-expanded="false" tabindex="-1">` +
+      `${tileHtml(it, d)}<span class="ind" aria-hidden="true"></span></button>`).join("");
+    const items = items_();
+    const keep = items.findIndex((b) => b.dataset.id === focusedId);
+    const start = keep >= 0 ? keep : 0;
+    items.forEach((b, i) => b.tabIndex = i === start ? 0 : -1);
+    if (keep >= 0) items[keep].focus({ preventScroll: true });
+    syncExpanded();
+    requestAnimationFrame(measure);
+  }
+  function updateLive() {
+    const d = now();
+    items_().forEach((b) => {
+      const w = widgets.find((x) => x.id === b.dataset.id);
+      const live = b.querySelector(".live");
+      if (w && live) live.innerHTML = liveFace(w, d);
+    });
+    const c = clockTicker(); if (c) c();
+    document.getElementById("tbClock").innerHTML = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(d) + "<br>" + new Intl.DateTimeFormat("pt-BR").format(d);
+  }
+  function measure() {
+    const r = bar.getBoundingClientRect(), n = widgets.length;
+    document.getElementById("measure").textContent =
+      `Dock em repouso: ${Math.round(r.width)} × ${Math.round(r.height)} px, com ${available() ? n : 0} ${n === 1 ? "widget" : "widgets"} no tamanho ${({ s: "Pequeno", m: "Médio", l: "Grande" })[state.size]}. Palco de ${Math.round(stage.getBoundingClientRect().width)} px.`;
+  }
+
+  // Magnification (B1, in steps)
+  function scales(n, i) { const s = [], l = []; for (let k = 0; k < n; k++) { s[k] = k === i ? 1.4 : Math.abs(k - i) === 1 ? 1.15 : 1; l[k] = k === i ? 6 : 0; } return [s, l]; }
+  function apply(barEl, [s, l]) { [...barEl.querySelectorAll(".item")].forEach((b, i) => { b.style.setProperty("--s", s[i] ?? 1); b.style.setProperty("--lift", (l[i] ?? 0) + "px"); }); }
+  function rest() { apply(bar, [[], []]); ui.hover = -1; hideTip(); }
+  function magnify(i) { if (reduced() || i < 0) { apply(bar, [[], []]); return; } apply(bar, scales(items_().length, i)); }
+
+  function showTip(i) {
+    const b = items_()[i];
+    if (!b || b.getAttribute("aria-expanded") === "true") { hideTip(); return; }
+    const it = dockItems().find((x) => x !== "sep" && x.id === b.dataset.id);
+    tip.textContent = nameOf(it); tip.hidden = false;
+    const tileEl = b.querySelector(".tile");
+    const place = () => {
+      if (tip.hidden) return;
+      const st = stage.getBoundingClientRect(), t = tileEl.getBoundingClientRect();
+      tip.style.left = (t.left + t.width / 2 - st.left) + "px";
+      tip.style.top = (state.edge === "bottom" ? t.top - st.top - 10 : t.bottom - st.top + 10) + "px";
+    };
+    requestAnimationFrame(place); tileEl.addEventListener("transitionend", place, { once: true });
+  }
+  function hideTip() { tip.hidden = true; }
+
+  dock.addEventListener("pointermove", (e) => {
+    if (state.forced === "hover" || state.forced === "focus" || ui.panel) return;
+    const b = e.target.closest(".item"), i = b ? items_().indexOf(b) : -1;
+    if (i !== ui.hover) { ui.hover = i; magnify(i); i >= 0 ? showTip(i) : hideTip(); }
+  });
+  dock.addEventListener("pointerleave", () => { if (state.forced === "none" || state.forced === "reduced") rest(); });
+  bar.addEventListener("click", (e) => { const b = e.target.closest(".item"); if (b) togglePanel(b.dataset.id); });
+  bar.addEventListener("keydown", (e) => {
+    const items = items_(), i = items.indexOf(document.activeElement); if (i < 0) return;
+    const n = { ArrowRight: Math.min(i + 1, items.length - 1), ArrowLeft: Math.max(i - 1, 0), Home: 0, End: items.length - 1 }[e.key];
+    if (n !== undefined) { e.preventDefault(); items.forEach((b, k) => b.tabIndex = k === n ? 0 : -1); items[n].focus(); }
+  });
+  bar.addEventListener("focusin", (e) => {
+    const b = e.target.closest(".item"); if (!b || !b.matches(":focus-visible")) return;
+    const i = items_().indexOf(b); if (!ui.panel) magnify(i); showTip(i);
+  });
+  bar.addEventListener("focusout", () => { if (state.forced === "none") rest(); });
+
+  // ---------- Panel ----------
+  const foot = (left) => `<div class="p-foot"><span>${left}</span><span><kbd>Esc</kbd> fecha</span></div>`;
+  const seg = (key, label, options, current, attr = "data-wset") =>
+    `<div class="p-row"><span id="lbl-${key}">${label}</span><div class="p-seg" role="group" aria-labelledby="lbl-${key}" ${attr}="${key}">` +
+    options.map(([v, t]) => `<button type="button" data-v="${v}" data-key="${key}-${v}" aria-pressed="${v === current}">${t}</button>`).join("") + `</div></div>`;
+  const head = (title, withAdjust) => `<div class="p-head"><h2 id="panelTitle">${esc(title)}</h2>` +
+    (withAdjust ? `<button type="button" class="q-btn" data-act="adjust" data-key="adjust">${svg("sliders")}Ajustes</button>` : "") + `</div>`;
+  const backHead = (title, to = "main") => `<div class="p-head"><button type="button" class="i-btn" data-act="back" data-to="${to}" data-key="back" aria-label="Voltar">${svg("back")}</button><h2 id="panelTitle">${esc(title)}</h2></div>`;
+  const labelField = (w) => `<label class="fld"><span>Rótulo</span><input class="inp" type="text" maxlength="40" data-field="label" data-key="label" placeholder="${KIND[w.kind].name}" value="${esc(w.label || "")}"></label>`;
+  const removeBtn = `<button type="button" class="x-btn" data-act="remove" data-key="remove">${svg("trash")}Remover do dock</button>`;
+
+  function clockMain(w) {
+    const c = clockParts(w.config, now());
+    return `<div class="clk" data-live="clock"><div class="clk-time"><span>${c.time}</span>${w.config.showSeconds ? `<span class="sec">:${c.sec}</span>` : ""}${c.ap ? `<span class="ap">${c.ap}</span>` : ""}</div><div class="clk-date">${c.date}</div></div>`;
+  }
+  let clockTicker = () => null;
+
+  function viewHtml() {
+    const id = ui.panel;
+    if (id === "about") {
+      return `<div class="about">${tileHtml({ kind: "about" }, now(), " static")}<div><h2 id="panelTitle">DockMax</h2><p>Dock para Windows 11, feito com Tauri.</p></div></div>` +
+        `<div class="about-list"><div><span>Versão</span><span>0.2.0</span></div><div><span>Licença</span><span>MIT</span></div><div><span>Código</span><span>github.com/maxeinstein-dev/DockMax</span></div></div>` + foot("Projeto independente");
+    }
+    if (id === "settings" && ui.view !== "items") {
+      const n = widgets.length, flag = state.storage !== "ok";
+      return head("Configurações") +
+        seg("theme", "Tema", [["system", "Sistema"], ["light", "Claro"], ["dark", "Escuro"]], state.theme, "data-set") +
+        seg("edge", "Posição", [["bottom", "Embaixo"], ["top", "Em cima"]], state.edge, "data-set") +
+        seg("size", "Tamanho", [["s", "Pequeno"], ["m", "Médio"], ["l", "Grande"]], state.size, "data-set") +
+        seg("opacity", "Opacidade do dock", [["translucent", "Translúcido"], ["solid", "Sólido"]], state.opacity, "data-set") +
+        `<button type="button" class="nav-row" data-act="items" data-key="items"><span class="lbl">Itens do dock</span><span class="val">` +
+        (flag ? '<span class="dot" aria-hidden="true"></span>' : "") +
+        (available() ? `${n} de 12` : "Indisponível") + `</span>${svg("next")}</button>` + foot("Salvo automaticamente");
+    }
+    if (id === "settings") {
+      let body = "";
+      if (state.storage === "recovered") body += `<div class="notice" role="status">${svg("warn")}<p><strong>O banco de dados estava danificado e foi recriado.</strong> As notas antigas ficaram guardadas em <code>dockmax.db.corrompido-20261016-120402</code>, na pasta de dados do DockMax.</p><button type="button" class="btn" data-act="dismiss" data-key="dismiss">Entendi</button></div>`;
+      if (!available()) {
+        body += `<div class="notice" role="status">${svg("warn")}<p><strong>Os widgets estão indisponíveis.</strong> O banco de dados não pôde ser aberto e não foi alterado: suas notas continuam no arquivo. O motivo está no log do DockMax.</p></div>`;
+      } else {
+        body += widgets.length ? `<ul class="wl" aria-label="Widgets na ordem do dock">` + widgets.map((w, i) =>
+          `<li>${miniTile(w.kind)}<div><div class="t1">${esc(nameOf(w))}</div><div class="t2">${esc(sub(w))}</div></div>` +
+          `<button type="button" class="i-btn" data-act="up" data-id="${w.id}" data-key="up-${w.id}" aria-label="Subir ${esc(nameOf(w))}"${i === 0 ? " disabled" : ""}>${svg("up")}</button>` +
+          `<button type="button" class="i-btn" data-act="down" data-id="${w.id}" data-key="down-${w.id}" aria-label="Descer ${esc(nameOf(w))}"${i === widgets.length - 1 ? " disabled" : ""}>${svg("down")}</button></li>`).join("") + `</ul>`
+          : `<p class="empty">Nenhum widget no dock. Adicione um abaixo.</p>`;
+        const full = widgets.length >= 12;
+        body += `<div class="add"><div class="add-head"><span class="p-label">Adicionar</span><span class="count">${full ? "Limite de 12 widgets" : `${widgets.length} de 12`}</span></div><div class="add-btns">` +
+          ["clock", "progress", "note"].map((k) => `<button type="button" class="btn" data-act="add" data-kind="${k}" data-key="add-${k}"${full ? " disabled" : ""}>${miniTile(k)}${k === "progress" ? "Progresso" : KIND[k].name}</button>`).join("") + `</div></div>`;
+      }
+      return backHead("Itens do dock") + body + foot(available() ? "A ordem é a do dock" : "Configurações e Sobre continuam funcionando");
+    }
+    const w = widgets.find((x) => x.id === id); if (!w) return "";
+    if (w.kind === "clock") {
+      if (ui.view === "main") {
+        clockTicker = () => () => { const el = panel.querySelector('[data-live="clock"]'); if (el) el.outerHTML = clockMain(w); };
+        const c = clockParts(w.config, now());
+        return head(nameOf(w), true) + clockMain(w) + foot(`${c.zone} · ${c.utc}`);
+      }
+      return backHead(`Ajustes do relógio`) + labelField(w) +
+        `<label class="fld"><span>Fuso horário</span><select class="inp" data-field="timeZone" data-key="tz"><option value="">Do sistema (${zoneName(SYSTEM_TZ)})</option>` +
+        ZONES.map(([z, n]) => `<option value="${z}"${w.config.timeZone === z ? " selected" : ""}>${n} · ${z}</option>`).join("") + `</select></label>` +
+        seg("hourCycle", "Formato", [["h23", "24 horas"], ["h12", "12 horas"]], w.config.hourCycle) +
+        seg("showSeconds", "Segundos no painel", [["false", "Ocultar"], ["true", "Mostrar"]], String(w.config.showSeconds)) +
+        seg("face", "Ícone no dock", [["digital", "Digital"], ["analog", "Analógico"]], w.config.face) +
+        removeBtn + foot("Salvo automaticamente");
+    }
+    if (w.kind === "progress") {
+      if (ui.view === "main") {
+        clockTicker = () => () => { const el = panel.querySelector(".pg"); if (el) el.outerHTML = pgList(w); };
+        return head(nameOf(w), true) + pgList(w) + foot(`Semana começa ${w.config.weekStart === "monday" ? "na segunda" : "no domingo"}`);
+      }
+      const ps = w.config.periods;
+      const order = [...ps, ...Object.keys(PERIODS).filter((p) => !ps.includes(p))];
+      return backHead("Ajustes do progresso") + labelField(w) +
+        `<div class="p-row"><span id="lbl-periods">Períodos, na ordem do painel</span><ul class="periods" aria-labelledby="lbl-periods">` +
+        order.map((p) => { const on = ps.includes(p), i = ps.indexOf(p);
+          return `<li><label><input type="checkbox" data-period="${p}" data-key="per-${p}"${on ? " checked" : ""}${on && ps.length === 1 ? " disabled" : ""}>${PERIODS[p]}${p === "workday" ? ' <span class="hint">seg. a sex.</span>' : ""}</label>` +
+            `<button type="button" class="i-btn" data-act="pup" data-period="${p}" data-key="pup-${p}" aria-label="Subir ${PERIODS[p]}"${!on || i === 0 ? " disabled" : ""}>${svg("up")}</button>` +
+            `<button type="button" class="i-btn" data-act="pdown" data-period="${p}" data-key="pdown-${p}" aria-label="Descer ${PERIODS[p]}"${!on || i === ps.length - 1 ? " disabled" : ""}>${svg("down")}</button></li>` +
+            (p === "workday" && on ? `<li class="hours"><span>das</span><input class="inp" type="time" data-field="wstart" data-key="wstart" aria-label="Início do expediente" value="${w.config.workday.start}"><span>às</span><input class="inp" type="time" data-field="wend" data-key="wend" aria-label="Fim do expediente" value="${w.config.workday.end}"></li>` : ""); }).join("") +
+        `</ul><p class="hint">O primeiro período é o do anel no ícone.</p></div>` +
+        seg("weekStart", "Semana começa", [["monday", "Segunda"], ["sunday", "Domingo"]], w.config.weekStart) +
+        removeBtn + foot("Salvo automaticamente");
+    }
+    // note
+    if (ui.view === "main") {
+      const st = state.save, txt = { saved: "Salvo", saving: "Salvando…", error: "Passou de 64 KB e não foi salvo. Encurte o texto." }[st];
+      return head(nameOf(w), true) + `<textarea class="inp note" data-field="text" data-key="text" aria-labelledby="panelTitle" placeholder="Escreva aqui. Salva sozinho.">${esc(w.config.text)}</textarea>` +
+        foot(`<span class="save" data-state="${st}" role="status">${txt}</span>`);
+    }
+    const confirm = ui.view === "confirm" && w.config.text
+      ? `<div class="confirm" role="alert"><p><strong>Remover a nota apaga o texto.</strong> Não dá para desfazer.</p><div class="row"><button type="button" class="btn" data-act="cancel" data-key="cancel">Cancelar</button><button type="button" class="d-btn" data-act="really" data-key="really">Remover nota</button></div></div>`
+      : removeBtn;
+    return backHead("Ajustes da nota") + labelField(w) + confirm + foot("Salvo automaticamente");
+  }
+  function pgList(w) {
+    const d = now();
+    return `<ul class="pg">` + w.config.periods.map((p) => {
+      const r = progress(p, d, w.config);
+      if (!r) return `<li class="off"><span class="name">${PERIODS[p]}</span><span class="left">Fora do expediente</span></li>`;
+      return `<li><span class="name">${PERIODS[p]}</span><span class="bar-t"><i style="--f:${r.f.toFixed(4)}"></i></span><span class="pct">${Math.floor(r.f * 100)}%</span><span class="left">${leftText(r.left)}</span></li>`;
+    }).join("") + `</ul>`;
+  }
+  function sub(w) {
+    if (w.kind === "clock") { const z = w.config.timeZone ? zoneName(w.config.timeZone) : "fuso do sistema"; return w.label ? `Relógio · ${z}` : z.charAt(0).toUpperCase() + z.slice(1); }
+    if (w.kind === "progress") return (w.label ? "Progresso · " : "") + w.config.periods.map((p) => PERIODS[p]).join(", ");
+    const lines = w.config.text ? w.config.text.split("\n").length : 0;
+    return (w.label ? "Nota · " : "") + (lines ? `${lines} ${lines === 1 ? "linha" : "linhas"}` : "vazia");
+  }
+
+  function renderPanel(focusKey) {
+    clockTicker = () => null;
+    if (!ui.panel) { panel.hidden = true; return; }
+    const w = widgets.find((x) => x.id === ui.panel);
+    panel.style.width = (KIND[w ? w.kind : ui.panel] || KIND.settings).width + "px";
+    panel.innerHTML = viewHtml();
+    panel.hidden = false;
+    placePanel();
+    if (focusKey) panel.querySelector(`[data-key="${focusKey}"]:not(:disabled)`)?.focus({ preventScroll: true });
+  }
+  function placePanel() {
+    if (panel.hidden) return;
+    const b = bar.querySelector(`.item[data-id="${ui.panel}"]`); if (!b) return;
+    const st = stage.getBoundingClientRect(), itemR = b.getBoundingClientRect(), barR = bar.getBoundingClientRect();
+    const w = panel.offsetWidth, h = panel.offsetHeight, margin = 8;
+    let x = itemR.left + itemR.width / 2 - w / 2 - st.left;
+    x = Math.max(margin, Math.min(x, st.width - w - margin));
+    const y = state.edge === "bottom" ? barR.top - st.top - margin - h : barR.bottom - st.top + margin;
+    panel.style.left = x + "px"; panel.style.top = y + "px";
+  }
+  function syncExpanded() { items_().forEach((b) => b.setAttribute("aria-expanded", String(b.dataset.id === ui.panel))); }
+  function togglePanel(id, focusBack) {
+    const closing = ui.panel === id;
+    ui.panel = closing ? null : id; ui.view = "main";
+    if (ui.panel) rest();
+    syncExpanded(); renderPanel(); hideTip(); syncSide();
+    if (closing && focusBack) bar.querySelector(`.item[data-id="${id}"]`)?.focus();
+  }
+  function closePanel() { ui.panel = null; syncExpanded(); renderPanel(); syncSide(); }
+
+  // Panel interactions
+  const current = () => widgets.find((x) => x.id === ui.panel);
+  panel.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || b.disabled) return;
+    const w = current();
+    if (b.closest("[data-set]")) { state[b.closest("[data-set]").dataset.set] = b.dataset.v; refresh(b.dataset.key); return; }
+    if (b.closest("[data-wset]") && w) {
+      const key = b.closest("[data-wset]").dataset.wset, v = b.dataset.v;
+      w.config[key] = v === "true" ? true : v === "false" ? false : v;
+      renderBar(); renderPanel(b.dataset.key); syncSide(); return;
+    }
+    const act = b.dataset.act;
+    if (act === "adjust") { ui.view = "adjust"; renderPanel("back"); }
+    else if (act === "back") { ui.view = b.dataset.to; renderPanel(ui.panel === "settings" ? "items" : "adjust"); }
+    else if (act === "items") { ui.view = "items"; renderPanel("back"); }
+    else if (act === "dismiss") { state.storage = "ok"; renderBar(); renderPanel("back"); syncSide(); }
+    else if (act === "add") { widgets.push(mk(b.dataset.kind)); renderBar(); renderPanel(b.dataset.key); }
+    else if (act === "up" || act === "down") {
+      const i = widgets.findIndex((x) => x.id === b.dataset.id), j = act === "up" ? i - 1 : i + 1;
+      [widgets[i], widgets[j]] = [widgets[j], widgets[i]]; renderBar(); renderPanel(b.dataset.key);
+    }
+    else if ((act === "pup" || act === "pdown") && w) {
+      const ps = w.config.periods, i = ps.indexOf(b.dataset.period), j = act === "pup" ? i - 1 : i + 1;
+      [ps[i], ps[j]] = [ps[j], ps[i]]; renderBar(); renderPanel(b.dataset.key);
+    }
+    else if (act === "remove" && w) {
+      if (w.kind === "note" && w.config.text) { ui.view = "confirm"; renderPanel("cancel"); }
+      else { widgets = widgets.filter((x) => x !== w); closePanel(); renderBar(); }
+    }
+    else if (act === "cancel") { ui.view = "adjust"; renderPanel("remove"); }
+    else if (act === "really" && w) { widgets = widgets.filter((x) => x !== w); closePanel(); renderBar(); }
+  });
+  let saveTimer = 0;
+  panel.addEventListener("input", (e) => {
+    const el = e.target, w = current(); if (!w) return;
+    if (el.dataset.field === "label") { w.label = el.value.trim() || null; renderBar(); }
+    if (el.dataset.field === "text") {
+      w.config.text = el.value;
+      const s = panel.querySelector(".save"); s.dataset.state = "saving"; s.textContent = "Salvando…";
+      clearTimeout(saveTimer); saveTimer = setTimeout(() => { s.dataset.state = "saved"; s.textContent = "Salvo"; }, 500);
+    }
+  });
+  panel.addEventListener("change", (e) => {
+    const el = e.target, w = current(); if (!w) return;
+    if (el.dataset.field === "timeZone") { w.config.timeZone = el.value || null; renderBar(); }
+    if (el.dataset.field === "wstart") w.config.workday.start = el.value || w.config.workday.start;
+    if (el.dataset.field === "wend") w.config.workday.end = el.value || w.config.workday.end;
+    if (el.dataset.period) {
+      const p = el.dataset.period, ps = w.config.periods;
+      w.config.periods = el.checked ? [...ps, p] : ps.filter((x) => x !== p);
+      renderBar(); renderPanel(el.dataset.key);
+    }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && ui.panel) togglePanel(ui.panel, true); });
+  stage.addEventListener("pointerdown", (e) => {
+    if (!ui.panel || panel.contains(e.target) || e.target.closest(".item")) return;
+    closePanel();
+  });
+
+  // ---------- Mock controls ----------
+  function openFromControl(v) {
+    if (v === "none") { ui.panel = null; }
+    else if (v === "settings" || v === "about") { ui.panel = v; ui.view = "main"; }
+    else if (v === "items") { ui.panel = "settings"; ui.view = "items"; }
+    else { const w = available() && widgets.find((x) => x.kind === v); ui.panel = w ? w.id : null; ui.view = w ? state.view : "main"; }
+    if (ui.view === "confirm") { const w = current(); if (!w || w.kind !== "note" || !w.config.text) ui.view = "adjust"; }
+  }
+  function syncSide() {
+    const w = current();
+    const open = !ui.panel ? "none" : ui.panel === "settings" ? (ui.view === "items" ? "items" : "settings") : ui.panel === "about" ? "about" : w ? w.kind : "none";
+    const vals = { ...state, open, view: w ? ui.view : state.view, face: widgets.find((x) => x.kind === "clock")?.config.face || state.face };
+    document.querySelectorAll(".side .seg").forEach((g) => g.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === vals[g.dataset.ctl]))));
+  }
+  document.querySelectorAll(".side .seg").forEach((g) => g.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    const k = g.dataset.ctl, v = b.dataset.v;
+    if (k === "open") { openFromControl(v); }
+    else if (k === "view") { state.view = v; const w = current(); if (w) { ui.view = v === "confirm" && !(w.kind === "note" && w.config.text) ? "adjust" : v; } else openFromControl(v === "confirm" ? "note" : "clock"); }
+    else if (k === "set") { state.set = v; widgets = SETS[v](); widgets.forEach((x) => x.kind === "clock" && (x.config.face = state.face)); if (ui.panel && !["settings", "about"].includes(ui.panel)) ui.panel = null; }
+    else if (k === "face") { state.face = v; widgets.forEach((x) => x.kind === "clock" && (x.config.face = v)); }
+    else if (k === "storage") { state.storage = v; if (v === "unavailable" && current()) ui.panel = null; }
+    else state[k] = v;
+    refresh();
+  }));
+
+  function applyForced() {
+    items_().forEach((b) => b.classList.remove("kb"));
+    rest();
+    if (state.forced === "hover" || state.forced === "focus") {
+      if (ui.panel) { ui.panel = null; syncExpanded(); renderPanel(); }
+      const i = 0; magnify(i); ui.hover = i;
+      if (state.forced === "focus") items_()[i].classList.add("kb");
+      showTip(i);
+    }
+  }
+
+  // ---------- State sheet ----------
+  function renderSheet() {
+    const d = now(), sheet = document.getElementById("sheet");
+    const sample = [mk("clock"), mk("clock", null, { face: "analog" }), mk("progress")];
+    const rows = [["light", "translucent", "Claro · translúcido"], ["light", "solid", "Claro · sólido"], ["dark", "translucent", "Escuro · translúcido"], ["dark", "solid", "Escuro · sólido"]];
+    let html = `<span></span>` + ["Pequeno · 40", "Médio · 48", "Grande · 64"].map((t) => `<span class="collabel">${t}</span>`).join("");
+    for (const [m, op, label] of rows) {
+      html += `<span class="rowlabel">${label}</span>`;
+      for (const size of ["s", "m", "l"]) {
+        html += `<div class="cell" data-mode="${m}"><div class="dock-root" data-size="${size}" data-opacity="${op}" data-edge="bottom"><div class="dock"><div class="bar" aria-hidden="true">` +
+          sample.map((w) => `<span class="item">${tileHtml(w, d)}</span>`).join("") + `</div></div></div></div>`;
+      }
+    }
+    sheet.innerHTML = html;
+  }
+
+  // ---------- Token table ----------
+  function renderTokens() {
+    const cs = getComputedStyle(root);
+    document.getElementById("tokensCaption").textContent = `Valores do tema ${mode() === "dark" ? "escuro" : "claro"}; os da Fase 1 não mudam.`;
+    const row = (n, v, chip) => `<tr><td>${n}</td><td>${chip ? `<span class="swatch" style="background:${chip}"></span>` : ""}${v}</td></tr>`;
+    const group = (t) => `<tr class="group"><td colspan="2">${t}</td></tr>`;
+    let html = group("Cor (por tema)");
+    ["--danger", "--danger-ink", "--danger-soft", "--field", "--field-line", "--pg-fill", "--pg-track"].forEach((n) => { const v = cs.getPropertyValue(n).trim(); html += row(n, v, v); });
+    html += group("Esmalte novo");
+    html += row(".t-progress", "musgo · 84 22% 38%", "hsl(84 22% 38%)");
+    html += group("Ícones vivos");
+    [["tile.clock.digital", "HH:mm (12 h: h:mm), Display 600, ícone × 0,28, algarismos tabulares, branco"],
+     ["tile.clock.analog", "ponteiros brancos, hora 2,1 e minuto 1,5 em 24 px de viewBox, 4 marcas a 75%, face a 76% do ladrilho"],
+     ["tile.progress.ring", "raio 9, traço 2,2 em 24 px de viewBox; trilho branco 28%; arco branco do primeiro período; 78% do ladrilho"],
+     ["tile.progress.pct", "Display 600, ícone × 0,23; some no Pequeno"],
+     ["tile.badge", "círculo de 10 px em --danger com anel de 2 px na cor da superfície, canto superior direito"],
+     ["tile.update", "uma vez por minuto, alinhado à virada (um timer só no dock)"]].forEach(([n, v]) => html += row(n, v));
+    html += group("Painéis");
+    [["panel.width.clock", "300px"], ["panel.width.progress", "320px"], ["panel.width.note", "340px"], ["clock.time", "Display 600 40px; segundos e AM/PM em --ink-2"],
+     ["note.field", "altura 210px, Text 12,5px/1,5, campo do Windows 11"], ["items.list", "máximo 268px de altura, rola com 12 widgets"]].forEach(([n, v]) => html += row(n, v));
+    document.getElementById("tokens").innerHTML = html;
+  }
+
+  function refresh(focusKey) {
+    stage.dataset.mode = mode(); stage.dataset.wall = state.wall; stage.dataset.width = state.width;
+    Object.assign(root.dataset, { size: state.size, opacity: state.opacity, edge: state.edge });
+    root.classList.toggle("reduced", reduced());
+    renderBar(); renderPanel(focusKey); syncSide();
+    requestAnimationFrame(() => { applyForced(); placePanel(); renderTokens(); renderSheet(); measure(); });
+  }
+  media.addEventListener("change", () => refresh());
+  reducedMedia.addEventListener("change", () => refresh());
+  addEventListener("resize", () => { placePanel(); measure(); });
+
+  widgets = SETS[state.set]();
+  widgets.forEach((x) => x.kind === "clock" && (x.config.face = state.face));
+  openFromControl(state.open);
+  refresh();
+  updateLive();
+  setInterval(updateLive, 1000);
+})();
+</script>
+</body>
+</html>
