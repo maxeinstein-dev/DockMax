@@ -7,13 +7,24 @@ import InlineNotice from "../../panel/parts/InlineNotice";
 import PanelHeader from "../../panel/parts/PanelHeader";
 import type { WidgetPanelProps } from "../contract";
 import { widgetName } from "../names";
-import { createAutosave, type Autosave, type AutosaveStatus } from "./autosave";
-import { holdReads, readNote } from "./memory";
+import {
+  createAutosave,
+  type Autosave,
+  type AutosaveDraft,
+  type AutosaveStatus,
+} from "./autosave";
+import { draftOf, holdReads, keepDraft, readNote } from "./memory";
 import "./notes.css";
 
 /** Where the reading of the note stands, for one instance. */
 type Read =
-  | { id: WidgetId; state: "ready"; text: string }
+  | {
+      id: WidgetId;
+      state: "ready";
+      text: string;
+      /** Text left unsaved by the last editor of this instance. */
+      draft: AutosaveDraft | null;
+    }
   /** `get_note` failed (a text that isn't UTF-8, the storage gone): the
    * editor stays locked, so no save can replace the stored text (spec
    * §2.10, N7). */
@@ -68,7 +79,7 @@ function NotePanel({
     let active = true;
     readNote(id).then(
       (text) => {
-        if (active) setRead({ id, state: "ready", text });
+        if (active) setRead({ id, state: "ready", text, draft: draftOf(id) });
       },
       () => {
         // Only the kind of an unexpected failure was logged (`getNote`);
@@ -108,6 +119,7 @@ function NotePanel({
           key={id}
           id={id}
           savedText={current.text}
+          draft={current.draft}
           flushRef={flush}
         />
       )}
@@ -117,40 +129,76 @@ function NotePanel({
 
 const IDLE: AutosaveStatus = { state: "idle", error: null };
 
+/** The status an editor starts in from `draft`, as `createAutosave` sets
+ * it; null when there is nothing unsaved to bring back. */
+function draftStatus(
+  draft: AutosaveDraft | null,
+  savedText: string,
+): AutosaveStatus | null {
+  if (draft === null || draft.text === savedText) return null;
+  return draft.error === null
+    ? { state: "pending", error: null }
+    : { state: "error", error: draft.error };
+}
+
 /** The editor of a note that was read, and the footer with its save
  * state. Saves about 500 ms after the last keystroke (`createAutosave`,
  * with its 10 s deadline), and at once when the editor or the window loses
  * the focus, when the window hides and when it unmounts (another panel,
- * Ajustes, closing). */
+ * Ajustes, closing). While the text isn't saved, it is kept in memory
+ * (`keepDraft`): an editor of the same note mounted later starts from it,
+ * with its error. */
 function NoteEditor({
   id,
   savedText,
+  draft,
   flushRef,
 }: {
   id: WidgetId;
   savedText: string;
+  draft: AutosaveDraft | null;
   /** Set to this editor's `Flush` while it is mounted. */
   flushRef: RefObject<Flush | null>;
 }) {
   const t = useT();
-  const [text, setText] = useState(savedText);
-  const [status, setStatus] = useState<AutosaveStatus>(IDLE);
+  const initial = draft?.text ?? savedText;
+  const [text, setText] = useState(initial);
+  const [status, setStatus] = useState<AutosaveStatus>(
+    () => draftStatus(draft, savedText) ?? IDLE,
+  );
   const autosave = useRef<Autosave | null>(null);
+  /** The text on screen, for the draft. */
+  const shown = useRef(initial);
+  /** Keeps the draft in step with the save: set while unsaved. */
+  const syncDraft = useRef<() => void>(() => {});
 
   useEffect(() => {
     const instance = createAutosave({
       save: (body) => saveNote({ id, body }),
       savedText,
+      draft,
     });
     autosave.current = instance;
+    const sync = () => {
+      const { state, error } = instance.getStatus();
+      keepDraft(
+        id,
+        state === "idle" && error === null
+          ? null
+          : { text: shown.current, error },
+      );
+    };
+    syncDraft.current = sync;
+    sync();
     flushRef.current = () => {
       const { state, error } = instance.getStatus();
       if (state === "idle" && error === null) return null;
       return instance.flush().then(() => instance.getStatus().error === null);
     };
-    const unsubscribe = instance.subscribe(() =>
-      setStatus(instance.getStatus()),
-    );
+    const unsubscribe = instance.subscribe(() => {
+      setStatus(instance.getStatus());
+      sync();
+    });
     const flush = () => void instance.flush();
     const onVisibility = () => {
       if (document.visibilityState === "hidden") flush();
@@ -163,15 +211,19 @@ function NoteEditor({
       unsubscribe();
       autosave.current = null;
       flushRef.current = null;
+      syncDraft.current = () => {};
       // Keep what was typed: save it first (`flush` always resolves),
       // then stop the timers. The next read of this note (shown again,
       // Ajustes) waits for it.
       holdReads(
         id,
-        instance.flush().then(() => instance.dispose()),
+        instance.flush().then(() => {
+          sync();
+          instance.dispose();
+        }),
       );
     };
-  }, [id, savedText, flushRef]);
+  }, [id, savedText, draft, flushRef]);
 
   const error = status.error;
   const state = error === null ? status.state : "error";
@@ -187,7 +239,9 @@ function NoteEditor({
         value={text}
         onChange={(event) => {
           setText(event.target.value);
+          shown.current = event.target.value;
           autosave.current?.change(event.target.value);
+          syncDraft.current();
         }}
         onBlur={() => void autosave.current?.flush()}
       />

@@ -5,6 +5,7 @@ import type { Settings } from "../core/settings";
 import type { WidgetsSnapshot } from "../core/widgets";
 import { WIDGET_FIXTURES } from "../core/widgets.fixtures";
 import { ptBR } from "../i18n/pt-BR";
+import { forgetNote } from "../widgets/notes/memory";
 import Panel from "./Panel";
 
 /* A note in the real panel host, with the real registry (NotePanel and
@@ -89,6 +90,7 @@ function saveState() {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  forgetNote(NOTE.id);
   handlers.clear();
   waits = 0;
   stored = "";
@@ -175,5 +177,49 @@ describe("showing the note again while a save runs", () => {
     });
     await settle(500);
     expect(stored).toBe("abc");
+  });
+});
+
+describe("closing and showing again a note whose save failed", () => {
+  it("brings back the unsaved text with its error, until a save confirms it", async () => {
+    let refuse = true;
+    save = (body) => {
+      if (refuse) return Promise.reject({ code: "noteTooLarge" });
+      stored = body;
+      return Promise.resolve();
+    };
+    const editor = await openNote();
+    fireEvent.change(editor, { target: { value: "Pão" } });
+    await settle(500);
+    expect(saveState()).toHaveTextContent(errors.noteTooLarge);
+
+    show("about");
+    await settle();
+    show({ widget: NOTE.id });
+    await settle();
+
+    expect(stored).toBe("");
+    expect(screen.getByRole("textbox", { name: "Mercado" })).toHaveValue("Pão");
+    expect(saveState()).toHaveTextContent(errors.noteTooLarge);
+    // Only in memory: never in the browser's storage.
+    expect(localStorage.length).toBe(0);
+    expect(sessionStorage.length).toBe(0);
+
+    refuse = false;
+    fireEvent.change(screen.getByRole("textbox", { name: "Mercado" }), {
+      target: { value: "Pão e leite" },
+    });
+    await settle(500);
+    expect(stored).toBe("Pão e leite");
+
+    // Saved: the next show starts from the stored note, with nothing to
+    // bring back.
+    stored = "outro";
+    show({ widget: NOTE.id });
+    await settle();
+    expect(screen.getByRole("textbox", { name: "Mercado" })).toHaveValue(
+      "outro",
+    );
+    expect(saveState()).toHaveTextContent(ptBR.widgets.note.saveStates.idle);
   });
 });

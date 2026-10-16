@@ -5,6 +5,7 @@ import { ptBR } from "../../i18n/pt-BR";
 import { PANEL_TITLE_ID } from "../../panel/parts/focus";
 import tokens from "../../themes/tokens.css?raw";
 import NotePanel from "./NotePanel";
+import { forgetNote } from "./memory";
 import css from "./notes.css?raw";
 
 const { invoke, log } = vi.hoisted(() => ({
@@ -93,6 +94,7 @@ function saveState() {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  forgetNote(NOTE.id);
   invoke.mockReset();
   log.error.mockReset();
   log.warn.mockReset();
