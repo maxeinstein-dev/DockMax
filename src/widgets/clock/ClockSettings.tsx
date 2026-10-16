@@ -104,8 +104,8 @@ function ClockSettings({
   } | null>(null);
   /** The label as typed, until it is committed; null shows the label of
    * `pending` or `instance`. */
-  const [labelDraft, setLabelDraft] = useState<WidgetErrorCode | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [labelDraft, setLabelDraft] = useState<string | null>(null);
+  const [error, setError] = useState<WidgetErrorCode | null>(null);
   const [removing, setRemoving] = useState(false);
   /** Number of the last change sent: only its outcome counts. */
   const sent = useRef(0);
