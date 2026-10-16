@@ -212,16 +212,43 @@ describe("the label", () => {
     });
   });
 
-  it("refuses more than 40 code points without saving", () => {
-    const { onUpdate } = renderSettings(clock());
+  it("refuses more than 40 code points without saving, with the message in the footer", () => {
+    const { onUpdate } = renderSettings(clock({}, "Lisboa"));
 
     fireEvent.change(labelField(), { target: { value: "a".repeat(41) } });
-    expect(labelField()).toHaveAttribute("aria-invalid", "true");
-    expect(labelField()).toHaveAccessibleDescription(text.errors.invalidLabel);
     fireEvent.blur(labelField());
 
     expect(onUpdate).not.toHaveBeenCalled();
-    expect(labelField()).toHaveValue("a".repeat(41));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      text.errors.invalidLabel,
+    );
+    expect(labelField()).toHaveAttribute("aria-invalid", "true");
+    expect(labelField()).toHaveValue("Lisboa");
+  });
+
+  it("saves the label trimmed", () => {
+    const { onUpdate } = renderSettings(clock());
+
+    fireEvent.change(labelField(), { target: { value: "  Lisboa  " } });
+    fireEvent.blur(labelField());
+
+    expect(onUpdate).toHaveBeenCalledExactlyOnceWith({
+      label: "Lisboa",
+      config: CONFIG,
+    });
+  });
+
+  it("counts the limit after trimming", () => {
+    const { onUpdate } = renderSettings(clock());
+    const forty = "a".repeat(40);
+
+    fireEvent.change(labelField(), { target: { value: ` ${forty} ` } });
+    fireEvent.blur(labelField());
+
+    expect(onUpdate).toHaveBeenCalledExactlyOnceWith({
+      label: forty,
+      config: CONFIG,
+    });
   });
 
   it("goes back to the saved label when Rust refuses it", async () => {
@@ -386,6 +413,44 @@ describe("the segmented settings", () => {
       label: "Lisboa",
       config: { ...CONFIG, iconStyle: "analog" },
     });
+  });
+
+  it("keeps the choice when the command answers before widgets-changed", async () => {
+    const { rerender } = renderSettings(clock());
+
+    await act(async () => {
+      fireEvent.click(option("12 horas"));
+    });
+    // The command has answered; the new instance hasn't arrived yet.
+    expect(option("12 horas")).toHaveAttribute("aria-pressed", "true");
+
+    rerender(clock({ hourCycle: "h12" }));
+    expect(option("12 horas")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps the latest choice while an earlier one's instance arrives", () => {
+    const { rerender } = renderSettings(clock(), {
+      onUpdate: vi.fn<OnUpdate>(() => new Promise(() => {})),
+    });
+
+    fireEvent.click(option("12 horas"));
+    fireEvent.click(option("Mostrar"));
+    rerender(clock({ hourCycle: "h12" }));
+
+    expect(option("12 horas")).toHaveAttribute("aria-pressed", "true");
+    expect(option("Mostrar")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("follows another window's change once its own has answered", async () => {
+    const { rerender } = renderSettings(clock());
+
+    await act(async () => {
+      fireEvent.click(option("12 horas"));
+    });
+    rerender(clock({ iconStyle: "analog" }));
+
+    expect(option("24 horas")).toHaveAttribute("aria-pressed", "true");
+    expect(option("Analógico")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("goes back to the instance and shows the message when refused", async () => {

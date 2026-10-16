@@ -1,13 +1,13 @@
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CLOCK_ICON_STYLES,
   HOUR_CYCLES,
-  MAX_LABEL_CHARS,
   isWidgetCommandError,
-  labelLength,
   type ClockConfig,
   type ClockIconStyle,
   type HourCycle,
+  type WidgetErrorCode,
+  type WidgetInstance,
 } from "../../core/widgets";
 import { format, useT, type Messages } from "../../i18n";
 import OptionGroup from "../../panel/OptionGroup";
@@ -16,6 +16,7 @@ import PanelHeader from "../../panel/parts/PanelHeader";
 import RemoveButton from "../../panel/parts/RemoveButton";
 import SelectField, { type SelectOption } from "../../panel/parts/SelectField";
 import TextField from "../../panel/parts/TextField";
+import { labelFromDraft } from "../../panel/parts/label";
 import type { WidgetSettingsProps, WidgetUpdate } from "../contract";
 import "./clock.css";
 import { systemTimeZone } from "./format";
@@ -27,12 +28,23 @@ const SYSTEM_ZONE = "";
 
 type SecondsOption = "hide" | "show";
 
-/** The message of a failed command; a rejection without a code (never
+type Update = WidgetUpdate<"clock">;
+
+/** An instance's label and config as one comparable value: the host may
+ * hand over an equal copy. */
+function keyOf(update: Update): string {
+  return JSON.stringify({ label: update.label, config: update.config });
+}
+
+const updateOf = (instance: WidgetInstance<"clock">): Update => ({
+  label: instance.label,
+  config: instance.config,
+});
+
+/** The error code of a failed command; a rejection without a code (never
  * expected) reads as a failed save. */
-function errorMessage(t: Messages, error: unknown): string {
-  return isWidgetCommandError(error)
-    ? t.widgets.errors[error.code]
-    : t.widgets.errors.writeFailed;
+function errorCode(error: unknown): WidgetErrorCode {
+  return isWidgetCommandError(error) ? error.code : "writeFailed";
 }
 
 /** The zone list: the system zone first, then `Intl`'s IANA names as
@@ -81,43 +93,67 @@ function ClockSettings({
 }: WidgetSettingsProps<"clock">) {
   const t = useT();
   const text = t.widgets.clock;
-  const labelErrorId = useId();
 
-  /** The last change sent and not settled yet: shown in place of
-   * `instance` until Rust answers. */
-  const [pending, setPending] = useState<WidgetUpdate<"clock"> | null>(null);
+  /** The last change sent, shown in place of `instance` until `instance`
+   * equals it (`widgets-changed` and the command's answer come in no set
+   * order) or it is refused. `settled`: the command answered; the next new
+   * instance replaces it even if it differs (another window won). */
+  const [pending, setPending] = useState<{
+    update: Update;
+    settled: boolean;
+  } | null>(null);
   /** The label as typed, until it is committed; null shows the label of
    * `pending` or `instance`. */
-  const [labelDraft, setLabelDraft] = useState<string | null>(null);
+  const [labelDraft, setLabelDraft] = useState<WidgetErrorCode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   /** Number of the last change sent: only its outcome counts. */
   const sent = useRef(0);
-  const current: WidgetUpdate<"clock"> = pending ?? {
-    label: instance.label,
-    config: instance.config,
-  };
+
+  const acceptedKey = keyOf(updateOf(instance));
+  const [syncedKey, setSyncedKey] = useState(acceptedKey);
+  if (syncedKey !== acceptedKey) {
+    setSyncedKey(acceptedKey);
+    if (
+      pending !== null &&
+      (pending.settled || keyOf(pending.update) === acceptedKey)
+    ) {
+      setPending(null);
+    }
+  }
+  // The last accepted instance, for an answer that settles after it came.
+  const latestKey = useRef(acceptedKey);
+  useEffect(() => {
+    latestKey.current = acceptedKey;
+  });
+
+  const current: Update = pending?.update ?? updateOf(instance);
   const config = current.config;
   const zones = useMemo(
     () => zoneOptions(t, config.timeZone),
     [t, config.timeZone],
   );
   const labelText = labelDraft ?? current.label ?? "";
-  const labelTooLong = labelLength(labelText) > MAX_LABEL_CHARS;
 
-  function send(update: WidgetUpdate<"clock">) {
+  function send(update: Update) {
     const id = ++sent.current;
-    setPending(update);
+    setPending({ update, settled: false });
     setError(null);
     onUpdate(update).then(
       () => {
-        if (sent.current === id) setPending(null);
+        if (sent.current !== id) return;
+        // Already shown by `instance`, or waiting for it.
+        setPending((shown) =>
+          shown === null || keyOf(shown.update) === latestKey.current
+            ? null
+            : { ...shown, settled: true },
+        );
       },
       (reason: unknown) => {
         if (sent.current !== id) return;
         // Every field shows `instance` again, the label too.
         setPending(null);
-        setError(errorMessage(t, reason));
+        setError(errorCode(reason));
       },
     );
   }
@@ -127,9 +163,13 @@ function ClockSettings({
   }
 
   function commitLabel() {
-    if (labelDraft === null || labelTooLong) return;
-    const label = labelDraft.trim() === "" ? null : labelDraft;
+    if (labelDraft === null) return;
+    const label = labelFromDraft(labelDraft);
     setLabelDraft(null);
+    if (label === "tooLong") {
+      setError("invalidLabel");
+      return;
+    }
     if (label !== current.label) send({ label, config });
   }
 
@@ -138,7 +178,7 @@ function ClockSettings({
     setError(null);
     onRemove().catch((reason: unknown) => {
       setRemoving(false);
-      setError(errorMessage(t, reason));
+      setError(errorCode(reason));
     });
   }
 
@@ -149,16 +189,10 @@ function ClockSettings({
         label={t.widgets.common.label}
         value={labelText}
         placeholder={t.widgets.kinds.clock}
-        invalid={labelTooLong}
-        describedBy={labelTooLong ? labelErrorId : undefined}
+        invalid={error === "invalidLabel"}
         onChange={setLabelDraft}
         onCommit={commitLabel}
       />
-      {labelTooLong ? (
-        <p id={labelErrorId} className="clock-field-error">
-          {t.widgets.errors.invalidLabel}
-        </p>
-      ) : null}
       <SelectField
         label={text.timeZone}
         value={config.timeZone ?? SYSTEM_ZONE}
@@ -195,7 +229,9 @@ function ClockSettings({
         onSelect={(iconStyle) => changeConfig({ iconStyle })}
       />
       <RemoveButton onClick={remove} disabled={removing} />
-      <PanelFooter alert={error}>{t.widgets.common.footer}</PanelFooter>
+      <PanelFooter alert={error ? t.widgets.errors[error] : null}>
+        {t.widgets.common.footer}
+      </PanelFooter>
     </>
   );
 }

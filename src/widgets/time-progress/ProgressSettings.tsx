@@ -1,8 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   isWidgetCommandError,
-  labelLength,
-  MAX_LABEL_CHARS,
   PERIODS,
   WEEK_STARTS,
   type MoveDirection,
@@ -18,6 +16,7 @@ import IconButton from "../../panel/parts/IconButton";
 import PanelHeader from "../../panel/parts/PanelHeader";
 import RemoveButton from "../../panel/parts/RemoveButton";
 import TextField from "../../panel/parts/TextField";
+import { labelFromDraft } from "../../panel/parts/label";
 import type { WidgetSettingsProps, WidgetUpdate } from "../contract";
 import "./time-progress.css";
 
@@ -102,9 +101,8 @@ function ProgressSettings({
   }
 
   function commitLabel() {
-    const trimmed = labelDraft.trim();
-    const label = trimmed === "" ? null : trimmed;
-    if (label !== null && labelLength(label) > MAX_LABEL_CHARS) {
+    const label = labelFromDraft(labelDraft);
+    if (label === "tooLong") {
       setLabelDraft(shown.label ?? "");
       setError("invalidLabel");
       return;

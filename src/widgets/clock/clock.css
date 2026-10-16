@@ -79,9 +79,3 @@
   text-transform: uppercase;
 }
 
-/* The label's own error, under the field. */
-.clock-field-error {
-  margin: -8px 0 0;
-  font-size: 12px;
-  color: var(--danger);
-}
