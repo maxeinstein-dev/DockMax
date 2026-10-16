@@ -121,7 +121,7 @@ O primeiro commit do PR leva esta spec e este plano.
 ### Batch D — fechamento do PR 1
 
 **V1** `[sequential]` **Verificação, revisão e PR**
-- **Em andamento:** rodada 2 de revisão e teste manual. Medições já registradas na spec §2.10.
+- **Feito:** rodadas 1 e 2 de revisão, teste manual do autor no build de release em 2026-10-16 (o app abre como antes, o `dockmax.db` nasce ao lado do `settings.json`, as preferências continuam iguais e o `-wal` fica com 0 bytes depois de sair). Medições na spec §2.10.
 - Rodar todos os checks locais e mostrar a saída.
 - Medir o tamanho do executável e o tempo de build com SQLite, e registrar na spec.
 - E2E local, só com autorização; com o DockMax do usuário aberto, o hash do `settings.json` real é o mesmo antes e depois.

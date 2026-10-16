@@ -1,6 +1,6 @@
 # Spec 0003 — Fase 2: núcleo de widgets e persistência
 
-- **Status:** Aprovada em 2026-10-15; PR 1 implementado (aguardando teste manual e PR)
+- **Status:** Aprovada em 2026-10-15; PR 1 implementado e verificado no teste manual do autor (2026-10-16)
 - **Data:** 2026-10-15
 - **Roadmap:** [Fase 2 — Núcleo de widgets e persistência](../roadmap.md#fase-2--núcleo-de-widgets-e-persistência)
 - **Origem das decisões:** sessão de grill de 2026-10-15 (Q1–Q16), resumidas no fim deste documento, e pesquisa de E2E e SQLite da mesma data.
@@ -193,8 +193,8 @@ Depois de aprovado, o `DESIGN.md` ganha os componentes novos.
 
 | Item | Antes da Fase 2 | PR 1 |
 |---|---|---|
-| `dockmax.exe` de release | 4.699.136 bytes | 7.143.936 bytes (+2.444.800, cerca de +2,44 MB) |
-| Build de release | 218 s (build limpo da C1, antes das dependências novas) | 133 s, com as dependências em cache |
+| `dockmax.exe` de release | 4.699.136 bytes | 7.144.960 bytes (+2.445.824, cerca de +2,45 MB) |
+| Build de release | 218 s (build limpo da C1, antes das dependências novas) | 127–133 s, com as dependências em cache |
 | Testes | 144 Vitest e 188 Rust | 531 Vitest, 328 Rust, 11 guardas e 3 E2E |
 
 - Do aumento do executável, o SQLite embutido responde por cerca de 1,7 MB e o `jiff` (com a base IANA) por cerca de 0,3 MB. Aceito: é o custo que a tabela de riscos previa.
