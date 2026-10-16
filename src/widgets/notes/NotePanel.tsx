@@ -18,16 +18,18 @@ type Read =
    * §2.10, N7). */
   | { id: WidgetId; state: "unreadable" };
 
-/** Saves what the editor holds and resolves once saved (or failed); null
- * when there is nothing to save. */
-type Flush = () => Promise<void> | null;
+/** Saves what the editor holds and resolves once done: true when saved,
+ * false when the save failed; null when there is nothing to save. */
+type Flush = () => Promise<boolean> | null;
 
 /** The main view of a note panel (spec 0003 §2.2, Nota): the text in a
  * 210 px editor that saves itself, and the save state in the footer. No
  * editor until `get_note` answers. "Ajustes" waits for the pending text to
  * be saved first: Ajustes reads the stored note to know whether removing
  * it must ask, and must never read a version older than the screen's (an
- * empty one would remove the note without asking). */
+ * empty one would remove the note without asking). When that save fails,
+ * Ajustes doesn't open: the view stays, with the text and the error, and
+ * the next click tries again. */
 function NotePanel({
   instance,
   onAdjust,
@@ -55,9 +57,9 @@ function NotePanel({
       return;
     }
     adjusting.current = true;
-    void saving.then(() => {
+    void saving.then((saved) => {
       adjusting.current = false;
-      if (mounted.current) onAdjust();
+      if (saved && mounted.current) onAdjust();
     });
   };
 
@@ -142,7 +144,8 @@ function NoteEditor({
     autosave.current = instance;
     flushRef.current = () => {
       const { state, error } = instance.getStatus();
-      return state === "idle" && error === null ? null : instance.flush();
+      if (state === "idle" && error === null) return null;
+      return instance.flush().then(() => instance.getStatus().error === null);
     };
     const unsubscribe = instance.subscribe(() =>
       setStatus(instance.getStatus()),

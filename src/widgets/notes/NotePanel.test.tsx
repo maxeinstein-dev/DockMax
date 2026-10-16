@@ -422,7 +422,8 @@ describe("Ajustes", () => {
     expect(onAdjust).toHaveBeenCalledTimes(1);
   });
 
-  it("opens Ajustes even when the save fails: the text stays on screen", async () => {
+  // With the real panel host: src/panel/NoteRouting.test.tsx.
+  it("does not open Ajustes when the save fails: the text and the error stay", async () => {
     backend({ save: () => Promise.reject({ code: "writeFailed" }) });
     const { editor, onAdjust } = await openNote();
     fireEvent.change(editor, { target: { value: "Pão" } });
@@ -430,7 +431,9 @@ describe("Ajustes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ajustes" }));
     await settle();
 
-    expect(onAdjust).toHaveBeenCalledTimes(1);
+    expect(onAdjust).not.toHaveBeenCalled();
+    expect(editor).toHaveValue("Pão");
+    expect(saveState()).toHaveTextContent(errors.writeFailed);
   });
 
   it("does not open Ajustes after the panel went away", async () => {
