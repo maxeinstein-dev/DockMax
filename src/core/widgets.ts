@@ -49,9 +49,16 @@ export const WIDGET_KINDS = [
   "files",
 ] as const;
 
-/** The kinds `add_widget` accepts in this phase; Shortcut and Files exist
- * only in the domain until phase 3. Must match `WidgetKind::creatable`. */
-export const CREATABLE_KINDS: readonly WidgetKind[] = [
+/** The kinds `add_widget` accepts in this phase. */
+export type CreatableKind = Extract<
+  WidgetKind,
+  "clock" | "time-progress" | "note"
+>;
+
+/** The kinds `add_widget` accepts in this phase, in the order of the add
+ * buttons; Shortcut and Files exist only in the domain until phase 3. Must
+ * match `WidgetKind::creatable`. */
+export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "clock",
   "time-progress",
   "note",
