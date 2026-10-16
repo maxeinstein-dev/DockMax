@@ -13,10 +13,10 @@
   scrollbar-color: color-mix(in srgb, var(--ink-2) 50%, transparent) transparent;
 }
 
-/* Mini tile, name and subtitle, subir and descer. */
+/* Mini tile, name and subtitle, subir, descer and remover. */
 .dock-items-row {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) auto auto;
+  grid-template-columns: 26px minmax(0, 1fr) auto auto auto;
   gap: 8px;
   align-items: center;
   padding: 6px 2px;
@@ -25,6 +25,11 @@
 
 .dock-items-row:last-child {
   border-bottom: 0;
+}
+
+/* A note's removal asks in its row, under the name, across the row. */
+.dock-items-confirm {
+  grid-column: 1 / -1;
 }
 
 .dock-items-text {

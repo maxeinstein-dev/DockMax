@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WidgetInstance, WidgetsSnapshot } from "../core/widgets";
 import { ptBR } from "../i18n/pt-BR";
 import tokens from "../themes/tokens.css?raw";
+import { draftOf, forgetNote, keepDraft } from "../widgets/notes/memory";
 import DockItems from "./DockItems";
 import css from "./DockItems.css?raw";
 
@@ -120,6 +121,17 @@ function moveUp(name: string) {
 
 function moveDown(name: string) {
   return button(`Descer ${name}`);
+}
+
+function removeButton(name: string) {
+  return button(`Remover ${name}`);
+}
+
+/** The commands sent with `name`, by their arguments. */
+function sent(name: string) {
+  return invoke.mock.calls
+    .filter(([command]) => command === name)
+    .map(([, args]) => args as unknown);
 }
 
 describe("DockItems", () => {
@@ -425,6 +437,159 @@ describe("DockItems", () => {
     await flush();
 
     expect(screen.getByRole("alert")).toHaveTextContent(text.errors.notReady);
+  });
+
+  describe("removing", () => {
+    beforeEach(() => forgetNote("n1"));
+
+    it("removes a clock at once and moves the focus to the next item", async () => {
+      const { rerender } = render(
+        <DockItems snapshot={THREE} onBack={vi.fn()} />,
+      );
+      await flush();
+
+      act(() => removeButton("Relógio").focus());
+      fireEvent.click(removeButton("Relógio"));
+      await flush();
+      expect(sent("remove_widget")).toEqual([{ id: "c1" }]);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+      rerender(
+        <DockItems snapshot={snapshot([PROGRESS, NOTE])} onBack={vi.fn()} />,
+      );
+      expect(removeButton("Progresso do tempo")).toHaveFocus();
+    });
+
+    it("removes the last item and moves the focus to the one before", async () => {
+      answer({ n1: "" });
+      const { rerender } = render(
+        <DockItems snapshot={THREE} onBack={vi.fn()} />,
+      );
+      await flush();
+
+      act(() => removeButton("Nota").focus());
+      fireEvent.click(removeButton("Nota"));
+      await flush();
+      // An empty note goes without asking.
+      expect(sent("remove_widget")).toEqual([{ id: "n1" }]);
+
+      rerender(
+        <DockItems snapshot={snapshot([CLOCK, PROGRESS])} onBack={vi.fn()} />,
+      );
+      expect(removeButton("Progresso do tempo")).toHaveFocus();
+    });
+
+    it("moves the focus to the first add button when the list empties", async () => {
+      const { rerender } = render(
+        <DockItems snapshot={snapshot([PROGRESS])} onBack={vi.fn()} />,
+      );
+      await flush();
+
+      act(() => removeButton("Progresso do tempo").focus());
+      fireEvent.click(removeButton("Progresso do tempo"));
+      await flush();
+      rerender(<DockItems snapshot={snapshot([])} onBack={vi.fn()} />);
+
+      expect(button(text.addNames.clock)).toHaveFocus();
+    });
+
+    it("asks in the row before removing a note with text", async () => {
+      const { rerender } = render(
+        <DockItems snapshot={THREE} onBack={vi.fn()} />,
+      );
+      await flush();
+
+      fireEvent.click(removeButton("Nota"));
+      await flush();
+      const row = rows()[2]!;
+      const confirm = within(row).getByRole("alert");
+      expect(confirm).toHaveTextContent(text.note.confirmRemove.title);
+      expect(sent("remove_widget")).toEqual([]);
+      expect(
+        within(row).getByRole("button", {
+          name: text.note.confirmRemove.cancel,
+        }),
+      ).toHaveFocus();
+
+      // Cancelar: the remove button comes back with the focus.
+      fireEvent.click(
+        within(row).getByRole("button", {
+          name: text.note.confirmRemove.cancel,
+        }),
+      );
+      expect(within(row).queryByRole("alert")).not.toBeInTheDocument();
+      expect(removeButton("Nota")).toHaveFocus();
+
+      fireEvent.click(removeButton("Nota"));
+      await flush();
+      fireEvent.click(
+        within(rows()[2]!).getByRole("button", {
+          name: text.note.confirmRemove.confirm,
+        }),
+      );
+      await flush();
+      expect(sent("remove_widget")).toEqual([{ id: "n1" }]);
+
+      rerender(
+        <DockItems snapshot={snapshot([CLOCK, PROGRESS])} onBack={vi.fn()} />,
+      );
+      expect(removeButton("Progresso do tempo")).toHaveFocus();
+    });
+
+    it("asks for a note whose text isn't saved, and forgets it once removed", async () => {
+      answer({ n1: "" });
+      keepDraft("n1", { text: "Pão", error: "writeFailed" });
+      render(<DockItems snapshot={THREE} onBack={vi.fn()} />);
+      await flush();
+
+      fireEvent.click(removeButton("Nota"));
+      await flush();
+      fireEvent.click(
+        within(rows()[2]!).getByRole("button", {
+          name: text.note.confirmRemove.confirm,
+        }),
+      );
+      await flush();
+
+      expect(sent("remove_widget")).toEqual([{ id: "n1" }]);
+      expect(draftOf("n1")).toBeNull();
+    });
+
+    it("asks for a note it can't read", async () => {
+      invoke.mockImplementation((command: string) =>
+        command === "get_note"
+          ? Promise.reject({ code: "invalidConfig" })
+          : Promise.resolve(undefined),
+      );
+      render(<DockItems snapshot={THREE} onBack={vi.fn()} />);
+      await flush();
+
+      fireEvent.click(removeButton("Nota"));
+      await flush();
+      expect(within(rows()[2]!).getByRole("alert")).toHaveTextContent(
+        text.note.confirmRemove.title,
+      );
+    });
+
+    it("keeps the item and the focus when the removal is refused", async () => {
+      invoke.mockImplementation((command: string) =>
+        command === "remove_widget"
+          ? Promise.reject({ code: "writeFailed" })
+          : Promise.resolve(""),
+      );
+      render(<DockItems snapshot={THREE} onBack={vi.fn()} />);
+      await flush();
+
+      act(() => removeButton("Relógio").focus());
+      fireEvent.click(removeButton("Relógio"));
+      await flush();
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        text.errors.writeFailed,
+      );
+      expect(removeButton("Relógio")).toHaveFocus();
+      expect(removeButton("Relógio")).toBeEnabled();
+    });
   });
 
   it("works from the keyboard: every control is a button in Tab order", async () => {

@@ -71,7 +71,7 @@ A Fase 2 é entregue em **dois PRs**, com um **mock visual aprovado** entre eles
 
 ### 2.3 Interface de instâncias
 
-1. **Configurações › Itens do dock** (Q10): lista os widgets na ordem do dock. Tem botões **adicionar** (escolhendo o tipo), **subir** e **descer**, todos operáveis pelo teclado. Reordenar nunca muda o ID de uma instância. Arrastar e o menu de botão direito ficam para a Fase 3.
+1. **Configurações › Itens do dock** (Q10): lista os widgets na ordem do dock. Tem botões **adicionar** (escolhendo o tipo), **subir**, **descer** e **remover**, todos operáveis pelo teclado. Remover segue a regra de "Remover do dock" nos Ajustes: Relógio e Progresso saem na hora; uma Nota com texto (guardado ou ainda não salvo) pede a confirmação inline na própria linha. Depois de remover, o foco vai para o item que ficou no lugar (ou o anterior, ou o primeiro botão de adicionar). Decisão do teste manual de 2026-10-16: antes só havia subir e descer, e não dava para remover sem abrir o painel do widget. Reordenar nunca muda o ID de uma instância. Arrastar e o menu de botão direito ficam para a Fase 3.
 2. **Ajustes da instância dentro do próprio painel** (Q11): um botão "Ajustes" troca o conteúdo do painel para a configuração daquela instância (rótulo e campos do tipo). O botão **"Remover do dock"** fica ali também.
 3. Como na Fase 1, cada mudança é aplicada e salva na hora, sem botão Salvar. O Rust é a fonte da verdade. Uma mudança aceita emite um evento para todas as janelas; numa falha, o valor volta ao anterior e o painel mostra a mensagem.
 4. **Acessibilidade**, no nível da spec 0002 §2.4 item 7:
@@ -325,7 +325,7 @@ Cada PR mostra a saída dos comandos, não a presume. Em todos os PRs: CI verde 
 | Q7 | Nota: texto simples, uma por instância, salvamento automático (~500 ms e ao perder o foco), 64 KiB, conteúdo nunca no log. |
 | Q8 | Atalho e Arquivos só no domínio, com validação sintática; nada na interface. |
 | Q9 | Banco corrompido: renomeia e recria, com aviso. Migração que falha ou banco mais novo: não toca, widgets indisponíveis. Backup antes de cada migração. |
-| Q10 | Primeiro uso com Relógio, Progresso e Nota; Configurações › Itens do dock com adicionar, subir e descer. |
+| Q10 | Primeiro uso com Relógio, Progresso e Nota; Configurações › Itens do dock com adicionar, subir e descer (remover acrescentado no teste manual de 2026-10-16, §2.3 item 1). |
 | Q11 | Ajustes e "Remover do dock" no painel de cada instância. |
 | Q12 | Widgets primeiro, separador, Configurações e Sobre fixos no fim; até 12 widgets. |
 | Q13 | Mock curto entre o PR 1 e o PR 2; `DESIGN.md` estendido. |

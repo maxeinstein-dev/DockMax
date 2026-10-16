@@ -72,6 +72,13 @@
   background: var(--track);
 }
 
+/* Remover an item (Itens do dock): quiet at rest, --danger only on hover
+   (The Danger Only Rule: it removes). */
+.icon-button.danger:hover:not(:disabled) {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
 .icon-button:disabled {
   opacity: 0.32;
   cursor: default;

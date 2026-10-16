@@ -7,6 +7,7 @@ import {
   getNote,
   isWidgetCommandError,
   moveWidget,
+  removeWidget,
   type CreatableKind,
   type MoveDirection,
   type WidgetErrorCode,
@@ -17,16 +18,18 @@ import {
 import { format, plural, useT, type Messages } from "../i18n";
 import { WIDGET_REGISTRY, isCreatableInstance } from "../widgets/registry";
 import { widgetName } from "../widgets/names";
+import { draftOf, forgetNote, readNote } from "../widgets/notes/memory";
 import PanelFooter from "./PanelFooter";
 import IconButton from "./parts/IconButton";
+import InlineConfirm from "./parts/InlineConfirm";
 import InlineNotice from "./parts/InlineNotice";
 import PanelHeader from "./parts/PanelHeader";
 import { PANEL_TITLE_ID } from "./parts/focus";
 import "./DockItems.css";
 
 /** Props of Configurações › Itens do dock (W4), a subview of the Settings
- * panel. It changes the list through `addWidget`, `moveWidget` and
- * `dismissStorageNotice` (`src/core/widgets.ts`); every accepted change
+ * panel. It changes the list through `addWidget`, `moveWidget`,
+ * `removeWidget` and `dismissStorageNotice` (`src/core/widgets.ts`); every accepted change
  * comes back in `snapshot` through `widgets-changed`, and a rejected one
  * shows its message (`t.widgets.errors[code]`). */
 export interface DockItemsProps {
@@ -151,7 +154,14 @@ type FocusTarget =
    * limit. */
   | { kind: "added"; id: WidgetId }
   /** Voltar, once the dismissed notice is gone. */
-  | { kind: "back" };
+  | { kind: "back" }
+  /** Once the removed item is gone: the remove button of the item now at
+   * its place, or of the one before it at the end, or the first add
+   * button when the list is empty. */
+  | { kind: "removed"; id: WidgetId; index: number }
+  /** The item's remove button, back from a cancelled or failed
+   * confirmation. */
+  | { kind: "remove"; id: WidgetId };
 
 const OTHER: Readonly<Record<MoveDirection, MoveDirection>> = {
   up: "down",
@@ -173,7 +183,8 @@ function focusLost(): boolean {
 /**
  * Configurações › Itens do dock (spec 0003 §2.3 item 1, §2.4 item 7;
  * DESIGN.md "Configurações › Itens do dock"): the widgets in dock order,
- * each with subir and descer, the add buttons with the count, and the
+ * each with subir, descer and remover (a note with text asks first, in its
+ * row), the add buttons with the count, and the
  * notice of a recovered or unavailable storage. Rust is the source of
  * truth: nothing here changes before `widgets-changed` says so.
  */
@@ -184,7 +195,15 @@ function DockItems({ snapshot, onBack }: DockItemsProps) {
   const [noteLines, setNoteLines] = useState<Record<WidgetId, number | null>>(
     {},
   );
+  /** The note whose removal waits for the inline confirmation, if any. */
+  const [confirming, setConfirming] = useState<WidgetId | null>(null);
+  /** The item being removed, or the note read before asking: its remove
+   * button turns off. */
+  const [removing, setRemoving] = useState<WidgetId | null>(null);
+  /** Subir, descer and remover of each item, by `id:direction` and
+   * `id:remove`. */
   const moveButtons = useRef(new Map<string, HTMLButtonElement>());
+  const addButton = useRef<HTMLButtonElement>(null);
   const focusTarget = useRef<FocusTarget | null>(null);
 
   const storage = snapshot?.storage.state ?? null;
@@ -214,6 +233,22 @@ function DockItems({ snapshot, onBack }: DockItemsProps) {
         if (focusLost()) button.focus();
         break;
       }
+      case "removed": {
+        // Still listed: wait for the snapshot without it.
+        if (widgets.some((instance) => instance.id === target.id)) return;
+        const next = widgets[Math.min(target.index, widgets.length - 1)];
+        const button = next
+          ? moveButtons.current.get(`${next.id}:remove`)
+          : addButton.current;
+        if (focusLost()) button?.focus();
+        break;
+      }
+      case "remove": {
+        const button = moveButtons.current.get(`${target.id}:remove`);
+        if (button === undefined) return;
+        button.focus();
+        break;
+      }
       case "back": {
         if (storage === "recovered") return;
         // The Voltar button comes right before the title (`PanelHeader`).
@@ -229,7 +264,7 @@ function DockItems({ snapshot, onBack }: DockItemsProps) {
   // Runs after each new snapshot, before paint, so the focus never shows
   // on the wrong control. `restoreFocus` reads only refs and `storage`.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useLayoutEffect(restoreFocus, [snapshot]);
+  useLayoutEffect(restoreFocus, [snapshot, confirming, removing]);
 
   // The lines of each note, for its subtitle: read once per note.
   const noteIds = widgets
@@ -278,6 +313,64 @@ function DockItems({ snapshot, onBack }: DockItemsProps) {
       focusTarget.current = { kind: "added", id: instance.id };
       restoreFocus();
     }, fail);
+  }
+
+  /** Removes `instance` (`remove_widget`). A note with text, stored or
+   * typed and not saved yet (`draftOf`), or one that can't be read, asks
+   * first in its row; the others go at once. */
+  function askToRemove(instance: WidgetInstance, index: number) {
+    setError(null);
+    if (instance.kind !== "note") {
+      remove(instance.id, index);
+      return;
+    }
+    if (draftOf(instance.id) !== null) {
+      setConfirming(instance.id);
+      return;
+    }
+    setRemoving(instance.id);
+    // After the saves still running, so a text just typed counts.
+    readNote(instance.id).then(
+      (body) => {
+        if (body === "") {
+          remove(instance.id, index);
+        } else {
+          setRemoving(null);
+          setConfirming(instance.id);
+        }
+      },
+      () => {
+        setRemoving(null);
+        setConfirming(instance.id);
+      },
+    );
+  }
+
+  function remove(id: WidgetId, index: number) {
+    setError(null);
+    setRemoving(id);
+    focusTarget.current = { kind: "removed", id, index };
+    removeWidget({ id }).then(
+      () => {
+        // The unsaved text of a note goes with it.
+        forgetNote(id);
+        // The focus moves once the snapshot without it comes (the layout
+        // effect runs again on `removing` and on the snapshot).
+        setConfirming(null);
+        setRemoving(null);
+      },
+      (reason: unknown) => {
+        fail(reason);
+        focusTarget.current = { kind: "remove", id };
+        setConfirming(null);
+        setRemoving(null);
+      },
+    );
+  }
+
+  function cancelRemove(id: WidgetId) {
+    focusTarget.current = { kind: "remove", id };
+    setConfirming(null);
   }
 
   function dismiss() {
@@ -362,6 +455,32 @@ function DockItems({ snapshot, onBack }: DockItemsProps) {
                         onClick={() => move(instance.id, direction)}
                       />
                     ))}
+                    {confirming === instance.id ? (
+                      <div className="dock-items-confirm">
+                        <InlineConfirm
+                          title={t.widgets.note.confirmRemove.title}
+                          detail={t.widgets.note.confirmRemove.detail}
+                          cancelLabel={t.widgets.note.confirmRemove.cancel}
+                          confirmLabel={t.widgets.note.confirmRemove.confirm}
+                          onCancel={() => cancelRemove(instance.id)}
+                          onConfirm={() => remove(instance.id, index)}
+                          busy={removing === instance.id}
+                        />
+                      </div>
+                    ) : (
+                      <IconButton
+                        ref={(button) => {
+                          const key = `${instance.id}:remove`;
+                          if (button) moveButtons.current.set(key, button);
+                          else moveButtons.current.delete(key);
+                        }}
+                        icon="trash"
+                        tone="danger"
+                        label={format(t.widgets.common.removeNamed, { name })}
+                        disabled={removing === instance.id}
+                        onClick={() => askToRemove(instance, index)}
+                      />
+                    )}
                   </li>
                 );
               })}
@@ -388,9 +507,10 @@ function DockItems({ snapshot, onBack }: DockItemsProps) {
               </span>
             </div>
             <div className="dock-items-add-buttons">
-              {CREATABLE_KINDS.map((kind) => (
+              {CREATABLE_KINDS.map((kind, index) => (
                 <button
                   key={kind}
+                  ref={index === 0 ? addButton : undefined}
                   type="button"
                   className="secondary-button"
                   disabled={full}

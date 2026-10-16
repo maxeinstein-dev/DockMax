@@ -128,6 +128,9 @@ const messages = {
       /** Accessible names of the move buttons, with the item's name. */
       moveUp: "Subir {name}",
       moveDown: "Descer {name}",
+      /** Accessible name of the remove button of each item in Itens do
+       * dock, with the item's name. */
+      removeNamed: "Remover {name}",
       /** Subtitle in Itens do dock of an instance with a label:
        * `{kind} · {detail}`, as `Relógio · Lisboa`. */
       labelledSubtitle: "{kind} · {detail}",
