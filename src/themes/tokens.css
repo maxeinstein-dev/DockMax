@@ -10,6 +10,12 @@
    keeps the two copies equal to DESIGN.md. */
 
 :root {
+  /* Native controls (the list of a <select>, the time field, the checkbox,
+     the scroll bars) in the WebView's light look, like the tokens below.
+     Each dark block sets "dark": without it they stayed light under the
+     dark theme's light --ink. */
+  color-scheme: light;
+
   /* Colors, light (DESIGN.md "Colors": Primary and Neutral). */
   --accent: #2f5bd3;
   --accent-ink: #1f45b3;
@@ -82,6 +88,7 @@
 /* Colors and shadow, dark: the "Sistema" theme on a dark Windows. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-mode="light"]) {
+    color-scheme: dark;
     --accent: #7c9cff;
     --accent-ink: #b0c2ff;
     --accent-soft: rgb(124 156 255 / 0.17);
@@ -111,6 +118,7 @@
    the block above. The "Claro" theme needs no block: data-mode="light"
    turns the media block off and the :root values apply. */
 :root[data-mode="dark"] {
+  color-scheme: dark;
   --accent: #7c9cff;
   --accent-ink: #b0c2ff;
   --accent-soft: rgb(124 156 255 / 0.17);
