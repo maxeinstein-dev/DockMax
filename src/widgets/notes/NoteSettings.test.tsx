@@ -4,6 +4,7 @@ import type { WidgetInstance } from "../../core/widgets";
 import { WIDGET_FIXTURES } from "../../core/widgets.fixtures";
 import { ptBR } from "../../i18n/pt-BR";
 import type { WidgetUpdate } from "../contract";
+import { draftOf, forgetNote, keepDraft } from "./memory";
 import NoteSettings from "./NoteSettings";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
@@ -58,6 +59,7 @@ function removeButton() {
 }
 
 beforeEach(() => {
+  forgetNote(NOTE.id);
   invoke.mockReset();
   stored(() => Promise.resolve(""));
 });
@@ -247,6 +249,36 @@ describe("Remover do dock", () => {
     fireEvent.click(removeButton());
     expect(second.onRemove).not.toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent(confirm.title);
+  });
+
+  it("asks when the note has unsaved text, even if the stored one is empty", async () => {
+    stored(() => Promise.resolve(""));
+    keepDraft(NOTE.id, { text: "Pão", error: "noteTooLarge" });
+    const { onRemove } = renderSettings();
+    await settle();
+
+    fireEvent.click(removeButton());
+    expect(onRemove).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(confirm.title);
+
+    // Removed: the unsaved text goes with the instance.
+    fireEvent.click(screen.getByRole("button", { name: confirm.confirm }));
+    await settle();
+    expect(onRemove).toHaveBeenCalledOnce();
+    expect(draftOf(NOTE.id)).toBeNull();
+  });
+
+  it("keeps the unsaved text when the removal fails", async () => {
+    keepDraft(NOTE.id, { text: "Pão", error: "noteTooLarge" });
+    renderSettings(NOTE, {
+      onRemove: vi.fn(() => Promise.reject({ code: "notFound" })),
+    });
+    await settle();
+
+    fireEvent.click(removeButton());
+    fireEvent.click(screen.getByRole("button", { name: confirm.confirm }));
+    await settle();
+    expect(draftOf(NOTE.id)).toEqual({ text: "Pão", error: "noteTooLarge" });
   });
 
   it("reads the note of this instance", async () => {

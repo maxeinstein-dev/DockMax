@@ -13,16 +13,17 @@ import PanelHeader from "../../panel/parts/PanelHeader";
 import RemoveButton from "../../panel/parts/RemoveButton";
 import TextField from "../../panel/parts/TextField";
 import type { WidgetSettingsProps } from "../contract";
-import { readNote } from "./memory";
+import { draftOf, forgetNote, readNote } from "./memory";
 
 /** The code of a failed command; anything else reads as `writeFailed`. */
 function codeOf(error: unknown): WidgetErrorCode {
   return isWidgetCommandError(error) ? error.code : "writeFailed";
 }
 
-/** Whether the stored note has text, for one instance: null while it is
- * read, or when it can't be (both ask before removing). Read once the saves
- * of the main view have ended. */
+/** Whether the note has text, for one instance: true while text typed in
+ * the main view isn't saved (`draftOf`), whatever the stored note holds;
+ * null while it is read, or when it can't be (both ask before removing).
+ * Read once the saves of the main view have ended. */
 function useHasText(id: WidgetId): boolean | null {
   const [read, setRead] = useState<{ id: WidgetId; hasText: boolean } | null>(
     null,
@@ -41,6 +42,7 @@ function useHasText(id: WidgetId): boolean | null {
       active = false;
     };
   }, [id]);
+  if (draftOf(id) !== null) return true;
   return read?.id === id ? read.hasText : null;
 }
 
@@ -91,13 +93,17 @@ function NoteSettings({
   const remove = () => {
     setRemoveError(null);
     setRemoving(true);
-    // Once removed, the host closes the panel.
-    onRemove().catch((error: unknown) => {
-      setRemoving(false);
-      setConfirming(false);
-      setCancelled(true);
-      setRemoveError(codeOf(error));
-    });
+    // Once removed, the host closes the panel; the unsaved text goes with
+    // the instance.
+    onRemove().then(
+      () => forgetNote(instance.id),
+      (error: unknown) => {
+        setRemoving(false);
+        setConfirming(false);
+        setCancelled(true);
+        setRemoveError(codeOf(error));
+      },
+    );
   };
 
   const error = labelError ?? removeError;
