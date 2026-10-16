@@ -57,12 +57,12 @@ Critérios verificados em 2026-10-15 (spec 0002, verificações 1–21, e teste 
 
 **Estimativa:** 1–2 semanas.
 
-- [ ] Definir o contrato de widget e o registro central.
-- [ ] Implementar persistência local e migrações.
-- [ ] Criar widgets Relógio, Progresso do tempo e Nota.
-- [ ] Criar estrutura inicial para Atalho e Arquivos.
-- [ ] Implementar validação de configurações.
-- [ ] Adicionar testes unitários para regras de negócio.
+- [x] Definir o contrato de widget e o registro central.
+- [x] Implementar persistência local e migrações.
+- [x] Criar widgets Relógio, Progresso do tempo e Nota.
+- [x] Criar estrutura inicial para Atalho e Arquivos.
+- [x] Implementar validação de configurações.
+- [x] Adicionar testes unitários para regras de negócio.
 
 **Critérios de aceitação**
 - Instâncias de widgets têm IDs estáveis.
