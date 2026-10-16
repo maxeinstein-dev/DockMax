@@ -1,4 +1,4 @@
-import type { PanelId } from "../core/panels";
+import { isWidgetPanel, type PanelId } from "../core/panels";
 import type { Settings } from "../core/settings";
 import AboutPanel from "./AboutPanel";
 import SettingsPanel from "./SettingsPanel";
@@ -12,6 +12,8 @@ type PanelContentProps = {
 /** The body of a panel, below its title. Runs inside the panel's error
  * boundary: a failure here leaves the title and Esc working. */
 function PanelContent({ panelId, settings }: PanelContentProps) {
+  // Widget panels are routed in W5 (`src/widgets/registry.ts`).
+  if (isWidgetPanel(panelId)) return null;
   switch (panelId) {
     case "settings":
       return <SettingsPanel settings={settings} />;

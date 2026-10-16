@@ -22,8 +22,11 @@ import { errorKind, log } from "../core/log";
 import {
   PANEL_CHANGED_EVENT,
   type LogicalRect,
+  isWidgetPanel,
+  samePanel,
   type PanelChanged,
   type PanelId,
+  type SystemPanelId,
 } from "../core/panels";
 import { useT } from "../i18n";
 import Glyph from "./Glyph";
@@ -41,13 +44,13 @@ import "./Dock.css";
  * has only the two system items, one group, so no separator: DESIGN.md
  * keeps the separator for setting Configurações and Sobre apart from the
  * items of the next phases. */
-const GROUPS: readonly (readonly PanelId[])[] = [["settings", "about"]];
-const ITEMS: readonly PanelId[] = GROUPS.flat();
+const GROUPS: readonly (readonly SystemPanelId[])[] = [["settings", "about"]];
+const ITEMS: readonly SystemPanelId[] = GROUPS.flat();
 const GROUP_SIZES = GROUPS.map((group) => group.length);
 
 /** Static glaze class of each item's tile (tokens.css, The Own Glaze
  * Rule). */
-const GLAZE: Record<PanelId, string> = {
+const GLAZE: Record<SystemPanelId, string> = {
   settings: "t-settings",
   about: "t-about",
 };
@@ -225,9 +228,11 @@ function Dock() {
       }),
       listen<DockRequestPanel>(DOCK_REQUEST_PANEL_EVENT, ({ payload }) => {
         const { panelId } = payload;
-        const index = ITEMS.indexOf(panelId);
+        // The dock has no widget items yet (W5): a widget panel is never
+        // asked for here.
+        const index = isWidgetPanel(panelId) ? -1 : ITEMS.indexOf(panelId);
         const anchor = restItemsRef.current[index];
-        if (!anchor || openRef.current === panelId) return;
+        if (!anchor || samePanel(openRef.current, panelId)) return;
         openPanel(panelId, anchor);
       }),
     ];

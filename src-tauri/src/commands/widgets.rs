@@ -151,6 +151,25 @@ pub fn write_note(storage: &mut Storage, id: &str, body: &str) -> Result<(), Wid
     notes_repo::save(conn, &parse_id(id)?, body)
 }
 
+/// The kind of the instance `id`, for opening its panel: `notFound` when
+/// no instance has this ID (or the storage can't be used in this run, so
+/// there is no instance at all), `notCreatable` for a kind that can't be
+/// used in this phase. Reads the list, at most `MAX_WIDGETS` rows.
+pub fn panel_kind(storage: &Storage, id: &WidgetId) -> Result<WidgetKind, WidgetError> {
+    let kind = storage
+        .snapshot()?
+        .widgets
+        .into_iter()
+        .find(|instance| &instance.id == id)
+        .map(|instance| instance.config.kind())
+        .ok_or(WidgetError::NotFound)?;
+    if kind.creatable() {
+        Ok(kind)
+    } else {
+        Err(WidgetError::NotCreatable)
+    }
+}
+
 /// Dismisses the recovery notice: the status goes from `recovered` to `ok`.
 pub fn dismiss_notice(storage: &mut Storage) -> Result<(), WidgetError> {
     storage.dismiss_recovery_notice()
@@ -183,7 +202,7 @@ fn apply<T>(
     Ok(Changed { value, snapshot })
 }
 
-fn lock<'a>(state: &'a State<'_, Mutex<Storage>>) -> MutexGuard<'a, Storage> {
+pub(crate) fn lock<'a>(state: &'a State<'_, Mutex<Storage>>) -> MutexGuard<'a, Storage> {
     // Every write runs in a transaction that rolls back if its holder
     // panicked, so the storage stays consistent.
     state
@@ -725,6 +744,59 @@ mod tests {
             result.map(|changed| changed.value),
             Err(WidgetError::NotFound)
         );
+    }
+
+    #[test]
+    fn panel_kind_is_the_kind_of_an_existing_instance() {
+        let dir = tempdir().unwrap();
+        let (mut storage, [clock, progress, note]) = open(&dir);
+        let parse = |id: &str| WidgetId::parse(id).unwrap();
+
+        assert_eq!(panel_kind(&storage, &parse(&clock)), Ok(WidgetKind::Clock));
+        assert_eq!(
+            panel_kind(&storage, &parse(&progress)),
+            Ok(WidgetKind::TimeProgress)
+        );
+        assert_eq!(panel_kind(&storage, &parse(&note)), Ok(WidgetKind::Note));
+
+        remove(&mut storage, &note).unwrap();
+        assert_eq!(
+            panel_kind(&storage, &parse(&note)),
+            Err(WidgetError::NotFound)
+        );
+        assert_eq!(
+            panel_kind(&storage, &WidgetId::new()),
+            Err(WidgetError::NotFound)
+        );
+    }
+
+    #[test]
+    fn panel_kind_finds_nothing_without_a_database() {
+        assert_eq!(
+            panel_kind(&unavailable(), &WidgetId::new()),
+            Err(WidgetError::NotFound)
+        );
+    }
+
+    #[test]
+    fn panel_kind_never_opens_a_kind_that_cannot_be_used_yet() {
+        let dir = tempdir().unwrap();
+        let (mut storage, _) = open(&dir);
+        let shortcut = WidgetId::new();
+        storage
+            .connection()
+            .unwrap()
+            .execute(
+                "INSERT INTO widget_instances \
+                 (id, kind, label, position, config, config_version, created_at) \
+                 VALUES (?1, 'shortcut', NULL, 3, '{}', 1, 0)",
+                [shortcut.as_str()],
+            )
+            .unwrap();
+
+        // The list hides it (`widgets_repo`), so there is no such instance
+        // to open; `creatable` stays as a second check.
+        assert_eq!(panel_kind(&storage, &shortcut), Err(WidgetError::NotFound));
     }
 
     #[test]

@@ -4,6 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import {
   PANEL_READY_COMMAND,
   PANEL_SHOW_EVENT,
+  isWidgetPanel,
+  panelKey,
   type PanelId,
   type PanelReadyArgs,
   type PanelShowPayload,
@@ -100,12 +102,16 @@ function Panel() {
       <section
         key={seq}
         className="panel"
-        data-panel={panelId}
+        data-panel={isWidgetPanel(panelId) ? "widget" : panelId}
         aria-labelledby="panel-title"
       >
-        <h1 id="panel-title">{t.panel.titles[panelId]}</h1>
+        {/* A widget panel brings its own header (`PanelHeader`); routing
+            to it is W5's. */}
+        {isWidgetPanel(panelId) ? null : (
+          <h1 id="panel-title">{t.panel.titles[panelId]}</h1>
+        )}
         <PanelBoundary
-          resetKey={panelId}
+          resetKey={panelKey(panelId)}
           fallback={t.panel.failed}
           onError={logPanelFailure}
         >

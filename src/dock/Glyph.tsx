@@ -1,9 +1,9 @@
-import type { PanelId } from "../core/panels";
+import type { SystemPanelId } from "../core/panels";
 
 /* Line glyphs drawn for DockMax itself (DESIGN.md "Dock item": one set, a
  * 24 px viewBox, a 1.75 stroke with round ends; Dock.css sets the stroke).
  * No third-party icon. */
-const PATHS: Record<PanelId, string[]> = {
+const PATHS: Record<SystemPanelId, string[]> = {
   // Two sliders.
   settings: [
     "M4 7.5h9.5M17.5 7.5H20M4 16.5h3.5M11.5 16.5H20",
@@ -18,7 +18,7 @@ const PATHS: Record<PanelId, string[]> = {
   ],
 };
 
-function Glyph({ id }: { id: PanelId }) {
+function Glyph({ id }: { id: SystemPanelId }) {
   return (
     <svg className="dock-glyph" viewBox="0 0 24 24" aria-hidden="true">
       {PATHS[id].map((d) => (
