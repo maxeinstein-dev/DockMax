@@ -291,32 +291,10 @@ describe("InlineNotice", () => {
   });
 });
 
-/* Guards for every lane: the panel parts and the widgets style only through
- * tokens and classes. */
-const components = import.meta.glob<string>(
-  [
-    "/src/panel/parts/*.tsx",
-    "/src/widgets/**/*.tsx",
-    "/src/panel/DockItems*.tsx",
-  ],
-  { query: "?raw", import: "default", eager: true },
-);
-
+/* Guard for every lane: the panel parts style only through tokens. The
+ * strict CSP guard (no inline style, no HTML from a string) covers all of
+ * src in src/core/csp.guard.test.ts. */
 describe("panel part guards", () => {
-  it("reads the components it guards", () => {
-    expect(Object.keys(components)).toContain(
-      "/src/panel/parts/PanelHeader.tsx",
-    );
-  });
-
-  it("never sets a style attribute (strict CSP: values go through the CSSOM)", () => {
-    const offenders = Object.entries(components)
-      .filter(([path]) => !path.endsWith(".test.tsx"))
-      .filter(([, text]) => /\sstyle=\{/.test(text))
-      .map(([path]) => path);
-    expect(offenders).toEqual([]);
-  });
-
   it("uses only tokens that tokens.css defines", () => {
     const defined = new Set(
       [...tokens.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]),
