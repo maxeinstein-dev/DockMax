@@ -269,6 +269,8 @@ const messages = {
     /** Accessible name of the Settings item while it has the warning
      * badge: `Configurações (com aviso)`. */
     withNotice: "{name} (com aviso)",
+    /** Said by screen readers after a row with the warning dot. */
+    notice: "com aviso",
     /** Shown when a widget change fails, by error code; the value goes
      * back to the previous one. A new code without a message does not
      * compile. */
