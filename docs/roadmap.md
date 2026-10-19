@@ -15,7 +15,7 @@ DockMax será um dock personalizável para Windows, inspirado em aplicações de
 - Separar widgets visuais de serviços nativos e integrações externas.
 - Implementar widgets por prioridade e dependência técnica.
 - Tratar recursos que dependem de hardware ou APIs externas como capacidades opcionais.
-- Medir consumo de memória/CPU antes de otimizar prematuramente.
+- Medir memória e CPU em repouso em todo PR que mude a interface e comparar com a linha de base. Orçamento até o MVP: memória privada em repouso (processo + WebView2) no máximo 20% acima da linha de base da Fase 1 (182 MB), ou seja, cerca de 220 MB.
 - Comercialização, suporte a macOS e sincronização em nuvem estão fora do escopo inicial.
 
 ## Fases
@@ -70,17 +70,26 @@ Critérios verificados em 2026-10-15 (spec 0002, verificações 1–21, e teste 
 - Notas persistem após reiniciar o aplicativo.
 - A lógica de negócio pode ser testada sem renderizar a interface.
 
+Revisão de 2026-10-19 (fim da Fase 2): a direção foi mantida e o roadmap ganhou orçamento de memória, a divisão da Fase 3 por valor e risco, o spike da janela única na Fase 4 e a poda dos widgets de baixo valor. Detalhes nas specs das fases.
+
 ### Fase 3 — Atalhos, arquivos e prateleira
 
-**Estimativa:** 1–2 semanas.
+**Estimativa:** 1–2 semanas. Dividida em três partes, por valor no uso diário e por risco; cada parte é um PR.
 
-- [ ] Abrir aplicativos, arquivos, pastas e URLs com validação.
+**3a — Atalhos** (maior valor, menor risco)
+- [ ] Esconder o dock sobre aplicativos em tela cheia (adiantado da Fase 4: é o que mais fere "nunca atrapalhar" no dia a dia, e a detecção da janela em primeiro plano já existe no código nativo).
+- [ ] Abrir aplicativos, arquivos, pastas e URLs com validação (`opener` com caminhos e URLs conferidos no Rust).
 - [ ] Permitir fixar, remover e reordenar atalhos.
-- [ ] Implementar widget Arquivos para locais escolhidos pelo usuário.
-- [ ] Implementar Prateleira com drag-and-drop e referências a arquivos.
-- [ ] Definir o que ocorre quando um arquivo de referência é movido ou removido.
 - [ ] Restringir comandos nativos ao necessário.
-- [ ] Link do repositório no painel Sobre abrindo o navegador (hoje é texto selecionável), junto com o retorno do `opener`.
+- [ ] Link do repositório no painel Sobre abrindo o navegador (hoje é texto selecionável).
+
+**3b — Arquivos**
+- [ ] Implementar widget Arquivos para locais escolhidos pelo usuário.
+- [ ] Definir o que ocorre quando um arquivo de referência é movido ou removido.
+
+**3c — Prateleira** (só depois da validação técnica)
+- [ ] Validação técnica: soltar arquivos (drag-and-drop) numa janela cujo click-through é alternado pelo Rust (ADR 0006). Alternativa já decidida antes de começar, como na Fase 1.
+- [ ] Implementar Prateleira com drag-and-drop e referências a arquivos.
 
 **Critérios de aceitação**
 - Atalhos válidos abrem o destino esperado.
@@ -92,9 +101,11 @@ Critérios verificados em 2026-10-15 (spec 0002, verificações 1–21, e teste 
 
 **Estimativa:** 2–4 semanas; pode variar significativamente.
 
+- [ ] Spike medido da janela única: dock e painel na mesma janela transparente, usando o click-through dinâmico já provado (ADR 0006, V1), para cortar um renderizador do WebView2. Decidir por ADR com a medição de memória, foco e blur.
+- [ ] Orçamento de CPU em repouso, medido junto com a memória.
 - [ ] Implementar provedores de bateria e rede.
 - [ ] Investigar enumeração, foco, ativação e minimização de janelas.
-- [ ] Definir comportamento de janela em tela cheia e múltiplos monitores.
+- [ ] Definir comportamento em múltiplos monitores (tela cheia já tratada na 3a).
 - [ ] Testar inicialização com o Windows.
 - [ ] Avaliar limites de acesso a métricas de hardware.
 - [ ] Adicionar testes e fallback quando uma API não estiver disponível.
@@ -111,8 +122,10 @@ Critérios verificados em 2026-10-15 (spec 0002, verificações 1–21, e teste 
 
 - [ ] Gerar instalador Windows.
 - [ ] Testar instalação e desinstalação em ambiente limpo.
-- [ ] Verificar persistência de configurações após atualização manual.
-- [ ] Documentar limitações conhecidas.
+- [ ] Verificar persistência de configurações e do banco após atualização manual, com uma migração real (v1 → v2) e o backup antes dela.
+- [ ] Política de retenção dos arquivos `bak-v*` e `.corrompido-*` na pasta de dados.
+- [ ] Documentar limitações conhecidas (inclusive: leitor de tela nunca testado).
+- [ ] README com "onde ficam seus dados" (`%APPDATA%\dev.maxsueleinstein.dockmax`).
 - [ ] Criar README com imagens, arquitetura, funcionalidades e instruções.
 - [ ] Criar uma demonstração curta do aplicativo.
 - [ ] Verificar licença de dependências e atribuições necessárias.
@@ -123,6 +136,7 @@ Critérios verificados em 2026-10-15 (spec 0002, verificações 1–21, e teste 
 - [ ] Atalhos e preferências persistem.
 - [ ] Notas são salvas e recuperadas.
 - [ ] Temas são aplicados de forma consistente.
+- [ ] Memória privada em repouso dentro do orçamento (cerca de 220 MB) e CPU em repouso abaixo de 1%.
 - [ ] Testes essenciais passam.
 - [ ] Documentação explica como executar, testar e compilar.
 - [ ] Limitações de gerenciamento de janelas estão explícitas.
@@ -133,14 +147,17 @@ Critérios verificados em 2026-10-15 (spec 0002, verificações 1–21, e teste 
 - [ ] Calendário
 - [ ] Lembretes e notificações
 - [ ] Área de transferência
-- [ ] Beber água
 - [ ] Melhorias na Prateleira e nos grupos de atalhos
 
 ### Sistema e mídia
-- [ ] Atividade: CPU e memória; outros indicadores conforme viabilidade
+- [ ] Atividade: CPU e memória; outros indicadores conforme viabilidade. Definir o escopo antes de qualquer PR.
 - [ ] Música: sessão de mídia do Windows
-- [ ] Ventoinhas e temperaturas: somente com provedor compatível
+
+### Só se sobrar (valor baixo para o custo; cada widget custou cerca de 2 mil linhas com testes na Fase 2)
+- [ ] Ventoinhas e temperaturas: exige driver de sensores, com risco de segurança
 - [ ] Conta-gotas de cores
+- [ ] Beber água
+- [ ] Uso do Claude: depende de dados que a conta pode não expor
 
 ### Personalização do dock
 - [ ] Cor de destaque escolhida pelo usuário (o token `--accent` já existe)
@@ -149,7 +166,6 @@ Critérios verificados em 2026-10-15 (spec 0002, verificações 1–21, e teste 
 ### Integrações
 - [ ] GitHub
 - [ ] Clima
-- [ ] Uso do Claude: fontes separadas para Claude Code local, API e dados de assinatura/organização disponíveis
 
 ## Widgets planejados
 
@@ -180,6 +196,8 @@ Critérios verificados em 2026-10-15 (spec 0002, verificações 1–21, e teste 
 | Risco | Impacto | Mitigação |
 |---|---|---|
 | Substituição completa da barra de tarefas | Alto | Manter convivência no MVP; evoluir por capacidades |
+| Memória do WebView2 (duas janelas = dois renderizadores; 182 MB na Fase 1, 280 MB no PR 2 da Fase 2) | Alto | Orçamento por fase, medição em todo PR de interface, spike da janela única na Fase 4 |
+| Drag-and-drop numa janela com click-through alternado pelo Rust | Médio | Validação técnica antes da Prateleira (3c), com alternativa decidida |
 | APIs de hardware inconsistentes | Alto | Provedores substituíveis e estado “indisponível” |
 | Métricas do Claude não acessíveis para conta individual | Alto | Identificar fonte e tipo de conta; não prometer limites não disponíveis |
 | Consumo excessivo de recursos | Médio | Atualização centralizada e medição |
@@ -195,6 +213,10 @@ Para cada tarefa:
 4. Executar testes e revisar o diff.
 5. Atualizar documentação quando uma decisão mudar.
 6. Criar commits atribuídos somente ao usuário, conforme a configuração de autoria desejada.
+7. Classificar cada PR como caro ou barato no plano: PR barato tem um revisor e dispensa a segunda rodada se não houver achado bloqueante; usar menos lanes quando as peças são pequenas.
+8. Antes do teste manual do usuário, capturar o build real via CDP nos dois temas (pega contraste e controle faltando antes do teste).
+9. Medir memória e CPU em repouso em todo PR que mude a interface.
+10. Versionar por fase (v0.2.0 no fim da Fase 2), para o painel Sobre e o instalador nascerem alinhados.
 
 ## Estimativa geral
 
