@@ -22,6 +22,11 @@
   --accent-soft: rgb(47 91 211 / 0.13);
   --surface-rgb: 247 247 249;
   --ink: #1d1e22;
+  /* The ink of the <option>s in the open list of a <select>, whose WebView2
+     popup paints a light surface in every theme (ADR 0007). Defined here
+     only and never set again in the dark blocks: the dark theme's --ink is
+     light, and the popup is not. Equal to the light theme's --ink. */
+  --popup-ink: #1d1e22;
   --ink-2: #5b5f69;
   --hair: rgb(0 0 0 / 0.09);
   --hi: rgb(255 255 255 / 0.8);

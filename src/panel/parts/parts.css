@@ -212,11 +212,12 @@
 /* The open list is a WebView2 popup window that paints a light surface in
    every theme: it ignores color-scheme, the page's background and the
    options' own (2026-10-19 release retest, captures in the PR). It does
-   honor the options' text color, so they carry the light theme's ink as a
-   literal, never --ink, which is light under the dark theme and left the
-   list unreadable. The field's own text keeps --ink. */
+   honor the options' text color, so they take --popup-ink (the light
+   theme's ink, set once in :root), never --ink, which is light under the
+   dark theme and left the list unreadable. The field's own text keeps
+   --ink. */
 .field-input option {
-  color: #1d1e22;
+  color: var(--popup-ink);
 }
 
 /* Full --ink-2: at 80 % it fell under 4.5:1 on --field. */

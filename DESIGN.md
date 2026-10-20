@@ -410,7 +410,7 @@ Classes estáticas `.t-*`, definidas por matiz, saturação e luminosidade (`--h
 
 **The Own Glaze Rule.** Todo ladrilho sai da paleta própria, em classe estática. Nenhum ícone, cor de marca ou arquivo de tema de terceiros; um item novo ganha uma matiz nova no mesmo registro dessaturado (saturação 14 a 48%, luminosidade 34 a 46%), como o musgo (84 22% 38%) do Progresso.
 
-**The Swappable Identity Rule.** Toda cor é um token por tema em `[data-mode="light"]` / `[data-mode="dark"]`. O destaque é um token só, para que a escolha de destaque pelo usuário entre depois sem retrabalho.
+**The Swappable Identity Rule.** Toda cor é um token por tema em `[data-mode="light"]` / `[data-mode="dark"]`. O destaque é um token só, para que a escolha de destaque pelo usuário entre depois sem retrabalho. Exceção nomeada: `--popup-ink`, a tinta das `<option>` da lista aberta de um `<select>`, tem um valor só, o da `--ink` clara, em todos os temas, porque o popup do WebView2 pinta fundo claro mesmo no tema escuro (ADR 0007).
 
 ## Typography
 
@@ -568,7 +568,7 @@ O campo de texto do Windows 11.
 - **Foco:** sem outline; o fio inferior vira `--accent` com 1 px interno a mais (2 px no total), cursor em `--accent`.
 - **Recusado** (`aria-invalid`): o fio inferior vira `--ink` com 1 px interno a mais; a mensagem vai para o rodapé do painel, em `--ink`. Nunca `--danger` (The Danger Only Rule): recusa de validação não é erro de salvamento.
 - **Caixa de seleção:** nativa, 15 px, `accent-color: var(--accent)`.
-- **Controles nativos:** `color-scheme` acompanha o tema em `tokens.css` (`light` no bloco claro, `dark` nos dois blocos escuros, o de Sistema e o de Escuro forçado). Assim a lista aberta do select, o campo de hora, a caixa de seleção e as barras de rolagem saem no visual nativo do mesmo tema; sem isso, a lista ficava clara com a `--ink` clara do tema escuro (teste manual de 2026-10-16).
+- **Controles nativos:** `color-scheme` acompanha o tema em `tokens.css` (`light` no bloco claro, `dark` nos dois blocos escuros, o de Sistema e o de Escuro forçado). Assim o campo de hora, a caixa de seleção e as barras de rolagem saem no visual nativo do mesmo tema (teste manual de 2026-10-16). A lista aberta do `<select>` não: é uma janela própria do WebView2 que pinta uma superfície clara em todo tema e ignora o `color-scheme`; só a cor do texto das `<option>` vale. Por isso as `<option>` recebem a tinta clara fixa `--popup-ink` (igual à `--ink` do tema claro, definida só em `:root`). Ver o ADR 0007.
 
 ### Aviso inline (notice)
 Bloco `--track`, raio 6 px, padding 10px 12px, grade de ícone de 16 px + texto. Ícone de alerta em `--danger`; texto em Label `--ink-2` com a frase principal em Label Strong `--ink`. Ação opcional como botão secundário sob o texto ("Entendi"). `role="status"`. Usado para banco recuperado (com o nome do arquivo guardado) e banco indisponível.
