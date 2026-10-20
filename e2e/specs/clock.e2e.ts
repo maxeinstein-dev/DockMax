@@ -90,9 +90,14 @@ describe("Clock", () => {
       expect.stringContaining(t.widgets.common.footer),
     );
 
-    // The main view, from the instance Rust sent back.
+    // The main view, from the instance Rust sent back: the seconds are
+    // there at once, as two digits (2026-10-19 release retest: Mostrar,
+    // then Voltar, with no other change in between).
     await $(`button[aria-label="${t.widgets.common.back}"]`).click();
     await expect($(".clock-seconds")).toBeDisplayed();
+    await expect($(".clock-seconds")).toHaveText(
+      expect.stringMatching(/^:d{2}$/),
+    );
     await expect($(".panel-foot")).toHaveText(
       expect.stringContaining("Tokyo · UTC+9"),
     );
