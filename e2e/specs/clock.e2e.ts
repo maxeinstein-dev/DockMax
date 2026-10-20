@@ -1,6 +1,6 @@
 import { $, browser, expect } from "@wdio/globals";
 import { ptBR as t } from "../../src/i18n/pt-BR.ts";
-import { restartApp } from "../app.ts";
+import { openPanelFrom, restartApp } from "../app.ts";
 
 /* The clock's Ajustes (spec 0003 §2.2): the zone, the seconds and the icon
  * style chosen in the panel reach the panel, the dock and Itens do dock, and
@@ -29,10 +29,7 @@ function option(group: string, name: string) {
 
 /** Opens the clock's panel from the dock, on its main view. */
 async function openClock() {
-  await browser.switchToWindow("dock");
-  await clockItem().click();
-  await browser.switchToWindow("panel");
-  await $(".clock-time").waitForDisplayed();
+  await openPanelFrom(clockItem, () => $(".clock-time"));
 }
 
 /** The zone list's option values, in order. */

@@ -1,6 +1,6 @@
 import { $, browser, expect } from "@wdio/globals";
 import { ptBR as t } from "../../src/i18n/pt-BR.ts";
-import { restartApp } from "../app.ts";
+import { openPanelFrom, restartApp } from "../app.ts";
 
 /* E2E 3 (spec 0003 §2.8, Verificação 10): a note written in its panel is
  * still there after a restart.
@@ -20,12 +20,9 @@ function noteItem() {
 
 /** Opens the note's panel from the dock and returns its editor. */
 async function openNote() {
-  await browser.switchToWindow("dock");
-  await noteItem().click();
-  await browser.switchToWindow("panel");
-  const editor = $("textarea.note-editor");
-  await editor.waitForDisplayed();
-  return editor;
+  const editor = () => $("textarea.note-editor");
+  await openPanelFrom(noteItem, editor);
+  return editor();
 }
 
 /** The save state in the note's footer (`data-state`). */
