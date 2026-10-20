@@ -23,7 +23,8 @@
         "skipTaskbar": true,
         "shadow": false,
         "visible": false,
-        "focus": false
+        "focus": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --process-per-site"
       },
       {
         "label": "panel",
@@ -38,7 +39,8 @@
         "skipTaskbar": true,
         "shadow": false,
         "visible": false,
-        "focus": false
+        "focus": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --process-per-site"
       }
     ],
     "security": {

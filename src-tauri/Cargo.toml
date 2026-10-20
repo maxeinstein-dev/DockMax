@@ -57,6 +57,9 @@ windows = { version = "0.62.2", features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
+# The WebView2 interfaces Tauri builds on, for the memory target of the
+# hidden panel (spec 0003 §2.12). The version tauri-runtime-wry uses.
+webview2-com = "0.39"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

@@ -15,6 +15,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 use super::dock::{self, Rect};
+use super::memory::{self, MemoryTarget};
 use super::panel::{LogicalRect, RectError, to_screen};
 
 /// Cursor sampling interval (~60 Hz) while the dock is visible.
@@ -89,6 +90,9 @@ struct Shared {
     window: Option<(Rect, f64)>,
     /// Where the dock paints, as last reported by its page.
     region: Option<HitRegion>,
+    /// The page reported a layout since the memory target was last
+    /// applied: the cursor thread applies it again (spec 0003 §2.12).
+    settle: bool,
     visible: bool,
     stopped: bool,
 }
@@ -164,6 +168,14 @@ impl Tracker {
     /// The dock reported where it paints. Validated by the caller.
     pub fn set_region(&self, region: HitRegion) {
         self.lock().region = Some(region);
+        self.settle();
+    }
+
+    /// The dock's page rendered something new: the cursor thread applies
+    /// the memory target again (spec 0003 §2.12).
+    pub fn settle(&self) {
+        self.lock().settle = true;
+        self.wake.notify_all();
     }
 
     /// Following the cursor runs only while the dock is visible.
@@ -219,7 +231,7 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
             }
             continue;
         }
-        let shared = tracker
+        let mut shared = tracker
             .wake
             .wait_while(shared, |shared| !shared.visible && !shared.stopped)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -228,14 +240,24 @@ fn follow_cursor(tracker: &Tracker, window: &WebviewWindow) {
         }
         let bar = shared.bar_on_screen();
         let hold = shared.hold_on_screen();
+        let settle = std::mem::take(&mut shared.settle);
         drop(shared);
 
+        let mut changed = false;
         if let Some(cursor) = cursor_position() {
             let next = next_captured(captured, cursor, bar, &hold);
             // On failure the window keeps its old state: retry next tick.
             if next != captured && set_captured(window, next, &mut failures) {
                 captured = next;
+                changed = true;
             }
+        }
+        // The page rendered something new (at startup, its first layout
+        // and, a moment later, its load): the target is applied again, so
+        // a dock nobody touches is at rest too. `set_captured` has just
+        // applied it when the capture changed.
+        if settle && !changed {
+            memory::set(window, MemoryTarget::in_use(captured));
         }
         thread::sleep(INTERVAL);
     }
@@ -254,6 +276,8 @@ fn set_captured(window: &WebviewWindow, captured: bool, failures: &mut CaptureFa
     if result.is_err() {
         return false;
     }
+    // In use while it holds the mouse, at rest once it lets it through.
+    memory::set(window, MemoryTarget::in_use(captured));
     if !captured && let Err(error) = window.emit_to(dock::LABEL, RELEASED_EVENT, ()) {
         log::warn!("dock: failed to send the release event: {error}");
     }
@@ -462,6 +486,19 @@ mod tests {
         assert!(next_captured(true, (900, 78), Some(bar), &[hovered]));
         assert!(!next_captured(true, (1040, 78), Some(bar), &[hovered]));
         assert!(!next_captured(true, (900, 81), Some(bar), &[hovered]));
+    }
+
+    #[test]
+    fn a_reported_layout_asks_the_cursor_thread_to_apply_the_memory_target() {
+        let tracker = Tracker::default();
+        assert!(!tracker.lock().settle);
+        tracker.set_region(HitRegion {
+            bar: logical(20.0, 40.0, 200.0, 64.0),
+            hold: Vec::new(),
+        });
+        // Consumed by the thread, as `follow_cursor` does.
+        assert!(std::mem::take(&mut tracker.lock().settle));
+        assert!(!tracker.lock().settle);
     }
 
     #[test]

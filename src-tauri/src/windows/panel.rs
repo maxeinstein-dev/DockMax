@@ -12,6 +12,7 @@ use tauri::{
 
 use super::dock::{self, Edge, Rect};
 use super::hit_test;
+use super::memory::{self, MemoryTarget};
 use crate::domain::widgets::{WidgetId, WidgetKind};
 
 pub const LABEL: &str = "panel";
@@ -674,15 +675,16 @@ struct ChangedPayload {
     panel_id: Option<PanelId>,
 }
 
-/// Registers the panel state and hides the panel when it loses focus or is
-/// closed (Alt+F4).
+/// Hides the panel when it loses focus or is closed (Alt+F4). The panel
+/// state itself is managed by the builder: a page can send a command
+/// (`set_dock_layout`, `toggle_panel`) while this still runs, and the
+/// command needs the state (seen as a panic at startup, spec 0003 §2.12).
 pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let window = app
         .get_webview_window(LABEL)
         .ok_or("panel window is missing from tauri.conf.json")?;
     #[cfg(windows)]
     super::native::install(&window, None, LAYERING)?;
-    app.manage(Mutex::new(PanelState::default()));
     let app = app.clone();
     window.on_window_event(move |event| {
         let action = match event {
@@ -732,6 +734,9 @@ pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
     let window = app
         .get_webview_window(LABEL)
         .ok_or("panel window is missing")?;
+    if let Some(target) = memory_target(&action) {
+        memory::set(&window, target);
+    }
     match action {
         Action::Prepare(id, wait) => {
             notify_dock(app, Some(id.clone()));
@@ -757,6 +762,16 @@ pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
         Action::Nothing => {}
     }
     Ok(())
+}
+
+/// The memory target an action moves the panel to: normal before its page
+/// renders a panel, low once it is hidden; the others keep it.
+fn memory_target(action: &Action) -> Option<MemoryTarget> {
+    match action {
+        Action::Prepare(..) => Some(MemoryTarget::Normal),
+        Action::Hide => Some(MemoryTarget::Low),
+        Action::Reveal { .. } | Action::Nothing => None,
+    }
 }
 
 /// Carries out a `Reveal` (or nothing); on failure, closes the panel.
@@ -1973,6 +1988,21 @@ mod tests {
             }
         );
         wait
+    }
+
+    #[test]
+    fn the_panel_is_at_normal_memory_to_render_and_low_once_hidden() {
+        let mut state = PanelState::default();
+        let prepare = state.toggle(Panel::Settings, ANCHOR, Instant::now());
+        assert_eq!(memory_target(&prepare), Some(MemoryTarget::Normal));
+        assert_eq!(memory_target(&state.hide()), Some(MemoryTarget::Low));
+        // Placing an open panel again, or nothing, keeps the level.
+        let reveal = Action::Reveal {
+            anchor: ANCHOR,
+            geometry: RENDERED,
+        };
+        assert_eq!(memory_target(&reveal), None);
+        assert_eq!(memory_target(&Action::Nothing), None);
     }
 
     #[test]

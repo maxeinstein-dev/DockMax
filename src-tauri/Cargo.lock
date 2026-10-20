@@ -894,6 +894,7 @@ dependencies = [
  "thiserror 2.0.21",
  "url",
  "uuid",
+ "webview2-com",
  "windows",
 ]
 

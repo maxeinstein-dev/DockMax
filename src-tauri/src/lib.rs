@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex, PoisonError};
 
-use tauri::{Manager, RunEvent, Wry, plugin::TauriPlugin};
+use tauri::{Manager, RunEvent, Wry, plugin::TauriPlugin, webview::PageLoadEvent};
 
 mod commands;
 mod domain;
@@ -52,7 +52,14 @@ pub fn run() {
         .plugin(logging::plugin())
         .manage(Arc::new(windows::hit_test::Tracker::default()))
         .manage(Mutex::new(windows::dock::Placement::default()))
+        .manage(Mutex::new(windows::panel::PanelState::default()))
         .plugin(startup())
+        // Each window is at rest once its page has settled (spec 0003 §2.12).
+        .on_page_load(|webview, payload| {
+            if payload.event() == PageLoadEvent::Finished {
+                windows::memory::page_loaded(webview.app_handle(), webview.label());
+            }
+        })
         .setup(|app| {
             windows::panel::setup(app.handle())?;
             windows::dock::setup(app.handle())?;
