@@ -1,6 +1,6 @@
 [package]
 name = "dockmax"
-version = "0.1.0"
+version = "0.2.0"
 description = "Windows desktop dock built with Tauri"
 authors = ["Maxsuel Einstein"]
 license = "MIT"

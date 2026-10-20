@@ -4,7 +4,7 @@
 
 Aplicativo desktop para Windows inspirado em docks personalizáveis, com foco em produtividade, widgets integrados e integração progressiva com o sistema operacional.
 
-> **Status:** Fase 1 concluída: dock flutuante acima da barra de tarefas, com painéis de Configurações e Sobre. O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O DockMax é um projeto independente e não é afiliado ao PrimoDock.
+> **Status:** Fase 2 concluída (v0.2.0): dock flutuante acima da barra de tarefas com os widgets Relógio, Progresso do tempo e Nota, painéis de Configurações e Sobre, e dados locais em SQLite. O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O DockMax é um projeto independente e não é afiliado ao PrimoDock.
 
 ## Objetivos
 
@@ -24,6 +24,9 @@ Aplicativo desktop para Windows inspirado em docks personalizáveis, com foco em
 - [`adr/0003-persistencia-local.md`](docs/adr/0003-persistencia-local.md): persistência.
 - [`adr/0004-escopo-windows.md`](docs/adr/0004-escopo-windows.md): plataforma e barra de tarefas.
 - [`adr/0005-ferramentas-de-desenvolvimento.md`](docs/adr/0005-ferramentas-de-desenvolvimento.md): ferramentas, versões e CI.
+- [`adr/0006-janelas-do-dock-e-paineis.md`](docs/adr/0006-janelas-do-dock-e-paineis.md): janelas do dock e dos painéis, click-through e memória.
+- [`adr/0007-configuracoes-logs-e-i18n.md`](docs/adr/0007-configuracoes-logs-e-i18n.md): configurações, logs e textos.
+- [`adr/0008-persistencia-sqlite-e-widgets.md`](docs/adr/0008-persistencia-sqlite-e-widgets.md): SQLite, contrato de widgets e testes end-to-end.
 - [`specs/`](docs/specs/): specs e planos de cada fase.
 
 ## Stack
@@ -32,7 +35,7 @@ Aplicativo desktop para Windows inspirado em docks personalizáveis, com foco em
 - **Desktop:** Tauri 2.
 - **Integração nativa:** Rust e APIs compatíveis com Windows.
 - **Persistência:** SQLite para dados estruturados e arquivos de configuração quando fizer sentido.
-- **Testes:** Vitest, React Testing Library e testes Rust; testes end-to-end a definir conforme a configuração Tauri.
+- **Testes:** Vitest, React Testing Library e testes Rust; testes end-to-end com WebdriverIO e `@wdio/tauri-service` (`pnpm test:e2e`, num build isolado que nunca toca nos seus dados; ver o [ADR 0008](docs/adr/0008-persistencia-sqlite-e-widgets.md)).
 - **Distribuição:** instalador Windows gerado pelo ecossistema Tauri.
 
 Versões fixadas na Fase 0 (detalhes e motivos no [ADR 0005](docs/adr/0005-ferramentas-de-desenvolvimento.md)):
@@ -83,6 +86,13 @@ cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked
 ```
 
+Testes end-to-end (a CI roda o job `e2e` com estes mesmos comandos). O build de teste usa uma identidade e uma pasta de dados temporária próprias: **não abre o seu DockMax nem toca nos seus dados**, mas mostra um segundo dock na tela por alguns segundos.
+
+```bash
+pnpm test:e2e:build       # gera o build de teste (feature e2e)
+pnpm test:e2e             # roda os specs do WebdriverIO
+```
+
 ## Princípios
 
 1. Entregar valor em incrementos pequenos.
@@ -95,14 +105,26 @@ cargo test --locked
 
 ## Estado atual
 
-Fase 1 concluída. O DockMax abre um dock no estilo do macOS (visual B1 · Big Sur, ver [`DESIGN.md`](DESIGN.md)) acima da barra de tarefas do Windows:
+Fase 2 concluída (v0.2.0). O DockMax abre um dock no estilo do macOS (visual B1 · Big Sur, ver [`DESIGN.md`](DESIGN.md)) acima da barra de tarefas do Windows:
 
 - ícones com ampliação, rótulo e ponto indicador; o clique atravessa a área transparente em volta do dock;
-- painel de **Configurações** (tema, posição, tamanho e opacidade, salvos em `%APPDATA%\dev.maxsueleinstein.dockmax\settings.json`) e painel **Sobre**;
-- ícone na bandeja para mostrar ou ocultar o dock, abrir as Configurações e sair;
-- logs em `%LOCALAPPDATA%\dev.maxsueleinstein.dockmax\logs`, sem dados pessoais.
+- **widgets**, cada um um item do dock que abre o próprio painel:
+  - **Relógio**: hora viva no ícone (digital ou analógica), fuso, 12/24 h e segundos no painel;
+  - **Progresso do tempo**: anel no ícone e painel com dia, semana, mês, ano e expediente;
+  - **Nota**: texto com salvamento automático;
+- painel de **Configurações** (tema, posição, tamanho, opacidade e **Itens do dock**, onde se adiciona, reordena e remove widgets) e painel **Sobre**;
+- ícone na bandeja para mostrar ou ocultar o dock, abrir as Configurações e sair.
 
-A próxima etapa é a Fase 2 (núcleo de widgets e persistência); veja o [roadmap](docs/roadmap.md).
+Onde ficam os seus dados (nada sai da máquina):
+
+| O quê | Onde |
+|---|---|
+| Preferências | `%APPDATA%\dev.maxsueleinstein.dockmax\settings.json` |
+| Widgets e notas | `%APPDATA%\dev.maxsueleinstein.dockmax\dockmax.db` (SQLite) |
+| Cópias de segurança e recuperação | `dockmax.db.bak-v*` e `dockmax.db.corrompido-*`, na mesma pasta: o DockMax nunca apaga seu banco, só renomeia um banco danificado |
+| Logs, sem dados pessoais | `%LOCALAPPDATA%\dev.maxsueleinstein.dockmax\logs` |
+
+A próxima etapa é a Fase 3 (atalhos, arquivos e prateleira); veja o [roadmap](docs/roadmap.md).
 
 ## Licença
 
