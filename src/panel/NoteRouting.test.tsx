@@ -163,19 +163,26 @@ describe("showing the note again while a save runs", () => {
     fireEvent.change(editor, { target: { value: "ab" } });
 
     // A new show remounts the content: the old editor saves "ab" once "a"
-    // answers, and the new one reads the note.
+    // answers, and the new one reads the note only then. Until that, no
+    // editor: one shown now would start from "a" (the draft hides it, but
+    // its next save, "abc", would be overwritten by the old editor's "ab").
     show({ widget: NOTE.id });
-    await settle();
+    await settle(500);
+    expect(stored).toBe("a");
+    expect(screen.queryByRole("textbox", { name: "Mercado" })).toBeNull();
+    expect(document.querySelector(".note-placeholder")).not.toBeNull();
+
     first.resolve();
     await settle();
-
     expect(stored).toBe("ab");
     expect(screen.getByRole("textbox", { name: "Mercado" })).toHaveValue("ab");
-    // Typing then saves over the newest text, not over an older one.
+    // Typing then saves over the newest text, and nothing saves after it.
     fireEvent.change(screen.getByRole("textbox", { name: "Mercado" }), {
       target: { value: "abc" },
     });
     await settle(500);
+    expect(stored).toBe("abc");
+    await settle(1000);
     expect(stored).toBe("abc");
   });
 });
