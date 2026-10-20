@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readSources } from "../test/sources";
 
 /* Pins "Reduzir movimento" for every stylesheet: a selector that moves
  * (`animation`, `transition` or their `-duration`) is also in a
@@ -6,11 +7,7 @@ import { describe, expect, it } from "vitest";
  * sets the same family to `none` or to zero. `animation-name` alone doesn't
  * move: a selector that only swaps the keyframes follows its base rule. */
 
-const sheets = import.meta.glob<string>("/src/**/*.css", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-});
+const sheets = readSources("src", /\.css$/);
 
 type Family = "animation" | "transition";
 const MOVING = /^(animation|transition)(-duration)?$/;

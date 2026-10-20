@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import design from "../../DESIGN.md?raw";
 import designJsonText from "../../.impeccable/design.json?raw";
+import { readSources } from "../test/sources";
 import css from "./tokens.css?raw";
 import { PANEL_INSET } from "../panel/geometry";
 
@@ -287,13 +288,9 @@ describe("tokens.css", () => {
   });
 });
 
-// Every source file as text. CSS comes through only because vite.config.ts
-// lets tests read all CSS (`test.css.include`); the guard below checks that.
-const sources = import.meta.glob<string>("/src/**/*.{css,ts,tsx}", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-});
+// Every source file as text, read from the disk (src/test/sources.ts), the
+// tests included: the glass guard looks at them too.
+const sources = readSources("src", /\.(css|tsx?)$/, { tests: true });
 
 describe("the provisional PR 1 glass", () => {
   it("reads the CSS sources as text", () => {

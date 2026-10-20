@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readSources } from "../test/sources";
 
 /* Pins the strict CSP of the webviews (no `unsafe-inline`, no
  * `unsafe-eval`): no source file outside the tests writes HTML, inline
@@ -7,10 +8,7 @@ import { describe, expect, it } from "vitest";
  * (`style.setProperty`), so it is the one `style` allowed, with `--*` keys
  * only. */
 
-const sources = import.meta.glob<string>(
-  ["/src/**/*.{ts,tsx}", "!/src/**/*.test.{ts,tsx}"],
-  { query: "?raw", import: "default", eager: true },
-);
+const sources = readSources("src", /\.tsx?$/);
 
 const FORBIDDEN: [name: string, pattern: RegExp][] = [
   ["dangerouslySetInnerHTML", /dangerouslySetInnerHTML/],

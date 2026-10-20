@@ -25,6 +25,7 @@ import {
   type WidgetCommandSignatures,
   type WidgetKind,
 } from "./widgets";
+import { readSources } from "../test/sources";
 import { COMMAND_ARGS_SAMPLES, WIDGET_FIXTURES } from "./widgets.fixtures";
 
 /* The Rust × TS contract (spec 0003 §2.6). The JSON files are what Rust
@@ -34,10 +35,7 @@ import { COMMAND_ARGS_SAMPLES, WIDGET_FIXTURES } from "./widgets.fixtures";
 
 const DIR = "/src-tauri/tests/fixtures/widgets/";
 
-const files = import.meta.glob<string>(
-  "/src-tauri/tests/fixtures/widgets/*.json",
-  { query: "?raw", import: "default", eager: true },
-);
+const files = readSources("src-tauri/tests/fixtures/widgets", /\.json$/);
 
 /** File name without folder or `.json`, as the keys of `WIDGET_FIXTURES`. */
 function nameOf(path: string): string {

@@ -1,8 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import tokens from "../../themes/tokens.css?raw";
-import css from "./parts.css?raw";
+import { readSource } from "../../test/sources";
 import { PANEL_TITLE_ID } from "./focus";
 import IconButton from "./IconButton";
 import InlineConfirm from "./InlineConfirm";
@@ -293,8 +292,12 @@ describe("InlineNotice", () => {
 
 /* Guard for every lane: the panel parts style only through tokens. The
  * strict CSP guard (no inline style, no HTML from a string) covers all of
- * src in src/core/csp.guard.test.ts. */
+ * src in src/core/csp.guard.test.ts. Both sheets are read from the disk
+ * (src/test/sources.ts), as the guards over every file are. */
 describe("panel part guards", () => {
+  const tokens = readSource("src/themes/tokens.css");
+  const css = readSource("src/panel/parts/parts.css");
+
   it("uses only tokens that tokens.css defines", () => {
     const defined = new Set(
       [...tokens.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]),
