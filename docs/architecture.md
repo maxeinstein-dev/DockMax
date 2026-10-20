@@ -259,6 +259,7 @@ Não criar abstrações para toda função simples. Criar uma port quando ela is
 - Não executar chamadas nativas em cada renderização.
 - Cancelar listeners e timers quando o recurso deixa de ser usado.
 - Medir consumo real antes de criar otimizações complexas.
+- Medir a memória em repouso em todo PR de interface (processo + WebView2, build de release isolado, método da spec 0003 §2.12) e comparar com a linha de base e o orçamento do roadmap.
 
 ## 10. Dock e gerenciamento de janelas
 
