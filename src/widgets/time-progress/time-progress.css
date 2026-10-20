@@ -1,0 +1,173 @@
+/* Progresso do tempo (DESIGN.md "Ladrilho vivo" and "Painel": Progresso do
+   tempo; the approved mock `docs/design/widgets-mock.html`). Only tokens
+   from tokens.css, plus `--f`, the share of a bar, which the panel sets
+   through the CSSOM (`style.setProperty`): no inline style (strict CSP). */
+
+/* Tile: the first period's ring, at 78% of the tile, with the percentage
+   in the center. White on the glaze in both themes. */
+.progress-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--glyph);
+}
+
+.progress-ring {
+  position: absolute;
+  inset: 0;
+  width: 78%;
+  height: 78%;
+  margin: auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.progress-ring-track {
+  stroke: color-mix(in srgb, var(--glyph) 28%, transparent);
+}
+
+.progress-tile-pct {
+  position: relative;
+  font: 600 calc(var(--icon) * 0.23) / 1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.progress-tile-pct small {
+  margin-left: 0.04em;
+  font-size: 0.7em;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+/* Pequeno: only the ring. */
+:root[data-size="s"] .progress-tile-pct {
+  display: none;
+}
+
+/* Panel: a list of bars, 12 px apart; name / bar / percentage, with the
+   time left under the bar. */
+.pg-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pg-list li {
+  display: grid;
+  grid-template-columns: 78px 1fr 42px;
+  column-gap: 10px;
+  row-gap: 3px;
+  align-items: center;
+  font-size: 12.5px;
+}
+
+.pg-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--pg-track);
+}
+
+.pg-fill {
+  display: block;
+  width: calc(var(--f, 0) * 100%);
+  height: 100%;
+  border-radius: 3px;
+  background: var(--pg-fill);
+}
+
+.pg-pct {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.pg-left {
+  grid-column: 2 / 4;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+/* A period without a value now: no bar, "Fora do expediente" in its
+   place. */
+.pg-list li.off .pg-name,
+.pg-list li.off .pg-left {
+  color: var(--ink-2);
+}
+
+.pg-list li.off .pg-left {
+  grid-row: 1;
+}
+
+/* Settings: the periods as checkboxes with up and down; the workday hours
+   on their own line, under it. */
+.period-field {
+  display: grid;
+  gap: 6px;
+}
+
+.period-field-label {
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.periods {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.periods li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0 2px 2px;
+  font-size: 12.5px;
+}
+
+.periods label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.periods input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.periods input[type="checkbox"]:disabled + .period-name {
+  cursor: default;
+}
+
+.periods li.period-hours {
+  gap: 6px;
+  padding: 0 0 4px 23px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.period-hint {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.progress-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}

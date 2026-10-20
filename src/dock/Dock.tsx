@@ -22,10 +22,24 @@ import { errorKind, log } from "../core/log";
 import {
   PANEL_CHANGED_EVENT,
   type LogicalRect,
+  panelKey,
+  samePanel,
+  widgetPanel,
   type PanelChanged,
   type PanelId,
+  type SystemPanelId,
 } from "../core/panels";
-import { useT } from "../i18n";
+import {
+  useWidgets,
+  type CreatableKind,
+  type StorageStatus,
+  type WidgetInstance,
+  type WidgetsSnapshot,
+} from "../core/widgets";
+import { format, useT, type Messages } from "../i18n";
+import { widgetName } from "../widgets/names";
+import { MINUTE_MS, useNow } from "../widgets/now";
+import { definitionOf, isCreatableInstance } from "../widgets/registry";
 import Glyph from "./Glyph";
 import {
   dockLayout,
@@ -37,20 +51,88 @@ import {
 import { magnificationOf, magnifyRole } from "./magnification";
 import "./Dock.css";
 
-/** The dock's items, by group; a separator stands between groups. Fase 1
- * has only the two system items, one group, so no separator: DESIGN.md
- * keeps the separator for setting Configurações and Sobre apart from the
- * items of the next phases. */
-const GROUPS: readonly (readonly PanelId[])[] = [["settings", "about"]];
-const ITEMS: readonly PanelId[] = GROUPS.flat();
-const GROUP_SIZES = GROUPS.map((group) => group.length);
+/** The system items, always last and never removed (spec 0003 §2.1 item
+ * 2). */
+const SYSTEM_ITEMS: readonly SystemPanelId[] = ["settings", "about"];
 
-/** Static glaze class of each item's tile (tokens.css, The Own Glaze
+/** Static glaze class of each system item's tile (tokens.css, The Own Glaze
  * Rule). */
-const GLAZE: Record<PanelId, string> = {
+const GLAZE: Record<SystemPanelId, string> = {
   settings: "t-settings",
   about: "t-about",
 };
+
+/** One item of the dock. */
+interface DockEntry {
+  panelId: PanelId;
+  /** `panelKey`: React key and identity across changes of the list. */
+  key: string;
+  /** The item's name: its `aria-label` (plus "(com aviso)" while badged)
+   * and its label pill. Never the time (spec 0003 §2.3 item 4). */
+  name: string;
+  /** The widget it shows, for its live face; null for a system item. */
+  instance: WidgetInstance<CreatableKind> | null;
+}
+
+/** The dock's items in order: the widgets in the order chosen, then
+ * Configurações and Sobre (spec 0003 §2.1 item 2). Without a readable
+ * list, or with the storage unavailable, only the system items. */
+function dockEntries(
+  t: Messages,
+  snapshot: WidgetsSnapshot | null,
+): DockEntry[] {
+  const widgets =
+    snapshot === null || snapshot.storage.state === "unavailable"
+      ? []
+      : snapshot.widgets.filter(isCreatableInstance);
+  return [
+    ...widgets.map((instance) => {
+      const panelId = widgetPanel(instance.id);
+      return {
+        panelId,
+        key: panelKey(panelId),
+        name: widgetName(t, instance),
+        instance,
+      };
+    }),
+    ...SYSTEM_ITEMS.map((panelId) => ({
+      panelId,
+      key: panelId,
+      name: t.dock.items[panelId],
+      instance: null,
+    })),
+  ];
+}
+
+/** The size of each group of items: a separator stands between them, so
+ * only when there are widgets. */
+function groupSizes(entries: readonly DockEntry[]): number[] {
+  const widgets = entries.length - SYSTEM_ITEMS.length;
+  return widgets > 0 ? [widgets, SYSTEM_ITEMS.length] : [SYSTEM_ITEMS.length];
+}
+
+/** Whether the Configurações icon carries the attention badge: while the
+ * database was recovered (until the notice is dismissed) or is unavailable
+ * (spec 0003 §2.11). */
+function needsAttention(storage: StorageStatus | undefined): boolean {
+  return storage !== undefined && storage.state !== "ok";
+}
+
+/** The face inside an item's glaze: a widget's live face, or a system
+ * item's glyph. */
+function TileFace({ entry, now }: { entry: DockEntry; now: Date }) {
+  if (entry.instance === null) {
+    return <Glyph id={entry.panelId as SystemPanelId} />;
+  }
+  const { Tile } = definitionOf(entry.instance);
+  return <Tile instance={entry.instance} now={now} />;
+}
+
+function glazeOf(entry: DockEntry): string {
+  return entry.instance === null
+    ? GLAZE[entry.panelId as SystemPanelId]
+    : definitionOf(entry.instance).glaze;
+}
 
 function reducedMotionQuery(): MediaQueryList | null {
   return typeof window.matchMedia === "function"
@@ -120,32 +202,66 @@ function openPanel(panelId: PanelId, anchor: LogicalRect) {
   });
 }
 
+/** Label widths measured for one set of names (`namesKey`). */
+interface LabelWidths {
+  key: string;
+  widths: number[];
+}
+
 function Dock() {
   const t = useT();
   const settings = useAppearance("dock");
+  const snapshot = useWidgets();
   const motion = !useReducedMotion();
   const viewport = useViewport();
+  // The dock's single timer, for every live face.
+  const now = useNow(MINUTE_MS);
 
-  const [hovered, setHovered] = useState<number | null>(null);
-  const [focused, setFocused] = useState<number | null>(null);
-  const [current, setCurrent] = useState(0);
+  const entries = dockEntries(t, snapshot);
+  const groups = groupSizes(entries);
+  const widgetCount = entries.length - SYSTEM_ITEMS.length;
+  const badge = needsAttention(snapshot?.storage);
+  // Changes whenever an item or a name changes: the pills are measured
+  // again then.
+  const names = entries.map((entry) => entry.name);
+  const namesKey = JSON.stringify(names);
+
+  const [hoveredAt, setHovered] = useState<number | null>(null);
+  const [focusedAt, setFocused] = useState<number | null>(null);
+  const [currentKey, setCurrentKey] = useState<string | null>(null);
   const [open, setOpen] = useState<PanelId | null>(null);
-  const [labelWidths, setLabelWidths] = useState<number[]>([]);
+  const [labels, setLabels] = useState<LabelWidths | null>(null);
 
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const tips = useRef<(HTMLSpanElement | null)[]>([]);
   const lastSent = useRef<string | null>(null);
   const lastPlace = useRef<string | null>(null);
 
+  // An index left over from a longer list counts as none.
+  const inRange = (index: number | null) =>
+    index !== null && index < entries.length ? index : null;
+  const hovered = inRange(hoveredAt);
+  const focused = inRange(focusedAt);
+  // The single tab stop: the item last focused, or the first one.
+  const currentIndex = Math.max(
+    entries.findIndex((entry) => entry.key === currentKey),
+    0,
+  );
+
   const { size, edge } = settings
     ? { size: dockSize(settings.dock.iconSize), edge: settings.dock.edge }
     : DEFAULT_DOCK_LOOK;
-  const shape: DockShape = { size, groups: GROUP_SIZES };
+  const shape: DockShape = { size, groups };
   // Edge and icon size as set, not as drawn: several sizes draw the same
   // preset.
   const placeKey = settings
     ? `${settings.dock.edge} ${settings.dock.iconSize}`
     : null;
+
+  // The window size depends on the labels: nothing is sent before the
+  // current names are measured.
+  const measured = labels !== null && labels.key === namesKey;
+  const labelWidths = measured ? labels.widths : [];
 
   // Frozen while a panel is open, off with reduced motion.
   const active = hovered ?? focused;
@@ -162,35 +278,38 @@ function Dock() {
     viewport,
   }).items;
   const restItemsRef = useRef(restItems);
+  const entriesRef = useRef(entries);
   const openRef = useRef(open);
   useLayoutEffect(() => {
     restItemsRef.current = restItems;
+    entriesRef.current = entries;
     openRef.current = open;
   });
 
-  const tipIndex = active !== null && ITEMS[active] !== open ? active : null;
-  const tipAt =
-    tipIndex === null
-      ? null
-      : tipAnchor(placement.tiles[tipIndex] as LogicalRect, edge);
+  const tipIndex =
+    active !== null && !samePanel(entries[active]?.panelId ?? null, open)
+      ? active
+      : null;
+  const tipTile = tipIndex === null ? undefined : placement.tiles[tipIndex];
+  const tipAt = tipTile ? tipAnchor(tipTile, edge) : null;
 
   // Label pills are laid out (hidden) all the time, so their widths are
-  // known before any shows; the window must fit the widest.
+  // known before any shows; the window must fit the widest. Measured again
+  // whenever an item or a name changes.
   useLayoutEffect(() => {
-    const widths = tips.current.map(
-      (tip) => tip?.getBoundingClientRect().width ?? 0,
-    );
-    setLabelWidths((previous) =>
-      previous.length === widths.length &&
-      previous.every((width, index) => width === widths[index])
+    const count = (JSON.parse(namesKey) as string[]).length;
+    const widths = tips.current
+      .slice(0, count)
+      .map((tip) => tip?.getBoundingClientRect().width ?? 0);
+    setLabels((previous) =>
+      previous !== null &&
+      previous.key === namesKey &&
+      previous.widths.length === widths.length &&
+      previous.widths.every((width, index) => width === widths[index])
         ? previous
-        : widths,
+        : { key: namesKey, widths },
     );
-  }, []);
-
-  // The window size depends on the labels: nothing is sent before they are
-  // measured.
-  const measured = labelWidths.length === ITEMS.length;
+  }, [namesKey]);
 
   /** Tells Rust where the dock paints (the mouse is captured only there)
    * and the window it needs. Sends when the layout changed, and after any
@@ -225,9 +344,11 @@ function Dock() {
       }),
       listen<DockRequestPanel>(DOCK_REQUEST_PANEL_EVENT, ({ payload }) => {
         const { panelId } = payload;
-        const index = ITEMS.indexOf(panelId);
+        const index = entriesRef.current.findIndex((entry) =>
+          samePanel(entry.panelId, panelId),
+        );
         const anchor = restItemsRef.current[index];
-        if (!anchor || openRef.current === panelId) return;
+        if (!anchor || samePanel(openRef.current, panelId)) return;
         openPanel(panelId, anchor);
       }),
     ];
@@ -237,9 +358,9 @@ function Dock() {
   }, []);
 
   const toggle = (index: number) => {
-    const panelId = ITEMS[index];
+    const entry = entries[index];
     const anchor = restItems[index];
-    if (panelId && anchor) openPanel(panelId, anchor);
+    if (entry && anchor) openPanel(entry.panelId, anchor);
   };
 
   const onPointer = (event: PointerEvent<HTMLElement>) => {
@@ -249,14 +370,14 @@ function Dock() {
   };
 
   const moveFocus = (index: number) => {
-    setCurrent(index);
+    setCurrentKey(entries[index]?.key ?? null);
     buttons.current[index]?.focus();
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     const index = itemIndex(event.currentTarget, event.target);
     if (index === null) return;
-    const last = ITEMS.length - 1;
+    const last = entries.length - 1;
     const next = {
       ArrowLeft: Math.max(index - 1, 0),
       ArrowRight: Math.min(index + 1, last),
@@ -276,8 +397,49 @@ function Dock() {
   };
 
   const onFocus = (index: number, event: FocusEvent<HTMLButtonElement>) => {
-    setCurrent(index);
+    setCurrentKey(entries[index]?.key ?? null);
     setFocused(focusVisible(event.currentTarget) ? index : null);
+  };
+
+  const item = (entry: DockEntry, index: number) => {
+    const { scale, lift } = magnificationOf(index, magnified);
+    // The badge is aria-hidden: the name says it instead.
+    const badged = badge && entry.panelId === "settings";
+    return (
+      <button
+        key={entry.key}
+        ref={(element) => {
+          buttons.current[index] = element;
+        }}
+        type="button"
+        className="dock-item"
+        aria-label={
+          badged
+            ? format(t.widgets.withNotice, { name: entry.name })
+            : entry.name
+        }
+        // No aria-controls: the panel is in another window, which an IDREF
+        // can't reach.
+        aria-expanded={samePanel(open, entry.panelId)}
+        tabIndex={index === currentIndex ? 0 : -1}
+        data-magnify={magnifyRole(index, magnified) ?? undefined}
+        style={
+          {
+            "--s": String(scale),
+            "--lift": `${lift}px`,
+          } as CSSProperties
+        }
+        onClick={() => toggle(index)}
+        onFocus={(event) => onFocus(index, event)}
+        onBlur={() => setFocused(null)}
+      >
+        <span className={`dock-tile ${glazeOf(entry)}`}>
+          <TileFace entry={entry} now={now} />
+          {badged ? <span className="dock-badge" aria-hidden="true" /> : null}
+        </span>
+        <span className="dock-dot" aria-hidden="true" />
+      </button>
+    );
   };
 
   return (
@@ -290,56 +452,21 @@ function Dock() {
         onPointerLeave={() => setHovered(null)}
         onKeyDown={onKeyDown}
       >
-        {GROUPS.map((group, groupIndex) => [
-          groupIndex > 0 ? (
-            <span
-              key={`separator-${groupIndex}`}
-              className="dock-separator"
-              aria-hidden="true"
-            />
-          ) : null,
-          ...group.map((panelId) => {
-            const index = ITEMS.indexOf(panelId);
-            const { scale, lift } = magnificationOf(index, magnified);
-            const expanded = open === panelId;
-            return (
-              <button
-                key={panelId}
-                ref={(element) => {
-                  buttons.current[index] = element;
-                }}
-                type="button"
-                className="dock-item"
-                aria-label={t.dock.items[panelId]}
-                // No aria-controls: the panel is in another window, which
-                // an IDREF can't reach.
-                aria-expanded={expanded}
-                tabIndex={index === current ? 0 : -1}
-                data-magnify={magnifyRole(index, magnified) ?? undefined}
-                style={
-                  {
-                    "--s": String(scale),
-                    "--lift": `${lift}px`,
-                  } as CSSProperties
-                }
-                onClick={() => toggle(index)}
-                onFocus={(event) => onFocus(index, event)}
-                onBlur={() => setFocused(null)}
-              >
-                <span className={`dock-tile ${GLAZE[panelId]}`}>
-                  <Glyph id={panelId} />
-                </span>
-                <span className="dock-dot" aria-hidden="true" />
-              </button>
-            );
-          }),
-        ])}
+        {entries
+          .slice(0, widgetCount)
+          .map((entry, index) => item(entry, index))}
+        {widgetCount > 0 ? (
+          <span className="dock-separator" aria-hidden="true" />
+        ) : null}
+        {entries
+          .slice(widgetCount)
+          .map((entry, offset) => item(entry, widgetCount + offset))}
       </nav>
-      {ITEMS.map((panelId, index) => {
+      {entries.map((entry, index) => {
         const at = index === tipIndex ? tipAt : null;
         return (
           <span
-            key={panelId}
+            key={entry.key}
             ref={(element) => {
               tips.current[index] = element;
             }}
@@ -355,7 +482,7 @@ function Dock() {
                 : undefined
             }
           >
-            {t.dock.items[panelId]}
+            {entry.name}
           </span>
         );
       })}

@@ -1,0 +1,319 @@
+/* Panel parts shared by the widget panels and Configurações › Itens do
+   dock (DESIGN.md "Components": Painel, Buttons, Linha de navegação,
+   Inputs / Fields, Aviso inline, Confirmação inline). Only tokens from
+   tokens.css; no inline style anywhere (strict CSP): a value per item goes
+   through the CSSOM (`style.setProperty`) on a custom property declared
+   here or in the lane's own CSS. */
+
+/* Line icons: 16 px, 1.75 stroke, round ends. */
+.part-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Header: a 24 px row, title with ellipsis, one action. */
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.panel-header h1 {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Buttons: Label, radius 4 px, no border. */
+.quiet-button,
+.icon-button,
+.secondary-button,
+.danger-button,
+.remove-button {
+  border: 0;
+  border-radius: var(--r-segment);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+
+.quiet-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  color: var(--ink-2);
+}
+
+.icon-button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: var(--ink-2);
+}
+
+.quiet-button:hover,
+.icon-button:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--track);
+}
+
+/* Remover an item (Itens do dock): quiet at rest, --danger only on hover
+   (The Danger Only Rule: it removes). */
+.icon-button.danger:hover:not(:disabled) {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.icon-button:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--track);
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 11%, transparent);
+}
+
+.secondary-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.danger-button {
+  padding: 6px 12px;
+  font-weight: 600;
+  color: var(--danger-ink);
+  background: var(--danger);
+}
+
+.danger-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.danger-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.remove-button {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  color: var(--danger);
+}
+
+.remove-button:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
+.remove-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Navigation row to a subview. */
+.nav-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 8px 8px 10px;
+  border: 0;
+  border-radius: var(--r-track);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--ink);
+  background: var(--track);
+  cursor: pointer;
+}
+
+.nav-row:hover {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+.nav-row-label {
+  flex: 1;
+  font-weight: 600;
+}
+
+.nav-row-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-row .part-icon {
+  color: var(--ink-2);
+}
+
+.warning-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-dot);
+  background: var(--danger);
+}
+
+/* Windows 11 text field: label above, bottom line, accent on focus. Also
+   the look of the zone list and of the note's editor. */
+.field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field-label {
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.field-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--hair);
+  border-bottom-color: var(--field-line);
+  border-radius: var(--r-segment);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--field);
+  caret-color: var(--accent);
+  user-select: text;
+}
+
+/* The open list is a WebView2 popup window that paints a light surface in
+   every theme: it ignores color-scheme, the page's background and the
+   options' own (2026-10-19 release retest, captures in the PR). It does
+   honor the options' text color, so they take --popup-ink (the light
+   theme's ink, set once in :root), never --ink, which is light under the
+   dark theme and left the list unreadable. The field's own text keeps
+   --ink. */
+.field-input option {
+  color: var(--popup-ink);
+}
+
+/* Full --ink-2: at 80 % it fell under 4.5:1 on --field. */
+.field-input::placeholder {
+  color: var(--ink-2);
+  opacity: 1;
+}
+
+.panel .field-input:focus,
+.panel .field-input:focus-visible {
+  outline: none;
+  border-bottom-color: var(--accent);
+  box-shadow: inset 0 -1px 0 var(--accent);
+}
+
+/* A refused value: a heavier --ink line; the message is in the footer.
+   Never --danger (The Danger Only Rule). */
+.field-input[aria-invalid="true"] {
+  border-bottom-color: var(--ink);
+  box-shadow: inset 0 -1px 0 var(--ink);
+}
+
+.field-input:disabled {
+  opacity: 0.6;
+}
+
+.field.time .field-input {
+  width: 84px;
+  padding: 4px 6px;
+}
+
+/* Inline notice: icon and text, an optional action under the text. */
+.inline-notice {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 4px 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-track);
+  font-size: 12.5px;
+  background: var(--track);
+}
+
+.inline-notice .part-icon {
+  margin-top: 1px;
+  color: var(--danger);
+}
+
+.inline-notice p {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.inline-notice strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.inline-notice .secondary-button {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 4px;
+}
+
+/* Inline confirmation, in the place of the control that asked. */
+.inline-confirm {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--r-track);
+  font-size: 12.5px;
+  background: var(--danger-soft);
+}
+
+.inline-confirm p {
+  margin: 0;
+}
+
+.inline-confirm strong {
+  font-weight: 600;
+}
+
+.inline-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Read by screen readers, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

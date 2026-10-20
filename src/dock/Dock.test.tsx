@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Settings } from "../core/settings";
+import type { WidgetInstance, WidgetsSnapshot } from "../core/widgets";
+import { WIDGET_FIXTURES } from "../core/widgets.fixtures";
 import { ptBR } from "../i18n/pt-BR";
 import Dock from "./Dock";
 
@@ -150,17 +152,46 @@ function stubReducedMotion(initial: boolean) {
   };
 }
 
+/** No widgets: the dock of Fase 1, Configurações and Sobre. */
+const NO_WIDGETS: WidgetsSnapshot = { storage: { state: "ok" }, widgets: [] };
+
+/** A clock that reads the same anywhere: 24 h in UTC, digital. */
+const CLOCK: WidgetInstance<"clock"> = {
+  ...WIDGET_FIXTURES["clock-default"],
+  config: {
+    timeZone: "UTC",
+    hourCycle: "h23",
+    showSeconds: false,
+    iconStyle: "digital",
+  },
+};
+const PROGRESS = WIDGET_FIXTURES["time-progress-sample"];
+const NOTE = WIDGET_FIXTURES["note-default"];
+
+const withWidgets = (
+  widgets: WidgetInstance[],
+  storage: WidgetsSnapshot["storage"] = { state: "ok" },
+): WidgetsSnapshot => ({ storage, widgets });
+
 describe("Dock", () => {
   let current: Settings;
+  let snapshot: WidgetsSnapshot;
 
   beforeEach(() => {
     handlers.clear();
     unlisten.mockClear();
     listen.mockClear();
     current = MEDIUM;
+    snapshot = NO_WIDGETS;
     invoke.mockReset();
     invoke.mockImplementation((command: string) =>
-      Promise.resolve(command === "get_settings" ? current : undefined),
+      Promise.resolve(
+        command === "get_settings"
+          ? current
+          : command === "list_widgets"
+            ? snapshot
+            : undefined,
+      ),
     );
     vi.stubGlobal("innerWidth", MEDIUM_WINDOW.width);
     vi.stubGlobal("innerHeight", MEDIUM_WINDOW.height);
@@ -168,7 +199,9 @@ describe("Dock", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
       function (this: HTMLElement) {
         if (!this.classList.contains("dock-tip")) return original.call(this);
-        const width = LABEL_WIDTHS[this.textContent ?? ""] ?? 0;
+        const name = this.textContent ?? "";
+        // Any other name: 8 px a character.
+        const width = LABEL_WIDTHS[name] ?? name.length * 8;
         return { ...rect(0, 0, width, 24) } as DOMRect;
       },
     );
@@ -315,7 +348,7 @@ describe("Dock", () => {
 
     it("reports the defaults when the settings can't be read", async () => {
       invoke.mockImplementation((command: string) =>
-        command === "get_settings"
+        command === "get_settings" || command === "list_widgets"
           ? Promise.reject(new Error("no settings"))
           : Promise.resolve(undefined),
       );
@@ -662,6 +695,239 @@ describe("Dock", () => {
     });
   });
 
+  describe("widgets", () => {
+    const names = () =>
+      screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"));
+
+    it("puts the widgets first, in order, then a separator and the system items", async () => {
+      snapshot = withWidgets([NOTE, CLOCK, PROGRESS]);
+      await renderDock();
+
+      expect(names()).toEqual([
+        "Nota",
+        "Relógio",
+        "Trabalho",
+        "Configurações",
+        "Sobre",
+      ]);
+      const children = Array.from(bar().children);
+      const separator = document.querySelector(".dock-separator");
+      expect(separator).toHaveAttribute("aria-hidden", "true");
+      expect(children.indexOf(separator as Element)).toBe(3);
+      expect(document.querySelectorAll(".dock-separator")).toHaveLength(1);
+    });
+
+    it("shows only the system items while the storage is unavailable", async () => {
+      snapshot = withWidgets([CLOCK], {
+        state: "unavailable",
+        reason: "newerVersion",
+      });
+      await renderDock();
+      expect(names()).toEqual(["Configurações (com aviso)", "Sobre"]);
+      expect(document.querySelector(".dock-separator")).toBeNull();
+    });
+
+    it("glazes each widget by its kind and draws its live face", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.UTC(2026, 9, 16, 9, 41, 30));
+      try {
+        snapshot = withWidgets([CLOCK, PROGRESS, NOTE]);
+        await renderDock();
+      } finally {
+        vi.useRealTimers();
+      }
+
+      const tile = (name: string) =>
+        screen.getByRole("button", { name }).querySelector(".dock-tile");
+      expect(tile("Relógio")).toHaveClass("t-clock");
+      expect(tile("Relógio")).toHaveTextContent("09:41");
+      expect(tile("Trabalho")).toHaveClass("t-progress");
+      expect(tile("Nota")).toHaveClass("t-notes");
+      // The name, never the time.
+      expect(screen.getByRole("button", { name: "Relógio" })).toHaveAttribute(
+        "aria-label",
+        "Relógio",
+      );
+      expect(
+        screen.getByText("Relógio", { selector: ".dock-tip" }),
+      ).toBeInTheDocument();
+    });
+
+    it("moves every live face at the minute turn, from one timer", async () => {
+      vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+      try {
+        vi.setSystemTime(Date.UTC(2026, 9, 16, 9, 41, 50));
+        snapshot = withWidgets([
+          CLOCK,
+          { ...CLOCK, id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6099", label: "B" },
+        ]);
+        await renderDock();
+        const faces = () =>
+          Array.from(document.querySelectorAll(".clock-tile-time")).map(
+            (face) => face.textContent,
+          );
+        expect(faces()).toEqual(["09:41", "09:41"]);
+        expect(vi.getTimerCount()).toBe(1);
+
+        await act(() => vi.advanceTimersByTimeAsync(10_000));
+
+        expect(faces()).toEqual(["09:42", "09:42"]);
+        expect(vi.getTimerCount()).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("badges Configurações while the storage was recovered or is unavailable", async () => {
+      const cases: [WidgetsSnapshot["storage"], boolean][] = [
+        [{ state: "ok" }, false],
+        [{ state: "recovered" }, true],
+        [{ state: "unavailable", reason: "openFailed" }, true],
+      ];
+      for (const [storage, badged] of cases) {
+        snapshot = withWidgets([], storage);
+        const view = await renderDock();
+        const badges = document.querySelectorAll(".dock-badge");
+        expect(badges, storage.state).toHaveLength(badged ? 1 : 0);
+        // The badge is hidden; the item's name says it.
+        const item = screen.getByRole("button", {
+          name: badged ? "Configurações (com aviso)" : "Configurações",
+        });
+        if (badged) {
+          expect(item.contains(badges[0] as Node)).toBe(true);
+          expect(badges[0]).toHaveAttribute("aria-hidden", "true");
+        }
+        // The pill keeps the plain name.
+        expect(
+          [...document.querySelectorAll(".dock-tip")].map(
+            (tip) => tip.textContent,
+          ),
+        ).toContain("Configurações");
+        view.unmount();
+      }
+    });
+
+    it("follows widgets-changed: items, names and the badge", async () => {
+      snapshot = withWidgets([CLOCK]);
+      await renderDock();
+
+      emit(
+        "widgets-changed",
+        withWidgets([{ ...CLOCK, label: "Lisboa" }, NOTE], {
+          state: "recovered",
+        }),
+      );
+
+      expect(names()).toEqual([
+        "Lisboa",
+        "Nota",
+        "Configurações (com aviso)",
+        "Sobre",
+      ]);
+      expect(document.querySelector(".dock-badge")).not.toBeNull();
+    });
+
+    it("measures the pills again when a name changes, and sends the wider window", async () => {
+      snapshot = withWidgets([CLOCK]);
+      await renderDock();
+      const before = layoutCalls().length;
+      const widthOf = (layout: unknown) =>
+        (layout as { window: { width: number } }).window.width;
+      const narrow = widthOf(lastLayout());
+
+      emit(
+        "widgets-changed",
+        withWidgets([{ ...CLOCK, label: "Um rótulo bem comprido aqui" }]),
+      );
+      await act(async () => {});
+
+      const sent = layoutCalls()
+        .slice(before)
+        .map(([, args]) => widthOf((args as { layout: unknown }).layout));
+      // One new layout, from the new widths: never the old widths with the
+      // new names.
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toBeGreaterThan(narrow);
+    });
+
+    it("opens a widget's panel by its PanelId, anchored where it rests", async () => {
+      snapshot = withWidgets([CLOCK]);
+      await renderDock();
+      const clock = screen.getByRole("button", { name: "Relógio" });
+
+      fireEvent.click(clock);
+      // Not on the dock: nothing to anchor to.
+      emit("dock-request-panel", { panelId: { widget: NOTE.id } });
+
+      const calls = panelCalls();
+      expect(calls).toHaveLength(1);
+      const args = calls[0]?.[1] as {
+        panelId: unknown;
+        anchor: { width: number; height: number };
+      };
+      expect(args.panelId).toEqual({ widget: CLOCK.id });
+      expect(args.anchor).toMatchObject({ width: 48, height: 48 });
+
+      emit("panel-changed", { panelId: { widget: CLOCK.id } });
+      expect(clock).toHaveAttribute("aria-expanded", "true");
+      expect(settings()).toHaveAttribute("aria-expanded", "false");
+      // Open: asking for it again does nothing.
+      emit("dock-request-panel", { panelId: { widget: CLOCK.id } });
+      expect(panelCalls()).toHaveLength(1);
+    });
+
+    it("keeps the arrows, Home and End across every item", async () => {
+      snapshot = withWidgets([CLOCK, NOTE]);
+      await renderDock();
+      const clock = screen.getByRole("button", { name: "Relógio" });
+      const note = screen.getByRole("button", { name: "Nota" });
+      expect(clock).toHaveAttribute("tabindex", "0");
+      act(() => clock.focus());
+
+      fireEvent.keyDown(clock, { key: "ArrowRight" });
+      expect(note).toHaveFocus();
+      fireEvent.keyDown(note, { key: "ArrowRight" });
+      expect(settings()).toHaveFocus();
+      fireEvent.keyDown(settings(), { key: "End" });
+      expect(about()).toHaveFocus();
+      fireEvent.keyDown(about(), { key: "Home" });
+      expect(clock).toHaveFocus();
+    });
+
+    it("keeps the tab stop on its item when the list changes", async () => {
+      snapshot = withWidgets([CLOCK, NOTE]);
+      await renderDock();
+      act(() => screen.getByRole("button", { name: "Nota" }).focus());
+
+      emit("widgets-changed", withWidgets([PROGRESS, CLOCK, NOTE]));
+      expect(screen.getByRole("button", { name: "Nota" })).toHaveAttribute(
+        "tabindex",
+        "0",
+      );
+
+      // Its item gone: the first item takes the stop.
+      emit("widgets-changed", withWidgets([PROGRESS]));
+      expect(screen.getByRole("button", { name: "Trabalho" })).toHaveAttribute(
+        "tabindex",
+        "0",
+      );
+    });
+
+    it("drops a magnified index the list no longer has", async () => {
+      snapshot = withWidgets([CLOCK, NOTE]);
+      await renderDock();
+      fireEvent.pointerOver(about());
+      expect(shownTip()).toHaveTextContent("Sobre");
+
+      emit("widgets-changed", NO_WIDGETS);
+
+      // Index 3 is gone: nothing is magnified and no pill shows.
+      expect(names()).toEqual(["Configurações", "Sobre"]);
+      expect(shownTip()).toBeNull();
+      expect(document.querySelector("[data-magnify]")).toBeNull();
+    });
+  });
+
   describe("cleanup", () => {
     it("drops every listener and observer when unmounted", async () => {
       const disconnect = vi.fn();
@@ -681,6 +947,7 @@ describe("Dock", () => {
           "panel-changed",
           "dock-request-panel",
           "settings-changed",
+          "widgets-changed",
         ]),
       );
 

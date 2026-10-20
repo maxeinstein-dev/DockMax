@@ -1,0 +1,147 @@
+/* Configurações › Itens do dock (DESIGN.md "Configurações › Itens do
+   dock"). Only tokens from tokens.css; no inline style (strict CSP). */
+
+/* The widgets in dock order: scrolls above 268 px (12 widgets). */
+.dock-items-list {
+  display: grid;
+  max-height: 268px;
+  margin: 0;
+  padding: 0 2px 0 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-2) 50%, transparent) transparent;
+}
+
+/* Mini tile, name and subtitle, subir, descer and remover. */
+.dock-items-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 2px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.dock-items-row:last-child {
+  border-bottom: 0;
+}
+
+/* A note's removal asks in its row, under the name, across the row. */
+.dock-items-confirm {
+  grid-column: 1 / -1;
+}
+
+.dock-items-text {
+  min-width: 0;
+}
+
+.dock-items-name,
+.dock-items-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dock-items-name {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.dock-items-detail {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.dock-items-empty {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+/* Adicionar: the label with the count at the right, then the buttons. */
+.dock-items-add {
+  display: grid;
+  gap: 8px;
+}
+
+.dock-items-add-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.dock-items-add-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.dock-items-count {
+  font-size: 12px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.dock-items-add-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Mini tile (DESIGN.md "Dock item": Mini): the dock's glaze (the static
+   .t-* class), static, 26 px in the list; glyph at 60% with a 2 stroke. */
+.mini-tile {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--glyph);
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.2));
+}
+
+.mini-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      130% 70% at 50% -12%,
+      rgb(255 255 255 / 0.26),
+      transparent 58%
+    ),
+    linear-gradient(
+      180deg,
+      hsl(var(--h) calc(var(--sat) * var(--sat-k)) calc(var(--l) + 7%)),
+      hsl(var(--h) calc(var(--sat) * var(--sat-k)) calc(var(--l) - 5%))
+    );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.32),
+    inset 0 -1px 0 rgb(0 0 0 / 0.16);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z'/%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
+}
+
+.mini-tile svg {
+  position: relative;
+  width: 60%;
+  height: 60%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mini-tile .track {
+  opacity: 0.4;
+}
+
+/* On an add button: 18 px, no shadow. */
+.mini-tile.small {
+  width: 18px;
+  height: 18px;
+  filter: none;
+}

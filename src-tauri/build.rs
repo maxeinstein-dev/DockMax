@@ -1,4 +1,15 @@
 fn main() {
+    // Integration test executables only (never the app): the mock app links
+    // the WebView runtime, which imports `TaskDialogIndirect` from Common
+    // Controls v6, and a test exe has no manifest asking for it ("entry point
+    // not found" before the first test). The app's own manifest is embedded
+    // by `tauri_build` below.
+    if std::env::var("CARGO_CFG_TARGET_OS").is_ok_and(|os| os == "windows") {
+        println!("cargo:rustc-link-arg-tests=/MANIFEST:EMBED");
+        println!(
+            "cargo:rustc-link-arg-tests=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
+        );
+    }
     // Declaring the app commands makes each one require an explicit
     // permission (`allow-<command>`) in a capability.
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(

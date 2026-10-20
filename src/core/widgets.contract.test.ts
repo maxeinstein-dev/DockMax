@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
+  CLOCK_ICON_STYLES,
   CREATABLE_KINDS,
   HOUR_CYCLES,
   MOVE_DIRECTIONS,
@@ -12,6 +13,7 @@ import {
   WIDGET_ERROR_CODES,
   WIDGET_KINDS,
   WIDGETS_CHANGED_EVENT,
+  type ClockIconStyle,
   type HourCycle,
   type MoveDirection,
   type Period,
@@ -23,6 +25,7 @@ import {
   type WidgetCommandSignatures,
   type WidgetKind,
 } from "./widgets";
+import { readSources } from "../test/sources";
 import { COMMAND_ARGS_SAMPLES, WIDGET_FIXTURES } from "./widgets.fixtures";
 
 /* The Rust × TS contract (spec 0003 §2.6). The JSON files are what Rust
@@ -32,10 +35,7 @@ import { COMMAND_ARGS_SAMPLES, WIDGET_FIXTURES } from "./widgets.fixtures";
 
 const DIR = "/src-tauri/tests/fixtures/widgets/";
 
-const files = import.meta.glob<string>(
-  "/src-tauri/tests/fixtures/widgets/*.json",
-  { query: "?raw", import: "default", eager: true },
-);
+const files = readSources("src-tauri/tests/fixtures/widgets", /\.json$/);
 
 /** File name without folder or `.json`, as the keys of `WIDGET_FIXTURES`. */
 function nameOf(path: string): string {
@@ -83,6 +83,9 @@ describe("widget closed sets", () => {
   it("has a tuple that is exactly each type", () => {
     expectTypeOf<WidgetKind>().toEqualTypeOf<(typeof WIDGET_KINDS)[number]>();
     expectTypeOf<HourCycle>().toEqualTypeOf<(typeof HOUR_CYCLES)[number]>();
+    expectTypeOf<ClockIconStyle>().toEqualTypeOf<
+      (typeof CLOCK_ICON_STYLES)[number]
+    >();
     expectTypeOf<Period>().toEqualTypeOf<(typeof PERIODS)[number]>();
     expectTypeOf<WeekStart>().toEqualTypeOf<(typeof WEEK_STARTS)[number]>();
     expectTypeOf<MoveDirection>().toEqualTypeOf<
@@ -103,6 +106,7 @@ describe("widget closed sets", () => {
     expect(enums).toEqual({
       WidgetKind: [...WIDGET_KINDS],
       HourCycle: [...HOUR_CYCLES],
+      ClockIconStyle: [...CLOCK_ICON_STYLES],
       Period: [...PERIODS],
       WeekStart: [...WEEK_STARTS],
       MoveDirection: [...MOVE_DIRECTIONS],

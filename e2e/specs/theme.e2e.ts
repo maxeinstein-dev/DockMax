@@ -36,6 +36,12 @@ describe("Theme", () => {
     await dark.click();
     await expect(dark).toHaveAttribute("aria-pressed", "true");
     await waitForMode("dark");
+    // The native controls (the zone list, the scroll bars) turn dark too.
+    expect(
+      await browser.execute(
+        () => getComputedStyle(document.documentElement).colorScheme,
+      ),
+    ).toBe("dark");
 
     // The test build writes to the run's folder, not to the user's DockMax.
     const dataDir = process.env[DATA_DIR_VAR];

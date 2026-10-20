@@ -581,3 +581,48 @@ describe("status and disposal", () => {
     expect(autosave.getStatus()).toBe(status);
   });
 });
+
+describe("starting from an unsaved draft", () => {
+  it("starts in its error, without retrying on its own, and retries on flush", async () => {
+    const save = vi.fn(async () => {});
+    const autosave = createAutosave({
+      save,
+      savedText: "",
+      draft: { text: "Pão", error: "noteTooLarge" },
+    });
+
+    expect(autosave.getStatus()).toEqual({
+      state: "error",
+      error: "noteTooLarge",
+    });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(save).not.toHaveBeenCalled();
+
+    await autosave.flush();
+    expect(save).toHaveBeenCalledExactlyOnceWith("Pão");
+    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
+  });
+
+  it("saves a draft without an error after the pause", async () => {
+    const save = vi.fn(async () => {});
+    const autosave = createAutosave({
+      save,
+      savedText: "",
+      draft: { text: "Pão", error: null },
+    });
+
+    expect(autosave.getStatus()).toEqual({ state: "pending", error: null });
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
+    expect(save).toHaveBeenCalledExactlyOnceWith("Pão");
+  });
+
+  it("is idle when the draft is the stored text", () => {
+    const autosave = createAutosave({
+      save: vi.fn(async () => {}),
+      savedText: "Pão",
+      draft: { text: "Pão", error: "writeFailed" },
+    });
+
+    expect(autosave.getStatus()).toEqual({ state: "idle", error: null });
+  });
+});

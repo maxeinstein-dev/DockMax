@@ -39,12 +39,15 @@ A Fase 2 é entregue em **dois PRs**, com um **mock visual aprovado** entre eles
 ### 2.2 Widgets
 
 **Relógio** (Q5)
-- O ícone do dock mostra a hora viva (`HH:mm`, sem segundos), legível no tamanho Pequeno (40 px) (Q2).
+- O ícone do dock mostra a hora viva, legível no tamanho Pequeno (40 px) (Q2), em um de dois estilos (decisão do mock, §2.11):
+  - **digital** (padrão): `HH:mm`, sem segundos; em 12 h, `h:mm` sem AM/PM, que fica no painel;
+  - **analógico**: ponteiros brancos sobre o esmalte, sem números.
 - O painel mostra hora, data e o fuso.
 - Ajustes por instância:
-  - fuso: o do sistema (padrão) ou um nome IANA;
+  - fuso: o do sistema (padrão) ou um nome IANA. Na lista, depois de "Do sistema", os fusos vêm ordenados pelo deslocamento UTC, do mais negativo ao mais positivo, e pelo nome do lugar dentro do mesmo deslocamento; cada opção começa pelo deslocamento (`UTC−3 · Sao Paulo · America/Sao_Paulo`). O deslocamento é o vigente no instante em que os Ajustes abrem, com horário de verão: Lisboa fica em `UTC+1` no verão e em `UTC` no inverno, e a ordem acompanha. O valor gravado é sempre o nome IANA na grafia exata (pedido do teste manual de 2026-10-16);
   - formato 24 h (padrão) ou 12 h;
-  - segundos no painel (padrão desligado).
+  - segundos no painel (padrão desligado);
+  - estilo do ícone: digital (padrão) ou analógico. Campo novo na configuração do Relógio; na leitura, um registro sem ele vale digital.
 - O nome do fuso é validado no Rust contra a base IANA, na grafia exata da base. `Factory` é recusado: está na base, mas quer dizer "fuso não configurado", não um lugar.
 - A interface formata com `Intl`. Se o WebView não conhecer um fuso que o Rust aceitou, o relógio usa o fuso do sistema e indica isso no painel, sem inventar a hora.
 - Se nem o fuso do sistema for identificado (o `Intl` informa `Etc/Unknown` e depois o recusa como `timeZone`), o relógio formata sem `timeZone`, no padrão do próprio `Intl`, e o painel diz que o fuso do sistema não foi identificado. A formatação nunca lança e nunca inventa um nome.
@@ -68,7 +71,7 @@ A Fase 2 é entregue em **dois PRs**, com um **mock visual aprovado** entre eles
 
 ### 2.3 Interface de instâncias
 
-1. **Configurações › Itens do dock** (Q10): lista os widgets na ordem do dock. Tem botões **adicionar** (escolhendo o tipo), **subir** e **descer**, todos operáveis pelo teclado. Reordenar nunca muda o ID de uma instância. Arrastar e o menu de botão direito ficam para a Fase 3.
+1. **Configurações › Itens do dock** (Q10): lista os widgets na ordem do dock. Tem botões **adicionar** (escolhendo o tipo), **subir**, **descer** e **remover**, todos operáveis pelo teclado. Remover segue a regra de "Remover do dock" nos Ajustes: Relógio e Progresso saem na hora; uma Nota com texto (guardado ou ainda não salvo) pede a confirmação inline na própria linha. Depois de remover, o foco vai para o item que ficou no lugar (ou o anterior, ou o primeiro botão de adicionar). Decisão do teste manual de 2026-10-16: antes só havia subir e descer, e não dava para remover sem abrir o painel do widget. Reordenar nunca muda o ID de uma instância. Arrastar e o menu de botão direito ficam para a Fase 3.
 2. **Ajustes da instância dentro do próprio painel** (Q11): um botão "Ajustes" troca o conteúdo do painel para a configuração daquela instância (rótulo e campos do tipo). O botão **"Remover do dock"** fica ali também.
 3. Como na Fase 1, cada mudança é aplicada e salva na hora, sem botão Salvar. O Rust é a fonte da verdade. Uma mudança aceita emite um evento para todas as janelas; numa falha, o valor volta ao anterior e o painel mostra a mensagem.
 4. **Acessibilidade**, no nível da spec 0002 §2.4 item 7:
@@ -179,6 +182,8 @@ Nomes e cargas foram fechados no passo de contratos do PR 1 (C1):
 
 Depois de aprovado, o `DESIGN.md` ganha os componentes novos.
 
+Resultado: §2.11.
+
 **PR 2 — Widgets**
 1. Relógio, Progresso e Nota completos, com o registro de apresentação (`src/widgets/registry.ts`).
 2. Itens do dock, Ajustes e "Remover do dock".
@@ -212,6 +217,52 @@ Depois de aprovado, o `DESIGN.md` ganha os componentes novos.
 - O timer único do dock ressincroniza quando a hora do sistema muda (relógio ajustado, volta da suspensão), em vez de confiar só em `msUntilNextMinute`.
 - O limite do rótulo na interface conta code points (`[...label].length`), como o Rust, e não `.length`.
 - `config` e `body` gigantes são desserializados pelo Tauri antes de o Rust aplicar o limite. Aceito: só o JS do próprio painel, sob CSP estrita, consegue mandar isso.
+
+### 2.11 Resultado do mock (2026-10-16)
+
+- Mock aprovado em `docs/design/widgets-mock.html`, com os estados reproduzíveis por parâmetros na URL. O `DESIGN.md` e o `.impeccable/design.json` ganharam os componentes novos.
+- Decisões que o mock acrescentou, aprovadas pelo usuário:
+  - **estilo do ícone do Relógio** como ajuste de cada relógio: digital (padrão) ou analógico (§2.2);
+  - **Progresso**: anel com percentual no centro; no tamanho Pequeno, só o anel; período "fora do expediente" no primeiro lugar mostra o anel vazio e um traço;
+  - **esmalte novo "musgo"** (`.t-progress`) para o Progresso;
+  - **token de perigo** (`--danger`), só para a confirmação de remover nota, o erro de salvamento e o selo de aviso; o cobalto continua só para foco, seleção e painel aberto;
+  - **selo no ícone de Configurações** enquanto o banco estiver recuperado (até dispensar o aviso) ou indisponível;
+  - **Configurações › Itens do dock como subtela**, com Voltar, no mesmo padrão de Ajustes, para o painel caber acima do dock; a lista rola com muitos widgets;
+  - horários do expediente editados na própria linha do período, visíveis só quando ele está marcado;
+  - larguras de painel: Relógio 300 px, Progresso 320 px, Nota 340 px; Configurações e Sobre como na Fase 1.
+- Com 12 widgets no tamanho Grande o dock tem cerca de 1.050 px em repouso e cabe numa tela de 1366 px.
+- A revisão final de acabamento do mock foi dispensada pelo usuário; o código do PR 2 passa pela revisão adversarial completa.
+
+**Testes manuais do PR 2 (2026-10-16 a 2026-10-20)**, no build de release:
+- Primeira rodada apontou três problemas: contraste da lista de fusos no tema escuro, falta de "remover" em Configurações › Itens do dock e segundos "não gravados". Os dois primeiros foram corrigidos (`color-scheme` nos controles nativos; depois a causa real da lista: o menu do `<select>` do WebView2 é uma janela própria que ignora `color-scheme` e só respeita a cor do texto das opções, fixada na tinta escura); o terceiro era expectativa de segundos no ícone do dock. Decisão do usuário: segundos só no painel, como a Q2 previa; o ajuste ganhou a nota "O ícone do dock mostra só horas e minutos".
+- Pedido extra atendido: a lista de fusos é ordenada pelo deslocamento UTC vigente, não por nome.
+- Segunda rodada: fusos, remoção e segundos no painel confirmados; nenhum defeito aberto. Memória: §2.12.
+
+### 2.12 Memória (2026-10-20)
+
+**Método.** Build de release isolado do E2E (`pnpm tauri build --no-bundle --features e2e --config src-tauri/tauri.e2e.conf.json`, pasta de dados própria por execução, nunca o DockMax do usuário), painéis abertos pelo WebDriver embutido, sem entrada sintética do sistema. Memória de `dockmax-e2e.exe` mais todos os `msedgewebview2.exe` descendentes (árvore por `ParentProcessId`), lida 20 a 25 s depois da última ação. Duas colunas: **privada** (bytes privados, o commit que o processo reserva; é o número da linha de base da Fase 1 e do orçamento do roadmap) e **working set privado** (o que está de fato na RAM, a coluna "Memória" do Gerenciador de Tarefas). Cenários: **(a)** três widgets semeados, painel nunca aberto; **(b)** depois de abrir e fechar cada painel (cinco); **(c)** doze widgets, depois de abrir e fechar cada painel (catorze). Duas a três execuções por build; a variação entre execuções fica em 10 a 20 MB na privada (quase toda no processo de GPU) e em 5 MB no working set. Scripts em pasta temporária da sessão, não no repositório.
+
+| Build | Processos | (a) privada / WS priv. | (b) privada / WS priv. | (c) privada / WS priv. |
+|---|---|---|---|---|
+| Fase 1 (spec 0002 §2.1.1) | 8 | 182 MB / — | — | — |
+| PR 2 antes (81f99f5) | 8 | 202–203 / 108–111 MB | 209–231 / 123–131 MB | 245–264 / 158–163 MB |
+| PR 2 depois | 7 | 170–175 / 80–81 MB | 187–192 / 50–52 MB | 217–231 / 39–44 MB |
+
+**O que entrou.**
+- **Um renderizador para as duas janelas** (`--process-per-site` em `additionalBrowserArgs` das duas janelas, com os argumentos padrão do wry repetidos, porque defini-los os substitui; teste em `windows/memory.rs` trava os dois pontos). O dock e o painel vêm da mesma origem (`http://tauri.localhost`); o segundo renderizador custava de 20 a 30 MB privados. Risco aceito: um travamento do painel passa a travar o dock; a interface do painel é leve, e o E2E passou inteiro.
+- **Alvo de memória baixo em repouso** (`ICoreWebView2_19::SetMemoryUsageTargetLevel`, `windows/memory.rs`): o painel pede `LOW` ao esconder e `NORMAL` em `Prepare`, antes de a página renderizar; o dock pede `LOW` quando solta o mouse e depois de cada layout que a página reporta, e `NORMAL` ao capturá-lo; 3 s depois de cada página carregar, o alvo é aplicado de novo, para a janela que ninguém toca depois de iniciar (`on_page_load`). Com os dois em `LOW`, o WebView2 enxuga também o browser, a GPU e os serviços, mas não em toda execução: o renderizador cai sempre (de 15–17 para 3–4 MB de working set em repouso); os processos compartilhados caíram em parte das execuções. Não muda a privada. Custo medido: a primeira interação depois de um repouso leva cerca de 10 ms a mais (ida e volta de um layout forçado no dock: 12–18 ms contra 6–8 ms) enquanto as páginas voltam para a RAM; o usuário confere no teste manual se a ampliação sente isso. Pedir `LOW` desde o início, ou `NORMAL` e `LOW` em seguida, não enxuga nada: o WebView2 age na transição.
+- **Estado do painel gerenciado pelo builder** (`lib.rs`), não mais em `panel::setup`: relançando o app logo depois de fechá-lo, a página do dock mandava `set_dock_layout` antes de o `setup` registrar o estado, e o app abortava com `state() called before manage()` (4 em 6 relançamentos no build com as mudanças acima, 0 em 5 na linha de base, que só corria menos). Depois da correção, 8 em 8 relançamentos sobem.
+
+**O que foi descartado, com a medição.**
+- **Separar o bundle do dock dos painéis** (`tiles.ts` só com os ladrilhos, guarda de bundle): sem diferença mensurável (privada igual; heap JS do dock 3,6 contra 3,7 MB). O dock deixava de carregar cerca de 26 KB de JS e 5 KB de CSS, que o V8 nem compila sem uso. Fora, por não reduzir.
+- **`--in-process-gpu`** (GPU dentro do processo do browser): −31 a −48 MB privados. Fora: uma falha do driver de vídeo derrubaria o processo do browser, e com ele as duas janelas, em vez de só reiniciar o processo de GPU; o dock fica aberto o dia inteiro.
+- **`--disable-gpu`**: −69 a −83 MB privados (o processo de GPU cai de cerca de 80 para 13 MB). Fora por ora: a ampliação anima doze ladrilhos com `transform` e `filter: drop-shadow` a 60 Hz, que passariam a ser rasterizados na CPU; sem entrada sintética não dá para medir a fluidez aqui. Candidato para o spike da janela única (roadmap, Fase 4), com teste de fluidez.
+- **`NetworkServiceInProcess`** e **`StorageServiceOutOfProcess` desligado**: sem efeito (os serviços continuaram fora do processo).
+- **Sombra dos ladrilhos** (`filter: drop-shadow` em cada `.dock-tile`): trocada por `box-shadow` ou removida via CSS injetado, sem diferença em (c) (232 contra 239 MB, dentro do ruído). O custo dos doze widgets está no tamanho da janela e das camadas, não no filtro.
+
+**Vazamentos.** Trezentas aberturas e fechamentos do mesmo painel, com `gc()` forçado: nós do DOM, callbacks do Tauri e listeners estáveis; o heap JS cresce cerca de 4 KB por abertura e desacelera (585 KB nas primeiras 25, 100 KB nas 25 seguintes). O crescimento maior visto antes (18 KB por abertura) era do WebDriver embutido, que retém cada script executado (cerca de 7 KB por comando, reproduzido com 300 `execute` sem efeito). Sem vazamento atribuível ao app.
+
+**Orçamento.** O roadmap fixa cerca de 220 MB privados em repouso até o MVP: (a) e (b) ficam dentro; (c), com doze widgets depois de catorze painéis, encosta no limite. O processo de GPU (70–95 MB privados, sozinho) é o próximo alvo, no spike da janela única.
 
 ## 3. O que esta spec deliberadamente NÃO entrega
 
@@ -285,7 +336,7 @@ Cada PR mostra a saída dos comandos, não a presume. Em todos os PRs: CI verde 
 11. Testes de componente: ícones vivos, painéis em modo normal e Ajustes, Itens do dock, estados indisponível e recuperado, e confirmação de remover nota.
 12. Teclado: adicionar, subir, descer, Ajustes e remover operáveis sem mouse, com foco visível.
 13. Contraste AA nos dois temas, nas duas opacidades e nos ícones vivos. Com "reduzir movimento", nada animado.
-14. Memória em repouso medida com os três widgets e comparada com a linha de base da spec 0002.
+14. Memória em repouso medida com os três widgets e comparada com a linha de base da spec 0002. Feito no PR 2: §2.12 (medida também com doze widgets e depois dos painéis).
 15. Teste manual do usuário no build de release, no Windows real:
     - criar dois relógios com fusos diferentes, reordenar e reiniciar;
     - escrever uma nota, encerrar pela bandeja e reabrir;
@@ -305,7 +356,7 @@ Cada PR mostra a saída dos comandos, não a presume. Em todos os PRs: CI verde 
 | Q7 | Nota: texto simples, uma por instância, salvamento automático (~500 ms e ao perder o foco), 64 KiB, conteúdo nunca no log. |
 | Q8 | Atalho e Arquivos só no domínio, com validação sintática; nada na interface. |
 | Q9 | Banco corrompido: renomeia e recria, com aviso. Migração que falha ou banco mais novo: não toca, widgets indisponíveis. Backup antes de cada migração. |
-| Q10 | Primeiro uso com Relógio, Progresso e Nota; Configurações › Itens do dock com adicionar, subir e descer. |
+| Q10 | Primeiro uso com Relógio, Progresso e Nota; Configurações › Itens do dock com adicionar, subir e descer (remover acrescentado no teste manual de 2026-10-16, §2.3 item 1). |
 | Q11 | Ajustes e "Remover do dock" no painel de cada instância. |
 | Q12 | Widgets primeiro, separador, Configurações e Sobre fixos no fim; até 12 widgets. |
 | Q13 | Mock curto entre o PR 1 e o PR 2; `DESIGN.md` estendido. |

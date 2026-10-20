@@ -1,10 +1,12 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { createServer } from "node:net";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { browser } from "@wdio/globals";
+import type { ChainablePromiseElement } from "webdriverio";
 
 /** The test build's identifier (`src-tauri/tauri.e2e.conf.json`). */
 export const E2E_IDENTIFIER = "dev.maxsueleinstein.dockmax.e2e";
@@ -78,6 +80,67 @@ async function waitFor(condition: () => Promise<boolean>, what: string) {
   }
 }
 
+/**
+ * Whether the WebDriver port can be bound right now. A server that stopped
+ * answering is not a port that is free: on a busy CI runner the old process
+ * still held it when the next one started, and the new app, unable to bind,
+ * exited and left the test waiting for a server that never came.
+ */
+function portFree(): Promise<boolean> {
+  return new Promise((done) => {
+    const probe = createServer();
+    probe.once("error", () => done(false));
+    probe.listen(WEBDRIVER_PORT, "127.0.0.1", () => {
+      probe.close(() => done(true));
+    });
+  });
+}
+
+/** Starts the test build, and reports whether its server came up before the
+ * process exited. */
+async function launch(): Promise<ChildProcess | null> {
+  const child = spawn(APP_PATH, [], {
+    env: { ...process.env, TAURI_WEBDRIVER_PORT: String(WEBDRIVER_PORT) },
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  let exited = false;
+  child.once("exit", () => {
+    exited = true;
+  });
+  const deadline = Date.now() + 30_000;
+  while (!exited && Date.now() < deadline) {
+    if (await serverUp()) return child;
+    await sleep(250);
+  }
+  if (!exited) child.kill();
+  return null;
+}
+
+/**
+ * Clicks a dock item until the panel it opens shows `ready`. Right after a
+ * restart the dock is still measuring its labels and placing the window, and
+ * a click that lands before that opens nothing: so the click is repeated, and
+ * only a panel that never opens fails the test.
+ */
+export async function openPanelFrom(
+  item: () => ChainablePromiseElement,
+  ready: () => ChainablePromiseElement,
+) {
+  await browser.waitUntil(
+    async () => {
+      await browser.switchToWindow("dock");
+      await item().click();
+      await browser.switchToWindow("panel");
+      return ready().isDisplayed();
+    },
+    {
+      timeout: 30_000,
+      interval: 750,
+      timeoutMsg: "the panel never opened from the dock",
+    },
+  );
+}
+
 /** The test build this worker started, still to be stopped. */
 let started: ChildProcess | null = null;
 
@@ -99,12 +162,19 @@ export async function restartApp() {
     await browser.closeWindow().catch(() => undefined);
   }
   await waitFor(async () => !(await serverUp()), "the app to exit");
+  await waitFor(portFree, "the WebDriver port to be released");
 
-  started = spawn(APP_PATH, [], {
-    env: { ...process.env, TAURI_WEBDRIVER_PORT: String(WEBDRIVER_PORT) },
-    stdio: ["ignore", "inherit", "inherit"],
-  });
-  await waitFor(serverUp, "the restarted app's WebDriver server");
+  // The port can be taken again between the probe and the app's own bind
+  // (the old process lingering): a few launches, each given the full time.
+  for (let attempt = 1; started === null; attempt++) {
+    started = await launch();
+    if (started === null && attempt >= 3) {
+      throw new Error(
+        "The restarted app never brought its WebDriver server up",
+      );
+    }
+    if (started === null) await waitFor(portFree, "the WebDriver port");
+  }
   await browser.reloadSession();
 }
 

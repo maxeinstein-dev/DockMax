@@ -5,6 +5,7 @@
   "config": {
     "timeZone": null,
     "hourCycle": "h23",
-    "showSeconds": false
+    "showSeconds": false,
+    "iconStyle": "digital"
   }
 }

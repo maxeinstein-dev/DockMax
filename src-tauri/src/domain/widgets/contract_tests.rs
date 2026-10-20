@@ -16,7 +16,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
-use super::clock::HourCycle;
+use super::clock::{ClockIconStyle, HourCycle};
 use super::shortcut::ShortcutTarget;
 use super::time_progress::{Period, WeekStart};
 use super::*;
@@ -177,6 +177,7 @@ fn the_enum_fixture_is_every_value_of_each_closed_set_in_order() {
     let expected = json!({
         "WidgetKind": WidgetKind::ALL,
         "HourCycle": HourCycle::ALL,
+        "ClockIconStyle": ClockIconStyle::ALL,
         "Period": Period::ALL,
         "WeekStart": WeekStart::ALL,
         "MoveDirection": MoveDirection::ALL,
@@ -190,6 +191,7 @@ fn the_enum_fixture_is_every_value_of_each_closed_set_in_order() {
     // And every name in it reads back as the same value.
     assert_closed_set(&enums, "WidgetKind", &WidgetKind::ALL);
     assert_closed_set(&enums, "HourCycle", &HourCycle::ALL);
+    assert_closed_set(&enums, "ClockIconStyle", &ClockIconStyle::ALL);
     assert_closed_set(&enums, "Period", &Period::ALL);
     assert_closed_set(&enums, "WeekStart", &WeekStart::ALL);
     assert_closed_set(&enums, "MoveDirection", &MoveDirection::ALL);

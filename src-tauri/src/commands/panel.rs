@@ -1,21 +1,55 @@
+use std::sync::Mutex;
 use std::time::Instant;
 
-use tauri::{AppHandle, WebviewWindow};
+use tauri::{AppHandle, State, WebviewWindow};
 
+use crate::commands::widgets;
+use crate::domain::widgets::WidgetError;
+use crate::persistence::database::Storage;
 use crate::windows::dock;
 use crate::windows::panel::{
-    self, Action, LogicalRect, PanelGeometry, PanelId, PanelInset, PanelSize,
+    self, Action, LogicalRect, Panel, PanelGeometry, PanelId, PanelInset, PanelSize,
 };
+
+/// The panel `id` names, checked against the storage: a widget panel opens
+/// only for an instance the dock has, of a kind usable in this phase
+/// (`notFound` or `notCreatable` otherwise). Settings and About always
+/// open.
+fn resolve(storage: &Storage, id: PanelId) -> Result<Panel, WidgetError> {
+    match id {
+        PanelId::Settings => Ok(Panel::Settings),
+        PanelId::About => Ok(Panel::About),
+        PanelId::Widget(id) => {
+            let kind = widgets::panel_kind(storage, &id)?;
+            Ok(Panel::Widget { id, kind })
+        }
+    }
+}
 
 /// Called by the dock when an item is clicked. `anchor` is the item's
 /// rectangle relative to the dock's client area, in logical pixels. Opening
 /// asks the panel page to render first (`panel-show`); the window shows on
 /// `panel_ready` or after `panel::READY_TIMEOUT`.
+///
+/// A widget instance the storage doesn't have (removed, or the widgets
+/// unavailable in this run) is refused with an error, and nothing changes:
+/// the open panel, if any, stays open.
 #[tauri::command]
-pub fn toggle_panel(app: AppHandle, panel_id: PanelId, anchor: LogicalRect) -> Result<(), String> {
+pub fn toggle_panel(
+    app: AppHandle,
+    storage: State<'_, Mutex<Storage>>,
+    panel_id: PanelId,
+    anchor: LogicalRect,
+) -> Result<(), String> {
     // `anchor` was checked when deserialized: an invalid one never gets
-    // here, so a rejected click changes nothing.
-    let action = panel::lock(&app).toggle(panel_id, anchor, Instant::now());
+    // here, so a rejected click changes nothing. The storage lock is
+    // released before the panel's.
+    let resolved = resolve(&widgets::lock(&storage), panel_id);
+    let panel = resolved.map_err(|error| {
+        log::warn!("panel: refused to open a widget panel: {error}");
+        "no such widget".to_string()
+    })?;
+    let action = panel::lock(&app).toggle(panel, anchor, Instant::now());
     let show = matches!(action, Action::Prepare(..));
     if show && !dock::is_visible(&app) {
         // A click queued before the dock was hidden from the tray: a panel
@@ -71,4 +105,69 @@ pub fn panel_ready(
         log::warn!("panel: failed to show: {error}");
         "could not open the panel".to_string()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use super::*;
+    use crate::domain::widgets::{UnavailableReason, WidgetId, WidgetKind};
+
+    #[test]
+    fn settings_and_about_always_open() {
+        let storage = Storage::unavailable(UnavailableReason::OpenFailed);
+        assert_eq!(resolve(&storage, PanelId::Settings), Ok(Panel::Settings));
+        assert_eq!(resolve(&storage, PanelId::About), Ok(Panel::About));
+    }
+
+    #[test]
+    fn a_widget_panel_opens_with_the_kind_of_its_instance() {
+        let dir = tempdir().unwrap();
+        let storage = widgets::open_storage::<String>(Ok(dir.path().to_path_buf()));
+        let seeded = widgets::snapshot(&storage).unwrap().widgets;
+        assert!(!seeded.is_empty());
+
+        for instance in seeded {
+            let id = instance.id.clone();
+            assert_eq!(
+                resolve(&storage, PanelId::Widget(id.clone())),
+                Ok(Panel::Widget {
+                    id,
+                    kind: instance.config.kind()
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn a_widget_panel_for_a_missing_instance_is_refused() {
+        let dir = tempdir().unwrap();
+        let mut storage = widgets::open_storage::<String>(Ok(dir.path().to_path_buf()));
+        let note = widgets::snapshot(&storage)
+            .unwrap()
+            .widgets
+            .into_iter()
+            .find(|instance| instance.config.kind() == WidgetKind::Note)
+            .unwrap();
+        widgets::remove(&mut storage, note.id.as_str()).unwrap();
+
+        assert_eq!(
+            resolve(&storage, PanelId::Widget(note.id)),
+            Err(WidgetError::NotFound)
+        );
+        assert_eq!(
+            resolve(&storage, PanelId::Widget(WidgetId::new())),
+            Err(WidgetError::NotFound)
+        );
+    }
+
+    #[test]
+    fn without_the_storage_no_widget_panel_opens() {
+        let storage = Storage::unavailable(UnavailableReason::NewerVersion);
+        assert_eq!(
+            resolve(&storage, PanelId::Widget(WidgetId::new())),
+            Err(WidgetError::NotFound)
+        );
+    }
 }

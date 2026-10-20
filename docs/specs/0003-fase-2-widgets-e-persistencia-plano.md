@@ -164,33 +164,53 @@ Aceitos ou adiados: `config`/`body` gigantes desserializados antes do limite (ac
 
 Aceitos: N3 (string literal no guard de ordem); N5 (o aviso se perde se a criação do banco novo falhar logo depois de renomear; raro); a ordem do salvamento abandonado (risco aceito: só acontece com um retry do IPC por `postMessage` depois de 10 s); a recusa de LRM/RLM/ALM no rótulo (decisão de produto). Pendência do PR 2: N7 (nota que não é UTF-8 válido: o painel não salva por cima).
 
-## Mock visual (esboço)
+## Mock visual
 
-**M1** `[sequential]` **Mock dos widgets** (spec §2.9), depois do merge do PR 1.
-- Skill `impeccable`, seguindo o `DESIGN.md`, em `docs/design/widgets-mock.html`.
-- Estados: ícones vivos (Relógio e anel do Progresso) nos três tamanhos e nos dois temas; painéis do Relógio, do Progresso e da Nota nos modos normal e Ajustes; Configurações › Itens do dock; indisponível; aviso de banco recuperado; confirmação de remover nota; dock com 12 widgets.
-- Publicar para o usuário escolher. Aprovado, o `DESIGN.md` e os tokens ganham os componentes novos.
-- Commit: `docs: adiciona mock dos widgets da fase 2`.
+**M1** — **Feito** (2026-10-16): `docs/design/widgets-mock.html` aprovado pelo usuário; decisões na spec §2.11; `DESIGN.md` e `.impeccable/design.json` estendidos. Revisão final de acabamento dispensada pelo usuário.
 
-## PR 2 — Widgets (esboço, branch `feat/fase-2-widgets`)
+## PR 2 — Widgets (branch `feat/fase-2-widgets`)
+
+Refinado em 2026-10-16, depois do mock e com o PR 1 em `main`.
+
+### Análise: spec × plano × realidade
+
+| Achado | Ajuste |
+|---|---|
+| O mock acrescentou o estilo do ícone do Relógio (digital/analógico), um campo de contrato | Entra no W0, nos dois lados, com fixtures e `enums.json` |
+| `PanelId` no Rust é um enum `Copy` de dois valores, usado na máquina de estados do painel (`Action`, `blurred`, `reopen`) e em `index()` | O W0 troca por um alvo que inclui a instância (`Widget(WidgetId)`), confere a instância no `toggle_panel` e dá o tamanho de reserva pelo tipo |
+| Tokens novos (`.t-progress`, `--danger*`, `--field*`, `--pg-*`) e textos ficam em arquivos que todas as lanes leriam (`tokens.css`, `pt-BR.ts`) | Tudo entra no W0, para nenhuma lane mexer neles |
+| O dock mede as pílulas dos rótulos uma vez (`labelWidths`); com itens e rótulos dinâmicos, isso precisa voltar a medir | W5 |
+| `SettingsPanel.tsx` já existe e ganha a linha "Itens do dock" e a subtela | W4, dono de `src/panel/SettingsPanel*` e do componente novo |
+| Pendências da spec §2.10 | N7 (nota não UTF-8) no W3; timer que ressincroniza no W5; contagem do rótulo por code points como função em `src/core/widgets.ts` no W0 |
+
+### Batch A — contratos
 
 - **W0** `[sequential]` **Contratos da interface**:
-  - `PanelId` nos dois lados aceita a instância de um widget, e o `toggle_panel` confere que ela existe;
-  - tamanho de reserva do painel por tipo;
-  - todas as chaves de texto no `pt-BR.ts`, incluindo as mensagens dos códigos de erro;
-  - `src/widgets/registry.ts`, com componentes provisórios nos caminhos finais de cada lane.
-- **Batch paralelo**, uma pasta por lane:
-  - **W1** Relógio: `src/widgets/clock/`, com ícone, painel e Ajustes;
-  - **W2** Progresso: `src/widgets/time-progress/`;
-  - **W3** Nota: `src/widgets/notes/`, com editor, salvamento automático, mensagem de limite e confirmação de remover;
-  - **W4** Configurações › Itens do dock e os avisos de indisponível e recuperado (`src/panel/`).
+  - Rust e TS: campo `iconStyle` (`digital` | `analog`, padrão `digital`) no Relógio, com fixtures e `enums.json` atualizados; um registro sem o campo lê como `digital`;
+  - `PanelId` nos dois lados aceita a instância de um widget; o `toggle_panel` devolve erro para instância inexistente; tamanho de reserva por tipo (Relógio 300, Progresso 320, Nota 340 de largura);
+  - tokens novos em `src/themes/tokens.css` (com o teste de tokens) e todas as chaves de texto dos widgets no `pt-BR.ts`, incluindo as mensagens de cada `WidgetErrorCode`;
+  - `src/widgets/registry.ts` ligando cada tipo criável ao nome, ao esmalte e aos componentes (ícone vivo, painel, ajustes), com provisórios nos caminhos finais de cada lane;
+  - `labelLength()` (code points) em `src/core/widgets.ts`;
+  - componentes de painel compartilhados que as lanes usam: cabeçalho com Ajustes e Voltar, campo de texto, botão de remover e confirmação inline, aviso inline (`src/panel/parts/`).
+  - Commit: `feat: define os contratos da interface dos widgets`.
+
+### Batch B — paralelo, uma pasta por lane
+
+- **W1** `[parallel-safe]` **Relógio** (`src/widgets/clock/`): ícone vivo digital e analógico, painel (hora, data, fuso, aviso de fuso não identificado) e Ajustes (rótulo, fuso, formato, segundos, estilo do ícone, remover), com testes de componente.
+- **W2** `[parallel-safe]` **Progresso** (`src/widgets/time-progress/`): anel com percentual (sem número no Pequeno; traço fora do expediente), painel com barras e tempo restante (o preenchimento da barra vai por CSSOM, `setProperty`, nunca por atributo `style`, por causa da CSP), Ajustes (rótulo, períodos com ordem, início da semana, horários do expediente na linha, remover), com testes.
+- **W3** `[parallel-safe]` **Nota** (`src/widgets/notes/`): editor com o `autosave` do PR 1, estado de salvamento no rodapé, mensagem do limite, bloqueio de edição quando a nota não pode ser lida (N7), Ajustes (rótulo, remover com confirmação quando há texto), com testes.
+- **W4** `[parallel-safe]` **Itens do dock** (`src/panel/SettingsPanel*`, `src/panel/DockItems*`): linha "Itens do dock" em Configurações com contagem e marcador, subtela com subir/descer, adicionar com limite de 12, avisos de recuperado (com "Entendi") e indisponível, com testes.
+
+### Batch C — integração
+
 - **W5** `[sequential]` **Integração**:
-  - dock com itens dinâmicos, separador, ícones vivos com um timer único alinhado ao minuto, e largura com 12 widgets;
-  - painel roteando para os widgets e para o modo Ajustes;
-  - E2E 3 (nota sobrevive ao reinício);
-  - roadmap marcado.
-- **V2** `[sequential]` **Verificação, revisão e PR**:
-  - verificações 10–15 da spec, com a memória medida;
-  - revisão adversarial e converge;
-  - teste manual do usuário no build de release;
-  - push e PR só com aprovação.
+  - dock com os itens do `useWidgets`, separador, ícones vivos com um timer único alinhado ao minuto que ressincroniza quando a hora muda, selo no ícone de Configurações, medição das pílulas a cada mudança de itens, e a janela comportando 12 widgets no Grande;
+  - painel roteando para cada instância e para Ajustes e Itens do dock; widget removido fecha o painel;
+  - E2E 3 (criar nota, reiniciar, conferir o texto);
+  - roadmap da Fase 2 marcado conforme verificado.
+  - Commit: `feat: liga os widgets ao dock e aos painéis`.
+
+### Batch D — fechamento
+
+- **V2** `[sequential]` **Verificação, revisão e PR**: verificações 10–15 da spec, com a memória medida; revisão adversarial com bite-checks e converge; teste manual do usuário no build de release; push e PR só com aprovação.
+  - **Feito até 2026-10-20:** rodada 1 de revisão (1 bloqueante e 5 SHOULD-FIX, corrigidos nas lanes FX1/FX2); dois testes manuais do usuário (correções FX3: lista de fusos, remover em Itens do dock, fusos por deslocamento, nota dos segundos); memória medida e reduzida (spec §2.12). Falta: rodada 2 curta de revisão, reteste final do usuário e PR.

@@ -10,12 +10,23 @@
    keeps the two copies equal to DESIGN.md. */
 
 :root {
+  /* Native controls (the list of a <select>, the time field, the checkbox,
+     the scroll bars) in the WebView's light look, like the tokens below.
+     Each dark block sets "dark": without it they stayed light under the
+     dark theme's light --ink. */
+  color-scheme: light;
+
   /* Colors, light (DESIGN.md "Colors": Primary and Neutral). */
   --accent: #2f5bd3;
   --accent-ink: #1f45b3;
   --accent-soft: rgb(47 91 211 / 0.13);
   --surface-rgb: 247 247 249;
   --ink: #1d1e22;
+  /* The ink of the <option>s in the open list of a <select>, whose WebView2
+     popup paints a light surface in every theme (ADR 0007). Defined here
+     only and never set again in the dark blocks: the dark theme's --ink is
+     light, and the popup is not. Equal to the light theme's --ink. */
+  --popup-ink: #1d1e22;
   --ink-2: #5b5f69;
   --hair: rgb(0 0 0 / 0.09);
   --hi: rgb(255 255 255 / 0.8);
@@ -23,6 +34,15 @@
   --tip-ink: #1d1e22;
   --track: rgb(29 30 34 / 0.055);
   --kbd: rgb(29 30 34 / 0.07);
+  /* Fase 2 (DESIGN.md "Colors": Secondary and Neutral). Danger only for
+     removing, a save error and the warning badge (The Danger Only Rule). */
+  --danger: hsl(10 62% 40%);
+  --danger-ink: #ffffff;
+  --danger-soft: hsl(10 62% 40% / 0.1);
+  --field: rgb(255 255 255 / 0.85);
+  --field-line: rgb(29 30 34 / 0.5);
+  --pg-fill: hsl(84 26% 38%);
+  --pg-track: rgb(29 30 34 / 0.08);
   /* White stroke on every tile, same in both themes ("Tertiary": Glifo). */
   --glyph: #ffffff;
 
@@ -73,6 +93,7 @@
 /* Colors and shadow, dark: the "Sistema" theme on a dark Windows. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-mode="light"]) {
+    color-scheme: dark;
     --accent: #7c9cff;
     --accent-ink: #b0c2ff;
     --accent-soft: rgb(124 156 255 / 0.17);
@@ -85,6 +106,13 @@
     --tip-ink: #f2f2f5;
     --track: rgb(255 255 255 / 0.06);
     --kbd: rgb(255 255 255 / 0.09);
+    --danger: hsl(10 86% 72%);
+    --danger-ink: #1d1e22;
+    --danger-soft: hsl(10 86% 72% / 0.14);
+    --field: rgb(255 255 255 / 0.045);
+    --field-line: rgb(255 255 255 / 0.4);
+    --pg-fill: hsl(84 30% 62%);
+    --pg-track: rgb(255 255 255 / 0.09);
     --shadow: 0 1px 2px rgb(0 0 0 / 0.32), 0 16px 36px -12px rgb(0 0 0 / 0.7);
     --shadow-panel:
       0 1px 2px rgb(0 0 0 / 0.32), 0 2px 8px -2px rgb(0 0 0 / 0.5);
@@ -95,6 +123,7 @@
    the block above. The "Claro" theme needs no block: data-mode="light"
    turns the media block off and the :root values apply. */
 :root[data-mode="dark"] {
+  color-scheme: dark;
   --accent: #7c9cff;
   --accent-ink: #b0c2ff;
   --accent-soft: rgb(124 156 255 / 0.17);
@@ -107,6 +136,13 @@
   --tip-ink: #f2f2f5;
   --track: rgb(255 255 255 / 0.06);
   --kbd: rgb(255 255 255 / 0.09);
+  --danger: hsl(10 86% 72%);
+  --danger-ink: #1d1e22;
+  --danger-soft: hsl(10 86% 72% / 0.14);
+  --field: rgb(255 255 255 / 0.045);
+  --field-line: rgb(255 255 255 / 0.4);
+  --pg-fill: hsl(84 30% 62%);
+  --pg-track: rgb(255 255 255 / 0.09);
   --shadow: 0 1px 2px rgb(0 0 0 / 0.32), 0 16px 36px -12px rgb(0 0 0 / 0.7);
   --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.32), 0 2px 8px -2px rgb(0 0 0 / 0.5);
 }
@@ -164,6 +200,13 @@
   --h: 192;
   --sat: 26%;
   --l: 40%;
+}
+
+/* Musgo: Progresso do tempo (Fase 2). */
+.t-progress {
+  --h: 84;
+  --sat: 22%;
+  --l: 38%;
 }
 
 /* Argila. */

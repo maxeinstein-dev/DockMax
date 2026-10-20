@@ -1,5 +1,42 @@
-/** Panels the dock can open; must match `PanelId` in the Rust side. */
-export type PanelId = "settings" | "about";
+import type { WidgetId } from "./widgets";
+
+/** The system panels: always on the dock, whatever the widgets. */
+export type SystemPanelId = "settings" | "about";
+
+/** The panel of a widget instance. */
+export interface WidgetPanelId {
+  widget: WidgetId;
+}
+
+/** Panels the dock can open; must match `PanelId` in
+ * `src-tauri/src/windows/panel.rs`. In JSON: `"settings"`, `"about"` or
+ * `{ "widget": "<id>" }`. Rust refuses (`toggle_panel` fails, nothing
+ * opens) a widget ID that isn't an instance the dock has. An object, so
+ * compare two with `samePanel`, never with `===`. */
+export type PanelId = SystemPanelId | WidgetPanelId;
+
+/** The panel of the instance `id`. */
+export function widgetPanel(id: WidgetId): WidgetPanelId {
+  return { widget: id };
+}
+
+/** Whether `id` is a widget instance's panel. */
+export function isWidgetPanel(id: PanelId): id is WidgetPanelId {
+  return typeof id === "object";
+}
+
+/** Whether `a` and `b` name the same panel. */
+export function samePanel(a: PanelId | null, b: PanelId | null): boolean {
+  if (a === null || b === null) return a === b;
+  if (isWidgetPanel(a)) return isWidgetPanel(b) && a.widget === b.widget;
+  return a === b;
+}
+
+/** A string that names the panel, for React keys and `resetKey`s:
+ * `settings`, `about` or `widget:<id>`. Never shown and never sent. */
+export function panelKey(id: PanelId): string {
+  return isWidgetPanel(id) ? `widget:${id.widget}` : id;
+}
 
 /** Rectangle in CSS pixels, relative to the window's client area. */
 export interface LogicalRect {

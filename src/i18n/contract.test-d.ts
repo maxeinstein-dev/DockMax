@@ -39,6 +39,7 @@ export const otherText: Messages = {
     repository: "github.com/maxeinstein-dev/DockMax",
     footer: "Independent project",
   },
+  widgets: ptBR.widgets,
 };
 
 /** A locale missing a key does not compile. */
@@ -65,12 +66,43 @@ export const missingErrorMessage: Messages = {
   },
 };
 
+/** `value` without `key`, typed so. */
+function without<T extends object, K extends keyof T>(
+  value: T,
+  key: K,
+): Omit<T, K> {
+  const copy: Partial<T> = { ...value };
+  delete copy[key];
+  return copy as Omit<T, K>;
+}
+
+/** A locale missing the message of a widget error code does not compile. */
+export const missingWidgetErrorMessage: Messages = {
+  ...ptBR,
+  widgets: {
+    ...ptBR.widgets,
+    // @ts-expect-error -- `notReady` is missing.
+    errors: without(ptBR.widgets.errors, "notReady"),
+  },
+};
+
+/** A locale missing the name of a widget kind does not compile. */
+export const missingKindName: Messages = {
+  ...ptBR,
+  widgets: {
+    ...ptBR.widgets,
+    // @ts-expect-error -- `files` is missing.
+    kinds: without(ptBR.widgets.kinds, "files"),
+  },
+};
+
 /** A locale missing a whole area does not compile. */
 // @ts-expect-error -- `settings` is missing.
 export const missingArea: Messages = {
   dock: ptBR.dock,
   panel: ptBR.panel,
   about: ptBR.about,
+  widgets: ptBR.widgets,
 };
 
 /** A locale with a key the PT-BR messages do not have does not compile. */

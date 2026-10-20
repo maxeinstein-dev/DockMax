@@ -22,7 +22,10 @@ async function violations(code: string): Promise<string[]> {
     .map((message) => message.message);
 }
 
-describe("frontend log rule", () => {
+// The first `lintText` loads ESLint's config and parser, which takes 7–9 s on
+// a machine busy with a cargo build: three sessions hit the default 5 s limit
+// (always passing alone, in under 2 s). The limit covers that cold start.
+describe("frontend log rule", { timeout: 30_000 }, () => {
   it.each([
     'log.error("dock: ready");',
     "log.warn(`settings: read failed`);",

@@ -140,6 +140,20 @@
   stroke-linejoin: round;
 }
 
+/* Attention badge on the Configurações tile while the widget database was
+   recovered or is unavailable (DESIGN.md "Dock item": badge): 10 px of
+   --danger with a 2 px ring of the surface, at the top right corner. */
+.dock-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 2px rgb(var(--surface-rgb));
+}
+
 /* Keyboard focus: cobalt outline following the tile's corners. */
 .dock-item:focus-visible .dock-tile {
   outline: 2px solid var(--accent);

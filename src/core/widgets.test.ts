@@ -2,11 +2,13 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   WIDGETS_CHANGED_EVENT,
+  MAX_LABEL_CHARS,
   WIDGET_ERROR_CODES,
   addWidget,
   dismissStorageNotice,
   getNote,
   isWidgetCommandError,
+  labelLength,
   listWidgets,
   moveWidget,
   removeWidget,
@@ -141,6 +143,37 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
+
+describe("labelLength", () => {
+  it("counts code points, as Rust does", () => {
+    expect(labelLength("")).toBe(0);
+    expect(labelLength("Mercado")).toBe(7);
+    expect(labelLength("São Paulo")).toBe(9);
+  });
+
+  it("counts an emoji outside the BMP once, not as two UTF-16 units", () => {
+    const label = "☕\u{1F600}";
+    expect(label.length).toBe(3);
+    expect(labelLength(label)).toBe(2);
+  });
+
+  it("counts a combining accent as its own code point", () => {
+    // "é" as "e" + U+0301: one grapheme, two code points.
+    expect(labelLength("Café")).toBe(5);
+    expect(labelLength("Café")).toBe(4);
+  });
+
+  it("counts every member of an emoji sequence", () => {
+    // Woman, zero-width joiner, laptop: one grapheme, three code points.
+    expect(labelLength("\u{1F469}‍\u{1F4BB}")).toBe(3);
+  });
+
+  it("lets 40 emoji fit the limit that .length would exceed", () => {
+    const label = "\u{1F600}".repeat(MAX_LABEL_CHARS);
+    expect(label.length).toBe(2 * MAX_LABEL_CHARS);
+    expect(labelLength(label)).toBe(MAX_LABEL_CHARS);
+  });
+});
 
 describe("isWidgetCommandError", () => {
   it.each(WIDGET_ERROR_CODES)("accepts the code %s", (code) => {

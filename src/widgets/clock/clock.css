@@ -1,0 +1,88 @@
+/* Clock widget (DESIGN.md "Ícones vivos": Relógio; "Painel": Relógio).
+   Only tokens from tokens.css; no inline style (strict CSP). */
+
+/* Dock icon, digital: Tile Time, white, centered on the glaze. */
+.clock-tile-time {
+  position: relative;
+  font: 600 calc(var(--icon) * 0.28) / 1 var(--font-display);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--glyph);
+  text-shadow: 0 1px 1px rgb(0 0 0 / 0.18);
+}
+
+/* Dock icon, analog: the dial at 76 % of the tile. */
+.clock-tile-dial {
+  position: relative;
+  width: 76%;
+  height: 76%;
+  fill: none;
+  stroke: var(--glyph);
+  stroke-linecap: round;
+}
+
+.clock-mark,
+.clock-axis {
+  fill: var(--glyph);
+  stroke: none;
+}
+
+.clock-mark {
+  opacity: 0.75;
+}
+
+.clock-hand-hour {
+  stroke-width: 2.1;
+}
+
+.clock-hand-minute {
+  stroke-width: 1.5;
+}
+
+/* Panel: Clock Time, with Clock Seconds and Clock AM/PM in --ink-2. */
+.clock-reading {
+  display: grid;
+  gap: 2px;
+}
+
+.clock-time {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin: 0;
+  font: 600 40px / 1.05 var(--font-display);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock-seconds {
+  font-size: 22px;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+
+.clock-period {
+  margin-left: 6px;
+  font-size: 15px;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+
+.clock-date {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.clock-date::first-letter {
+  text-transform: uppercase;
+}
+
+/* Note under "Segundos no painel": the icon never shows seconds. Pulled up
+   against its group, like the Progress panel's ring hint. */
+.clock-hint {
+  margin: -8px 0 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}

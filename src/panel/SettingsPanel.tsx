@@ -10,9 +10,11 @@ import {
   type SizePreset,
   type Theme,
 } from "../core/settings";
-import { useT } from "../i18n";
+import { MAX_WIDGETS, type WidgetsSnapshot } from "../core/widgets";
+import { format, useT, type Messages } from "../i18n";
 import OptionGroup, { type Option } from "./OptionGroup";
 import PanelFooter from "./PanelFooter";
+import NavRow from "./parts/NavRow";
 
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
 const EDGES: readonly DockEdge[] = ["bottom", "top"];
@@ -45,10 +47,32 @@ interface Pending {
   confirmed: boolean;
 }
 
+/** The value of the "Itens do dock" row: `3 de 12`, or `Indisponível`
+ * while the widgets can't be used or read. */
+function itemsValue(t: Messages, widgets: WidgetsSnapshot | null): string {
+  if (widgets === null || widgets.storage.state === "unavailable") {
+    return t.widgets.items.unavailable;
+  }
+  return format(t.widgets.items.count, {
+    count: widgets.widgets.length,
+    max: MAX_WIDGETS,
+  });
+}
+
 type SettingsPanelProps = {
   /** The settings in use (`useSettings`), or null while they can't be
    * read. The only source of the confirmed values. */
   settings: Settings | null;
+  /** The widgets and the storage state (`useWidgets`), for the count and
+   * the warning dot of the "Itens do dock" row; null (the default) while
+   * loading or unreadable: the row says `Indisponível`, unmarked. */
+  widgets?: WidgetsSnapshot | null;
+  /** Opens Configurações › Itens do dock (`DockItems`): the panel host
+   * swaps this view for the subview. Without it there is no row. */
+  onOpenItems?: () => void;
+  /** Focuses the "Itens do dock" row on mount: set it when coming back
+   * from the subview (its Voltar). */
+  focusItemsRow?: boolean;
 };
 
 /**
@@ -57,7 +81,12 @@ type SettingsPanelProps = {
  * while Rust saves it; if Rust refuses, the translated reason shows in the
  * footer and the options go back to the confirmed settings.
  */
-function SettingsPanel({ settings }: SettingsPanelProps) {
+function SettingsPanel({
+  settings,
+  widgets = null,
+  onOpenItems,
+  focusItemsRow = false,
+}: SettingsPanelProps) {
   const t = useT();
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<SettingsErrorCode | null>(null);
@@ -150,6 +179,16 @@ function SettingsPanel({ settings }: SettingsPanelProps) {
           }))
         }
       />
+      {onOpenItems ? (
+        <NavRow
+          label={t.widgets.items.title}
+          value={itemsValue(t, widgets)}
+          // The notice lives in the subview (spec 0003 §2.4 item 7).
+          warning={widgets !== null && widgets.storage.state !== "ok"}
+          onClick={onOpenItems}
+          focusOnMount={focusItemsRow}
+        />
+      ) : null}
       <PanelFooter alert={error && t.settings.errors[error]}>
         {t.settings.footer}
       </PanelFooter>

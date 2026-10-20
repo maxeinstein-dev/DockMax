@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import parts from "../panel/parts/parts.css?raw";
 import css from "./tokens.css?raw";
 
 // WCAG 2.x contrast of the text and glyphs DockMax draws, computed from the
@@ -45,8 +46,23 @@ function token(theme: keyof typeof THEMES, name: string): string {
   return value;
 }
 
-/** `#rrggbb`, `rgb(r g b / a)` or a bare `r g b` triplet. */
+/** `#rrggbb`, `rgb(r g b / a)`, `hsl(h s% l% / a)` or a bare `r g b`
+ * triplet. */
 function parse(value: string): Rgba {
+  const hslMatch =
+    /^hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*(?:\/\s*([\d.]+))?\s*\)$/.exec(
+      value,
+    );
+  if (hslMatch) {
+    return {
+      rgb: hsl(
+        Number(hslMatch[1]),
+        Number(hslMatch[2]) / 100,
+        Number(hslMatch[3]) / 100,
+      ),
+      alpha: hslMatch[4] === undefined ? 1 : Number(hslMatch[4]),
+    };
+  }
   const hex = /^#([0-9a-f]{6})$/i.exec(value);
   if (hex?.[1]) {
     const n = parseInt(hex[1], 16);
@@ -67,6 +83,15 @@ function parse(value: string): Rgba {
 
 function color(theme: keyof typeof THEMES, name: string): Rgba {
   return parse(token(theme, name));
+}
+
+/** The opacity of the text field's placeholder, as parts.css sets it. */
+function placeholderOpacity(): number {
+  const match = /\.field-input::placeholder\s*\{[^}]*?opacity:\s*([\d.]+)/.exec(
+    parts,
+  );
+  if (!match) throw new Error("no placeholder opacity in parts.css");
+  return Number(match[1]);
 }
 
 /** `top` painted over the opaque `bottom`. */
@@ -121,6 +146,13 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
   const track = over(color(theme, "--track"), surface);
   const tipInk = color(theme, "--tip-ink").rgb;
   const tipBg = color(theme, "--tip-bg");
+  const danger = over(color(theme, "--danger"), surface);
+  const field = over(color(theme, "--field"), surface);
+  const inkColor = color(theme, "--ink");
+  // `color-mix(in srgb, var(--ink) 9%, transparent)`: the ink at 9 % of
+  // its alpha.
+  const navHover = over({ ...inkColor, alpha: inkColor.alpha * 0.09 }, surface);
+  const dangerSoft = over(color(theme, "--danger-soft"), surface);
   return [
     { name: "--ink on the panel", ratio: contrast(ink, surface), min: TEXT },
     { name: "--ink-2 on the panel", ratio: contrast(ink2, surface), min: TEXT },
@@ -146,6 +178,58 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
       min: TEXT,
     },
     {
+      // "Remover nota", inside the confirmation.
+      name: "--danger-ink on --danger",
+      ratio: contrast(color(theme, "--danger-ink").rgb, danger),
+      min: TEXT,
+    },
+    {
+      // "Remover do dock" and the note's save error.
+      name: "--danger on the panel",
+      ratio: contrast(danger, surface),
+      min: TEXT,
+    },
+    {
+      // The hovered "Remover do dock".
+      name: "--danger on --danger-soft",
+      ratio: contrast(danger, dangerSoft),
+      min: TEXT,
+    },
+    {
+      // The text of the inline confirmation.
+      name: "--ink on --danger-soft",
+      ratio: contrast(ink, dangerSoft),
+      min: TEXT,
+    },
+    {
+      name: "--ink in a text field (--field)",
+      ratio: contrast(ink, field),
+      min: TEXT,
+    },
+    {
+      // The kind's name in an empty "Rótulo".
+      name: "the placeholder (--ink-2) in a text field (--field)",
+      ratio: contrast(
+        over(
+          { ...color(theme, "--ink-2"), alpha: placeholderOpacity() },
+          field,
+        ),
+        field,
+      ),
+      min: TEXT,
+    },
+    {
+      // A quiet or icon button's text, and the value of a navigation row.
+      name: "--ink-2 on --track",
+      ratio: contrast(ink2, track),
+      min: TEXT,
+    },
+    {
+      name: "--ink-2 on a hovered navigation row",
+      ratio: contrast(ink2, navHover),
+      min: TEXT,
+    },
+    {
       name: "--tip-ink on --tip-bg over black",
       ratio: contrast(tipInk, over(tipBg, BLACK)),
       min: TEXT,
@@ -158,9 +242,39 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
   ];
 }
 
+/** Non-text marks the user must see (WCAG 1.4.11). */
+function graphicPairs(theme: keyof typeof THEMES): Pair[] {
+  const surface = color(theme, "--surface-rgb").rgb;
+  const track = over(color(theme, "--pg-track"), surface);
+  return [
+    {
+      name: "--pg-fill on --pg-track",
+      ratio: contrast(over(color(theme, "--pg-fill"), track), track),
+      min: GRAPHIC,
+    },
+    {
+      // The bottom line is what marks a text field as one.
+      name: "--field-line under a text field",
+      ratio: contrast(
+        over(color(theme, "--field-line"), surface),
+        over(color(theme, "--field"), surface),
+      ),
+      min: GRAPHIC,
+    },
+  ];
+}
+
 /** The ratio, rounded down to two decimals, for the test name. */
 function shown(pair: Pair): Pair & { shown: string } {
   return { ...pair, shown: (Math.floor(pair.ratio * 100) / 100).toFixed(2) };
+}
+
+/** A tile glaze's middle colour: halfway between the top (+7 %) and the
+ * bottom (-5 %), under the sheen, which is transparent by then. */
+function glazeMiddle(name: string): Rgb {
+  const props = rule(css, `.${name}`);
+  const number = (prop: string) => parseFloat(props.get(prop) ?? "NaN");
+  return hsl(number("--h"), number("--sat") / 100, (number("--l") + 1) / 100);
 }
 
 /** Each tile glaze's top colour (DESIGN.md "Dock item / ladrilho": the
@@ -182,7 +296,7 @@ function glazeTops(): { name: string; rgb: Rgb }[] {
 describe("contrast (WCAG AA)", () => {
   for (const theme of ["light", "dark"] as const) {
     describe(`${theme} theme`, () => {
-      it.each(textPairs(theme).map(shown))(
+      it.each([...textPairs(theme), ...graphicPairs(theme)].map(shown))(
         "$name: $shown:1, at least $min:1",
         ({ ratio, min }) => {
           expect(ratio).toBeGreaterThanOrEqual(min);
@@ -198,6 +312,19 @@ describe("contrast (WCAG AA)", () => {
     ),
   )(
     "white glyph on the top of $name: $shown:1, at least $min:1",
+    ({ ratio, min }) => {
+      expect(ratio).toBeGreaterThanOrEqual(min);
+    },
+  );
+
+  // The live icons write text on the glaze: the clock's time, the
+  // progress's percentage.
+  it.each(
+    ["t-clock", "t-progress"].map((name) =>
+      shown({ name, ratio: contrast(glyph, glazeMiddle(name)), min: TEXT }),
+    ),
+  )(
+    "white text in the middle of $name: $shown:1, at least $min:1",
     ({ ratio, min }) => {
       expect(ratio).toBeGreaterThanOrEqual(min);
     },

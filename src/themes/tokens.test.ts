@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import design from "../../DESIGN.md?raw";
 import designJsonText from "../../.impeccable/design.json?raw";
+import { readSources } from "../test/sources";
 import css from "./tokens.css?raw";
 import { PANEL_INSET } from "../panel/geometry";
 
@@ -66,6 +67,15 @@ function declarations(text: string, selector: string): Map<string, string> {
   return props;
 }
 
+/** The `color-scheme` of the rule whose selector is exactly `selector`. */
+function colorScheme(text: string, selector: string): string | undefined {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`(^|\\n)\\s*${escaped}\\s*\\{`).exec(text);
+  if (!match) return undefined;
+  const body = blockAfter(text, match.index).replace(/\/\*[\s\S]*?\*\//g, "");
+  return /(?:^|;)\s*color-scheme\s*:\s*([^;]+?)\s*(?:;|$)/.exec(body)?.[1];
+}
+
 const mediaStart = css.indexOf("@media (prefers-color-scheme: dark)");
 const blocks = {
   light: declarations(css, ":root"),
@@ -93,6 +103,13 @@ const MODE_COLORS: Record<string, string> = {
   "--tip-ink": "tip-ink",
   "--track": "track",
   "--kbd": "kbd",
+  "--danger": "perigo",
+  "--danger-ink": "perigo-ink",
+  "--danger-soft": "perigo-soft",
+  "--field": "field",
+  "--field-line": "field-line",
+  "--pg-fill": "pg-fill",
+  "--pg-track": "pg-track",
 };
 
 const SURFACES = { light: "porcelana-surface", dark: "grafite-surface" };
@@ -165,6 +182,30 @@ describe("tokens.css", () => {
     expect(blocks.systemDark).toEqual(blocks.forcedDark);
   });
 
+  it("tells the native controls the theme in every block", () => {
+    // The list of a <select>, the time field, the checkbox and the scroll
+    // bars are drawn by the WebView in its own light or dark look: without
+    // `color-scheme` they stay light in the dark theme, with the theme's
+    // light --ink on them (2026-10-16 manual test: the zone list unreadable).
+    expect(colorScheme(css, ":root")).toBe("light");
+    expect(
+      colorScheme(
+        mediaStart < 0 ? "" : blockAfter(css, mediaStart),
+        ':root:not([data-mode="light"])',
+      ),
+    ).toBe("dark");
+    expect(colorScheme(css, ':root[data-mode="dark"]')).toBe("dark");
+  });
+
+  it("sets color-scheme only in tokens.css", () => {
+    const offenders = Object.entries(sources)
+      .filter(([path]) => path !== "/src/themes/tokens.css")
+      .filter(([path]) => !/\.test\.tsx?$/.test(path))
+      .filter(([, text]) => /color-scheme\s*:|colorScheme/.test(text))
+      .map(([path]) => path);
+    expect(offenders).toEqual([]);
+  });
+
   it("has the glyph color", () => {
     expect(blocks.light.get("--glyph")).toBe(normalize(colors.glifo ?? ""));
   });
@@ -227,7 +268,7 @@ describe("tokens.css", () => {
   });
 
   it("has a static class per tile glaze", () => {
-    expect(tertiary).toHaveLength(7);
+    expect(tertiary).toHaveLength(8);
     for (const [name, meta] of tertiary) {
       const match =
         /^(\.t-[\w-]+) \{ --h: (\d+); --sat: (\d+%); --l: (\d+%); \}$/.exec(
@@ -247,13 +288,9 @@ describe("tokens.css", () => {
   });
 });
 
-// Every source file as text. CSS comes through only because vite.config.ts
-// lets tests read all CSS (`test.css.include`); the guard below checks that.
-const sources = import.meta.glob<string>("/src/**/*.{css,ts,tsx}", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-});
+// Every source file as text, read from the disk (src/test/sources.ts), the
+// tests included: the glass guard looks at them too.
+const sources = readSources("src", /\.(css|tsx?)$/, { tests: true });
 
 describe("the provisional PR 1 glass", () => {
   it("reads the CSS sources as text", () => {

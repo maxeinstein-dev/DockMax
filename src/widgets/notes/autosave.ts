@@ -25,6 +25,14 @@ export interface AutosaveStatus {
   error: WidgetErrorCode | null;
 }
 
+/** Text left unsaved by an editor that went away, to start the next one
+ * from (`memory.ts`). */
+export interface AutosaveDraft {
+  text: string;
+  /** Code of its failed save; null when it was only waiting. */
+  error: WidgetErrorCode | null;
+}
+
 /** The timer functions, injected (`setTimeout`/`clearTimeout`). */
 export interface Schedule {
   setTimeout(callback: () => void, ms: number): unknown;
@@ -47,6 +55,10 @@ export interface AutosaveOptions {
   /** The text already stored (from `get_note`): typing it back saves
    * nothing. */
   savedText?: string;
+  /** Unsaved text to start from instead of `savedText`: with its error, it
+   * waits for a change or a `flush()` (like any failed text); without one,
+   * it saves after the pause. Ignored when it is the stored text. */
+  draft?: AutosaveDraft | null;
 }
 
 export interface Autosave {
@@ -102,6 +114,7 @@ export function createAutosave({
   saveTimeoutMs = SAVE_TIMEOUT_MS,
   schedule = globalSchedule,
   savedText = "",
+  draft = null,
 }: AutosaveOptions): Autosave {
   /** Text on screen. */
   let latest = savedText;
@@ -120,6 +133,16 @@ export function createAutosave({
   let disposed = false;
   let status: AutosaveStatus = { state: "idle", error: null };
   const listeners = new Set<() => void>();
+  if (draft !== null && draft.text !== savedText) {
+    latest = draft.text;
+    if (draft.error === null) {
+      timer = { handle: schedule.setTimeout(onPause, delayMs) };
+      status = { state: "pending", error: null };
+    } else {
+      failed = draft.text;
+      status = { state: "error", error: draft.error };
+    }
+  }
 
   function setStatus(state: AutosaveState, error: WidgetErrorCode | null) {
     if (disposed || (status.state === state && status.error === error)) return;

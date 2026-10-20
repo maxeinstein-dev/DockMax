@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::sync::Mutex;
@@ -11,6 +12,8 @@ use tauri::{
 
 use super::dock::{self, Edge, Rect};
 use super::hit_test;
+use super::memory::{self, MemoryTarget};
+use crate::domain::widgets::{WidgetId, WidgetKind};
 
 pub const LABEL: &str = "panel";
 
@@ -50,11 +53,18 @@ pub const MAX_PANEL_SIZE: f64 = 4096.0;
 /// window (which blocks clicks) never covers the bar.
 pub const MAX_INSET: f64 = MARGIN;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Which panel the dock asks for, as the pages send and get it:
+/// `"settings"`, `"about"` or `{ "widget": "<id>" }` (`PanelId` in
+/// `src/core/panels.ts`). The widget ID is checked when deserialized
+/// ([`WidgetId::parse`]): a malformed one is refused before any command
+/// runs. Whether the instance exists is checked by `toggle_panel`, which
+/// turns the ID into a [`Panel`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PanelId {
     Settings,
     About,
+    Widget(WidgetId),
 }
 
 /// Transparent inset the panel page lays around the card, in logical
@@ -62,28 +72,62 @@ pub enum PanelId {
 /// `src/panel/geometry.ts`).
 const PAGE_INSET: f64 = 8.0;
 
-impl PanelId {
-    /// The visible card, in logical pixels: its width as `Panel.css` fixes
-    /// it, and about the height its content takes.
-    fn card_size(self) -> (f64, f64) {
+/// A panel to open: its ID and, for a widget, the kind of the instance,
+/// which fixes the size the panel is reserved before its page reports one.
+/// `toggle_panel` builds it after checking the instance in the storage, so
+/// the state never opens a panel for an instance that isn't there.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Panel {
+    Settings,
+    About,
+    Widget { id: WidgetId, kind: WidgetKind },
+}
+
+impl Panel {
+    /// The ID the pages know this panel by.
+    pub fn id(&self) -> PanelId {
         match self {
-            PanelId::Settings => (320.0, 390.0),
-            PanelId::About => (300.0, 236.0),
+            Panel::Settings => PanelId::Settings,
+            Panel::About => PanelId::About,
+            Panel::Widget { id, .. } => PanelId::Widget(id.clone()),
+        }
+    }
+
+    /// Whether this is the panel `id` names.
+    fn is(&self, id: &PanelId) -> bool {
+        match (self, id) {
+            (Panel::Settings, PanelId::Settings) | (Panel::About, PanelId::About) => true,
+            (Panel::Widget { id: own, .. }, PanelId::Widget(other)) => own == other,
+            _ => false,
+        }
+    }
+
+    /// The visible card, in logical pixels: its width as `Panel.css` fixes
+    /// it, and about the height its content takes in its main view (the
+    /// mock, `docs/design/widgets-mock.html`).
+    fn card_size(&self) -> (f64, f64) {
+        match self {
+            Panel::Settings => (320.0, 390.0),
+            Panel::About => (300.0, 236.0),
+            Panel::Widget { kind, .. } => match kind {
+                // Title, time and date, footer.
+                WidgetKind::Clock => (300.0, 170.0),
+                // Title, four periods, footer.
+                WidgetKind::TimeProgress => (320.0, 284.0),
+                // Title, the 210 px text field, footer.
+                WidgetKind::Note => (340.0, 318.0),
+                // Never opened in this phase: `toggle_panel` refuses kinds
+                // that can't be created. The Settings card, if one ever is.
+                WidgetKind::Shortcut | WidgetKind::Files => (320.0, 390.0),
+            },
         }
     }
 
     /// Size the panel window is shown with before its page ever reported
     /// one, in logical pixels: the card and `PAGE_INSET` on every side.
-    pub fn logical_size(self) -> (f64, f64) {
+    pub fn logical_size(&self) -> (f64, f64) {
         let (width, height) = self.card_size();
         (width + 2.0 * PAGE_INSET, height + 2.0 * PAGE_INSET)
-    }
-
-    fn index(self) -> usize {
-        match self {
-            PanelId::Settings => 0,
-            PanelId::About => 1,
-        }
     }
 }
 
@@ -310,8 +354,8 @@ impl PanelGeometry {
 
     /// What the panel is shown with before its page ever reported a size:
     /// the geometry the page lays it out with, give or take the height.
-    pub fn fallback(id: PanelId) -> Self {
-        let (width, height) = id.logical_size();
+    pub fn fallback(panel: &Panel) -> Self {
+        let (width, height) = panel.logical_size();
         PanelGeometry {
             size: LogicalSize { width, height },
             inset: PAGE_INSET,
@@ -399,7 +443,7 @@ pub fn panel_rect(
     })
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     /// Hide the window, ask its page to render the panel and wait for
     /// `panel_ready`, or `READY_TIMEOUT`. The number tells this wait from
@@ -415,26 +459,38 @@ pub enum Action {
     Nothing,
 }
 
+/// The open panel: shown or waiting for its page.
+#[derive(Debug, Clone)]
+struct Open {
+    panel: Panel,
+    /// The dock item it is anchored to.
+    anchor: LogicalRect,
+    /// The wait that showed it (its `panel-show`).
+    shown: u64,
+}
+
 /// Which panel is open. Only one panel is open at a time.
 ///
 /// A panel opens in two steps: `toggle` prepares it (the window stays
 /// hidden while its page renders), then `ready` or `time_out` reveals it.
 #[derive(Debug, Default)]
 pub struct PanelState {
-    /// The open panel, shown or waiting for its page, the dock item it is
-    /// anchored to, and the wait that showed it (its `panel-show`).
-    open: Option<(PanelId, LogicalRect, u64)>,
+    open: Option<Open>,
     /// The wait for the open panel's page, while it lasts.
     waiting: Option<u64>,
     /// Waits started so far; numbers each one.
     waits: u64,
     /// Panel hidden by losing focus, and when.
     blurred: Option<(PanelId, Instant)>,
-    /// Last geometry each panel's page reported.
-    known: [Option<PanelGeometry>; 2],
+    /// Last geometry each panel's page reported, by panel: Settings, About
+    /// and each widget instance opened in this run. An instance removed
+    /// later keeps its entry, a few bytes, until the app exits; its ID is
+    /// never reused.
+    known: HashMap<PanelId, PanelGeometry>,
     /// Panel closed because the dock moved (its edge or size changed), to
     /// reopen at its item once the dock has settled in its new place, and
-    /// when the dock moved.
+    /// when the dock moved. Reopening goes through the dock's
+    /// `toggle_panel` again, which checks a widget instance again.
     reopen: Option<(PanelId, Instant)>,
 }
 
@@ -442,27 +498,32 @@ impl PanelState {
     /// A click on a dock item. Clicking the item of an open panel makes the
     /// panel lose focus (and hide) before the toggle arrives, so a toggle of
     /// that panel right after a blur-hide keeps it closed.
-    pub fn toggle(&mut self, id: PanelId, anchor: LogicalRect, now: Instant) -> Action {
+    pub fn toggle(&mut self, panel: Panel, anchor: LogicalRect, now: Instant) -> Action {
         // A click is an explicit request: it replaces a pending reopen.
         self.reopen = None;
         let blurred = self.blurred.take();
-        match self.open {
-            Some((open, _, _)) if open == id => self.close(),
-            Some(_) => self.prepare(id, anchor),
+        match &self.open {
+            Some(open) if open.panel == panel => self.close(),
+            Some(_) => self.prepare(panel, anchor),
             None => match blurred {
                 Some((closed, at))
-                    if closed == id && now.saturating_duration_since(at) < REOPEN_GUARD =>
+                    if panel.is(&closed) && now.saturating_duration_since(at) < REOPEN_GUARD =>
                 {
                     Action::Nothing
                 }
-                _ => self.prepare(id, anchor),
+                _ => self.prepare(panel, anchor),
             },
         }
     }
 
-    fn prepare(&mut self, id: PanelId, anchor: LogicalRect) -> Action {
+    fn prepare(&mut self, panel: Panel, anchor: LogicalRect) -> Action {
         self.waits += 1;
-        self.open = Some((id, anchor, self.waits));
+        let id = panel.id();
+        self.open = Some(Open {
+            panel,
+            anchor,
+            shown: self.waits,
+        });
         self.waiting = Some(self.waits);
         Action::Prepare(id, self.waits)
     }
@@ -483,8 +544,8 @@ impl PanelState {
             return Action::Nothing;
         }
         match self.open.take() {
-            Some((id, _, _)) => {
-                self.blurred = Some((id, now));
+            Some(open) => {
+                self.blurred = Some((open.panel.id(), now));
                 Action::Hide
             }
             None => Action::Nothing,
@@ -535,8 +596,9 @@ impl PanelState {
     /// The panel to reopen, unless the move was `REOPEN_TIMEOUT` ago.
     fn pending_reopen(&self, now: Instant) -> Option<PanelId> {
         self.reopen
-            .filter(|&(_, at)| now.saturating_duration_since(at) <= REOPEN_TIMEOUT)
-            .map(|(id, _)| id)
+            .as_ref()
+            .filter(|(_, at)| now.saturating_duration_since(*at) <= REOPEN_TIMEOUT)
+            .map(|(id, _)| id.clone())
     }
 
     /// The panel page rendered `id` at `geometry` (validated), answering
@@ -545,13 +607,14 @@ impl PanelState {
     /// ignored. A signal for the panel already on screen places it again
     /// (its content changed size, or the time-out showed it first).
     pub fn ready(&mut self, id: PanelId, wait: u64, geometry: PanelGeometry) -> Action {
-        let Some((open, anchor, shown)) = self.open else {
+        let Some(open) = &self.open else {
             return Action::Nothing;
         };
-        if open != id || shown != wait {
+        if !open.panel.is(&id) || open.shown != wait {
             return Action::Nothing;
         }
-        self.known[id.index()] = Some(geometry);
+        let anchor = open.anchor;
+        self.known.insert(id, geometry);
         self.waiting = None;
         Action::Reveal { anchor, geometry }
     }
@@ -563,10 +626,14 @@ impl PanelState {
             return Action::Nothing;
         }
         self.waiting = None;
-        match self.open {
-            Some((id, anchor, _)) => Action::Reveal {
-                anchor,
-                geometry: self.known[id.index()].unwrap_or_else(|| PanelGeometry::fallback(id)),
+        match &self.open {
+            Some(open) => Action::Reveal {
+                anchor: open.anchor,
+                geometry: self
+                    .known
+                    .get(&open.panel.id())
+                    .copied()
+                    .unwrap_or_else(|| PanelGeometry::fallback(&open.panel)),
             },
             None => Action::Nothing,
         }
@@ -574,7 +641,7 @@ impl PanelState {
 
     /// The open panel, shown or waiting for its page.
     pub fn open(&self) -> Option<PanelId> {
-        self.open.map(|(id, _, _)| id)
+        self.open.as_ref().map(|open| open.panel.id())
     }
 
     /// Drops the reopen guard: the next toggle is an explicit request (the
@@ -608,15 +675,16 @@ struct ChangedPayload {
     panel_id: Option<PanelId>,
 }
 
-/// Registers the panel state and hides the panel when it loses focus or is
-/// closed (Alt+F4).
+/// Hides the panel when it loses focus or is closed (Alt+F4). The panel
+/// state itself is managed by the builder: a page can send a command
+/// (`set_dock_layout`, `toggle_panel`) while this still runs, and the
+/// command needs the state (seen as a panic at startup, spec 0003 §2.12).
 pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let window = app
         .get_webview_window(LABEL)
         .ok_or("panel window is missing from tauri.conf.json")?;
     #[cfg(windows)]
     super::native::install(&window, None, LAYERING)?;
-    app.manage(Mutex::new(PanelState::default()));
     let app = app.clone();
     window.on_window_event(move |event| {
         let action = match event {
@@ -666,9 +734,12 @@ pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
     let window = app
         .get_webview_window(LABEL)
         .ok_or("panel window is missing")?;
+    if let Some(target) = memory_target(&action) {
+        memory::set(&window, target);
+    }
     match action {
         Action::Prepare(id, wait) => {
-            notify_dock(app, Some(id));
+            notify_dock(app, Some(id.clone()));
             // Hidden while the page renders: no previous content, no flash
             // at the previous size.
             window.hide()?;
@@ -691,6 +762,16 @@ pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
         Action::Nothing => {}
     }
     Ok(())
+}
+
+/// The memory target an action moves the panel to: normal before its page
+/// renders a panel, low once it is hidden; the others keep it.
+fn memory_target(action: &Action) -> Option<MemoryTarget> {
+    match action {
+        Action::Prepare(..) => Some(MemoryTarget::Normal),
+        Action::Hide => Some(MemoryTarget::Low),
+        Action::Reveal { .. } | Action::Nothing => None,
+    }
 }
 
 /// Carries out a `Reveal` (or nothing); on failure, closes the panel.
@@ -825,10 +906,92 @@ mod tests {
         assert!(serde_json::from_str::<PanelId>("\"About\"").is_err());
     }
 
+    /// Two widget instances, as Rust makes their IDs (UUID v7).
+    const WIDGET: &str = "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6071";
+    const OTHER_WIDGET: &str = "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6075";
+
+    fn widget_id(id: &str) -> PanelId {
+        PanelId::Widget(WidgetId::parse(id).unwrap())
+    }
+
+    fn widget(id: &str, kind: WidgetKind) -> Panel {
+        Panel::Widget {
+            id: WidgetId::parse(id).unwrap(),
+            kind,
+        }
+    }
+
+    #[test]
+    fn a_widget_panel_id_is_an_object_with_the_instance() {
+        let json = format!(r#"{{"widget":"{WIDGET}"}}"#);
+        assert_eq!(serde_json::to_string(&widget_id(WIDGET)).unwrap(), json);
+        assert_eq!(
+            serde_json::from_str::<PanelId>(&json).unwrap(),
+            widget_id(WIDGET)
+        );
+        assert_eq!(
+            serde_json::to_value(ChangedPayload {
+                panel_id: Some(widget_id(WIDGET))
+            })
+            .unwrap(),
+            serde_json::json!({ "panelId": { "widget": WIDGET } })
+        );
+    }
+
+    #[test]
+    fn a_widget_panel_id_with_a_malformed_instance_or_extra_keys_is_rejected() {
+        let rejected = [
+            r#"{"widget":""}"#.to_owned(),
+            r#"{"widget":"clock"}"#.to_owned(),
+            // Uppercase, and a v4 UUID: not the form Rust makes.
+            r#"{"widget":"019A1B2C-3D4E-7F60-8A1B-2C3D4E5F6071"}"#.to_owned(),
+            r#"{"widget":"019a1b2c-3d4e-4f60-8a1b-2c3d4e5f6071"}"#.to_owned(),
+            r#"{"widget":7}"#.to_owned(),
+            r#"{"widget":null}"#.to_owned(),
+            r#""widget""#.to_owned(),
+            r#"{"Widget":"019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6071"}"#.to_owned(),
+            format!(r#"{{"widget":"{WIDGET}","kind":"clock"}}"#),
+            format!(r#"{{"widget":"{WIDGET}","about":null}}"#),
+            r#"{}"#.to_owned(),
+            r#"[]"#.to_owned(),
+        ];
+        for json in rejected {
+            assert!(serde_json::from_str::<PanelId>(&json).is_err(), "{json}");
+        }
+    }
+
+    #[test]
+    fn widget_panels_are_reserved_by_kind() {
+        assert_eq!(
+            widget(WIDGET, WidgetKind::Clock).logical_size(),
+            (316.0, 186.0)
+        );
+        assert_eq!(
+            widget(WIDGET, WidgetKind::TimeProgress).logical_size(),
+            (336.0, 300.0)
+        );
+        assert_eq!(
+            widget(WIDGET, WidgetKind::Note).logical_size(),
+            (356.0, 334.0)
+        );
+    }
+
+    #[test]
+    fn a_panel_is_the_one_its_id_names() {
+        let clock = widget(WIDGET, WidgetKind::Clock);
+        assert_eq!(clock.id(), widget_id(WIDGET));
+        assert!(clock.is(&widget_id(WIDGET)));
+        assert!(!clock.is(&widget_id(OTHER_WIDGET)));
+        assert!(!clock.is(&PanelId::Settings));
+        assert!(Panel::Settings.is(&PanelId::Settings));
+        assert!(!Panel::Settings.is(&PanelId::About));
+        assert!(!Panel::About.is(&widget_id(WIDGET)));
+    }
+
     #[test]
     fn panels_have_fixed_sizes() {
-        assert_eq!(PanelId::Settings.logical_size(), (336.0, 406.0));
-        assert_eq!(PanelId::About.logical_size(), (316.0, 252.0));
+        assert_eq!(Panel::Settings.logical_size(), (336.0, 406.0));
+        assert_eq!(Panel::About.logical_size(), (316.0, 252.0));
     }
 
     /// The number of pixels `property` is set to in the CSS rule whose
@@ -859,16 +1022,32 @@ mod tests {
             .unwrap()
             .replace("\r\n", "\n");
         let inset = css_px(&css, ".panel-frame", "--panel-inset");
+        let widget = |kind| Panel::Widget {
+            id: WidgetId::parse(WIDGET).unwrap(),
+            kind,
+        };
         let cards = [
-            (PanelId::Settings, css_px(&css, ".panel", "width")),
+            (Panel::Settings, css_px(&css, ".panel", "width")),
             (
-                PanelId::About,
+                Panel::About,
                 css_px(&css, r#".panel[data-panel="about"]"#, "width"),
+            ),
+            (
+                widget(WidgetKind::Clock),
+                css_px(&css, r#".panel[data-widget="clock"]"#, "width"),
+            ),
+            (
+                widget(WidgetKind::TimeProgress),
+                css_px(&css, r#".panel[data-widget="time-progress"]"#, "width"),
+            ),
+            (
+                widget(WidgetKind::Note),
+                css_px(&css, r#".panel[data-widget="note"]"#, "width"),
             ),
         ];
 
         for (id, card_width) in cards {
-            let fallback = PanelGeometry::fallback(id);
+            let fallback = PanelGeometry::fallback(&id);
             assert_eq!(fallback.inset, inset, "{id:?}");
             assert_eq!(fallback.size.width, card_width + 2.0 * inset, "{id:?}");
             // A geometry the page could have reported.
@@ -1797,8 +1976,9 @@ mod tests {
 
     /// Opens `id` and reveals it as its page confirms, at `RENDERED`.
     /// Returns the wait that showed it.
-    fn show(state: &mut PanelState, id: PanelId, now: Instant) -> u64 {
-        let (prepared_id, wait) = prepared(state.toggle(id, ANCHOR, now));
+    fn show(state: &mut PanelState, panel: Panel, now: Instant) -> u64 {
+        let id = panel.id();
+        let (prepared_id, wait) = prepared(state.toggle(panel, ANCHOR, now));
         assert_eq!(prepared_id, id);
         assert_eq!(
             state.ready(id, wait, RENDERED),
@@ -1811,10 +1991,25 @@ mod tests {
     }
 
     #[test]
+    fn the_panel_is_at_normal_memory_to_render_and_low_once_hidden() {
+        let mut state = PanelState::default();
+        let prepare = state.toggle(Panel::Settings, ANCHOR, Instant::now());
+        assert_eq!(memory_target(&prepare), Some(MemoryTarget::Normal));
+        assert_eq!(memory_target(&state.hide()), Some(MemoryTarget::Low));
+        // Placing an open panel again, or nothing, keeps the level.
+        let reveal = Action::Reveal {
+            anchor: ANCHOR,
+            geometry: RENDERED,
+        };
+        assert_eq!(memory_target(&reveal), None);
+        assert_eq!(memory_target(&Action::Nothing), None);
+    }
+
+    #[test]
     fn toggle_prepares_a_closed_panel_without_showing_it() {
         let mut state = PanelState::default();
 
-        let (id, _) = prepared(state.toggle(PanelId::Settings, ANCHOR, Instant::now()));
+        let (id, _) = prepared(state.toggle(Panel::Settings, ANCHOR, Instant::now()));
 
         assert_eq!(id, PanelId::Settings);
         assert_eq!(state.open(), Some(PanelId::Settings));
@@ -1823,7 +2018,7 @@ mod tests {
     #[test]
     fn ready_for_the_waiting_panel_reveals_it_at_the_reported_geometry() {
         let mut state = PanelState::default();
-        let (_, wait) = prepared(state.toggle(PanelId::About, ANCHOR, Instant::now()));
+        let (_, wait) = prepared(state.toggle(Panel::About, ANCHOR, Instant::now()));
 
         assert_eq!(
             state.ready(PanelId::About, wait, RENDERED),
@@ -1838,8 +2033,8 @@ mod tests {
     fn ready_for_a_stale_panel_is_ignored() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        let (_, first) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
-        let (_, wait) = prepared(state.toggle(PanelId::About, ANCHOR, at(t, 50)));
+        let (_, first) = prepared(state.toggle(Panel::Settings, ANCHOR, t));
+        let (_, wait) = prepared(state.toggle(Panel::About, ANCHOR, at(t, 50)));
 
         // The Settings page confirms late, after the switch to About.
         assert_eq!(
@@ -1851,7 +2046,7 @@ mod tests {
             state.time_out(wait),
             Action::Reveal {
                 anchor: ANCHOR,
-                geometry: PanelGeometry::fallback(PanelId::About)
+                geometry: PanelGeometry::fallback(&Panel::About)
             }
         );
     }
@@ -1861,10 +2056,10 @@ mod tests {
         let mut state = PanelState::default();
         let t = Instant::now();
         // A, then B, then A again before either page confirmed.
-        let (_, a) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
-        let (_, b) = prepared(state.toggle(PanelId::About, ANCHOR, at(t, 30)));
+        let (_, a) = prepared(state.toggle(Panel::Settings, ANCHOR, t));
+        let (_, b) = prepared(state.toggle(Panel::About, ANCHOR, at(t, 30)));
         let moved = LogicalRect { x: 120.0, ..ANCHOR };
-        let (_, again) = prepared(state.toggle(PanelId::Settings, moved, at(t, 60)));
+        let (_, again) = prepared(state.toggle(Panel::Settings, moved, at(t, 60)));
 
         // The answers to the first A and to B arrive late.
         assert_eq!(state.ready(PanelId::Settings, a, RENDERED), Action::Nothing);
@@ -1889,7 +2084,7 @@ mod tests {
         let mut state = PanelState::default();
         assert_eq!(state.ready(PanelId::Settings, 1, RENDERED), Action::Nothing);
 
-        let (_, wait) = prepared(state.toggle(PanelId::Settings, ANCHOR, Instant::now()));
+        let (_, wait) = prepared(state.toggle(Panel::Settings, ANCHOR, Instant::now()));
         state.hide();
         assert_eq!(
             state.ready(PanelId::Settings, wait, RENDERED),
@@ -1900,17 +2095,17 @@ mod tests {
     #[test]
     fn time_out_reveals_the_waiting_panel_at_its_fallback_size() {
         let mut state = PanelState::default();
-        let (_, wait) = prepared(state.toggle(PanelId::Settings, ANCHOR, Instant::now()));
+        let (_, wait) = prepared(state.toggle(Panel::Settings, ANCHOR, Instant::now()));
 
         assert_eq!(
             state.time_out(wait),
             Action::Reveal {
                 anchor: ANCHOR,
-                geometry: PanelGeometry::fallback(PanelId::Settings)
+                geometry: PanelGeometry::fallback(&Panel::Settings)
             }
         );
         assert_eq!(
-            PanelGeometry::fallback(PanelId::Settings).size,
+            PanelGeometry::fallback(&Panel::Settings).size,
             LogicalSize {
                 width: 336.0,
                 height: 406.0
@@ -1922,10 +2117,10 @@ mod tests {
     fn time_out_reveals_at_the_last_size_the_page_reported() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.hide();
 
-        let (_, wait) = prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1000)));
+        let (_, wait) = prepared(state.toggle(Panel::Settings, ANCHOR, at(t, 1000)));
 
         assert_eq!(
             state.time_out(wait),
@@ -1940,12 +2135,12 @@ mod tests {
     fn time_out_after_ready_or_of_an_older_wait_does_nothing() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        let (_, first) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
+        let (_, first) = prepared(state.toggle(Panel::Settings, ANCHOR, t));
         state.ready(PanelId::Settings, first, RENDERED);
         assert_eq!(state.time_out(first), Action::Nothing);
 
         state.hide();
-        let (_, second) = prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1000)));
+        let (_, second) = prepared(state.toggle(Panel::Settings, ANCHOR, at(t, 1000)));
         assert_ne!(first, second);
         // The first wait's timer fires late: the second wait is untouched.
         assert_eq!(state.time_out(first), Action::Nothing);
@@ -1956,10 +2151,10 @@ mod tests {
     fn toggle_of_the_waiting_panel_cancels_it() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        let (_, wait) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
+        let (_, wait) = prepared(state.toggle(Panel::Settings, ANCHOR, t));
 
         assert_eq!(
-            state.toggle(PanelId::Settings, ANCHOR, at(t, 100)),
+            state.toggle(Panel::Settings, ANCHOR, at(t, 100)),
             Action::Hide
         );
         assert_eq!(state.time_out(wait), Action::Nothing);
@@ -1974,9 +2169,9 @@ mod tests {
     fn toggle_of_another_panel_while_waiting_starts_a_new_wait() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        let (_, first) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
+        let (_, first) = prepared(state.toggle(Panel::Settings, ANCHOR, t));
 
-        let (id, second) = prepared(state.toggle(PanelId::About, ANCHOR, at(t, 100)));
+        let (id, second) = prepared(state.toggle(Panel::About, ANCHOR, at(t, 100)));
 
         assert_eq!(id, PanelId::About);
         assert_eq!(state.time_out(first), Action::Nothing);
@@ -1988,7 +2183,7 @@ mod tests {
         // Hiding the window for the wait takes its focus.
         let mut state = PanelState::default();
         let t = Instant::now();
-        let (_, wait) = prepared(state.toggle(PanelId::Settings, ANCHOR, t));
+        let (_, wait) = prepared(state.toggle(Panel::Settings, ANCHOR, t));
 
         assert_eq!(state.blur(at(t, 10)), Action::Nothing);
         assert_eq!(state.open(), Some(PanelId::Settings));
@@ -2003,7 +2198,7 @@ mod tests {
     #[test]
     fn hide_while_waiting_closes_and_ends_the_wait() {
         let mut state = PanelState::default();
-        let (_, wait) = prepared(state.toggle(PanelId::About, ANCHOR, Instant::now()));
+        let (_, wait) = prepared(state.toggle(Panel::About, ANCHOR, Instant::now()));
 
         assert_eq!(state.hide(), Action::Hide);
         assert_eq!(state.time_out(wait), Action::Nothing);
@@ -2013,7 +2208,7 @@ mod tests {
     #[test]
     fn ready_for_the_panel_on_screen_places_it_again() {
         let mut state = PanelState::default();
-        let wait = show(&mut state, PanelId::Settings, Instant::now());
+        let wait = show(&mut state, Panel::Settings, Instant::now());
         let taller = PanelGeometry {
             size: LogicalSize {
                 width: 392.0,
@@ -2036,7 +2231,7 @@ mod tests {
     fn toggle_anchors_the_panel_to_the_clicked_item() {
         let mut state = PanelState::default();
         let item = LogicalRect { x: 90.0, ..ANCHOR };
-        let (_, wait) = prepared(state.toggle(PanelId::About, item, Instant::now()));
+        let (_, wait) = prepared(state.toggle(Panel::About, item, Instant::now()));
 
         assert_eq!(
             state.ready(PanelId::About, wait, RENDERED),
@@ -2051,14 +2246,14 @@ mod tests {
     fn toggle_of_the_open_panel_hides_it() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
 
         assert_eq!(
-            state.toggle(PanelId::Settings, ANCHOR, at(t, 1000)),
+            state.toggle(Panel::Settings, ANCHOR, at(t, 1000)),
             Action::Hide
         );
         assert_eq!(
-            prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1100))).0,
+            prepared(state.toggle(Panel::Settings, ANCHOR, at(t, 1100))).0,
             PanelId::Settings
         );
     }
@@ -2067,23 +2262,20 @@ mod tests {
     fn toggle_of_another_panel_switches_content() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
 
         assert_eq!(
-            prepared(state.toggle(PanelId::About, ANCHOR, at(t, 50))).0,
+            prepared(state.toggle(Panel::About, ANCHOR, at(t, 50))).0,
             PanelId::About
         );
-        assert_eq!(
-            state.toggle(PanelId::About, ANCHOR, at(t, 100)),
-            Action::Hide
-        );
+        assert_eq!(state.toggle(Panel::About, ANCHOR, at(t, 100)), Action::Hide);
     }
 
     #[test]
     fn blur_hides_the_open_panel() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::About, t);
+        show(&mut state, Panel::About, t);
 
         assert_eq!(state.blur(at(t, 10)), Action::Hide);
         assert_eq!(state.blur(at(t, 20)), Action::Nothing);
@@ -2100,16 +2292,16 @@ mod tests {
     fn toggle_right_after_a_blur_hide_of_the_same_panel_keeps_it_closed() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.blur(at(t, 1000));
 
         assert_eq!(
-            state.toggle(PanelId::Settings, ANCHOR, at(t, 1299)),
+            state.toggle(Panel::Settings, ANCHOR, at(t, 1299)),
             Action::Nothing
         );
         // The guard is consumed: the next click opens again.
         assert_eq!(
-            prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1350))).0,
+            prepared(state.toggle(Panel::Settings, ANCHOR, at(t, 1350))).0,
             PanelId::Settings
         );
     }
@@ -2118,11 +2310,11 @@ mod tests {
     fn toggle_300ms_or_more_after_a_blur_hide_reopens() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.blur(at(t, 1000));
 
         assert_eq!(
-            prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1300))).0,
+            prepared(state.toggle(Panel::Settings, ANCHOR, at(t, 1300))).0,
             PanelId::Settings
         );
     }
@@ -2131,11 +2323,11 @@ mod tests {
     fn toggle_of_another_panel_right_after_a_blur_hide_opens_it() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.blur(at(t, 1000));
 
         assert_eq!(
-            prepared(state.toggle(PanelId::About, ANCHOR, at(t, 1050))).0,
+            prepared(state.toggle(Panel::About, ANCHOR, at(t, 1050))).0,
             PanelId::About
         );
     }
@@ -2144,13 +2336,13 @@ mod tests {
     fn forgetting_the_blur_lets_an_explicit_request_reopen_at_once() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.blur(at(t, 1000));
 
         state.forget_blur();
 
         assert_eq!(
-            prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 1010))).0,
+            prepared(state.toggle(Panel::Settings, ANCHOR, at(t, 1010))).0,
             PanelId::Settings
         );
     }
@@ -2159,13 +2351,13 @@ mod tests {
     fn hide_closes_the_open_panel_without_arming_the_reopen_guard() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
 
         assert_eq!(state.hide(), Action::Hide);
         // The focus loss caused by hiding must not arm the guard.
         assert_eq!(state.blur(at(t, 10)), Action::Nothing);
         assert_eq!(
-            prepared(state.toggle(PanelId::Settings, ANCHOR, at(t, 50))).0,
+            prepared(state.toggle(Panel::Settings, ANCHOR, at(t, 50))).0,
             PanelId::Settings
         );
     }
@@ -2174,14 +2366,14 @@ mod tests {
     fn hide_after_a_blur_hide_keeps_the_reopen_guard() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.blur(at(t, 1000));
 
         // A late hide (Esc or the dock hiding) after the blur-hide.
         assert_eq!(state.hide(), Action::Nothing);
         // The click that closed the panel must not reopen it.
         assert_eq!(
-            state.toggle(PanelId::Settings, ANCHOR, at(t, 1100)),
+            state.toggle(Panel::Settings, ANCHOR, at(t, 1100)),
             Action::Nothing
         );
     }
@@ -2197,7 +2389,7 @@ mod tests {
     fn moving_the_dock_closes_the_open_panel_and_remembers_it() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
 
         assert_eq!(state.close_for_move(t), Action::Hide);
         assert_eq!(state.open(), None);
@@ -2211,7 +2403,7 @@ mod tests {
     fn moving_the_dock_closes_a_waiting_panel_and_remembers_it() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        let (_, wait) = prepared(state.toggle(PanelId::About, ANCHOR, t));
+        let (_, wait) = prepared(state.toggle(Panel::About, ANCHOR, t));
 
         assert_eq!(state.close_for_move(t), Action::Hide);
         assert_eq!(state.time_out(wait), Action::Nothing);
@@ -2231,7 +2423,7 @@ mod tests {
     fn reopen_waits_while_the_layout_resizes_or_moves_the_dock() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.close_for_move(t);
 
         // The page measured the old window: its items are not where they
@@ -2248,7 +2440,7 @@ mod tests {
     fn reopen_is_handed_out_once() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.close_for_move(t);
 
         assert_eq!(
@@ -2263,7 +2455,7 @@ mod tests {
     fn a_second_move_before_the_dock_settles_keeps_the_reopen() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::About, t);
+        show(&mut state, Panel::About, t);
         state.close_for_move(t);
 
         assert_eq!(state.close_for_move(at(t, 900)), Action::Nothing);
@@ -2275,7 +2467,7 @@ mod tests {
     fn a_reopen_the_dock_never_settles_for_expires() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.close_for_move(t);
 
         // Only layouts that resize the window, then nothing for a second.
@@ -2289,7 +2481,7 @@ mod tests {
     fn a_reopen_settled_just_in_time_is_handed_out() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.close_for_move(t);
 
         assert_eq!(REOPEN_TIMEOUT, Duration::from_secs(1));
@@ -2303,7 +2495,7 @@ mod tests {
     fn a_reopen_expired_while_closed_is_not_revived_by_a_later_move() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.close_for_move(t);
 
         // Long after, the size changes again with no panel open.
@@ -2315,7 +2507,7 @@ mod tests {
     fn explicit_close_or_hide_drops_the_reopen() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.close_for_move(t);
 
         // Esc, Alt+F4 or the dock hiding.
@@ -2327,10 +2519,10 @@ mod tests {
     fn a_click_on_an_item_replaces_the_reopen() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.close_for_move(t);
 
-        let (id, _) = prepared(state.toggle(PanelId::About, ANCHOR, at(t, 100)));
+        let (id, _) = prepared(state.toggle(Panel::About, ANCHOR, at(t, 100)));
 
         assert_eq!(id, PanelId::About);
         assert_eq!(state.dock_settled(false, at(t, 150)), None);
@@ -2340,7 +2532,7 @@ mod tests {
     fn the_reopened_panel_opens_like_a_click() {
         let mut state = PanelState::default();
         let t = Instant::now();
-        show(&mut state, PanelId::Settings, t);
+        show(&mut state, Panel::Settings, t);
         state.close_for_move(t);
         // Hiding the window for the move takes its focus.
         assert_eq!(state.blur(at(t, 1)), Action::Nothing);
@@ -2349,13 +2541,149 @@ mod tests {
         // The dock answers `dock-request-panel` with a toggle at the item's
         // new place, right away: no reopen guard applies.
         let moved = LogicalRect { x: 120.0, ..ANCHOR };
-        let (_, wait) = prepared(state.toggle(reopen, moved, at(t, 20)));
+        assert_eq!(reopen, PanelId::Settings);
+        let (_, wait) = prepared(state.toggle(Panel::Settings, moved, at(t, 20)));
         assert_eq!(
             state.ready(reopen, wait, RENDERED),
             Action::Reveal {
                 anchor: moved,
                 geometry: RENDERED
             }
+        );
+    }
+
+    #[test]
+    fn toggle_prepares_a_widget_panel_by_its_instance() {
+        let mut state = PanelState::default();
+        let (id, wait) =
+            prepared(state.toggle(widget(WIDGET, WidgetKind::Note), ANCHOR, Instant::now()));
+
+        assert_eq!(id, widget_id(WIDGET));
+        assert_eq!(state.open(), Some(widget_id(WIDGET)));
+        assert_eq!(
+            state.ready(widget_id(WIDGET), wait, RENDERED),
+            Action::Reveal {
+                anchor: ANCHOR,
+                geometry: RENDERED
+            }
+        );
+    }
+
+    #[test]
+    fn two_instances_of_a_kind_are_two_panels() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        show(&mut state, widget(WIDGET, WidgetKind::Clock), t);
+
+        let (id, wait) =
+            prepared(state.toggle(widget(OTHER_WIDGET, WidgetKind::Clock), ANCHOR, at(t, 50)));
+        assert_eq!(id, widget_id(OTHER_WIDGET));
+        // The first instance's answer is stale.
+        assert_eq!(
+            state.ready(widget_id(WIDGET), wait, RENDERED),
+            Action::Nothing
+        );
+        assert_eq!(
+            state.toggle(widget(OTHER_WIDGET, WidgetKind::Clock), ANCHOR, at(t, 100)),
+            Action::Hide
+        );
+    }
+
+    #[test]
+    fn a_widget_and_a_system_panel_switch_like_any_two_panels() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        show(&mut state, widget(WIDGET, WidgetKind::Note), t);
+
+        assert_eq!(
+            prepared(state.toggle(Panel::Settings, ANCHOR, at(t, 50))).0,
+            PanelId::Settings
+        );
+        assert_eq!(
+            prepared(state.toggle(widget(WIDGET, WidgetKind::Note), ANCHOR, at(t, 100))).0,
+            widget_id(WIDGET)
+        );
+    }
+
+    #[test]
+    fn the_reopen_guard_is_per_instance() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        show(&mut state, widget(WIDGET, WidgetKind::Clock), t);
+        assert_eq!(state.blur(at(t, 1000)), Action::Hide);
+
+        // The click that closed it keeps it closed...
+        assert_eq!(
+            state.toggle(widget(WIDGET, WidgetKind::Clock), ANCHOR, at(t, 1100)),
+            Action::Nothing
+        );
+        show(&mut state, widget(WIDGET, WidgetKind::Clock), at(t, 1200));
+        assert_eq!(state.blur(at(t, 2000)), Action::Hide);
+        // ...but a click on another instance opens that one.
+        assert_eq!(
+            prepared(state.toggle(widget(OTHER_WIDGET, WidgetKind::Clock), ANCHOR, at(t, 2050))).0,
+            widget_id(OTHER_WIDGET)
+        );
+    }
+
+    #[test]
+    fn time_out_reveals_a_widget_panel_at_the_size_of_its_kind() {
+        let mut state = PanelState::default();
+        let note = widget(WIDGET, WidgetKind::Note);
+        let (_, wait) = prepared(state.toggle(note.clone(), ANCHOR, Instant::now()));
+
+        assert_eq!(
+            state.time_out(wait),
+            Action::Reveal {
+                anchor: ANCHOR,
+                geometry: PanelGeometry::fallback(&note)
+            }
+        );
+        assert_eq!(PanelGeometry::fallback(&note).size.width, 356.0);
+    }
+
+    #[test]
+    fn each_instance_keeps_the_size_its_page_reported() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        show(&mut state, widget(WIDGET, WidgetKind::Clock), t);
+        state.hide();
+
+        // Another instance of the same kind never reported one.
+        let other = widget(OTHER_WIDGET, WidgetKind::Clock);
+        let (_, wait) = prepared(state.toggle(other.clone(), ANCHOR, at(t, 100)));
+        assert_eq!(
+            state.time_out(wait),
+            Action::Reveal {
+                anchor: ANCHOR,
+                geometry: PanelGeometry::fallback(&other)
+            }
+        );
+        state.hide();
+
+        let (_, wait) =
+            prepared(state.toggle(widget(WIDGET, WidgetKind::Clock), ANCHOR, at(t, 200)));
+        assert_eq!(
+            state.time_out(wait),
+            Action::Reveal {
+                anchor: ANCHOR,
+                geometry: RENDERED
+            }
+        );
+    }
+
+    #[test]
+    fn moving_the_dock_reopens_the_widget_panel_by_its_id() {
+        let mut state = PanelState::default();
+        let t = Instant::now();
+        show(&mut state, widget(WIDGET, WidgetKind::TimeProgress), t);
+
+        assert_eq!(state.close_for_move(t), Action::Hide);
+        // The dock toggles it again, so `toggle_panel` checks the instance
+        // again before it reopens.
+        assert_eq!(
+            state.dock_settled(false, at(t, 50)),
+            Some(widget_id(WIDGET))
         );
     }
 }
