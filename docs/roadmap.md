@@ -196,7 +196,7 @@ Revisão de 2026-10-19 (fim da Fase 2): a direção foi mantida e o roadmap ganh
 | Risco | Impacto | Mitigação |
 |---|---|---|
 | Substituição completa da barra de tarefas | Alto | Manter convivência no MVP; evoluir por capacidades |
-| Memória do WebView2 (duas janelas = dois renderizadores; 182 MB na Fase 1, 280 MB no PR 2 da Fase 2) | Alto | Orçamento por fase, medição em todo PR de interface, spike da janela única na Fase 4 |
+| Memória do WebView2 (182 MB na Fase 1; no PR 2 da Fase 2, 202–264 MB antes e 170–231 MB depois de dividir um renderizador e baixar o alvo de memória em repouso, spec 0003 §2.12) | Alto | Orçamento por fase, medição em todo PR de interface, spike da janela única na Fase 4 |
 | Drag-and-drop numa janela com click-through alternado pelo Rust | Médio | Validação técnica antes da Prateleira (3c), com alternativa decidida |
 | APIs de hardware inconsistentes | Alto | Provedores substituíveis e estado “indisponível” |
 | Métricas do Claude não acessíveis para conta individual | Alto | Identificar fonte e tipo de conta; não prometer limites não disponíveis |

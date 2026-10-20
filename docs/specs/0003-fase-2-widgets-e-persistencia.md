@@ -233,6 +233,11 @@ Resultado: §2.11.
 - Com 12 widgets no tamanho Grande o dock tem cerca de 1.050 px em repouso e cabe numa tela de 1366 px.
 - A revisão final de acabamento do mock foi dispensada pelo usuário; o código do PR 2 passa pela revisão adversarial completa.
 
+**Testes manuais do PR 2 (2026-10-16 a 2026-10-20)**, no build de release:
+- Primeira rodada apontou três problemas: contraste da lista de fusos no tema escuro, falta de "remover" em Configurações › Itens do dock e segundos "não gravados". Os dois primeiros foram corrigidos (`color-scheme` nos controles nativos; depois a causa real da lista: o menu do `<select>` do WebView2 é uma janela própria que ignora `color-scheme` e só respeita a cor do texto das opções, fixada na tinta escura); o terceiro era expectativa de segundos no ícone do dock. Decisão do usuário: segundos só no painel, como a Q2 previa; o ajuste ganhou a nota "O ícone do dock mostra só horas e minutos".
+- Pedido extra atendido: a lista de fusos é ordenada pelo deslocamento UTC vigente, não por nome.
+- Segunda rodada: fusos, remoção e segundos no painel confirmados; nenhum defeito aberto. Memória: §2.12.
+
 ### 2.12 Memória (2026-10-20)
 
 **Método.** Build de release isolado do E2E (`pnpm tauri build --no-bundle --features e2e --config src-tauri/tauri.e2e.conf.json`, pasta de dados própria por execução, nunca o DockMax do usuário), painéis abertos pelo WebDriver embutido, sem entrada sintética do sistema. Memória de `dockmax-e2e.exe` mais todos os `msedgewebview2.exe` descendentes (árvore por `ParentProcessId`), lida 20 a 25 s depois da última ação. Duas colunas: **privada** (bytes privados, o commit que o processo reserva; é o número da linha de base da Fase 1 e do orçamento do roadmap) e **working set privado** (o que está de fato na RAM, a coluna "Memória" do Gerenciador de Tarefas). Cenários: **(a)** três widgets semeados, painel nunca aberto; **(b)** depois de abrir e fechar cada painel (cinco); **(c)** doze widgets, depois de abrir e fechar cada painel (catorze). Duas a três execuções por build; a variação entre execuções fica em 10 a 20 MB na privada (quase toda no processo de GPU) e em 5 MB no working set. Scripts em pasta temporária da sessão, não no repositório.

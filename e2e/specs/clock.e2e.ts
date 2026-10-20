@@ -96,7 +96,7 @@ describe("Clock", () => {
     await $(`button[aria-label="${t.widgets.common.back}"]`).click();
     await expect($(".clock-seconds")).toBeDisplayed();
     await expect($(".clock-seconds")).toHaveText(
-      expect.stringMatching(/^:d{2}$/),
+      expect.stringMatching(/^:\d{2}$/),
     );
     await expect($(".panel-foot")).toHaveText(
       expect.stringContaining("Tokyo · UTC+9"),

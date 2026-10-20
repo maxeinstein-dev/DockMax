@@ -213,3 +213,4 @@ Refinado em 2026-10-16, depois do mock e com o PR 1 em `main`.
 ### Batch D — fechamento
 
 - **V2** `[sequential]` **Verificação, revisão e PR**: verificações 10–15 da spec, com a memória medida; revisão adversarial com bite-checks e converge; teste manual do usuário no build de release; push e PR só com aprovação.
+  - **Feito até 2026-10-20:** rodada 1 de revisão (1 bloqueante e 5 SHOULD-FIX, corrigidos nas lanes FX1/FX2); dois testes manuais do usuário (correções FX3: lista de fusos, remover em Itens do dock, fusos por deslocamento, nota dos segundos); memória medida e reduzida (spec §2.12). Falta: rodada 2 curta de revisão, reteste final do usuário e PR.
