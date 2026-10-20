@@ -303,4 +303,17 @@ describe("panel part guards", () => {
     expect(used.length).toBeGreaterThan(0);
     expect(used.filter((token) => !defined.has(token))).toEqual([]);
   });
+
+  // The list of a <select> opens in a WebView2 popup that paints a light
+  // surface whatever the page's theme, color-scheme or backgrounds say
+  // (2026-10-19 release retest, screen captures in the PR). The options
+  // carry the light theme's ink themselves, so the list reads in the dark
+  // theme too; the field's own text keeps --ink.
+  it("gives the options of a list the light theme's ink, for the popup", () => {
+    const lightInk = /--ink:\s*(#[0-9a-f]{6})/i.exec(tokens)?.[1];
+    expect(lightInk).toBeDefined();
+    const rule = /\.field-input\s+option\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(rule).toMatch(new RegExp(`color:\\s*${lightInk}\\s*;`));
+    expect(rule).not.toMatch(/var\(--ink/);
+  });
 });
