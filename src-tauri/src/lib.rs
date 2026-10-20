@@ -1,6 +1,8 @@
 use std::sync::{Arc, Mutex, PoisonError};
 
-use tauri::{Manager, RunEvent, Wry, plugin::TauriPlugin, webview::PageLoadEvent};
+use tauri::{
+    Builder, Manager, RunEvent, Runtime, Wry, plugin::TauriPlugin, webview::PageLoadEvent,
+};
 
 mod commands;
 mod domain;
@@ -32,6 +34,40 @@ fn startup() -> TauriPlugin<Wry> {
         .build()
 }
 
+/// Registers the state the windows and the commands read (`state()`,
+/// which aborts the startup when nothing was managed yet: "state() called
+/// before manage()"). On the builder before any `setup`, the plugins' and
+/// the app's: `windows::panel::setup` reads the panel's state there.
+///
+/// Public (and hidden) only so `tests/managed_state.rs` can build a mock app
+/// with it.
+#[doc(hidden)]
+pub fn with_state<R: Runtime>(builder: Builder<R>) -> Builder<R> {
+    builder
+        .manage(Arc::new(windows::hit_test::Tracker::default()))
+        .manage(Mutex::new(windows::dock::Placement::default()))
+        .manage(Mutex::new(windows::panel::PanelState::default()))
+}
+
+/// The states `with_state` manages that `app` has, by type name.
+#[doc(hidden)]
+pub fn managed_state<R: Runtime>(app: &impl Manager<R>) -> Vec<&'static str> {
+    let mut found = Vec::new();
+    if app.try_state::<Arc<windows::hit_test::Tracker>>().is_some() {
+        found.push("Arc<Tracker>");
+    }
+    if app.try_state::<Mutex<windows::dock::Placement>>().is_some() {
+        found.push("Mutex<Placement>");
+    }
+    if app
+        .try_state::<Mutex<windows::panel::PanelState>>()
+        .is_some()
+    {
+        found.push("Mutex<PanelState>");
+    }
+    found
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg_attr(not(feature = "e2e"), expect(unused_mut))]
@@ -49,10 +85,8 @@ pub fn run() {
                 log::warn!("single instance: failed to show the dock: {error}");
             }
         }))
-        .plugin(logging::plugin())
-        .manage(Arc::new(windows::hit_test::Tracker::default()))
-        .manage(Mutex::new(windows::dock::Placement::default()))
-        .manage(Mutex::new(windows::panel::PanelState::default()))
+        .plugin(logging::plugin());
+    let builder = with_state(builder)
         .plugin(startup())
         // Each window is at rest once its page has settled (spec 0003 §2.12).
         .on_page_load(|webview, payload| {

@@ -620,3 +620,30 @@ fn e2e_config_only_renames_the_app() {
         "{file}: `mainBinaryName` must be a non-empty string, found {binary:?}"
     );
 }
+
+#[test]
+fn the_app_builder_registers_its_state_through_with_state() {
+    // `tests/managed_state.rs` proves `with_state` manages the state before
+    // any setup; this keeps `run` from skipping it, and keeps the state from
+    // being managed anywhere else (after the plugins that read it).
+    let source = rust_code("src/lib.rs");
+    let run = source
+        .split("pub fn run()")
+        .nth(1)
+        .unwrap_or_else(|| panic!("src/lib.rs: `pub fn run()` was not found"));
+    assert!(
+        run.contains("with_state(builder)"),
+        "src/lib.rs: `run` must register the state with `with_state(builder)`"
+    );
+    assert!(
+        !run.contains(".manage("),
+        "src/lib.rs: `run` must not `.manage(...)` by itself; add it to `with_state`"
+    );
+    let with_state = block_after(&source, "fn with_state", "src/lib.rs");
+    for state in ["Tracker", "Placement", "PanelState"] {
+        assert!(
+            with_state.contains(state),
+            "src/lib.rs: `with_state` must manage the {state} state"
+        );
+    }
+}

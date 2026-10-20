@@ -50,6 +50,9 @@ url = "2"
 
 [dev-dependencies]
 tempfile = "3"
+# `tauri::test`: the mock runtime that checks the builder (`lib.rs`) without
+# a window. No extra crate: the feature only exposes the module.
+tauri = { version = "2", features = ["test"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", features = [
