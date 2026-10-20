@@ -82,3 +82,4 @@ O dock precisa flutuar acima da barra de tarefas, sem atrapalhar os apps de trá
 - O "vidro" não desfoca o fundo; a legibilidade vem da opacidade, ajustável pelo usuário (Translúcido/Sólido).
 - Testar CSP exige build de release.
 - As duas janelas dividem um renderizador do WebView2 (`--process-per-site` em `additionalBrowserArgs`, igual nas duas, com os argumentos padrão do wry mantidos) e cada WebView pede o alvo de memória baixo em repouso (painel oculto, dock sem o mouse) e volta ao normal antes do uso. Medição, método e o que foi descartado na spec 0003 §2.12.
+  - Recuperação: por dividirem um renderizador, um travamento do painel trava também o dock. A bandeja vive em outro processo e sobrevive: "Sair" e abrir o DockMax de novo recuperam. Um handler de `ProcessFailed` (recriar as janelas sem sair) fica como evolução possível, fora desta fase.
