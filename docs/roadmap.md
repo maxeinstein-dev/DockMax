@@ -125,7 +125,7 @@ Revisão de 2026-10-19 (fim da Fase 2): a direção foi mantida e o roadmap ganh
 - [ ] Verificar persistência de configurações e do banco após atualização manual, com uma migração real (v1 → v2) e o backup antes dela.
 - [ ] Política de retenção dos arquivos `bak-v*` e `.corrompido-*` na pasta de dados.
 - [ ] Documentar limitações conhecidas (inclusive: leitor de tela nunca testado).
-- [ ] README com "onde ficam seus dados" (`%APPDATA%\dev.maxsueleinstein.dockmax`).
+- [x] README com "onde ficam seus dados" (`%APPDATA%\dev.maxsueleinstein.dockmax`). (feito na v0.2.0)
 - [ ] Criar README com imagens, arquitetura, funcionalidades e instruções.
 - [ ] Criar uma demonstração curta do aplicativo.
 - [ ] Verificar licença de dependências e atribuições necessárias.
