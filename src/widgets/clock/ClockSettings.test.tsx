@@ -396,6 +396,13 @@ describe("the segmented settings", () => {
     expect(option(name)).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("says under the seconds group that the icon never shows them", () => {
+    renderSettings(clock());
+    expect(
+      screen.getByText("O ícone do dock mostra só horas e minutos."),
+    ).toBeInTheDocument();
+  });
+
   it("switches back to 24 h and hides the seconds", () => {
     const { onUpdate } = renderSettings(
       clock({ hourCycle: "h12", showSeconds: true, iconStyle: "analog" }),

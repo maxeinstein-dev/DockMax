@@ -233,6 +233,7 @@ function ClockSettings({
         selected={config.showSeconds ? "show" : "hide"}
         onSelect={(value) => changeConfig({ showSeconds: value === "show" })}
       />
+      <p className="clock-hint">{text.secondsHint}</p>
       <OptionGroup<ClockIconStyle>
         label={text.iconStyle}
         options={CLOCK_ICON_STYLES.map((value) => ({

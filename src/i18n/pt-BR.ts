@@ -153,6 +153,9 @@ const messages = {
         h12: "12 horas",
       } satisfies Record<HourCycle, string>,
       seconds: "Segundos no painel",
+      /** Under the seconds group: the dock icon never shows seconds (spec
+       * 0003 Q2), which the manual test of 2026-10-20 showed is not obvious. */
+      secondsHint: "O ícone do dock mostra só horas e minutos.",
       secondsOptions: {
         hide: "Ocultar",
         show: "Mostrar",
