@@ -98,3 +98,37 @@ Feita em 2026-10-23, no app real (build de depuração), com o banco e as config
 - **Restauração:** a barra do Windows voltou e o arquivo de estado foi removido ao encerrar.
 
 Pendente do autor: abrir um programa a partir do dock (clique no ícone), que o teste automático não faz.
+
+## 6. Spike do menu dos apps: as Jump Lists (B3)
+
+Feito em 2026-10-23, só leitura: nada foi aberto nem alterado (`src-tauri/examples/jumplist_probe.rs` e `jumplist_tasks.rs`). Responde ao requisito do autor (spec 0004 §3.7c): o menu de um app no dock deve ser o que a barra do Windows mostra.
+
+### 6.1 O que a barra mostra e de onde vem
+
+O menu de um ícone da barra é a **Jump List** do app: tarefas (por exemplo "Nova janela"), categorias que o próprio app monta e as listas Recentes e Frequentes. O Windows não tem API para desenhar esse menu, só para ler e escrever as listas. O que se pode ler, e como:
+
+| Parte | Como | Resultado na máquina do autor (197 programas) |
+|---|---|---|
+| **AppID** do programa | propriedade `System.AppUserModel.ID` do item da pasta Aplicativos (`SHGetPropertyStoreFromParsingName`) | todos os 197 têm; programas clássicos sem AUMID próprio devolvem o caminho do executável |
+| **Recentes e Frequentes** | API documentada `IApplicationDocumentLists` (`SetAppID`, `GetList`) | 31 programas com itens, entre eles Explorador de Arquivos, Visual Studio Code, Word, Excel, Bloco de notas, Fotos, Chrome e Edge; devolve `IShellItem` |
+| **Tarefas e categorias do app** | arquivo `%APPDATA%\Microsoft\Windows\Recent\CustomDestinations\<hash>.customDestinations-ms` | 23 programas com lista, entre eles Chrome, Edge, Visual Studio Code, Calculadora (os cinco modos), Outlook ("Nova Mensagem", "Novo Evento", "Abrir Calendário"), ChatGPT e Claude |
+
+- **O nome do arquivo** é o hash do AppID: CRC-64 de polinômio `0x259C84CBA6426349`, refletido, valor inicial de todos os bits ligados, sem xor final, sobre o AppID em **maiúsculas** como UTF-16 little endian, escrito com 16 dígitos hexadecimais minúsculos. Achado por tentativa (48 acertos em 197 programas, nenhum falso) e confirmado: o arquivo de cada programa com lista aparece pelo hash.
+- **O arquivo** é uma sequência de atalhos `.lnk` (cada um começa pelo cabeçalho `4C 00 00 00 01 14 02 00 ...`) entre cabeçalhos de categoria e o marcador `AB FB BF BA`. Basta achar o cabeçalho de cada atalho e entregar o trecho até o próximo a um `IShellLinkW` carregado de um arquivo temporário (`IPersistFile::Load`): ele devolve o **título** (`System.Title`), o destino e os argumentos. Para apps da Loja o destino é o AUMID e os argumentos de ativação ficam nas propriedades do atalho.
+- **Para executar** uma entrada: gravar o trecho num `.lnk` temporário e abri-lo com `ShellExecuteW`, que é o que o shell faz; assim nenhuma regra de ativação (Loja, argumentos, diretório de trabalho) é reimplementada.
+
+### 6.2 O que ficou claro
+
+- É viável e dá o mesmo conteúdo da barra para os programas que têm lista, sem reimplementar nada do shell.
+- Os títulos podem ser recursos indiretos (`@{pacote?ms-resource:///...}`, como nos modos da Calculadora): resolvem com `SHLoadIndirectString`. Entradas de documento (Word, Excel) vêm sem título: usa-se o nome do arquivo.
+- O formato do arquivo não é documentado, mas é o mesmo desde o Windows 7. A leitura tem de ser tolerante: uma entrada que não carrega é pulada e um arquivo que não bate com a assinatura vira "sem lista".
+- Pouco mais de um décimo dos programas tem lista própria; os outros ficam só com as ações do dock (abrir, remover, mostrar no Explorador, fechar).
+- **Privacidade:** as listas guardam documentos, endereços e conversas recentes. Só são lidas quando o menu abre, nada vai para o log, para o banco ou para a página além do que o menu mostra naquele instante.
+- **Não fazer:** `ICustomDestinationList::BeginList` num AppID de outro programa reescreveria a lista dele.
+
+### 6.3 Desenho proposto para o B3
+
+1. Rust: `windows/jumplist.rs` com `destinations(app_id)` (Recentes e Frequentes pela API), `tasks(app_id)` (arquivo e atalhos), `run(entrada)` (atalho temporário e `ShellExecuteW`), todos tolerantes e testados com arquivos de exemplo gravados no formato real.
+2. Comando `app_menu(id)` do app fixado, e `run_app_entry`, que só aceita uma entrada que o último `app_menu` desse app devolveu (o menu guarda o que mostrou).
+3. Interface: o botão direito num app abre o menu no painel (novo `PanelId`, ancorado no ícone), com as seções Tarefas, Recentes e Frequentes e, no fim, Abrir, Remover do Dock e Mostrar no Explorador de Arquivos.
+4. O botão direito no dock ainda não existe: entra junto, com a hospedagem do menu no painel.
