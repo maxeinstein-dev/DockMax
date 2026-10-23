@@ -7,6 +7,7 @@ import {
   useSettings,
   type Settings,
   type SettingsErrorCode,
+  DEFAULT_LOOK,
 } from "./settings";
 
 type Handler = (event: { payload: Settings }) => void;
@@ -31,7 +32,12 @@ vi.mock("./log", async (importOriginal) => ({
 const DEFAULTS: Settings = {
   version: 1,
   theme: "system",
-  dock: { edge: "bottom", iconSize: 48, opacity: "translucent" },
+  dock: {
+    edge: "bottom",
+    iconSize: 48,
+    opacity: "translucent",
+    ...DEFAULT_LOOK,
+  },
 };
 
 const DARK: Settings = { ...DEFAULTS, theme: "dark" };

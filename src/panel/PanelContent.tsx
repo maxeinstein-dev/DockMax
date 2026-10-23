@@ -14,7 +14,14 @@ import { definitionOf } from "../widgets/registry";
 import AboutPanel from "./AboutPanel";
 import DockItems from "./DockItems";
 import SettingsPanel from "./SettingsPanel";
-import { BACK_VIEW, SUB_VIEW, type PanelView } from "./view";
+import LookPanel from "./LookPanel";
+import {
+  BACK_FROM_LOOK_VIEW,
+  BACK_VIEW,
+  LOOK_VIEW,
+  SUB_VIEW,
+  type PanelView,
+} from "./view";
 
 type PanelContentProps = {
   panelId: PanelId;
@@ -116,14 +123,27 @@ function PanelContent({
   }
   switch (panelId) {
     case "settings":
-      return view.sub ? (
-        <DockItems snapshot={widgets} onBack={() => onView(BACK_VIEW)} />
-      ) : (
+      if (view.sub === "items") {
+        return (
+          <DockItems snapshot={widgets} onBack={() => onView(BACK_VIEW)} />
+        );
+      }
+      if (view.sub === "look") {
+        return (
+          <LookPanel
+            settings={settings}
+            onBack={() => onView(BACK_FROM_LOOK_VIEW)}
+          />
+        );
+      }
+      return (
         <SettingsPanel
           settings={settings}
           widgets={widgets}
           onOpenItems={() => onView(SUB_VIEW)}
-          focusItemsRow={view.returned}
+          onOpenLook={() => onView(LOOK_VIEW)}
+          focusItemsRow={view.returned && view.from !== "look"}
+          focusLookRow={view.returned && view.from === "look"}
         />
       );
     case "about":

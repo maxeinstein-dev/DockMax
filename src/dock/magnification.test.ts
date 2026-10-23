@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import css from "./Dock.css?raw";
-import { MAGNIFICATION, magnificationOf, magnifyRole } from "./magnification";
+import { DOCK_STYLES } from "../core/settings";
+import {
+  DEFAULT_HOVER,
+  MAGNIFICATION,
+  hoverConfigOf,
+  magnificationOf,
+  magnifyRole,
+  peakMagnification,
+} from "./magnification";
 
 describe("magnification", () => {
   it("uses the DESIGN.md values: 1.4 lifted 6 px, neighbours 1.15", () => {
@@ -21,6 +29,49 @@ describe("magnification", () => {
     expect(magnificationOf(0, 1)).toEqual(MAGNIFICATION.neighbor);
     expect(magnificationOf(3, 1)).toEqual({ scale: 1, lift: 0 });
     expect(magnificationOf(0, null)).toEqual({ scale: 1, lift: 0 });
+  });
+});
+
+describe("hover effects", () => {
+  const scale = { effect: "scale", scale: 1.25 } as const;
+  const none = { effect: "none", scale: 1.25 } as const;
+  const magnify = { effect: "magnify", scale: 1.25 } as const;
+
+  it("does nothing with Nenhum", () => {
+    expect(magnifyRole(1, 1, "none")).toBeNull();
+    expect(magnifyRole(0, 1, "none")).toBeNull();
+    expect(magnificationOf(1, 1, none)).toEqual({ scale: 1, lift: 0 });
+    expect(peakMagnification(none)).toEqual({ scale: 1, lift: 0 });
+  });
+
+  it("grows only the hovered item, by the chosen scale and without lift, with Escala", () => {
+    expect(magnifyRole(1, 1, "scale")).toBe("hovered");
+    expect(magnifyRole(0, 1, "scale")).toBeNull();
+    expect(magnifyRole(2, 1, "scale")).toBeNull();
+    expect(magnificationOf(1, 1, scale)).toEqual({ scale: 1.25, lift: 0 });
+    expect(magnificationOf(0, 1, scale)).toEqual({ scale: 1, lift: 0 });
+    expect(peakMagnification(scale)).toEqual({ scale: 1.25, lift: 0 });
+  });
+
+  it("keeps the Fase 1 values with Ampliação, whatever the scale", () => {
+    expect(magnificationOf(1, 1, magnify)).toEqual(MAGNIFICATION.hovered);
+    expect(magnificationOf(0, 1, magnify)).toEqual(MAGNIFICATION.neighbor);
+    expect(peakMagnification(magnify)).toEqual(MAGNIFICATION.hovered);
+  });
+
+  it("reads the effect and the scale from the settings, in percent", () => {
+    expect(hoverConfigOf({ hover: "scale", hoverScale: 110 })).toEqual({
+      effect: "scale",
+      scale: 1.1,
+    });
+    expect(hoverConfigOf({ hover: "magnify", hoverScale: 160 }).scale).toBe(
+      1.6,
+    );
+  });
+
+  it("starts as the defaults of the settings: Escala, 110 %", () => {
+    expect(hoverConfigOf(undefined)).toEqual(DEFAULT_HOVER);
+    expect(DEFAULT_HOVER).toEqual({ effect: "scale", scale: 1.1 });
   });
 });
 
@@ -75,5 +126,42 @@ describe("Dock.css", () => {
     // 1 px border + pad − 1 px of padding: the items sit pad inside.
     expect(bar).toContain("padding: calc(var(--pad) - 1px)");
     expect(bar).toContain("border: 1px solid var(--hair)");
+  });
+
+  it("draws every style of the bar, Nativo being the base look", () => {
+    const others = DOCK_STYLES.filter((style) => style !== "native");
+    expect(others).toHaveLength(DOCK_STYLES.length - 1);
+    expect(css).not.toContain('data-style="native"');
+    for (const style of others) {
+      const block = new RegExp(
+        ':root\\[data-style="' + style + '"\\] \\{([^}]*)\\}',
+      ).exec(css)?.[1];
+      expect(block, style).toBeDefined();
+      // Every style names its bar color and its indicator color.
+      expect(block, style).toContain("--bar-bg:");
+      expect(block, style).toContain("--ind-default:");
+    }
+  });
+
+  it("takes the corners, the outline and the reflections from the page attributes", () => {
+    expect(rule(":root[data-style] .dock-bar")).toContain(
+      "var(--corners, 0.65)",
+    );
+    expect(rule(':root[data-border="off"] .dock-bar')).toContain(
+      "border-color: transparent",
+    );
+    expect(css).toContain(':root[data-reflect="on"] .dock-tile');
+    expect(css).toContain(
+      ':root[data-edge="top"][data-reflect="on"] .dock-tile',
+    );
+  });
+
+  it("draws the dash indicator and takes its color from the page", () => {
+    expect(rule(".dock-dot")).toContain(
+      "background: var(--indicator-color, var(--ind-default, var(--accent)))",
+    );
+    expect(rule(':root[data-indicator="dash"] .dock-dot')).toContain(
+      "height: 3px",
+    );
   });
 });

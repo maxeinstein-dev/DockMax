@@ -9,8 +9,11 @@ use std::sync::{Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+use std::collections::BTreeMap;
+
 use crate::domain::settings::{
-    DockEdge, DockOpacity, DockSettings, Settings, SettingsError, SettingsErrorCode, Theme,
+    DockEdge, DockOpacity, DockSettings, DockStyle, HoverEffect, Indicator, Settings,
+    SettingsError, SettingsErrorCode, StyleTweaks, TaskbarMode, Theme,
 };
 use crate::persistence::settings_file::{self, FILE_NAME};
 use crate::windows::dock;
@@ -39,6 +42,16 @@ struct DockSettingsInput {
     edge: DockEdge,
     icon_size: u16,
     opacity: DockOpacity,
+    style: DockStyle,
+    tweaks: BTreeMap<DockStyle, StyleTweaks>,
+    hover: HoverEffect,
+    hover_scale: u16,
+    indicator: Indicator,
+    /// An `Option` that serde fills with `None` when missing: the interface
+    /// always sends it, as `null` for the style's own color.
+    indicator_color: Option<String>,
+    taskbar: TaskbarMode,
+    bottom_space: u8,
 }
 
 impl From<SettingsInput> for Settings {
@@ -56,6 +69,14 @@ impl From<SettingsInput> for Settings {
                 edge: dock.edge,
                 icon_size: dock.icon_size,
                 opacity: dock.opacity,
+                style: dock.style,
+                tweaks: dock.tweaks,
+                hover: dock.hover,
+                hover_scale: dock.hover_scale,
+                indicator: dock.indicator,
+                indicator_color: dock.indicator_color,
+                taskbar: dock.taskbar,
+                bottom_space: dock.bottom_space,
             },
         }
     }
@@ -296,12 +317,18 @@ mod tests {
         serde_json::from_str(json)
     }
 
-    const FULL: &str =
-        r#"{"version":1,"theme":"dark","dock":{"edge":"top","iconSize":64,"opacity":"solid"}}"#;
+    /// The look fields of a full update payload.
+    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","taskbar":"hidden","bottomSpace":2"##;
+
+    fn full() -> String {
+        format!(
+            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}}}}"#
+        )
+    }
 
     #[test]
     fn full_update_payload_converts_into_the_settings() {
-        let settings = Settings::from(input(FULL).unwrap());
+        let settings = Settings::from(input(&full()).unwrap());
 
         assert_eq!(
             settings,
@@ -312,6 +339,20 @@ mod tests {
                     edge: DockEdge::Top,
                     icon_size: 64,
                     opacity: DockOpacity::Solid,
+                    style: DockStyle::Neon,
+                    tweaks: BTreeMap::from([(
+                        DockStyle::Neon,
+                        StyleTweaks {
+                            corners: Some(30),
+                            ..StyleTweaks::default()
+                        },
+                    )]),
+                    hover: HoverEffect::Magnify,
+                    hover_scale: 120,
+                    indicator: Indicator::Dash,
+                    indicator_color: Some("#0A84FF".into()),
+                    taskbar: TaskbarMode::Hidden,
+                    bottom_space: 2,
                 },
             }
         );
@@ -322,32 +363,68 @@ mod tests {
         // Unlike the file, a missing field is never filled with its default:
         // it would silently reset that setting.
         let partial = [
-            "{}",
-            r#"{"version":1,"theme":"dark"}"#,
-            r#"{"theme":"dark","dock":{"edge":"top","iconSize":64,"opacity":"solid"}}"#,
-            r#"{"version":1,"dock":{"edge":"top","iconSize":64,"opacity":"solid"}}"#,
-            r#"{"version":1,"theme":"dark","dock":{}}"#,
-            r#"{"version":1,"theme":"dark","dock":{"edge":"top","iconSize":64}}"#,
-            r#"{"version":1,"theme":"dark","dock":{"edge":"top","opacity":"solid"}}"#,
-            r#"{"version":1,"theme":"dark","dock":{"iconSize":64,"opacity":"solid"}}"#,
+            "{}".to_string(),
+            r#"{"version":1,"theme":"dark"}"#.to_string(),
+            format!(
+                r#"{{"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}}}}"#
+            ),
+            format!(
+                r#"{{"version":1,"dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}}}}"#
+            ),
+            r#"{"version":1,"theme":"dark","dock":{}}"#.to_string(),
+            format!(
+                r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,{LOOK}}}}}"#
+            ),
+            format!(
+                r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","opacity":"solid",{LOOK}}}}}"#
+            ),
+            format!(
+                r#"{{"version":1,"theme":"dark","dock":{{"iconSize":64,"opacity":"solid",{LOOK}}}}}"#
+            ),
+            // A payload from before the look fields: every one of them is
+            // required, none is filled with its default.
+            r#"{"version":1,"theme":"dark","dock":{"edge":"top","iconSize":64,"opacity":"solid"}}"#
+                .to_string(),
         ];
         for json in partial {
-            assert!(input(json).is_err(), "{json}");
+            assert!(input(&json).is_err(), "{json}");
+        }
+
+        // Each look field, taken out of an otherwise full payload (the
+        // optional color is the exception: it is `null` for the default).
+        for field in [
+            "style",
+            "tweaks",
+            "hover",
+            "hoverScale",
+            "indicator",
+            "taskbar",
+            "bottomSpace",
+        ] {
+            let mut value: serde_json::Value = serde_json::from_str(&full()).unwrap();
+            value["dock"].as_object_mut().unwrap().remove(field);
+            assert!(input(&value.to_string()).is_err(), "{field}");
         }
     }
 
     #[test]
     fn update_payload_with_unknown_fields_is_rejected() {
         let extra = [
-            r#"{"version":1,"theme":"dark","locale":"en",
-                "dock":{"edge":"top","iconSize":64,"opacity":"solid"}}"#,
-            r#"{"version":1,"theme":"dark",
-                "dock":{"edge":"top","iconSize":64,"opacity":"solid","offset":3}}"#,
-            r#"{"version":1,"theme":"dark",
-                "dock":{"edge":"top","icon_size":64,"opacity":"solid"}}"#,
+            format!(
+                r#"{{"version":1,"theme":"dark","locale":"en",
+                "dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}}}}"#
+            ),
+            format!(
+                r#"{{"version":1,"theme":"dark",
+                "dock":{{"edge":"top","iconSize":64,"opacity":"solid","offset":3,{LOOK}}}}}"#
+            ),
+            format!(
+                r#"{{"version":1,"theme":"dark",
+                "dock":{{"edge":"top","icon_size":64,"opacity":"solid",{LOOK}}}}}"#
+            ),
         ];
         for json in extra {
-            assert!(input(json).is_err(), "{json}");
+            assert!(input(&json).is_err(), "{json}");
         }
     }
 
@@ -373,6 +450,7 @@ mod tests {
     fn command_error_is_only_the_code() {
         let cases = [
             (SettingsError::IconSizeOutOfRange, "iconSizeOutOfRange"),
+            (SettingsError::LookOutOfRange, "lookOutOfRange"),
             (SettingsError::UnsupportedVersion, "unsupportedVersion"),
             (
                 SettingsError::Write(io::ErrorKind::PermissionDenied),

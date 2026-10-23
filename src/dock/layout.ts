@@ -2,7 +2,12 @@ import type { DockSize } from "../core/appearance";
 import type { DockLayout } from "../core/dock";
 import type { LogicalRect } from "../core/panels";
 import type { DockEdge } from "../core/settings";
-import { MAGNIFICATION, magnificationOf } from "./magnification";
+import {
+  MAGNIFY_HOVER,
+  magnificationOf,
+  peakMagnification,
+  type HoverConfig,
+} from "./magnification";
 
 /* The dock's geometry, computed instead of measured: the rects sent to Rust
  * and the label position are the final ones, never a transition caught
@@ -49,11 +54,13 @@ export function separatorWidth(gap: number): number {
   return 1 + gap * 0.8;
 }
 
-/** What the dock shows: its size and the number of items in each group (a
- * separator stands between groups). */
+/** What the dock shows: its size, the number of items in each group (a
+ * separator stands between groups) and what an item does under the pointer
+ * (the magnification of Fase 1 when left out). */
 export interface DockShape {
   size: DockSize;
   groups: readonly number[];
+  hover?: HoverConfig;
 }
 
 interface Row {
@@ -66,7 +73,10 @@ interface Row {
 
 /** Lays the items out along the bar while the item at `magnified` is
  * magnified (null: at rest). */
-function row({ size, groups }: DockShape, magnified: number | null): Row {
+function row(
+  { size, groups, hover = MAGNIFY_HOVER }: DockShape,
+  magnified: number | null,
+): Row {
   const { icon, pad, gap } = SIZE_GEOMETRY[size];
   const items: Row["items"] = [];
   let x = pad;
@@ -75,7 +85,7 @@ function row({ size, groups }: DockShape, magnified: number | null): Row {
     if (count <= 0) return;
     if (group > 0 && !first) x += separatorWidth(gap) + gap;
     for (let k = 0; k < count; k++) {
-      const { scale, lift } = magnificationOf(items.length, magnified);
+      const { scale, lift } = magnificationOf(items.length, magnified, hover);
       const width = icon * scale;
       items.push({ x, width, scale, lift });
       x += width + gap;
@@ -112,9 +122,10 @@ export function dockWindowSize({
   ...shape
 }: WindowSizeInput): DockLayout["window"] {
   const { icon, pad } = SIZE_GEOMETRY[shape.size];
-  const { scale, lift } = motion
-    ? MAGNIFICATION.hovered
-    : { scale: 1, lift: 0 };
+  const peak = peakMagnification(shape.hover ?? MAGNIFY_HOVER);
+  // Nothing grows with "reduce motion" or without a hover effect.
+  const grows = motion && peak.scale !== 1;
+  const { scale, lift } = grows ? peak : { scale: 1, lift: 0 };
   const tileReach = pad + icon * scale + lift;
   const height = tileReach + TIP_GAP + TIP_HEIGHT + ROOM;
 
@@ -122,7 +133,7 @@ export function dockWindowSize({
   // magnified, only the magnified item does.
   const count = row(shape, null).items.length;
   const states: (number | null)[] = [null];
-  if (motion) for (let i = 0; i < count; i++) states.push(i);
+  if (grows) for (let i = 0; i < count; i++) states.push(i);
 
   let half = 0;
   for (const state of states) {

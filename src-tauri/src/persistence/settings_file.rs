@@ -169,6 +169,7 @@ mod tests {
                 edge: DockEdge::Top,
                 icon_size: 64,
                 opacity: DockOpacity::Solid,
+                ..DockSettings::default()
             },
         }
     }
@@ -344,7 +345,12 @@ mod tests {
             serde_json::json!({
                 "version": 1,
                 "theme": "system",
-                "dock": { "edge": "bottom", "iconSize": 48, "opacity": "translucent" }
+                "dock": {
+                    "edge": "bottom", "iconSize": 48, "opacity": "translucent",
+                    "style": "native", "tweaks": {}, "hover": "scale", "hoverScale": 110,
+                    "indicator": "dot", "indicatorColor": null,
+                    "taskbar": "hidden", "bottomSpace": 2
+                }
             })
         );
     }

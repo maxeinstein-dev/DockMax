@@ -4,6 +4,7 @@
 //! files still load, and unknown fields are ignored. Values that are present
 //! but wrong are rejected by [`Settings::validate`].
 
+use std::collections::BTreeMap;
 use std::io;
 
 use serde::{Deserialize, Serialize};
@@ -18,6 +19,24 @@ pub const MIN_ICON_SIZE: u16 = 32;
 
 /// Largest dock icon size accepted, in logical pixels.
 pub const MAX_ICON_SIZE: u16 = 96;
+
+/// Smallest and largest growth of the hovered item, in percent.
+pub const MIN_HOVER_SCALE: u16 = 100;
+pub const MAX_HOVER_SCALE: u16 = 160;
+
+/// Growth of the hovered item unless the user changes it, in percent.
+pub const DEFAULT_HOVER_SCALE: u16 = 110;
+
+/// Most a style's corner tweak can ask for, in percent.
+pub const MAX_CORNERS: u8 = 100;
+
+/// Largest distance between the dock and the screen edge, in logical
+/// pixels.
+pub const MAX_BOTTOM_SPACE: u8 = 64;
+
+/// The distance between the dock and the edge unless the user changes it:
+/// the dock takes the place of the taskbar, so it sits close to the edge.
+pub const DEFAULT_BOTTOM_SPACE: u8 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -38,8 +57,8 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// Checks the rules serde can't express: the format version and the
-    /// icon size range.
+    /// Checks the rules serde can't express: the format version, the icon
+    /// size range and the ranges of the look (spec 0005 §3.1).
     pub fn validate(&self) -> Result<(), SettingsError> {
         if self.version != CURRENT_VERSION {
             return Err(SettingsError::UnsupportedVersion);
@@ -47,8 +66,41 @@ impl Settings {
         if !(MIN_ICON_SIZE..=MAX_ICON_SIZE).contains(&self.dock.icon_size) {
             return Err(SettingsError::IconSizeOutOfRange);
         }
+        self.dock.validate_look()
+    }
+}
+
+impl DockSettings {
+    fn validate_look(&self) -> Result<(), SettingsError> {
+        if !(MIN_HOVER_SCALE..=MAX_HOVER_SCALE).contains(&self.hover_scale) {
+            return Err(SettingsError::LookOutOfRange);
+        }
+        if self
+            .tweaks
+            .values()
+            .any(|tweaks| tweaks.corners.is_some_and(|corners| corners > MAX_CORNERS))
+        {
+            return Err(SettingsError::LookOutOfRange);
+        }
+        if self.bottom_space > MAX_BOTTOM_SPACE {
+            return Err(SettingsError::LookOutOfRange);
+        }
+        if self
+            .indicator_color
+            .as_deref()
+            .is_some_and(|color| !is_hex_color(color))
+        {
+            return Err(SettingsError::LookOutOfRange);
+        }
         Ok(())
     }
+}
+
+/// `#RRGGBB`: a hash and six hexadecimal digits, nothing else.
+fn is_hex_color(color: &str) -> bool {
+    color.len() == 7
+        && color.starts_with('#')
+        && color[1..].bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,6 +121,25 @@ pub struct DockSettings {
     /// The size presets are values of this field, not a separate setting.
     pub icon_size: u16,
     pub opacity: DockOpacity,
+    /// The look of the bar (spec 0005 §3.2).
+    pub style: DockStyle,
+    /// What the user changed in each style; a style without an entry, or a
+    /// field left out, keeps the style's own look.
+    pub tweaks: BTreeMap<DockStyle, StyleTweaks>,
+    /// What an item does under the pointer (spec 0005 §3.3).
+    pub hover: HoverEffect,
+    /// How much the hovered item grows with [`HoverEffect::Scale`], in
+    /// percent, within `MIN_HOVER_SCALE..=MAX_HOVER_SCALE`.
+    pub hover_scale: u16,
+    /// The mark under an open item (spec 0005 §3.4).
+    pub indicator: Indicator,
+    /// `#RRGGBB`, or `None` for the style's own color.
+    pub indicator_color: Option<String>,
+    /// What the dock does with the Windows taskbar (ADR 0009).
+    pub taskbar: TaskbarMode,
+    /// Distance between the dock and the screen edge, in logical pixels,
+    /// within `0..=MAX_BOTTOM_SPACE`.
+    pub bottom_space: u8,
 }
 
 impl Default for DockSettings {
@@ -77,8 +148,82 @@ impl Default for DockSettings {
             edge: DockEdge::default(),
             icon_size: SizePreset::Medium.icon_size(),
             opacity: DockOpacity::default(),
+            style: DockStyle::default(),
+            tweaks: BTreeMap::new(),
+            hover: HoverEffect::default(),
+            hover_scale: DEFAULT_HOVER_SCALE,
+            indicator: Indicator::default(),
+            indicator_color: None,
+            taskbar: TaskbarMode::default(),
+            bottom_space: DEFAULT_BOTTOM_SPACE,
         }
     }
+}
+
+/// What the dock does with the Windows taskbar (ADR 0009).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskbarMode {
+    /// Leaves the taskbar alone and sits above it.
+    Visible,
+    /// The dock takes the edge; the taskbar hides until the pointer reaches
+    /// it.
+    Autohide,
+    /// The dock takes the edge and the taskbar is hidden altogether: what
+    /// the dock does unless the user says otherwise (ADR 0009).
+    #[default]
+    Hidden,
+}
+
+
+/// The look of the dock bar: nine ready-made styles (spec 0005 §3.2).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DockStyle {
+    #[default]
+    Native,
+    LiquidGlass,
+    Midnight,
+    Rocket,
+    AquaShelf,
+    Neon,
+    Canary,
+    Paper,
+    Floating,
+}
+
+/// The user's changes to one style. `None` keeps what the style has.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct StyleTweaks {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub border: Option<bool>,
+    /// How round the bar is, 0–100 % of the most it can be.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub corners: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reflections: Option<bool>,
+}
+
+/// What an item does under the pointer.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum HoverEffect {
+    None,
+    /// Only the item under the pointer grows.
+    #[default]
+    Scale,
+    /// It grows and so do its neighbours, as in the macOS dock.
+    Magnify,
+}
+
+/// The mark under an open item.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Indicator {
+    #[default]
+    Dot,
+    Dash,
 }
 
 impl DockSettings {
@@ -152,6 +297,9 @@ pub enum SettingsError {
     UnsupportedVersion,
     #[error("icon size out of range")]
     IconSizeOutOfRange,
+    /// A value of the dock's look is outside its range or malformed.
+    #[error("dock look value out of range")]
+    LookOutOfRange,
     #[error("settings file could not be written ({0})")]
     Write(io::ErrorKind),
     /// There is nowhere to save: the app config folder could not be
@@ -166,6 +314,7 @@ impl SettingsError {
     pub fn code(&self) -> SettingsErrorCode {
         match self {
             SettingsError::IconSizeOutOfRange => SettingsErrorCode::IconSizeOutOfRange,
+            SettingsError::LookOutOfRange => SettingsErrorCode::LookOutOfRange,
             SettingsError::UnsupportedVersion => SettingsErrorCode::UnsupportedVersion,
             SettingsError::Write(_) => SettingsErrorCode::WriteFailed,
             SettingsError::Unavailable => SettingsErrorCode::NotReady,
@@ -181,6 +330,8 @@ impl SettingsError {
 pub enum SettingsErrorCode {
     /// The icon size is outside `MIN_ICON_SIZE..=MAX_ICON_SIZE`.
     IconSizeOutOfRange,
+    /// A value of the dock's look is outside its range or malformed.
+    LookOutOfRange,
     /// The format version is not `CURRENT_VERSION`.
     UnsupportedVersion,
     /// The settings could not be saved; the previous ones stay.
@@ -278,12 +429,18 @@ mod tests {
 
     #[test]
     fn defaults_serialize_to_the_v1_example_of_the_spec() {
-        // Spec 0002 §2.3 item 3, verbatim.
+        // Spec 0002 §2.3 item 3 plus the look fields of spec 0005 §3.1, which
+        // are additive: the version stays 1.
         let spec: serde_json::Value = serde_json::from_str(
             r#"{
               "version": 1,
               "theme": "system",
-              "dock": { "edge": "bottom", "iconSize": 48, "opacity": "translucent" }
+              "dock": {
+                "edge": "bottom", "iconSize": 48, "opacity": "translucent",
+                "style": "native", "tweaks": {}, "hover": "scale", "hoverScale": 110,
+                "indicator": "dot", "indicatorColor": null,
+                "taskbar": "hidden", "bottomSpace": 2
+              }
             }"#,
         )
         .unwrap();
@@ -293,6 +450,151 @@ mod tests {
             serde_json::from_value::<Settings>(spec).unwrap(),
             Settings::default()
         );
+    }
+
+    #[test]
+    fn a_file_from_before_the_look_fields_loads_with_their_defaults() {
+        let settings: Settings = serde_json::from_str(
+            r#"{"version":1,"theme":"dark",
+                "dock":{"edge":"top","iconSize":64,"opacity":"solid"}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(settings.dock.style, DockStyle::Native);
+        assert!(settings.dock.tweaks.is_empty());
+        assert_eq!(settings.dock.hover, HoverEffect::Scale);
+        assert_eq!(settings.dock.hover_scale, 110);
+        assert_eq!(settings.dock.indicator, Indicator::Dot);
+        assert_eq!(settings.dock.indicator_color, None);
+        assert_eq!(settings.validate(), Ok(()));
+    }
+
+    fn with_dock(change: impl FnOnce(&mut DockSettings)) -> Settings {
+        let mut settings = Settings::default();
+        change(&mut settings.dock);
+        settings
+    }
+
+    #[test]
+    fn styles_hovers_and_indicators_use_camel_case_names() {
+        let settings: Settings = serde_json::from_str(
+            r#"{"dock":{"style":"aquaShelf","hover":"magnify","indicator":"dash",
+                "tweaks":{"liquidGlass":{"corners":70,"reflections":true}}}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(settings.dock.style, DockStyle::AquaShelf);
+        assert_eq!(settings.dock.hover, HoverEffect::Magnify);
+        assert_eq!(settings.dock.indicator, Indicator::Dash);
+        assert_eq!(
+            settings.dock.tweaks[&DockStyle::LiquidGlass],
+            StyleTweaks {
+                border: None,
+                corners: Some(70),
+                reflections: Some(true),
+            }
+        );
+        assert_eq!(settings.validate(), Ok(()));
+        assert!(serde_json::from_str::<DockStyle>("\"liquid-glass\"").is_err());
+        assert!(serde_json::from_str::<DockStyle>("\"Native\"").is_err());
+    }
+
+    #[test]
+    fn a_tweak_left_out_is_not_written() {
+        let tweaks = StyleTweaks {
+            border: Some(false),
+            ..StyleTweaks::default()
+        };
+
+        assert_eq!(
+            serde_json::to_string(&tweaks).unwrap(),
+            r#"{"border":false}"#
+        );
+    }
+
+    #[test]
+    fn every_style_round_trips_through_json() {
+        let styles = [
+            (DockStyle::Native, "native"),
+            (DockStyle::LiquidGlass, "liquidGlass"),
+            (DockStyle::Midnight, "midnight"),
+            (DockStyle::Rocket, "rocket"),
+            (DockStyle::AquaShelf, "aquaShelf"),
+            (DockStyle::Neon, "neon"),
+            (DockStyle::Canary, "canary"),
+            (DockStyle::Paper, "paper"),
+            (DockStyle::Floating, "floating"),
+        ];
+        for (style, name) in styles {
+            assert_eq!(serde_json::to_value(style).unwrap(), name);
+            assert_eq!(
+                serde_json::from_value::<DockStyle>(name.into()).unwrap(),
+                style
+            );
+        }
+    }
+
+    #[test]
+    fn hover_scale_outside_the_range_is_rejected() {
+        for percent in [0, 99, 161, u16::MAX] {
+            assert_eq!(
+                with_dock(|dock| dock.hover_scale = percent).validate(),
+                Err(SettingsError::LookOutOfRange),
+                "{percent}"
+            );
+        }
+        for percent in [100, 110, 160] {
+            assert_eq!(
+                with_dock(|dock| dock.hover_scale = percent).validate(),
+                Ok(()),
+                "{percent}"
+            );
+        }
+    }
+
+    #[test]
+    fn corners_above_100_are_rejected_in_any_style() {
+        let settings = with_dock(|dock| {
+            dock.tweaks.insert(
+                DockStyle::Neon,
+                StyleTweaks {
+                    corners: Some(101),
+                    ..StyleTweaks::default()
+                },
+            );
+        });
+
+        assert_eq!(settings.validate(), Err(SettingsError::LookOutOfRange));
+        let edge = with_dock(|dock| {
+            dock.tweaks.insert(
+                DockStyle::Neon,
+                StyleTweaks {
+                    corners: Some(100),
+                    ..StyleTweaks::default()
+                },
+            );
+        });
+        assert_eq!(edge.validate(), Ok(()));
+    }
+
+    #[test]
+    fn the_indicator_color_must_be_a_six_digit_hex_color() {
+        for color in ["#ffffff", "#0A84FF", "#000000"] {
+            assert_eq!(
+                with_dock(|dock| dock.indicator_color = Some(color.into())).validate(),
+                Ok(()),
+                "{color}"
+            );
+        }
+        for color in [
+            "", "#", "fff", "#fff", "ffffff", "#fffffg", "#fffffff", "red", "#ffffff ", "#ffffÃ",
+        ] {
+            assert_eq!(
+                with_dock(|dock| dock.indicator_color = Some(color.into())).validate(),
+                Err(SettingsError::LookOutOfRange),
+                "{color:?}"
+            );
+        }
     }
 
     #[test]
@@ -344,6 +646,7 @@ mod tests {
         let errors = [
             SettingsError::UnsupportedVersion,
             SettingsError::IconSizeOutOfRange,
+            SettingsError::LookOutOfRange,
             SettingsError::Write(io::ErrorKind::PermissionDenied),
             SettingsError::Write(io::ErrorKind::NotFound),
             SettingsError::Write(io::ErrorKind::Other),
@@ -365,6 +668,10 @@ mod tests {
             (
                 SettingsError::IconSizeOutOfRange,
                 SettingsErrorCode::IconSizeOutOfRange,
+            ),
+            (
+                SettingsError::LookOutOfRange,
+                SettingsErrorCode::LookOutOfRange,
             ),
             (
                 SettingsError::UnsupportedVersion,
@@ -390,6 +697,7 @@ mod tests {
         // `SettingsErrorCode` in src/core/settings.ts.
         let cases = [
             (SettingsErrorCode::IconSizeOutOfRange, "iconSizeOutOfRange"),
+            (SettingsErrorCode::LookOutOfRange, "lookOutOfRange"),
             (SettingsErrorCode::UnsupportedVersion, "unsupportedVersion"),
             (SettingsErrorCode::WriteFailed, "writeFailed"),
             (SettingsErrorCode::NotReady, "notReady"),

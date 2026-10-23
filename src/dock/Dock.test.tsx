@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Settings } from "../core/settings";
+import { DEFAULT_LOOK, type Settings } from "../core/settings";
 import type { WidgetInstance, WidgetsSnapshot } from "../core/widgets";
 import { WIDGET_FIXTURES } from "../core/widgets.fixtures";
 import { ptBR } from "../i18n/pt-BR";
@@ -29,7 +29,13 @@ const text = ptBR.dock;
 const MEDIUM: Settings = {
   version: 1,
   theme: "system",
-  dock: { edge: "bottom", iconSize: 48, opacity: "translucent" },
+  dock: {
+    edge: "bottom",
+    iconSize: 48,
+    opacity: "translucent",
+    ...DEFAULT_LOOK,
+    hover: "magnify",
+  },
 };
 
 const withDock = (dock: Partial<Settings["dock"]>): Settings => ({
@@ -54,6 +60,9 @@ const rect = (x: number, y: number, width: number, height: number) => ({
 // window (the size it asks for).
 const REST_BAR = rect(36, 61, 117, 62);
 const MEDIUM_WINDOW = { width: 189, height: 123 };
+// The same dock with the default hover (Escala 110 %): nothing lifts, the
+// tile grows to 52.8 px and the label sets the width.
+const SCALE_WINDOW = { width: 181, height: 102 };
 const SETTINGS_AT_REST = rect(43, 68, 48, 48);
 const ABOUT_AT_REST = rect(98, 68, 48, 48);
 
@@ -274,14 +283,36 @@ describe("Dock", () => {
 
   describe("layout", () => {
     it("reports the bar and the window it needs once on mount", async () => {
+      // The settings the dock starts with, so nothing changes when they load.
+      current = withDock({ hover: DEFAULT_LOOK.hover });
+
       await renderDock();
 
       expect(layoutCalls()).toHaveLength(1);
       expectClose(lastLayout(), {
         bar: REST_BAR,
         hold: [],
-        window: MEDIUM_WINDOW,
+        window: SCALE_WINDOW,
       });
+    });
+
+    it("sizes the window for the hover effect: none, scale or magnify", async () => {
+      const windowOf = async (hover: Settings["dock"]["hover"]) => {
+        invoke.mockClear();
+        current = withDock({ hover, hoverScale: 130 });
+        const view = await renderDock();
+        view.unmount();
+        return (lastLayout() as { window: { width: number; height: number } })
+          .window;
+      };
+
+      // Only the widest label sets the width at rest: 110 and 60 px labels
+      // over 48 px items give 181. The height is the bar's padding (7), the
+      // tile at its peak (48; 62.4 at 130 %), the gap to the label (10), the
+      // label (24) and the room (8): 97 and 112 (spec 0005 §3.3).
+      expect(await windowOf("none")).toEqual({ width: 181, height: 97 });
+      expect(await windowOf("scale")).toEqual({ width: 181, height: 112 });
+      expect(await windowOf("magnify")).toEqual(MEDIUM_WINDOW);
     });
 
     it("applies the size and edge to the page", async () => {
@@ -295,10 +326,11 @@ describe("Dock", () => {
 
     it("reports again when the size preset changes", async () => {
       await renderDock();
+      const reported = layoutCalls().length;
 
       emit("settings-changed", withDock({ iconSize: 64 }));
 
-      expect(layoutCalls()).toHaveLength(2);
+      expect(layoutCalls()).toHaveLength(reported + 1);
       // Large: 2 × 9 + 9 + 2 × 64 = 155 wide, 64 + 2 × 9 = 82 tall, in the
       // window as it still is.
       expectClose(lastLayout(), {
@@ -325,25 +357,27 @@ describe("Dock", () => {
       // Rust closed the open panel for the move and reopens it only on the
       // next layout: one must come even though the dock draws the same.
       await renderDock();
+      const reported = layoutCalls().length;
 
       emit("settings-changed", withDock({ iconSize: 50 }));
 
-      expect(layoutCalls()).toHaveLength(2);
-      expect(lastLayout()).toEqual(layoutCalls()[0]?.[1]?.layout);
+      expect(layoutCalls()).toHaveLength(reported + 1);
+      expect(lastLayout()).toEqual(layoutCalls()[reported - 1]?.[1]?.layout);
 
       emit("settings-changed", withDock({ iconSize: 50, edge: "top" }));
       emit("settings-changed", withDock({ iconSize: 50, edge: "top" }));
 
-      expect(layoutCalls()).toHaveLength(3);
+      expect(layoutCalls()).toHaveLength(reported + 2);
     });
 
     it("does not report an unchanged layout again", async () => {
       await renderDock();
+      const reported = layoutCalls().length;
 
       emit("settings-changed", { ...withDock({}), theme: "dark" });
       emit("settings-changed", withDock({ opacity: "solid" }));
 
-      expect(layoutCalls()).toHaveLength(1);
+      expect(layoutCalls()).toHaveLength(reported);
     });
 
     it("reports the defaults when the settings can't be read", async () => {
@@ -359,7 +393,7 @@ describe("Dock", () => {
       expectClose(lastLayout(), {
         bar: REST_BAR,
         hold: [],
-        window: MEDIUM_WINDOW,
+        window: SCALE_WINDOW,
       });
     });
 

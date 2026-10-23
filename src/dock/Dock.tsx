@@ -48,7 +48,7 @@ import {
   tipAnchor,
   type DockShape,
 } from "./layout";
-import { magnificationOf, magnifyRole } from "./magnification";
+import { hoverConfigOf, magnificationOf, magnifyRole } from "./magnification";
 import "./Dock.css";
 
 /** The system items, always last and never removed (spec 0003 §2.1 item
@@ -251,7 +251,8 @@ function Dock() {
   const { size, edge } = settings
     ? { size: dockSize(settings.dock.iconSize), edge: settings.dock.edge }
     : DEFAULT_DOCK_LOOK;
-  const shape: DockShape = { size, groups };
+  const hover = hoverConfigOf(settings?.dock);
+  const shape: DockShape = { size, groups, hover };
   // Edge and icon size as set, not as drawn: several sizes draw the same
   // preset.
   const placeKey = settings
@@ -402,7 +403,7 @@ function Dock() {
   };
 
   const item = (entry: DockEntry, index: number) => {
-    const { scale, lift } = magnificationOf(index, magnified);
+    const { scale, lift } = magnificationOf(index, magnified, hover);
     // The badge is aria-hidden: the name says it instead.
     const badged = badge && entry.panelId === "settings";
     return (
@@ -422,7 +423,7 @@ function Dock() {
         // can't reach.
         aria-expanded={samePanel(open, entry.panelId)}
         tabIndex={index === currentIndex ? 0 : -1}
-        data-magnify={magnifyRole(index, magnified) ?? undefined}
+        data-magnify={magnifyRole(index, magnified, hover.effect) ?? undefined}
         style={
           {
             "--s": String(scale),

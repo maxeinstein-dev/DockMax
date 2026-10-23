@@ -34,18 +34,19 @@
   padding: calc(var(--pad) - 1px);
   border: 1px solid var(--hair);
   border-radius: var(--r-bar);
-  background: rgb(var(--surface-rgb) / var(--surface-a));
-  /* The light edge faces away from the screen edge (The Light Edge Rule). */
+  background: var(--bar-bg, rgb(var(--surface-rgb) / var(--surface-a)));
+  /* The light edge faces away from the screen edge (The Light Edge Rule);
+     --lip is its offset, mirrored on the top edge. */
+  --lip: 0 1px;
   box-shadow:
-    inset 0 1px 0 var(--hi),
+    inset var(--lip) 0 var(--hi),
+    var(--bar-glow, 0 0 0 transparent),
     var(--shadow);
 }
 
 :root[data-edge="top"] .dock-bar {
   align-items: flex-start;
-  box-shadow:
-    inset 0 -1px 0 var(--hi),
-    var(--shadow);
+  --lip: 0 -1px;
 }
 
 /* Between groups only: a 1 px hairline inset 4 px, gap × 0.4 on each side
@@ -55,7 +56,7 @@
   align-self: stretch;
   width: 1px;
   margin: 4px calc(var(--gap) * 0.4);
-  background: var(--hair);
+  background: var(--bar-sep, var(--hair));
 }
 
 /* The item's box widens with its magnification (--s), so it pushes its
@@ -178,7 +179,7 @@
   height: 4px;
   margin-left: -2px;
   border-radius: var(--r-dot);
-  background: var(--accent);
+  background: var(--indicator-color, var(--ind-default, var(--accent)));
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s;
@@ -189,8 +190,154 @@
   bottom: auto;
 }
 
+/* Indicator "Traço": a dash instead of the dot (spec 0005 §3.4). */
+:root[data-indicator="dash"] .dock-dot {
+  width: 14px;
+  height: 3px;
+  margin-left: -7px;
+  border-radius: 2px;
+}
+
 .dock-item[aria-expanded="true"] .dock-dot {
   opacity: 1;
+}
+
+/* The styles of the bar (spec 0005 §3.2), chosen by data-style on <html>.
+   Each sets the bar's own colors through --bar-bg, --bar-line, --bar-glow,
+   --bar-sep and --ind-default; Nativo is the base look above and has no
+   block. The glow stays within the window's 8 px of room (ROOM in
+   layout.ts), which cuts whatever goes past it. data-border="off" takes the
+   outline away, data-reflect="on" mirrors each tile under itself, and
+   --corners (0–1) is how round the bar is, of a full pill. */
+:root[data-style] .dock-bar {
+  border-radius: calc(
+    var(--corners, 0.65) * (var(--icon) + 2 * var(--pad)) / 2
+  );
+}
+
+:root[data-border="off"] .dock-bar {
+  border-color: transparent;
+}
+
+:root[data-style="liquidGlass"] {
+  --bar-bg:
+    linear-gradient(180deg, rgb(255 255 255 / 0.24), rgb(255 255 255 / 0.07)),
+    rgb(32 38 56 / 0.5);
+  --bar-line: rgb(255 255 255 / 0.62);
+  --bar-sep: rgb(255 255 255 / 0.28);
+  --bar-glow: 0 0 6px rgb(255 255 255 / 0.18);
+  --ind-default: #ffffff;
+}
+
+:root[data-style="midnight"] {
+  --bar-bg: rgb(8 10 16 / 0.93);
+  --bar-line: rgb(255 255 255 / 0.78);
+  --bar-sep: rgb(255 255 255 / 0.2);
+  --ind-default: #ffffff;
+}
+
+:root[data-style="rocket"] {
+  --bar-bg: rgb(9 14 32 / 0.95);
+  --bar-line: #5b8cff;
+  --bar-sep: rgb(120 160 255 / 0.3);
+  --bar-glow:
+    0 0 7px 1px rgb(80 130 255 / 0.6), inset 0 0 0 1px rgb(90 140 255 / 0.25);
+  --ind-default: #8fb0ff;
+}
+
+:root[data-style="neon"] {
+  --bar-bg: rgb(6 6 12 / 0.96);
+  --bar-sep: rgb(255 255 255 / 0.2);
+  --bar-glow: 0 0 6px rgb(0 229 255 / 0.55), 0 0 6px 1px rgb(255 43 214 / 0.35);
+  --ind-default: #00e5ff;
+}
+
+/* The outline is a gradient: transparent border over a second background
+   layer clipped to the border box. */
+:root[data-style="neon"][data-border="on"] .dock-bar {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--bar-bg), var(--bar-bg)) padding-box,
+    linear-gradient(90deg, #00e5ff, #ff2bd6) border-box;
+}
+
+:root[data-style="canary"] {
+  --bar-bg:
+    linear-gradient(180deg, rgb(255 255 255 / 0.42), rgb(255 255 255 / 0) 46%),
+    linear-gradient(180deg, #f3ef3d, #8ed12c 58%, #34a52c);
+  --bar-line: rgb(24 84 18 / 0.75);
+  --bar-sep: rgb(24 84 18 / 0.3);
+  --ind-default: #1c4a12;
+}
+
+:root[data-style="paper"] {
+  --bar-bg: rgb(247 247 243);
+  --bar-line: rgb(0 0 0 / 0.14);
+  --bar-sep: rgb(0 0 0 / 0.14);
+  --hi: rgb(255 255 255 / 0);
+  --ind-default: #2c3a5a;
+}
+
+/* No bar: the tiles float. */
+:root[data-style="floating"] {
+  --bar-bg: transparent;
+  --bar-line: rgb(255 255 255 / 0.35);
+  --bar-sep: rgb(255 255 255 / 0.25);
+  --hi: transparent;
+  --ind-default: #ffffff;
+}
+
+:root[data-style="floating"] .dock-bar,
+:root[data-style="aquaShelf"] .dock-bar {
+  box-shadow: none;
+}
+
+/* A shelf under the tiles: a silver plate, narrower at the top, drawn
+   behind the items. */
+:root[data-style="aquaShelf"] {
+  --bar-bg: transparent;
+  --bar-line: rgb(255 255 255 / 0.35);
+  --bar-sep: rgb(255 255 255 / 0.3);
+  --hi: transparent;
+  --ind-default: #2c3a5a;
+}
+
+:root[data-style="aquaShelf"] .dock-bar {
+  position: relative;
+  isolation: isolate;
+}
+
+:root[data-style="aquaShelf"] .dock-bar::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--pad) + 9px);
+  clip-path: polygon(3% 0, 97% 0, 100% 100%, 0 100%);
+  background: linear-gradient(180deg, #f6f8fc, #b4bac6 55%, #858c9b);
+}
+
+:root[data-edge="top"][data-style="aquaShelf"] .dock-bar::before {
+  top: 0;
+  bottom: auto;
+  clip-path: polygon(0 0, 100% 0, 97% 100%, 3% 100%);
+  background: linear-gradient(0deg, #f6f8fc, #b4bac6 55%, #858c9b);
+}
+
+/* Reflections: the tile mirrored under itself, fading out within the bar's
+   padding so the window needs no more room. The mask is applied before the
+   image is mirrored, so it is opaque at the edge that faces the tile: the
+   bottom of the tile for "below", the top for "above". */
+:root[data-reflect="on"] .dock-tile {
+  -webkit-box-reflect: below 0
+    linear-gradient(to top, rgb(255 255 255 / 0.6), transparent 15%);
+}
+
+:root[data-edge="top"][data-reflect="on"] .dock-tile {
+  -webkit-box-reflect: above 0
+    linear-gradient(to bottom, rgb(255 255 255 / 0.6), transparent 15%);
 }
 
 /* Label pill: every item has one, laid out but hidden, so its width is

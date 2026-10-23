@@ -1,8 +1,13 @@
 import type {
   DockEdge,
   DockOpacity,
+  DockStyle,
+  HoverEffect,
+  Indicator,
+  IndicatorColor,
   SettingsErrorCode,
   SizePreset,
+  TaskbarMode,
   Theme,
 } from "../core/settings";
 import type {
@@ -27,6 +32,12 @@ const messages = {
     items: {
       settings: "Configurações",
       about: "Sobre",
+      tray: "Bandeja do sistema",
+    },
+    /** The clock and the date at the end of the dock. */
+    status: {
+      /** Accessible name of the button: it opens the Windows calendar. */
+      calendar: "Relógio e calendário",
     },
   },
   panel: {
@@ -34,6 +45,7 @@ const messages = {
     titles: {
       settings: "Configurações",
       about: "Sobre",
+      tray: "Bandeja do sistema",
     },
     /** Shown in place of a panel that failed to render. */
     failed: "Não foi possível mostrar este painel.",
@@ -47,6 +59,7 @@ const messages = {
       edge: "Posição",
       size: "Tamanho",
       opacity: "Opacidade do dock",
+      taskbar: "Barra de tarefas do Windows",
     },
     theme: {
       system: "Sistema",
@@ -66,12 +79,82 @@ const messages = {
       translucent: "Translúcido",
       solid: "Sólido",
     } satisfies Record<DockOpacity, string>,
+    /** What the dock does with the Windows taskbar (ADR 0009): leaves it,
+     * takes the edge and lets it hide, or takes the edge and hides it. */
+    taskbar: {
+      visible: "Visível",
+      autohide: "Automática",
+      hidden: "Oculta",
+    } satisfies Record<TaskbarMode, string>,
+    /** Configurações › Aparência do dock (spec 0005 §3.5). */
+    look: {
+      /** The row that opens it, and its title. */
+      title: "Aparência do dock",
+      style: "Estilo",
+      styles: {
+        native: "Nativo",
+        liquidGlass: "Liquid Glass",
+        midnight: "Meia-noite",
+        rocket: "Rocket",
+        aquaShelf: "Prateleira Aqua",
+        neon: "Neon",
+        canary: "Canarinho",
+        paper: "Papel",
+        floating: "Flutuante",
+      } satisfies Record<DockStyle, string>,
+      /** Group of the changes that belong to the chosen style. */
+      tweaks: "Personalizar este estilo",
+      border: "Borda",
+      corners: "Cantos",
+      cornersHint: "O quanto a barra é arredondada",
+      reflections: "Reflexos",
+      reflectionsHint: "Uma imagem espelhada embaixo de cada ícone",
+      restore: "Restaurar",
+      restoreHint: "Descarta as mudanças deste estilo",
+      hover: "Efeito ao passar o mouse",
+      hoverOptions: {
+        none: "Nenhum",
+        scale: "Escala",
+        magnify: "Ampliação",
+      } satisfies Record<HoverEffect, string>,
+      hoverScale: "Escala ao passar o mouse",
+      indicator: "Indicador",
+      indicatorOptions: {
+        dot: "Ponto",
+        dash: "Traço",
+      } satisfies Record<Indicator, string>,
+      indicatorColor: "Cor do indicador",
+      /** The style's own color, before any is chosen. */
+      indicatorDefault: "Padrão",
+      /** Names of the colors offered, by `#RRGGBB`. */
+      colors: {
+        "#FFFFFF": "Branco",
+        "#E8E8EC": "Cinza muito claro",
+        "#C7C7CC": "Cinza claro",
+        "#8E8E93": "Cinza",
+        "#2C3A5A": "Grafite azulado",
+        "#0B1020": "Azul-noite",
+        "#000000": "Preto",
+        "#0A84FF": "Azul",
+        "#64D2FF": "Azul-claro",
+        "#00E5FF": "Ciano",
+        "#30D158": "Verde",
+        "#1E8A3C": "Verde-escuro",
+        "#FFD60A": "Amarelo",
+        "#FF9F0A": "Laranja",
+        "#FF453A": "Vermelho",
+        "#FF2D95": "Rosa",
+        "#BF5AF2": "Roxo",
+        "#9DB4FF": "Lilás",
+      } satisfies Record<IndicatorColor, string>,
+    },
     /** Footer text: there is no Save button. */
     footer: "Salvo automaticamente",
     /** Shown when a change is refused, by error code; the option goes back
      * to its previous value. A new code without a message does not
      * compile. */
     errors: {
+      lookOutOfRange: "Esse ajuste do visual não é aceito.",
       iconSizeOutOfRange:
         "Esse tamanho não é aceito. Escolha Pequeno, Médio ou Grande.",
       unsupportedVersion:
@@ -80,6 +163,18 @@ const messages = {
       notReady:
         "As configurações não estão disponíveis agora. Reinicie o DockMax e tente de novo.",
     } satisfies Record<SettingsErrorCode, string>,
+  },
+  /** The notification area in its panel (ADR 0009, Fase E). */
+  tray: {
+    /** Shown while no program has put an icon there. */
+    empty: "Nenhum programa colocou um ícone aqui ainda.",
+    /** Under the empty text: why a running program may be missing. */
+    emptyHint:
+      "Alguns só aparecem depois de abertos de novo, depois que o DockMax assumiu a bandeja.",
+    /** The icon of a program without a tooltip. */
+    unnamed: "Programa sem nome",
+    /** Footer: the buttons do what the taskbar's did. */
+    footer: "Botão direito abre o menu do programa",
   },
   about: {
     /** One line under the app name. */

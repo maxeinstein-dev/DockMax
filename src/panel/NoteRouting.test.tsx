@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PanelShowPayload } from "../core/panels";
-import type { Settings } from "../core/settings";
+import { DEFAULT_LOOK, type Settings } from "../core/settings";
 import type { WidgetsSnapshot } from "../core/widgets";
 import { WIDGET_FIXTURES } from "../core/widgets.fixtures";
 import { ptBR } from "../i18n/pt-BR";
@@ -31,7 +31,12 @@ vi.mock("@tauri-apps/api/event", () => ({ listen }));
 const SETTINGS: Settings = {
   version: 1,
   theme: "system",
-  dock: { edge: "bottom", iconSize: 48, opacity: "translucent" },
+  dock: {
+    edge: "bottom",
+    iconSize: 48,
+    opacity: "translucent",
+    ...DEFAULT_LOOK,
+  },
 };
 
 const NOTE = { ...WIDGET_FIXTURES["note-default"], label: "Mercado" };

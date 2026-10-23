@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { dockLookOf } from "../dock/look";
 import {
   SIZE_PRESETS,
   useSettings,
@@ -71,6 +72,24 @@ export function applyAppearance(
     root.dataset.opacity = settings.dock.opacity;
     root.dataset.size = dockSize(settings.dock.iconSize);
     root.dataset.edge = settings.dock.edge;
+    applyLook(root, settings);
+  }
+}
+
+/** The bar's style and the user's changes to it, as the attributes and
+ * custom properties `src/dock/Dock.css` reads. The custom properties are set
+ * through the CSSOM, which the release CSP allows (no inline style). */
+function applyLook(root: HTMLElement, settings: Settings) {
+  const look = dockLookOf(settings.dock);
+  root.dataset.style = look.style;
+  root.dataset.border = look.border ? "on" : "off";
+  root.dataset.reflect = look.reflections ? "on" : "off";
+  root.dataset.indicator = look.indicator;
+  root.style.setProperty("--corners", String(look.corners / 100));
+  if (look.indicatorColor === null) {
+    root.style.removeProperty("--indicator-color");
+  } else {
+    root.style.setProperty("--indicator-color", look.indicatorColor);
   }
 }
 
