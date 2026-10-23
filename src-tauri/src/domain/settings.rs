@@ -175,6 +175,12 @@ pub enum TaskbarMode {
     Hidden,
 }
 
+impl TaskbarMode {
+    /// Whether the dock reserves the edge of the screen (an app bar).
+    pub fn reserves_the_edge(self) -> bool {
+        self != TaskbarMode::Visible
+    }
+}
 
 /// The look of the dock bar: nine ready-made styles (spec 0005 §3.2).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
