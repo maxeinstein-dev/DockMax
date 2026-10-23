@@ -54,7 +54,8 @@ pub const MAX_PANEL_SIZE: f64 = 4096.0;
 pub const MAX_INSET: f64 = MARGIN;
 
 /// Which panel the dock asks for, as the pages send and get it:
-/// `"settings"`, `"about"` or `{ "widget": "<id>" }` (`PanelId` in
+/// `"settings"`, `"about"`, `"tray"`, `{ "widget": "<id>" }` or
+/// `{ "app": "<id>" }`, the menu of a pinned program (`PanelId` in
 /// `src/core/panels.ts`). The widget ID is checked when deserialized
 /// ([`WidgetId::parse`]): a malformed one is refused before any command
 /// runs. Whether the instance exists is checked by `toggle_panel`, which
@@ -67,6 +68,9 @@ pub enum PanelId {
     /// The notification area (ADR 0009, Fase E).
     Tray,
     Widget(WidgetId),
+    /// The menu of a pinned program (spec 0006 §6): the ID is the pinned
+    /// item's, checked like a widget's.
+    App(WidgetId),
 }
 
 /// Transparent inset the panel page lays around the card, in logical
@@ -83,7 +87,14 @@ pub enum Panel {
     Settings,
     About,
     Tray,
-    Widget { id: WidgetId, kind: WidgetKind },
+    Widget {
+        id: WidgetId,
+        kind: WidgetKind,
+    },
+    /// The menu of the pinned program `id`.
+    App {
+        id: WidgetId,
+    },
 }
 
 impl Panel {
@@ -94,6 +105,7 @@ impl Panel {
             Panel::About => PanelId::About,
             Panel::Tray => PanelId::Tray,
             Panel::Widget { id, .. } => PanelId::Widget(id.clone()),
+            Panel::App { id } => PanelId::App(id.clone()),
         }
     }
 
@@ -104,6 +116,7 @@ impl Panel {
             | (Panel::About, PanelId::About)
             | (Panel::Tray, PanelId::Tray) => true,
             (Panel::Widget { id: own, .. }, PanelId::Widget(other)) => own == other,
+            (Panel::App { id: own }, PanelId::App(other)) => own == other,
             _ => false,
         }
     }
@@ -117,6 +130,8 @@ impl Panel {
             Panel::About => (300.0, 236.0),
             // Title, a row of icons, footer.
             Panel::Tray => (280.0, 150.0),
+            // Title, a few entries, the actions, footer.
+            Panel::App { .. } => (280.0, 300.0),
             Panel::Widget { kind, .. } => match kind {
                 // Title, time and date, footer.
                 WidgetKind::Clock => (300.0, 170.0),
@@ -972,6 +987,41 @@ mod tests {
             })
             .unwrap(),
             serde_json::json!({ "panelId": { "widget": WIDGET } })
+        );
+    }
+
+    #[test]
+    fn an_app_panel_id_is_an_object_with_the_pinned_item() {
+        let json = format!(r#"{{"app":"{WIDGET}"}}"#);
+        let id = PanelId::App(WidgetId::parse(WIDGET).unwrap());
+
+        assert_eq!(serde_json::to_string(&id).unwrap(), json);
+        assert_eq!(serde_json::from_str::<PanelId>(&json).unwrap(), id);
+        for rejected in [
+            r#"{"app":""}"#.to_owned(),
+            r#"{"app":"Some.App!App"}"#.to_owned(),
+            r#"{"app":7}"#.to_owned(),
+            format!(r#"{{"app":"{WIDGET}","widget":"{WIDGET}"}}"#),
+        ] {
+            assert!(
+                serde_json::from_str::<PanelId>(&rejected).is_err(),
+                "{rejected}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_app_panel_is_the_one_its_id_names_and_not_the_widget_with_the_same_id() {
+        let app = Panel::App {
+            id: WidgetId::parse(WIDGET).unwrap(),
+        };
+
+        assert_eq!(app.id(), PanelId::App(WidgetId::parse(WIDGET).unwrap()));
+        assert!(app.is(&PanelId::App(WidgetId::parse(WIDGET).unwrap())));
+        assert!(!app.is(&PanelId::App(WidgetId::parse(OTHER_WIDGET).unwrap())));
+        assert!(!app.is(&widget_id(WIDGET)));
+        assert!(
+            !widget(WIDGET, WidgetKind::Clock).is(&PanelId::App(WidgetId::parse(WIDGET).unwrap()))
         );
     }
 

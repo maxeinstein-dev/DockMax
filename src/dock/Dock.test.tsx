@@ -1201,11 +1201,58 @@ describe("Dock", () => {
       expect(launches).toHaveLength(2);
     });
 
-    it("is not expanded and points to no panel", async () => {
+    it("announces a menu and is expanded only while its menu is open", async () => {
+      pinned = withApps(CALCULATOR);
+      await renderDock();
+      const button = program("Calculadora");
+      expect(button).toHaveAttribute("aria-haspopup", "menu");
+      expect(button).toHaveAttribute("aria-expanded", "false");
+
+      emit("panel-changed", { panelId: { app: CALCULATOR.id } });
+
+      expect(button).toHaveAttribute("aria-expanded", "true");
+      expect(settings()).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("opens the menu on a right click, anchored where the item rests, and not the program", async () => {
+      pinned = withApps(CALCULATOR, NOTEPAD);
+      await renderDock();
+
+      const proceeded = fireEvent.contextMenu(program("Bloco de notas"));
+
+      // The page's own menu is not shown.
+      expect(proceeded).toBe(false);
+      expect(panelCalls()).toHaveLength(1);
+      const [, args] = panelCalls()[0] as [
+        string,
+        { panelId: unknown; anchor: { x: number; width: number } },
+      ];
+      expect(args.panelId).toEqual({ app: NOTEPAD.id });
+      expect(args.anchor.width).toBeGreaterThan(0);
+      expect(invoke).not.toHaveBeenCalledWith("launch_app", expect.anything());
+    });
+
+    it("anchors the menu of each program at its own place", async () => {
+      pinned = withApps(CALCULATOR, NOTEPAD);
+      await renderDock();
+
+      fireEvent.contextMenu(program("Calculadora"));
+      fireEvent.contextMenu(program("Bloco de notas"));
+
+      const anchors = panelCalls().map(
+        ([, args]) => (args as { anchor: { x: number } }).anchor.x,
+      );
+      expect(anchors[1]).toBeGreaterThan(anchors[0] as number);
+    });
+
+    it("leaves the right click of the other items alone", async () => {
       pinned = withApps(CALCULATOR);
       await renderDock();
 
-      expect(program("Calculadora")).not.toHaveAttribute("aria-expanded");
+      const proceeded = fireEvent.contextMenu(settings());
+
+      expect(proceeded).toBe(true);
+      expect(panelCalls()).toHaveLength(0);
     });
 
     it("labels the hovered program, even while a panel is open", async () => {

@@ -225,6 +225,24 @@ const messages = {
     remove: "Remover {name} do dock",
     footer: "A ordem é a do dock",
     footerUnavailable: "Configurações e Sobre continuam funcionando",
+    /** The menu of a pinned program (right click on its icon). */
+    menu: {
+      /** Accessible name of the menu, with the program's name. */
+      label: "Menu de {name}",
+      /** Heading of each kind of section; a category has its own name. */
+      sections: {
+        tasks: "Tarefas",
+        category: "Recentes",
+        recent: "Recentes",
+        frequent: "Frequentes",
+      },
+      loading: "Lendo o menu…",
+      failed: "Não foi possível ler o menu deste app.",
+      open: "Abrir",
+      reveal: "Mostrar no Explorador de Arquivos",
+      remove: "Remover do dock",
+      footer: "O menu da barra de tarefas",
+    },
     /** Notice of a database that can't be used in this run. */
     unavailableNotice: {
       title: "Os apps do dock estão indisponíveis.",

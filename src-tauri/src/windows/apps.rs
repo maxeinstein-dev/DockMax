@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use crate::domain::apps::is_valid_app_id;
 
 #[cfg(windows)]
-use ::windows::Win32::Foundation::SIZE;
+use ::windows::Win32::Foundation::{PROPERTYKEY, SIZE};
 #[cfg(windows)]
 use ::windows::Win32::Graphics::Gdi::{
     BI_RGB, BITMAP, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS, DeleteObject, GetDC, GetDIBits,
@@ -21,6 +21,10 @@ use ::windows::Win32::Graphics::Gdi::{
 };
 #[cfg(windows)]
 use ::windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoTaskMemFree};
+#[cfg(windows)]
+use ::windows::Win32::UI::Shell::PropertiesSystem::{
+    GPS_DEFAULT, IPropertyStore, SHGetPropertyStoreFromParsingName,
+};
 #[cfg(windows)]
 use ::windows::Win32::UI::Shell::{
     BHID_EnumItems, FOLDERID_AppsFolder, IEnumShellItems, IShellItem, IShellItemImageFactory,
@@ -115,6 +119,72 @@ pub fn name_of(id: &str) -> Option<String> {
         .map(take_text)
         .ok()?;
     (!name.trim().is_empty()).then_some(name)
+}
+
+/// `System.AppUserModel.ID`.
+#[cfg(windows)]
+const PKEY_APP_USER_MODEL_ID: PROPERTYKEY = PROPERTYKEY {
+    fmtid: ::windows::core::GUID::from_u128(0x9f4c2855_9f79_4b39_a8d0_e1d42de1d5f3),
+    pid: 5,
+};
+
+/// The AppID the shell knows the program by (what its taskbar button, and
+/// its Jump List, are filed under): the `System.AppUserModel.ID` of its item
+/// in the Apps folder.
+#[cfg(windows)]
+pub fn app_user_model_id(id: &str) -> Option<String> {
+    if !is_valid_app_id(id) {
+        return None;
+    }
+    init_com();
+    let name = HSTRING::from(format!("shell:AppsFolder\\{id}"));
+    let store: IPropertyStore =
+        unsafe { SHGetPropertyStoreFromParsingName(&name, None, GPS_DEFAULT) }.ok()?;
+    let value = unsafe { store.GetValue(&PKEY_APP_USER_MODEL_ID) }.ok()?;
+    let text = value.to_string();
+    (!text.is_empty()).then_some(text)
+}
+
+#[cfg(not(windows))]
+pub fn app_user_model_id(_id: &str) -> Option<String> {
+    None
+}
+
+/// The path of the program's file, when its id is that path (a classic
+/// program the shell lists by its executable); `None` for a Store app, which
+/// has no file to show, and for the ids that name a folder and a file.
+pub fn file_of(id: &str) -> Option<std::path::PathBuf> {
+    let bytes = id.as_bytes();
+    let drive =
+        bytes.len() > 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'\\';
+    let path = std::path::PathBuf::from(id);
+    (is_valid_app_id(id) && drive && path.is_file()).then_some(path)
+}
+
+/// Shows `path` selected in a File Explorer window.
+#[cfg(windows)]
+pub fn reveal(path: &std::path::Path) -> Result<(), String> {
+    let arguments = HSTRING::from(format!("/select,\"{}\"", path.display()));
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            PCWSTR::null(),
+            &HSTRING::from("explorer.exe"),
+            &arguments,
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    if result.0 as usize > 32 {
+        Ok(())
+    } else {
+        Err(format!("ShellExecute answered {}", result.0 as usize))
+    }
+}
+
+#[cfg(not(windows))]
+pub fn reveal(_path: &std::path::Path) -> Result<(), String> {
+    Err("not Windows".to_owned())
 }
 
 /// Opens the program, the way the Start menu does.
@@ -279,6 +349,25 @@ mod tests {
             id: id.to_owned(),
             name: name.to_owned(),
         }
+    }
+
+    #[test]
+    fn only_an_id_that_is_a_path_to_a_file_has_a_file_to_show() {
+        let exe = std::env::current_exe().unwrap();
+        let id = exe.to_string_lossy().into_owned();
+
+        assert_eq!(file_of(&id), Some(exe));
+        assert_eq!(
+            file_of("Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"),
+            None
+        );
+        assert_eq!(
+            file_of(r"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\notepad.exe"),
+            None
+        );
+        assert_eq!(file_of(r"C:\no\such\file.exe"), None);
+        assert_eq!(file_of(r"C:\"), None);
+        assert_eq!(file_of(""), None);
     }
 
     #[test]

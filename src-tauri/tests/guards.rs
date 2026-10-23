@@ -71,6 +71,14 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-pin-app",
             "allow-unpin-app",
             "allow-move-app",
+            // The menu of a pinned program (spec 0006 §6) shows in the
+            // panel: its Jump List, opening it, and showing its file. Each
+            // names a pinned item; an entry is run by the key of the menu
+            // last shown, never by a path.
+            "allow-launch-app",
+            "allow-app-menu",
+            "allow-run-app-entry",
+            "allow-reveal-app",
             "log:allow-log",
         ],
     ),

@@ -161,7 +161,10 @@ pub fn run() {
             commands::apps::pin_app,
             commands::apps::unpin_app,
             commands::apps::move_app,
-            commands::apps::launch_app
+            commands::apps::launch_app,
+            commands::apps::app_menu,
+            commands::apps::run_app_entry,
+            commands::apps::reveal_app
         ]);
     // Test build only: the WebDriver server the E2E suite drives the windows
     // through, on the port in `TAURI_WEBDRIVER_PORT` (4445 by default).

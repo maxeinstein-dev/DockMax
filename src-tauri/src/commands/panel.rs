@@ -24,6 +24,15 @@ fn resolve(storage: &Storage, id: PanelId) -> Result<Panel, WidgetError> {
             let kind = widgets::panel_kind(storage, &id)?;
             Ok(Panel::Widget { id, kind })
         }
+        PanelId::App(id) => {
+            // Only a program the dock has pinned has a menu.
+            let snapshot = storage.apps_snapshot().map_err(|_| WidgetError::NotFound)?;
+            if snapshot.apps.iter().any(|app| app.id == id) {
+                Ok(Panel::App { id })
+            } else {
+                Err(WidgetError::NotFound)
+            }
+        }
     }
 }
 
@@ -159,6 +168,45 @@ mod tests {
         );
         assert_eq!(
             resolve(&storage, PanelId::Widget(WidgetId::new())),
+            Err(WidgetError::NotFound)
+        );
+    }
+
+    #[test]
+    fn an_app_panel_opens_only_for_a_pinned_program() {
+        let dir = tempdir().unwrap();
+        let mut storage = widgets::open_storage::<String>(Ok(dir.path().to_path_buf()));
+        let pinned = crate::commands::apps::pin(&mut storage, "Some.App!App", "Some App").unwrap();
+
+        assert_eq!(
+            resolve(&storage, PanelId::App(pinned.id.clone())),
+            Ok(Panel::App {
+                id: pinned.id.clone()
+            })
+        );
+        // A widget's id is not a pinned program's, and the other way round.
+        let widget = widgets::snapshot(&storage).unwrap().widgets.remove(0);
+        assert_eq!(
+            resolve(&storage, PanelId::App(widget.id.clone())),
+            Err(WidgetError::NotFound)
+        );
+        assert_eq!(
+            resolve(&storage, PanelId::Widget(pinned.id.clone())),
+            Err(WidgetError::NotFound)
+        );
+        crate::commands::apps::unpin(&mut storage, pinned.id.as_str()).unwrap();
+        assert_eq!(
+            resolve(&storage, PanelId::App(pinned.id)),
+            Err(WidgetError::NotFound)
+        );
+    }
+
+    #[test]
+    fn without_the_storage_no_app_panel_opens() {
+        let storage = Storage::unavailable(UnavailableReason::OpenFailed);
+
+        assert_eq!(
+            resolve(&storage, PanelId::App(WidgetId::new())),
             Err(WidgetError::NotFound)
         );
     }

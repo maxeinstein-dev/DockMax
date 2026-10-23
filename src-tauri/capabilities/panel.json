@@ -26,6 +26,10 @@
     "allow-pin-app",
     "allow-unpin-app",
     "allow-move-app",
+    "allow-launch-app",
+    "allow-app-menu",
+    "allow-run-app-entry",
+    "allow-reveal-app",
     "log:allow-log"
   ]
 }

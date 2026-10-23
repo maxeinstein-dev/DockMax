@@ -122,6 +122,21 @@ export const otherText: Messages = {
     remove: "Remove {name} from the dock",
     footer: "The order is the dock's",
     footerUnavailable: "Settings and About keep working",
+    menu: {
+      label: "Menu of {name}",
+      sections: {
+        tasks: "Tasks",
+        category: "Recent",
+        recent: "Recent",
+        frequent: "Frequent",
+      },
+      loading: "Reading the menu…",
+      failed: "The menu of this app could not be read.",
+      open: "Open",
+      reveal: "Show in File Explorer",
+      remove: "Remove from the dock",
+      footer: "The taskbar menu",
+    },
     unavailableNotice: {
       title: "Dock apps are unavailable.",
       detail: "Detail.",

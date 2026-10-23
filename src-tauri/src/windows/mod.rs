@@ -5,6 +5,7 @@ pub mod dock;
 #[cfg(windows)]
 pub mod flyout;
 pub mod hit_test;
+pub mod jumplist;
 pub mod memory;
 #[cfg(windows)]
 mod native;

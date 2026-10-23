@@ -38,6 +38,9 @@ fn main() {
             "unpin_app",
             "move_app",
             "launch_app",
+            "app_menu",
+            "run_app_entry",
+            "reveal_app",
         ]),
     ))
     .expect("failed to run tauri-build");
