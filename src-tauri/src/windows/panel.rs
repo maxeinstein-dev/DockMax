@@ -64,6 +64,8 @@ pub const MAX_INSET: f64 = MARGIN;
 pub enum PanelId {
     Settings,
     About,
+    /// The notification area (ADR 0009, Fase E).
+    Tray,
     Widget(WidgetId),
 }
 
@@ -80,6 +82,7 @@ const PAGE_INSET: f64 = 8.0;
 pub enum Panel {
     Settings,
     About,
+    Tray,
     Widget { id: WidgetId, kind: WidgetKind },
 }
 
@@ -89,6 +92,7 @@ impl Panel {
         match self {
             Panel::Settings => PanelId::Settings,
             Panel::About => PanelId::About,
+            Panel::Tray => PanelId::Tray,
             Panel::Widget { id, .. } => PanelId::Widget(id.clone()),
         }
     }
@@ -96,7 +100,9 @@ impl Panel {
     /// Whether this is the panel `id` names.
     fn is(&self, id: &PanelId) -> bool {
         match (self, id) {
-            (Panel::Settings, PanelId::Settings) | (Panel::About, PanelId::About) => true,
+            (Panel::Settings, PanelId::Settings)
+            | (Panel::About, PanelId::About)
+            | (Panel::Tray, PanelId::Tray) => true,
             (Panel::Widget { id: own, .. }, PanelId::Widget(other)) => own == other,
             _ => false,
         }
@@ -109,6 +115,8 @@ impl Panel {
         match self {
             Panel::Settings => (320.0, 390.0),
             Panel::About => (300.0, 236.0),
+            // Title, a row of icons, footer.
+            Panel::Tray => (280.0, 150.0),
             Panel::Widget { kind, .. } => match kind {
                 // Title, time and date, footer.
                 WidgetKind::Clock => (300.0, 170.0),
@@ -688,6 +696,10 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let app = app.clone();
     window.on_window_event(move |event| {
         let action = match event {
+            // A program's menu, opened from the tray panel, took the focus:
+            // the panel stays (`popup_menu`).
+            #[cfg(windows)]
+            WindowEvent::Focused(false) if super::popup_menu::blocks_blur() => return,
             WindowEvent::Focused(false) => lock(&app).blur(Instant::now()),
             WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
@@ -700,6 +712,26 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         }
     });
     Ok(())
+}
+
+/// The menu a program opened from the tray panel is gone: the panel gets the
+/// focus back, so Esc and a click elsewhere close it as usual; unless the user
+/// went to another window, which closes it now.
+#[cfg(windows)]
+pub fn after_tray_menu(app: &AppHandle) {
+    if lock(app).open().is_none() {
+        return;
+    }
+    if super::native::foreground_is_other_visible_window() {
+        let action = lock(app).hide();
+        if let Err(error) = apply(app, action) {
+            log::warn!("panel: failed to hide after a tray menu: {error}");
+        }
+    } else if let Some(window) = app.get_webview_window(LABEL)
+        && let Err(error) = window.set_focus()
+    {
+        log::warn!("panel: failed to take the focus back after a tray menu: {error}");
+    }
 }
 
 pub fn lock(app: &AppHandle) -> std::sync::MutexGuard<'_, PanelState> {
@@ -903,6 +935,11 @@ mod tests {
             serde_json::from_str::<PanelId>("\"about\"").unwrap(),
             PanelId::About
         );
+        assert_eq!(serde_json::to_string(&PanelId::Tray).unwrap(), "\"tray\"");
+        assert_eq!(
+            serde_json::from_str::<PanelId>("\"tray\"").unwrap(),
+            PanelId::Tray
+        );
         assert!(serde_json::from_str::<PanelId>("\"About\"").is_err());
     }
 
@@ -992,6 +1029,7 @@ mod tests {
     fn panels_have_fixed_sizes() {
         assert_eq!(Panel::Settings.logical_size(), (336.0, 406.0));
         assert_eq!(Panel::About.logical_size(), (316.0, 252.0));
+        assert_eq!(Panel::Tray.logical_size(), (296.0, 166.0));
     }
 
     /// The number of pixels `property` is set to in the CSS rule whose
@@ -1031,6 +1069,10 @@ mod tests {
             (
                 Panel::About,
                 css_px(&css, r#".panel[data-panel="about"]"#, "width"),
+            ),
+            (
+                Panel::Tray,
+                css_px(&css, r#".panel[data-panel="tray"]"#, "width"),
             ),
             (
                 widget(WidgetKind::Clock),

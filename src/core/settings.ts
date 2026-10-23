@@ -17,12 +17,131 @@ export type DockEdge = "bottom" | "top";
 /** Dock background: simulated glass or opaque. Panels are always opaque. */
 export type DockOpacity = "translucent" | "solid";
 
+/** The look of the dock bar (spec 0005 §3.2); must match `DockStyle` in
+ * `src-tauri/src/domain/settings.rs`. */
+export type DockStyle =
+  | "native"
+  | "liquidGlass"
+  | "midnight"
+  | "rocket"
+  | "aquaShelf"
+  | "neon"
+  | "canary"
+  | "paper"
+  | "floating";
+
+/** Every style, in the order the Settings panel lists them. */
+export const DOCK_STYLES: readonly DockStyle[] = [
+  "native",
+  "liquidGlass",
+  "midnight",
+  "rocket",
+  "aquaShelf",
+  "neon",
+  "canary",
+  "paper",
+  "floating",
+];
+
+/** What the user changed in one style; a field left out keeps the style's
+ * own value. */
+export interface StyleTweaks {
+  border?: boolean;
+  /** How round the bar is, `MIN_CORNERS`–`MAX_CORNERS` percent. */
+  corners?: number;
+  reflections?: boolean;
+}
+
+export const MIN_CORNERS = 0;
+export const MAX_CORNERS = 100;
+
+/** What an item does under the pointer. */
+export type HoverEffect = "none" | "scale" | "magnify";
+
+/** Growth of the hovered item with `scale`, in percent. */
+export const MIN_HOVER_SCALE = 100;
+export const MAX_HOVER_SCALE = 160;
+export const DEFAULT_HOVER_SCALE = 110;
+
+/** The mark under an open item. */
+export type Indicator = "dot" | "dash";
+
+/** Colors offered for the indicator, `#RRGGBB`; `null` is the style's own
+ * (spec 0004 §3.1: the default plus fifteen). */
+export const INDICATOR_COLORS = [
+  "#FFFFFF",
+  "#E8E8EC",
+  "#C7C7CC",
+  "#8E8E93",
+  "#2C3A5A",
+  "#0B1020",
+  "#000000",
+  "#0A84FF",
+  "#64D2FF",
+  "#00E5FF",
+  "#30D158",
+  "#1E8A3C",
+  "#FFD60A",
+  "#FF9F0A",
+  "#FF453A",
+  "#FF2D95",
+  "#BF5AF2",
+  "#9DB4FF",
+] as const;
+
+/** One of the colors offered. */
+export type IndicatorColor = (typeof INDICATOR_COLORS)[number];
+
+/** What the dock does with the Windows taskbar (ADR 0009); must match
+ * `TaskbarMode` in `src-tauri/src/domain/settings.rs`. */
+export type TaskbarMode = "visible" | "autohide" | "hidden";
+
+/** Distance between the dock and the screen edge, in logical pixels. */
+export const MAX_BOTTOM_SPACE = 64;
+export const DEFAULT_BOTTOM_SPACE = 2;
+
+/** The look fields of `DockSettings` before the user changes anything;
+ * equal to `DockSettings::default()` in `src-tauri/src/domain/settings.rs`. */
+export const DEFAULT_LOOK = {
+  style: "native",
+  tweaks: {},
+  hover: "scale",
+  hoverScale: DEFAULT_HOVER_SCALE,
+  indicator: "dot",
+  indicatorColor: null,
+  taskbar: "hidden",
+  bottomSpace: DEFAULT_BOTTOM_SPACE,
+} as const satisfies Pick<
+  DockSettings,
+  | "style"
+  | "tweaks"
+  | "hover"
+  | "hoverScale"
+  | "indicator"
+  | "indicatorColor"
+  | "taskbar"
+  | "bottomSpace"
+>;
+
 export interface DockSettings {
   edge: DockEdge;
   /** Icon size in logical pixels, 32–96; the size presets are values of
    * this field. */
   iconSize: number;
   opacity: DockOpacity;
+  style: DockStyle;
+  /** Per-style changes; a style without an entry keeps its own look. */
+  tweaks: Partial<Record<DockStyle, StyleTweaks>>;
+  hover: HoverEffect;
+  /** Growth of the hovered item with `scale`, in percent. */
+  hoverScale: number;
+  indicator: Indicator;
+  /** `#RRGGBB`, or null for the style's own color. */
+  indicatorColor: string | null;
+  taskbar: TaskbarMode;
+  /** Distance between the dock and the screen edge, in logical pixels,
+   * 0–`MAX_BOTTOM_SPACE`. */
+  bottomSpace: number;
 }
 
 export interface Settings {
@@ -48,6 +167,8 @@ export const SIZE_PRESETS: Readonly<Record<SizePreset, number>> = {
  * `settings.errors` of the i18n dictionary. */
 export type SettingsErrorCode =
   | "iconSizeOutOfRange"
+  /** A value of the dock's look is outside its range. */
+  | "lookOutOfRange"
   | "unsupportedVersion"
   | "writeFailed"
   /** The settings can't be changed in this run (no config folder), or the
@@ -63,6 +184,7 @@ export interface SettingsCommandError {
 const ERROR_CODES: ReadonlySet<string> = new Set(
   Object.keys({
     iconSizeOutOfRange: true,
+    lookOutOfRange: true,
     unsupportedVersion: true,
     writeFailed: true,
     notReady: true,

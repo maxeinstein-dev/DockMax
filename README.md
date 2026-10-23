@@ -128,4 +128,4 @@ A próxima etapa é a Fase 3 (atalhos, arquivos e prateleira); veja o [roadmap](
 
 ## Licença
 
-[MIT](LICENSE) © 2026 Maxsuel Einstein
+[Uso pessoal](LICENSE) © 2026 Maxsuel Einstein. Todos os direitos reservados. As versões até a 0.2.0 foram publicadas sob a licença MIT.

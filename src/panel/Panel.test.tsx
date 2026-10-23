@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PanelReadyArgs, PanelShowPayload } from "../core/panels";
-import type { Settings } from "../core/settings";
+import { DEFAULT_LOOK, type Settings } from "../core/settings";
 import { ptBR } from "../i18n/pt-BR";
 import Panel from "./Panel";
 
@@ -10,7 +10,12 @@ const text = ptBR.panel;
 const SETTINGS: Settings = {
   version: 1,
   theme: "system",
-  dock: { edge: "bottom", iconSize: 48, opacity: "translucent" },
+  dock: {
+    edge: "bottom",
+    iconSize: 48,
+    opacity: "translucent",
+    ...DEFAULT_LOOK,
+  },
 };
 
 type Handler = (event: { payload: unknown }) => void;

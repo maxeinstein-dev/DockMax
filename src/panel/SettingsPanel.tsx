@@ -1,13 +1,10 @@
-import { useRef, useState } from "react";
 import {
   SIZE_PRESETS,
-  isSettingsCommandError,
-  updateSettings,
   type DockEdge,
   type DockOpacity,
   type Settings,
-  type SettingsErrorCode,
   type SizePreset,
+  type TaskbarMode,
   type Theme,
 } from "../core/settings";
 import { MAX_WIDGETS, type WidgetsSnapshot } from "../core/widgets";
@@ -15,11 +12,13 @@ import { format, useT, type Messages } from "../i18n";
 import OptionGroup, { type Option } from "./OptionGroup";
 import PanelFooter from "./PanelFooter";
 import NavRow from "./parts/NavRow";
+import { useSettingsEditor } from "./useSettingsEditor";
 
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
 const EDGES: readonly DockEdge[] = ["bottom", "top"];
 const SIZES: readonly SizePreset[] = ["small", "medium", "large"];
 const OPACITIES: readonly DockOpacity[] = ["translucent", "solid"];
+const TASKBARS: readonly TaskbarMode[] = ["visible", "autohide", "hidden"];
 
 /** The preset whose icon size is `iconSize`, or null when none is (a size
  * set by hand in the file): then no size option shows as chosen. */
@@ -32,19 +31,6 @@ function options<V extends string>(
   labels: Readonly<Record<V, string>>,
 ): Option<V>[] {
   return values.map((value) => ({ value, label: labels[value] }));
-}
-
-/** A change sent to Rust and not yet confirmed by `settings-changed`. */
-interface Pending {
-  /** Tells the latest change from older ones still answering. */
-  id: number;
-  /** The full settings sent. */
-  value: Settings;
-  /** Rust accepted it. */
-  saved: boolean;
-  /** New confirmed settings arrived (`settings-changed`) since it was
-   * sent. */
-  confirmed: boolean;
 }
 
 /** The value of the "Itens do dock" row: `3 de 12`, or `Indisponível`
@@ -70,9 +56,14 @@ type SettingsPanelProps = {
   /** Opens Configurações › Itens do dock (`DockItems`): the panel host
    * swaps this view for the subview. Without it there is no row. */
   onOpenItems?: () => void;
+  /** Opens Configurações › Aparência do dock (`LookPanel`). Without it
+   * there is no row. */
+  onOpenLook?: () => void;
   /** Focuses the "Itens do dock" row on mount: set it when coming back
    * from the subview (its Voltar). */
   focusItemsRow?: boolean;
+  /** The same for the "Aparência do dock" row. */
+  focusLookRow?: boolean;
 };
 
 /**
@@ -85,58 +76,17 @@ function SettingsPanel({
   settings,
   widgets = null,
   onOpenItems,
+  onOpenLook,
   focusItemsRow = false,
+  focusLookRow = false,
 }: SettingsPanelProps) {
   const t = useT();
-  const [pending, setPending] = useState<Pending | null>(null);
-  const [error, setError] = useState<SettingsErrorCode | null>(null);
-  const lastId = useRef(0);
-  const [lastSettings, setLastSettings] = useState(settings);
-
-  // New confirmed settings: the pending change has its answer from
-  // `settings-changed`, or will once saved (the event and the command's
-  // answer may come in either order). A saved change is done then.
-  if (lastSettings !== settings) {
-    setLastSettings(settings);
-    if (pending) {
-      setPending(pending.saved ? null : { ...pending, confirmed: true });
-    }
-  }
-
-  // Optimistic until both saved and confirmed.
-  const shown =
-    pending && !(pending.saved && pending.confirmed) ? pending.value : settings;
-
-  function change(next: (current: Settings) => Settings) {
-    setError(null);
-    if (shown === null) {
-      // Nothing to build the full object from.
-      setError("notReady");
-      return;
-    }
-    const value = next(shown);
-    const id = ++lastId.current;
-    setPending({ id, value, saved: false, confirmed: false });
-    updateSettings(value).then(
-      () => {
-        setPending((current) => {
-          if (current?.id !== id) return current;
-          return current.confirmed ? null : { ...current, saved: true };
-        });
-      },
-      (reason: unknown) => {
-        // An older change answering late says nothing about the latest.
-        if (id !== lastId.current) return;
-        setPending(null);
-        setError(isSettingsCommandError(reason) ? reason.code : "notReady");
-      },
-    );
-  }
-
+  const { shown, change, error } = useSettingsEditor(settings);
   const theme = shown?.theme ?? null;
   const edge = shown?.dock.edge ?? null;
   const size = shown ? sizePresetOf(shown.dock.iconSize) : null;
   const opacity = shown?.dock.opacity ?? null;
+  const taskbar = shown?.dock.taskbar ?? null;
 
   return (
     <>
@@ -179,6 +129,25 @@ function SettingsPanel({
           }))
         }
       />
+      <OptionGroup
+        label={t.settings.groups.taskbar}
+        options={options(TASKBARS, t.settings.taskbar)}
+        selected={taskbar}
+        onSelect={(value) =>
+          change((s) => ({
+            ...s,
+            dock: { ...s.dock, taskbar: value },
+          }))
+        }
+      />
+      {onOpenLook ? (
+        <NavRow
+          label={t.settings.look.title}
+          value={shown ? t.settings.look.styles[shown.dock.style] : ""}
+          onClick={onOpenLook}
+          focusOnMount={focusLookRow}
+        />
+      ) : null}
       {onOpenItems ? (
         <NavRow
           label={t.widgets.items.title}

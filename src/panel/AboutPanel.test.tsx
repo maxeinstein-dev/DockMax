@@ -26,10 +26,10 @@ describe("AboutPanel", () => {
     expect(value("Versão")).toHaveTextContent(version);
   });
 
-  it("shows the MIT license", () => {
+  it("shows the personal-use license", () => {
     render(<AboutPanel />);
 
-    expect(value("Licença")).toHaveTextContent("MIT");
+    expect(value("Licença")).toHaveTextContent("Uso pessoal");
   });
 
   it("shows the repository as selectable text, not a link", () => {

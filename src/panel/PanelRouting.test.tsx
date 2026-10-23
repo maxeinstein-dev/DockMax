@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PanelReadyArgs, PanelShowPayload } from "../core/panels";
-import type { Settings } from "../core/settings";
+import { DEFAULT_LOOK, type Settings } from "../core/settings";
 import type {
   CreatableKind,
   WidgetInstance,
@@ -78,7 +78,12 @@ vi.mock("../widgets/registry", async (importOriginal) => {
 const SETTINGS: Settings = {
   version: 1,
   theme: "system",
-  dock: { edge: "bottom", iconSize: 48, opacity: "translucent" },
+  dock: {
+    edge: "bottom",
+    iconSize: 48,
+    opacity: "translucent",
+    ...DEFAULT_LOOK,
+  },
 };
 
 const CLOCK = WIDGET_FIXTURES["clock-sample"];
@@ -377,6 +382,39 @@ describe("Panel routing", () => {
       expect(
         screen.getByRole("heading", { name: ptBR.panel.titles.settings }),
       ).toBeInTheDocument();
+      expect(row()).toHaveFocus();
+      expect(readyCalls()).toHaveLength(3);
+    });
+
+    it("opens Aparência do dock in place and comes back to its row", async () => {
+      await renderPanel();
+      show("settings");
+      const row = () =>
+        screen.getByRole("button", {
+          name: new RegExp(ptBR.settings.look.title),
+        });
+      expect(row()).toHaveTextContent(ptBR.settings.look.styles.native);
+
+      fireEvent.click(row());
+
+      // It brings its own title, in place of Configurações.
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole("heading", { name: ptBR.settings.look.title }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("combobox", { name: ptBR.settings.look.style }),
+      ).toBeInTheDocument();
+      expect(readyCalls()).toHaveLength(2);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: ptBR.widgets.common.back }),
+      );
+
+      expect(
+        screen.getByRole("heading", { name: ptBR.panel.titles.settings }),
+      ).toBeInTheDocument();
+      // The focus goes back to the row that opened it, not to Itens do dock.
       expect(row()).toHaveFocus();
       expect(readyCalls()).toHaveLength(3);
     });

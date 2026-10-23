@@ -10,23 +10,23 @@ web
 
 ## Users
 
-- **Primário:** o próprio autor, desenvolvedor, no Windows 11 do dia a dia (monitor 2560×1080 a 100%, efeitos de transparência desligados). Usa o DockMax o dia inteiro, junto da barra de tarefas nativa, para abrir painéis e, nas próximas fases, atalhos e widgets.
-- **Secundário:** quem avalia o projeto como portfólio no GitHub (README, prints, demonstração).
-- **Prioridade confirmada:** uso pessoal primeiro. O dock precisa ser agradável e discreto no uso diário; o valor de portfólio é consequência de um produto bem feito.
+- **Primário:** o próprio autor, desenvolvedor, no Windows 11 do dia a dia (monitor 2560×1080 a 100%, efeitos de transparência desligados). Usa o DockMax o dia inteiro como o dock do Windows: abrir apps, trocar de workspace, ver widgets. A barra de tarefas nativa fica visível, escondida automaticamente ou oculta por completo, à escolha dele.
+- **Secundário:** quem lê o projeto no GitHub (README, prints). A licença é de uso pessoal; o código pode ser estudado, não redistribuído.
+- **Prioridade confirmada:** uso pessoal. O dock precisa ser agradável no uso diário.
 
 ## Product Purpose
 
-Um dock personalizável para Windows, inspirado em docks de macOS e Linux, que reúne atalhos e painéis de widgets sem substituir a barra de tarefas. Sucesso na Fase 1: dock e painéis abrem e fecham sem falhas, preferências (tema, posição, tamanho, opacidade) sobrevivem a reinicializações, e o dock nunca atrapalha o trabalho nos apps de trás.
+Um dock completo para Windows que pode substituir a barra de tarefas: atalhos e apps abertos, workspaces com Docks próprios, widgets vivos, pacotes de ícones e temas prontos. Desde 2026-10-22 o produto mira a paridade de funcionalidades e de visual com o PrimoDock (spec 0004), implementada do zero. Sucesso na Fase 1: dock e painéis abrem e fecham sem falhas, preferências (tema, posição, tamanho, opacidade) sobrevivem a reinicializações, e o dock nunca atrapalha o trabalho nos apps de trás.
 
 ## Positioning
 
-Dock com identidade própria para Windows, construído com Tauri (leve, local, sem backend), que convive com a barra nativa em vez de substituí-la, captura o mouse só onde desenha e deixa o clique atravessar o resto.
+Dock para Windows construído com Tauri (leve, local, sem conta, sem analytics), com a mesma proposta de produto do PrimoDock: um Dock para cada coisa que se faz (workspaces), prévias de janela ao vivo e um pet na barra. Captura o mouse só onde desenha e deixa o clique atravessar o resto.
 
 ## Operating Context
 
-- Fica sempre no topo, centralizado na borda inferior (ou superior) do monitor principal, 8 px acima da área útil.
+- Fica sempre no topo, centralizado numa das quatro bordas (embaixo, no topo, esquerda, direita), com espaço configurável até a borda. Sobre o destino final, a barra de aplicativos reserva a área de trabalho (ADR 0009).
 - Abre painéis ancorados aos itens; um painel por vez; fecha com Esc, clique fora ou novo clique no item.
-- Controlado também pela bandeja do Windows (mostrar/ocultar, sair).
+- Controlado também pela bandeja do Windows (mostrar/ocultar, sair) enquanto a barra nativa estiver visível; com ela oculta, o próprio Dock hospeda a bandeja.
 - Uso contínuo ao longo do dia, ao lado de navegadores, IDEs e chats; ocupa uma faixa pequena da tela.
 
 ## Capabilities and Constraints
@@ -37,21 +37,23 @@ Dock com identidade própria para Windows, construído com Tauri (leve, local, s
   - ampliação viável, com captura do mouse só na barra e no ícone ampliado;
   - **sem desfoque real do fundo**: o vidro é simulado em CSS (camada tingida translúcida), porque o backdrop do Windows não respeita cantos arredondados;
   - CSP estrita em release: sem estilos inline injetados, sem `eval`.
-- **Próximas fases:** atalhos de apps, arquivos e prateleira (Fase 3); widgets como relógio, notas, calendário etc. (Fase 2 em diante); múltiplos monitores e tela cheia (Fase 4).
+- **Paridade com o PrimoDock** (spec 0004): 9 temas, formatos de ícone, efeitos de passar o mouse, animações de abertura, indicadores, workspaces, galeria de ícones, widgets em quadrados e cartões, pet, controle da barra de tarefas nativa. A ordem e o escopo ficam na spec.
 - Interface em PT-BR, estruturada para receber inglês depois.
 
 ## Brand Commitments
 
-- Nome: **DockMax**. Projeto independente, sem afiliação com o PrimoDock.
+- Nome: **DockMax**. Projeto independente, sem afiliação com o PrimoDock; a marca, o nome e o logotipo do PrimoDock não são usados.
+- **Licença:** uso pessoal, todos os direitos reservados (arquivo `LICENSE`). Versões até a 0.2.0 foram MIT.
 - Identidade **própria do DockMax**, sem ligação com a marca pessoal do autor, isolada em tokens para poder mudar depois.
 - **Personalização é requisito:** o dock precisa ser ajustável o suficiente para ficar do gosto de quem usa. Toda a identidade vive em tokens trocáveis; os ajustes da Fase 1 são tema, posição, tamanho e opacidade, e a arquitetura não pode impedir outros (destaque, estilo dos ícones etc.).
-- **Destino de longo prazo:** substituir a barra de tarefas do Windows, em harmonia com as janelas abertas (ADR 0004). O visual tem de conviver bem com janelas do Windows 11 desde já.
-- Ficar próximo do dock do macOS é desejado, não um risco. O que deve ser evitado é ser chamativo no uso diário (brilho, cor ou animação que cansam).
-- Referências visuais escolhidas pelo usuário: dock do macOS (Big Sur), tema **WhiteSur** para GTK, dock do **Zorin OS**; inspiração em docks Linux (Plank, Latte Dock, Cairo-Dock). Só como referência: nenhum código, ícone ou arquivo de tema de terceiros (várias são GPL; o DockMax é MIT).
+- **Destino:** substituir a barra de tarefas do Windows, em harmonia com as janelas abertas (ADR 0009, que substitui a convivência do ADR 0004). Enquanto isso não chega, o dock convive com a barra.
+- Ficar próximo do PrimoDock e do dock do macOS é desejado. Os temas chamativos (Neon, Rocket, Canarinho) existem como opção; o padrão continua discreto.
+- Referência visual principal: o PrimoDock, observado pelas telas de configuração e pelo uso (capturas do autor). Referências secundárias: dock do macOS (Big Sur), WhiteSur, Zorin OS, Plank, Latte Dock, Cairo-Dock.
+- **Regra de implementação do zero:** o DockMax copia funcionalidade, organização e aparência, nunca arquivos. Nada do executável do PrimoDock, do código descompilado, da pasta `IconPacks`, do catálogo da galeria nem dos sprites do pet entra no repositório. Ícones, pacotes e pet são desenhados do zero, e pacotes de terceiros (GPL, por exemplo) também ficam de fora. Ter visto o produto original não é um "clean room" estrito; a proteção é a regra de não copiar arquivos nem código.
 
 ## Evidence on Hand
 
-- Documentação: `README.md`, `docs/architecture.md`, `docs/roadmap.md`, ADRs 0001–0006, specs 0001–0002.
+- Documentação: `README.md`, `docs/architecture.md`, `docs/roadmap.md`, ADRs 0001–0009, specs 0001–0004.
 - App funcional com visual provisório (barra escura com dois botões), CI verde.
 - Não existem logotipo, ícones próprios, prints de produto nem demonstração; não inventar.
 

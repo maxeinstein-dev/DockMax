@@ -13,7 +13,11 @@ import {
   dockSize,
   useAppearance,
 } from "./appearance";
-import { SETTINGS_CHANGED_EVENT, type Settings } from "./settings";
+import {
+  DEFAULT_LOOK,
+  SETTINGS_CHANGED_EVENT,
+  type Settings,
+} from "./settings";
 
 type Handler = (event: { payload: Settings }) => void;
 
@@ -36,7 +40,12 @@ vi.mock("@tauri-apps/api/event", () => ({ listen }));
 const DEFAULTS: Settings = {
   version: 1,
   theme: "system",
-  dock: { edge: "bottom", iconSize: 48, opacity: "translucent" },
+  dock: {
+    edge: "bottom",
+    iconSize: 48,
+    opacity: "translucent",
+    ...DEFAULT_LOOK,
+  },
 };
 
 function settingsWith(
@@ -97,7 +106,10 @@ describe("applyAppearance", () => {
   it("gives the dock its size preset and edge", () => {
     applyAppearance(
       root,
-      { ...DEFAULTS, dock: { edge: "top", iconSize: 64, opacity: "solid" } },
+      {
+        ...DEFAULTS,
+        dock: { edge: "top", iconSize: 64, opacity: "solid", ...DEFAULT_LOOK },
+      },
       { window: "dock" },
     );
 
@@ -110,10 +122,70 @@ describe("applyAppearance", () => {
     expect(root.dataset.edge).toBe("bottom");
   });
 
+  it("gives the dock its style, outline, reflections and indicator", () => {
+    applyAppearance(
+      root,
+      {
+        ...DEFAULTS,
+        dock: {
+          ...DEFAULTS.dock,
+          style: "floating",
+          indicator: "dash",
+          indicatorColor: "#0A84FF",
+        },
+      },
+      { window: "dock" },
+    );
+
+    expect(root.dataset.style).toBe("floating");
+    expect(root.dataset.border).toBe("off");
+    expect(root.dataset.reflect).toBe("on");
+    expect(root.dataset.indicator).toBe("dash");
+    expect(root.style.getPropertyValue("--corners")).toBe("0.4");
+    expect(root.style.getPropertyValue("--indicator-color")).toBe("#0A84FF");
+  });
+
+  it("puts the changes of the chosen style over its own look", () => {
+    applyAppearance(
+      root,
+      {
+        ...DEFAULTS,
+        dock: {
+          ...DEFAULTS.dock,
+          style: "floating",
+          tweaks: {
+            floating: { border: true, corners: 100, reflections: false },
+          },
+        },
+      },
+      { window: "dock" },
+    );
+
+    expect(root.dataset.border).toBe("on");
+    expect(root.dataset.reflect).toBe("off");
+    expect(root.style.getPropertyValue("--corners")).toBe("1");
+  });
+
+  it("drops the indicator color when it goes back to the own one of the style", () => {
+    applyAppearance(
+      root,
+      { ...DEFAULTS, dock: { ...DEFAULTS.dock, indicatorColor: "#FF0000" } },
+      { window: "dock" },
+    );
+    expect(root.style.getPropertyValue("--indicator-color")).toBe("#FF0000");
+
+    applyAppearance(root, DEFAULTS, { window: "dock" });
+
+    expect(root.style.getPropertyValue("--indicator-color")).toBe("");
+  });
+
   it("never gives the panel a size or edge", () => {
     applyAppearance(
       root,
-      { ...DEFAULTS, dock: { edge: "top", iconSize: 40, opacity: "solid" } },
+      {
+        ...DEFAULTS,
+        dock: { edge: "top", iconSize: 40, opacity: "solid", ...DEFAULT_LOOK },
+      },
       { window: "panel" },
     );
 

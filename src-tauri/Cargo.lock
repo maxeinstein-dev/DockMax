@@ -879,8 +879,10 @@ dependencies = [
 name = "dockmax"
 version = "0.2.0"
 dependencies = [
+ "base64 0.22.1",
  "jiff",
  "log",
+ "png 0.17.16",
  "rusqlite",
  "rusqlite_migration",
  "serde",

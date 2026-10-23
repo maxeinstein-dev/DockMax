@@ -68,8 +68,45 @@ pub fn managed_state<R: Runtime>(app: &impl Manager<R>) -> Vec<&'static str> {
     found
 }
 
+/// The two jobs this executable has besides being the app (ADR 0009), told
+/// by its first argument: the watchdog that gives the taskbar back when the
+/// app is killed, and the manual restore. Returns whether it did one, in
+/// which case `main` has nothing left to do.
+pub fn run_special_mode() -> bool {
+    #[cfg(windows)]
+    {
+        use std::path::Path;
+        use windows::taskbar::{RESTORE_FLAG, WATCHDOG_FLAG};
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        match args.as_slice() {
+            [flag, pid, path] if flag == WATCHDOG_FLAG => {
+                if let Ok(pid) = pid.parse() {
+                    windows::taskbar::watch(pid, Path::new(path));
+                }
+                return true;
+            }
+            [flag, path] if flag == RESTORE_FLAG => {
+                windows::taskbar::restore_now(Path::new(path));
+                return true;
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // A panic gives the taskbar back before the process aborts (release
+    // builds abort on panic, so nothing is dropped).
+    #[cfg(windows)]
+    {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            windows::taskbar::release();
+            previous(info);
+        }));
+    }
     #[cfg_attr(not(feature = "e2e"), expect(unused_mut))]
     let mut context = tauri::generate_context!();
     // Test build only: before anything reads the identifier or a folder.
@@ -114,7 +151,10 @@ pub fn run() {
             commands::widgets::update_widget,
             commands::widgets::get_note,
             commands::widgets::save_note,
-            commands::widgets::dismiss_storage_notice
+            commands::widgets::dismiss_storage_notice,
+            commands::system::open_flyout,
+            commands::tray::list_tray,
+            commands::tray::tray_click
         ]);
     // Test build only: the WebDriver server the E2E suite drives the windows
     // through, on the port in `TAURI_WEBDRIVER_PORT` (4445 by default).
@@ -125,6 +165,13 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app, event| {
             if let RunEvent::Exit = event {
+                // The edge and the taskbar go back before anything else.
+                #[cfg(windows)]
+                {
+                    windows::tray_host::stop();
+                    windows::appbar::remove();
+                    windows::taskbar::release();
+                }
                 windows::hit_test::tracker(app).stop();
                 // The process ends without closing the widget database:
                 // leave the file complete on its own, `-wal` applied.

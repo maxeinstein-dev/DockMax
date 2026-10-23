@@ -26,7 +26,9 @@ pub const LAYERING: super::native::Layering = super::native::Layering::Always;
 pub const REQUEST_PANEL_EVENT: &str = "dock-request-panel";
 
 /// Gap between the dock window (and the bar, flush with its screen-facing
-/// edge) and the work area edge, in logical pixels.
+/// edge) and the work area edge, in logical pixels, before `bottomSpace` was
+/// a setting: what the tests of the placing rules use.
+#[cfg(test)]
 const MARGIN: f64 = 8.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,10 +76,23 @@ pub fn saturate(value: i64) -> i32 {
 /// The size is capped so the window stays inside the work area. Logical
 /// values are rounded the same way Tauri converts logical to physical
 /// pixels.
+#[cfg(test)]
 pub fn dock_rect(work_area: Rect, scale_factor: f64, window_size: (f64, f64), edge: Edge) -> Rect {
+    dock_rect_with_margin(work_area, scale_factor, window_size, edge, MARGIN)
+}
+
+/// `dock_rect` with the distance from the edge (`bottomSpace`) as a setting,
+/// in logical pixels.
+pub fn dock_rect_with_margin(
+    work_area: Rect,
+    scale_factor: f64,
+    window_size: (f64, f64),
+    edge: Edge,
+    margin: f64,
+) -> Rect {
     // Every term fits in i32/u32 (`as` saturates), so sums in i64 can't
     // overflow.
-    let margin = i64::from((MARGIN * scale_factor).round() as i32);
+    let margin = i64::from((margin * scale_factor).round() as i32);
     let max_height =
         u32::try_from((i64::from(work_area.height) - margin).max(0)).unwrap_or(work_area.height);
     let width = ((window_size.0 * scale_factor).round() as u32).min(work_area.width);
@@ -95,6 +110,46 @@ pub fn dock_rect(work_area: Rect, scale_factor: f64, window_size: (f64, f64), ed
         width,
         height,
     }
+}
+
+/// Physical rectangle of the dock window when the dock holds a band of its
+/// own along the edge (an app bar, ADR 0009): centered across the monitor,
+/// with its screen-facing side `margin` logical pixels inside the band's
+/// outer edge. The window is taller than the band (it holds the
+/// magnification and the label) and overlays what is beyond it, so only the
+/// monitor, not the band, caps its height.
+pub fn docked_rect(
+    band: Rect,
+    monitor: Rect,
+    scale_factor: f64,
+    window_size: (f64, f64),
+    edge: Edge,
+    margin: f64,
+) -> Rect {
+    let margin = i64::from((margin * scale_factor).round() as i32);
+    let max_height =
+        u32::try_from((i64::from(monitor.height) - margin).max(0)).unwrap_or(monitor.height);
+    let width = ((window_size.0 * scale_factor).round() as u32).min(monitor.width);
+    let height = ((window_size.1 * scale_factor).round() as u32).min(max_height);
+    let x = i64::from(monitor.x) + (i64::from(monitor.width) - i64::from(width)).div_euclid(2);
+    let y = match edge {
+        Edge::Bottom => i64::from(band.y) + i64::from(band.height) - margin - i64::from(height),
+        Edge::Top => i64::from(band.y) + margin,
+    };
+    Rect {
+        x: saturate(x),
+        y: saturate(y),
+        width,
+        height,
+    }
+}
+
+/// The height of the bar before the page reports its layout, in logical
+/// pixels: the icon and the padding the size presets use (`SIZE_GEOMETRY`
+/// in `src/dock/layout.ts`: 40 + 2 × 6, 48 + 2 × 7, 64 + 2 × 9).
+fn estimated_bar_height(icon_size: u16) -> f64 {
+    let icon = f64::from(icon_size);
+    icon + 2.0 * (icon * 7.0 / 48.0).round()
 }
 
 /// Largest icon the dock draws, in logical pixels.
@@ -226,6 +281,9 @@ pub struct Placement {
     size: Option<(f64, f64)>,
     /// Physical rectangle last given to the window.
     applied: Option<Rect>,
+    /// Height of the bar the page reported, in logical pixels: the band an
+    /// app bar reserves is as thick as this and the distance from the edge.
+    bar_height: Option<f64>,
 }
 
 impl Placement {
@@ -251,7 +309,10 @@ pub fn edge(app: &AppHandle) -> Edge {
 /// panel, anchored to an item, is closed and reopened at the item's new
 /// place.
 pub fn moves_the_dock(before: &DockSettings, after: &DockSettings) -> bool {
-    before.edge != after.edge || before.icon_size != after.icon_size
+    before.edge != after.edge
+        || before.icon_size != after.icon_size
+        || before.taskbar != after.taskbar
+        || before.bottom_space != after.bottom_space
 }
 
 /// Shows the dock on the primary monitor. Closing it (Alt+F4) hides it.
@@ -261,7 +322,14 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         .ok_or("dock window is missing from tauri.conf.json")?;
     hit_test::start(app, &window)?;
     #[cfg(windows)]
-    super::native::install(&window, Some(reposition), LAYERING)?;
+    {
+        super::native::install(&window, Some(reposition), LAYERING)?;
+        // A previous run that was killed may have left the taskbar changed.
+        if let Some(path) = taskbar_state_path(app) {
+            super::taskbar::recover(&path);
+        }
+        apply_taskbar(app, commands::settings::current(app).dock.taskbar);
+    }
     let handle = app.clone();
     window.on_window_event(move |event| {
         if let WindowEvent::CloseRequested { api, .. } = event {
@@ -283,7 +351,11 @@ pub fn set_layout(app: &AppHandle, layout: DockLayout) -> Result<(), Box<dyn Err
     let window = app
         .get_webview_window(LABEL)
         .ok_or("dock window is missing")?;
-    placement(app).size = Some(layout.window_size());
+    {
+        let mut placement = placement(app);
+        placement.size = Some(layout.window_size());
+        placement.bar_height = Some(layout.bar.height);
+    }
     let placed = place(&window, false);
     // Even when placing failed: the region is relative to the window.
     hit_test::tracker(app).set_region(layout.into_region());
@@ -309,6 +381,10 @@ pub fn request_panel(app: &AppHandle, panel_id: PanelId) -> tauri::Result<()> {
 pub fn settings_changed(app: &AppHandle, before: &DockSettings, after: &DockSettings) {
     if !moves_the_dock(before, after) {
         return;
+    }
+    #[cfg(windows)]
+    if before.taskbar != after.taskbar {
+        apply_taskbar(app, after.taskbar);
     }
     panel::close_for_move(app);
     let placed = app
@@ -399,7 +475,18 @@ fn place(window: &WebviewWindow, force: bool) -> Result<bool, Box<dyn Error>> {
         Some(size) => size,
         None => initial_size(app)?,
     };
-    let rect = dock_rect(work_area, scale_factor, size, edge(app));
+    let settings = commands::settings::current(app).dock;
+    let edge = Edge::from(settings.edge);
+    let margin = f64::from(settings.bottom_space);
+    #[cfg(windows)]
+    let held = reserve_edge(window, &settings, scale_factor);
+    #[cfg(not(windows))]
+    let held: Option<(Rect, Rect)> = None;
+    let rect = match held {
+        // The dock holds a band of its own: it sits in it.
+        Some((band, monitor)) => docked_rect(band, monitor, scale_factor, size, edge, margin),
+        None => dock_rect_with_margin(work_area, scale_factor, size, edge, margin),
+    };
     if !placement(app).needs(rect, force) {
         return Ok(false);
     }
@@ -418,6 +505,100 @@ fn place(window: &WebviewWindow, force: bool) -> Result<bool, Box<dyn Error>> {
         window.scale_factor()?,
     );
     Ok(true)
+}
+
+/// Where the settings keep the taskbar's state file, in the app's local
+/// data folder; `None` when the folder can't be resolved (then the taskbar is
+/// never changed).
+#[cfg(windows)]
+fn taskbar_state_path(app: &AppHandle) -> Option<std::path::PathBuf> {
+    app.path()
+        .app_local_data_dir()
+        .ok()
+        .map(|dir| dir.join(super::taskbar::STATE_FILE))
+}
+
+/// Takes the taskbar the way `mode` says, or gives it back. A failure is
+/// logged and leaves the taskbar as it was: the dock then sits above it.
+#[cfg(windows)]
+fn apply_taskbar(app: &AppHandle, mode: crate::domain::settings::TaskbarMode) {
+    use crate::domain::settings::TaskbarMode;
+    // The test build runs on the machine of whoever tests: it never touches
+    // the taskbar, whatever the default is.
+    if cfg!(feature = "e2e") {
+        return;
+    }
+    if mode == TaskbarMode::Visible && super::taskbar::is_held() {
+        commands::tray::stop(app);
+        super::taskbar::release();
+        return;
+    }
+    if mode == TaskbarMode::Visible {
+        return;
+    }
+    let Some(path) = taskbar_state_path(app) else {
+        log::warn!("taskbar: no data folder, the taskbar stays");
+        return;
+    };
+    if let Err(error) = super::taskbar::hold(mode, &path) {
+        log::warn!("taskbar: could not be taken: {error}");
+        return;
+    }
+    // The notification area is the dock's only while the taskbar is hidden
+    // altogether: with it hiding on its own, its own tray is a hover away.
+    if mode == TaskbarMode::Hidden {
+        commands::tray::start(app);
+    } else {
+        commands::tray::stop(app);
+    }
+}
+
+/// With the taskbar taken, reserves the band along the edge of the primary
+/// monitor and returns it with the monitor's rectangle; `None` (and the band
+/// given back) when the taskbar stays or the band could not be had.
+#[cfg(windows)]
+fn reserve_edge(
+    window: &WebviewWindow,
+    settings: &DockSettings,
+    scale_factor: f64,
+) -> Option<(Rect, Rect)> {
+    use super::appbar;
+    if !settings.taskbar.reserves_the_edge() || !super::taskbar::is_held() {
+        appbar::set(None);
+        return None;
+    }
+    let app = window.app_handle();
+    {
+        let app = app.clone();
+        appbar::start(move || {
+            // From the app bar's thread: only queues the work for the main
+            // one, which the dock's own placing waits on.
+            let again = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                if let Some(window) = again.get_webview_window(LABEL) {
+                    reposition(&window);
+                }
+            });
+        });
+    }
+    let monitor = window.primary_monitor().ok()??;
+    let monitor = Rect {
+        x: monitor.position().x,
+        y: monitor.position().y,
+        width: monitor.size().width,
+        height: monitor.size().height,
+    };
+    let bar_height = placement(app)
+        .bar_height
+        .unwrap_or_else(|| estimated_bar_height(settings.icon_size));
+    let thickness =
+        appbar::band_thickness(bar_height, f64::from(settings.bottom_space), scale_factor);
+    let granted = appbar::set(Some(appbar::Request {
+        edge: Edge::from(settings.edge),
+        monitor,
+        thickness,
+    }))?;
+    Some((granted, monitor))
 }
 
 /// The primary monitor's work area, in physical pixels, and its scale factor.
@@ -652,9 +833,127 @@ mod tests {
         assert!(!moved(|_| {}));
         assert!(moved(|dock| dock.edge = DockEdge::Top));
         assert!(moved(|dock| dock.icon_size = 64));
+        assert!(moved(
+            |dock| dock.taskbar = crate::domain::settings::TaskbarMode::Visible
+        ));
+        assert!(moved(|dock| dock.bottom_space = 12));
         assert!(!moved(|dock| {
             dock.opacity = crate::domain::settings::DockOpacity::Solid
         }));
+    }
+
+    /// A 2560 × 1080 monitor with a band of 64 px at the bottom, as a bar of
+    /// 62 px and 2 px from the edge reserve.
+    const MONITOR: Rect = Rect {
+        x: 0,
+        y: 0,
+        width: 2560,
+        height: 1080,
+    };
+    const BAND: Rect = Rect {
+        x: 0,
+        y: 1016,
+        width: 2560,
+        height: 64,
+    };
+
+    #[test]
+    fn docked_window_sits_in_the_band_with_its_bar_flush_to_the_margin() {
+        // 240 × 104: the bar is the lower 62 px, the rest is room for the
+        // magnification. The window's bottom is 2 px above the band's.
+        let dock = docked_rect(BAND, MONITOR, 1.0, SIZE, Edge::Bottom, 2.0);
+
+        assert_eq!(dock, rect(1160, 1080 - 2 - 104, 240, 104));
+        assert_eq!(dock.y + dock.height as i32, BAND.y + BAND.height as i32 - 2);
+    }
+
+    #[test]
+    fn docked_window_is_taller_than_the_band_and_overlays_what_is_beyond() {
+        let dock = docked_rect(BAND, MONITOR, 1.0, SIZE, Edge::Bottom, 2.0);
+
+        assert!(dock.height > BAND.height);
+        assert!(dock.y < BAND.y);
+    }
+
+    #[test]
+    fn docked_window_follows_the_band_a_taskbar_pushed_up() {
+        // Another bar of 48 px holds the edge: Windows grants the band above it.
+        let granted = Rect {
+            y: BAND.y - 48,
+            ..BAND
+        };
+
+        let dock = docked_rect(granted, MONITOR, 1.0, SIZE, Edge::Bottom, 2.0);
+
+        assert_eq!(dock.y + dock.height as i32, 1080 - 48 - 2);
+    }
+
+    #[test]
+    fn docked_window_on_top_hangs_from_the_band() {
+        let band = Rect { y: 0, ..BAND };
+
+        let dock = docked_rect(band, MONITOR, 1.0, SIZE, Edge::Top, 2.0);
+
+        assert_eq!(dock.y, 2);
+    }
+
+    #[test]
+    fn docked_window_is_centered_on_the_monitor_not_on_the_band() {
+        let left = Rect {
+            x: -1920,
+            y: 0,
+            width: 1920,
+            height: 1200,
+        };
+        let band = Rect {
+            y: 1136,
+            height: 64,
+            ..left
+        };
+
+        let dock = docked_rect(band, left, 1.0, SIZE, Edge::Bottom, 0.0);
+
+        assert_eq!(dock.x, -1920 + (1920 - 240) / 2);
+        assert_eq!(dock.y + dock.height as i32, 1200);
+    }
+
+    #[test]
+    fn docked_window_scales_its_margin_and_its_size() {
+        let band = Rect {
+            y: 1080 - 96,
+            height: 96,
+            ..BAND
+        };
+
+        let dock = docked_rect(band, MONITOR, 1.5, SIZE, Edge::Bottom, 2.0);
+
+        assert_eq!((dock.width, dock.height), (360, 156));
+        assert_eq!(dock.y + dock.height as i32, 1080 - 3);
+    }
+
+    #[test]
+    fn docked_window_never_leaves_the_monitor() {
+        let dock = docked_rect(BAND, MONITOR, 1.0, (5000.0, 5000.0), Edge::Bottom, 2.0);
+
+        assert_eq!(dock.width, 2560);
+        assert_eq!(dock.height, 1080 - 2);
+        assert!(dock.y >= 0);
+    }
+
+    #[test]
+    fn the_bar_height_before_the_page_reports_matches_the_presets() {
+        assert_eq!(estimated_bar_height(40), 52.0);
+        assert_eq!(estimated_bar_height(48), 62.0);
+        assert_eq!(estimated_bar_height(64), 82.0);
+    }
+
+    #[test]
+    fn the_distance_from_the_edge_is_the_margin_of_the_window() {
+        let work_area = rect(0, 0, 2560, 1040);
+        for margin in [0.0, 2.0, 8.0, 64.0] {
+            let dock = dock_rect_with_margin(work_area, 1.0, SIZE, Edge::Bottom, margin);
+            assert_eq!(dock.y + dock.height as i32, 1040 - margin as i32);
+        }
     }
 
     #[test]

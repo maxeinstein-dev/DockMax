@@ -10,6 +10,11 @@ const PATHS: Record<SystemPanelId, string[]> = {
     "M13.5 7.5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
     "M7.5 16.5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
   ],
+  // An arrow up in a rounded square: more icons.
+  tray: [
+    "M6 9.5l6 6 6-6",
+    "M4.5 5h15a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5h-15a1.5 1.5 0 0 1-1.5-1.5v-11A1.5 1.5 0 0 1 4.5 5z",
+  ],
   // "i" in a circle.
   about: [
     "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0",

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Settings } from "../core/settings";
+import { DEFAULT_LOOK, type Settings } from "../core/settings";
 import type { WidgetInstance, WidgetsSnapshot } from "../core/widgets";
 import { ptBR } from "../i18n/pt-BR";
 import SettingsPanel from "./SettingsPanel";
@@ -10,7 +10,12 @@ const text = ptBR.settings;
 const SETTINGS: Settings = {
   version: 1,
   theme: "dark",
-  dock: { edge: "bottom", iconSize: 48, opacity: "translucent" },
+  dock: {
+    edge: "bottom",
+    iconSize: 48,
+    opacity: "translucent",
+    ...DEFAULT_LOOK,
+  },
 };
 
 const { invoke, log } = vi.hoisted(() => ({
@@ -66,6 +71,8 @@ describe("SettingsPanel", () => {
     expect(chosen(text.groups.edge)).toEqual([text.edge.bottom]);
     expect(chosen(text.groups.size)).toEqual([text.size.medium]);
     expect(chosen(text.groups.opacity)).toEqual([text.opacity.translucent]);
+    // The dock takes the taskbar's place until the user says otherwise.
+    expect(chosen(text.groups.taskbar)).toEqual([text.taskbar.hidden]);
     expect(screen.getByText(text.footer)).toBeInTheDocument();
     expect(screen.getByText("Esc").tagName).toBe("KBD");
   });
@@ -114,9 +121,22 @@ describe("SettingsPanel", () => {
       { ...SETTINGS, dock: { ...SETTINGS.dock, iconSize: 40 } },
     ],
     [
+      text.groups.taskbar,
+      text.taskbar.visible,
+      { ...SETTINGS, dock: { ...SETTINGS.dock, taskbar: "visible" } },
+    ],
+    [
+      text.groups.taskbar,
+      text.taskbar.autohide,
+      { ...SETTINGS, dock: { ...SETTINGS.dock, taskbar: "autohide" } },
+    ],
+    [
       text.groups.opacity,
       text.opacity.solid,
-      { ...SETTINGS, dock: { ...SETTINGS.dock, opacity: "solid" } },
+      {
+        ...SETTINGS,
+        dock: { ...SETTINGS.dock, opacity: "solid" },
+      },
     ],
   ])("saves the full settings on choosing %s: %s", (groupName, name, sent) => {
     invoke.mockReturnValue(new Promise(() => {}));
@@ -367,6 +387,51 @@ describe("SettingsPanel", () => {
         "-1",
       );
     });
+  });
+});
+
+describe("SettingsPanel › Aparência do dock row", () => {
+  const look = ptBR.settings.look;
+
+  it("names the style in use and opens the subview", () => {
+    const onOpenLook = vi.fn();
+    render(
+      <SettingsPanel
+        settings={{ ...SETTINGS, dock: { ...SETTINGS.dock, style: "neon" } }}
+        onOpenLook={onOpenLook}
+      />,
+    );
+    const row = screen.getByRole("button", { name: new RegExp(look.title) });
+
+    expect(row).toHaveTextContent(look.styles.neon);
+
+    fireEvent.click(row);
+
+    expect(onOpenLook).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("has no row without a way to open it", () => {
+    render(<SettingsPanel settings={SETTINGS} />);
+
+    expect(
+      screen.queryByRole("button", { name: new RegExp(look.title) }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("takes the focus when it is the row the user comes back to", () => {
+    render(
+      <SettingsPanel
+        settings={SETTINGS}
+        onOpenLook={vi.fn()}
+        onOpenItems={vi.fn()}
+        focusLookRow
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: new RegExp(look.title) }),
+    ).toHaveFocus();
   });
 });
 

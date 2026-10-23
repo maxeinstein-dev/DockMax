@@ -9,6 +9,7 @@ import css from "./Dock.css?raw";
 import {
   ROOM,
   SIZE_GEOMETRY,
+  STATUS_WIDTH,
   TIP_GAP,
   TIP_HEIGHT,
   dockLayout,
@@ -400,5 +401,86 @@ describe("a full dock: 12 widgets and the system items", () => {
       labelWidths: WIDE_LABELS,
     });
     expect(window.width).toBeLessThanOrEqual(1366);
+  });
+});
+
+describe("the clock at the end of the bar", () => {
+  const medium = SIZE_GEOMETRY.m;
+
+  it("adds a separator and its own width, between two gaps, to the bar", () => {
+    const without = placeDock({
+      size: "m",
+      groups: GROUPS,
+      edge: "bottom",
+      magnified: null,
+      viewport: { width: 400, height: 123 },
+    }).bar.width;
+    const withStatus = placeDock({
+      size: "m",
+      groups: GROUPS,
+      status: true,
+      edge: "bottom",
+      magnified: null,
+      viewport: { width: 400, height: 123 },
+    }).bar.width;
+
+    expect(STATUS_WIDTH).toBe(76);
+    // [item][gap][separator][gap][clock]: two gaps, the separator and the
+    // clock, on top of the bar without it.
+    expect(withStatus - without).toBeCloseTo(
+      2 * medium.gap + separatorWidth(medium.gap) + STATUS_WIDTH,
+      9,
+    );
+  });
+
+  it("moves no item and no tile", () => {
+    const shape = {
+      size: "m",
+      groups: GROUPS,
+      edge: "bottom",
+      magnified: 0,
+    } as const;
+    const viewport = { width: 400, height: 123 };
+    const without = placeDock({ ...shape, viewport });
+    const withStatus = placeDock({ ...shape, status: true, viewport });
+
+    // Relative to the bar's own left edge, the items stay where they were.
+    without.items.forEach((item, index) => {
+      const other = withStatus.items[index];
+      expect(other?.x).toBeDefined();
+      expect((other?.x ?? 0) - withStatus.bar.x).toBeCloseTo(
+        item.x - without.bar.x,
+        9,
+      );
+      expect(other?.width).toBe(item.width);
+    });
+    expect(withStatus.items).toHaveLength(without.items.length);
+  });
+
+  it("makes the window wide enough for the bar with the clock", () => {
+    const size = (status: boolean) =>
+      dockWindowSize({
+        size: "m",
+        groups: GROUPS,
+        status,
+        motion: true,
+        labelWidths: [0, 0],
+      }).width;
+
+    // Without labels the bar is the widest thing in the window.
+    expect(size(true) - size(false)).toBeGreaterThanOrEqual(96);
+  });
+
+  it("alone, without items, is a bar of its own", () => {
+    const { bar } = placeDock({
+      size: "m",
+      groups: [],
+      status: true,
+      edge: "bottom",
+      magnified: null,
+      viewport: { width: 300, height: 100 },
+    });
+
+    expect(bar.width).toBeCloseTo(2 * medium.pad + STATUS_WIDTH, 9);
   });
 });

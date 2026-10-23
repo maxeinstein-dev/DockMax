@@ -237,6 +237,13 @@
   --l: 46%;
 }
 
+/* Teal: the tray. */
+.t-tray {
+  --h: 176;
+  --sat: 22%;
+  --l: 36%;
+}
+
 /* Items of later phases shown only as illustration: saturation × 0.55. */
 .illustrative {
   --sat-k: 0.55;
