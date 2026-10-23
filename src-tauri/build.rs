@@ -31,6 +31,13 @@ fn main() {
             "open_flyout",
             "list_tray",
             "tray_click",
+            "list_apps",
+            "list_catalog",
+            "app_icon",
+            "pin_app",
+            "unpin_app",
+            "move_app",
+            "launch_app",
         ]),
     ))
     .expect("failed to run tauri-build");
