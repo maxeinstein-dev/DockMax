@@ -1,0 +1,15 @@
+{
+  "storage": { "state": "ok" },
+  "apps": [
+    {
+      "id": "0199a4c0-0000-7000-8000-000000000001",
+      "appId": "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
+      "name": "Calculadora"
+    },
+    {
+      "id": "0199a4c0-0000-7000-8000-000000000002",
+      "appId": "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\notepad.exe",
+      "name": "Bloco de notas"
+    }
+  ]
+}

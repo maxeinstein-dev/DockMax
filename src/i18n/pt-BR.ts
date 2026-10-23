@@ -1,3 +1,4 @@
+import type { AppErrorCode } from "../core/apps";
 import type {
   DockEdge,
   DockOpacity,
@@ -195,6 +196,56 @@ const messages = {
    * §2.2, §2.3; the approved mock `docs/design/widgets-mock.html`). A text
    * with `{name}` placeholders goes through `format`; a `{ one, other }`
    * pair through `plural`. */
+  /** Configurações › Apps do dock (spec 0006). */
+  apps: {
+    /** The navigation row in Configurações, and the subview's title. */
+    title: "Apps do dock",
+    /** The row's value and the count: `3 de 40`. */
+    count: "{count} de {max}",
+    /** The row's value while the apps can't be used. */
+    unavailable: "Indisponível",
+    /** Accessible name of the list of pinned apps. */
+    listLabel: "Apps na ordem do dock",
+    empty: "Nenhum app no dock. Procure um abaixo.",
+    add: "Adicionar um app",
+    /** In place of the count at the limit; pinning turns off. */
+    limit: "Limite de {max} apps",
+    searchLabel: "Buscar app instalado",
+    searchPlaceholder: "Buscar por nome",
+    catalogLabel: "Apps instalados",
+    loading: "Lendo os apps instalados…",
+    noMatch: "Nenhum app com esse nome.",
+    catalogFailed: "Não foi possível ler os apps instalados.",
+    retry: "Tentar de novo",
+    /** Accessible names of the buttons of each program, with its name. */
+    pin: "Fixar {name}",
+    pinned: "{name} (fixado)",
+    moveUp: "Subir {name}",
+    moveDown: "Descer {name}",
+    remove: "Remover {name} do dock",
+    footer: "A ordem é a do dock",
+    footerUnavailable: "Configurações e Sobre continuam funcionando",
+    /** Notice of a database that can't be used in this run. */
+    unavailableNotice: {
+      title: "Os apps do dock estão indisponíveis.",
+      detail:
+        "O banco de dados não pôde ser aberto e não foi alterado. O motivo está no log do DockMax.",
+    },
+    /** Shown when an apps change fails, by error code. A new code without
+     * a message does not compile. */
+    errors: {
+      limitReached: "O dock já tem 40 apps. Remova um para fixar outro.",
+      notFound: "Este app não está mais no dock.",
+      alreadyPinned: "Este app já está no dock.",
+      invalidApp: "Este app não está mais instalado ou não pode ser fixado.",
+      launchFailed: "Não foi possível abrir o app.",
+      unavailable:
+        "Os apps estão indisponíveis agora. O motivo está no log do DockMax.",
+      writeFailed: "Não foi possível salvar a mudança. Tente de novo.",
+      notReady:
+        "Os apps não estão disponíveis agora. Reinicie o DockMax e tente de novo.",
+    } satisfies Record<AppErrorCode, string>,
+  },
   widgets: {
     /** Name of each kind: the dock item's name and the panel title when the
      * instance has no label, and the label field's placeholder. */

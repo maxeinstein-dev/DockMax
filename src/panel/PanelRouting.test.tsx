@@ -139,6 +139,10 @@ describe("Panel routing", () => {
     invoke.mockReset();
     invoke.mockImplementation((command: string) => {
       if (command === "get_settings") return Promise.resolve(SETTINGS);
+      if (command === "list_apps") {
+        return Promise.resolve({ storage: { state: "ok" }, apps: [] });
+      }
+      if (command === "list_catalog") return Promise.resolve([]);
       if (command === "list_widgets") {
         return widgets instanceof Error
           ? Promise.reject(widgets)
@@ -415,6 +419,38 @@ describe("Panel routing", () => {
         screen.getByRole("heading", { name: ptBR.panel.titles.settings }),
       ).toBeInTheDocument();
       // The focus goes back to the row that opened it, not to Itens do dock.
+      expect(row()).toHaveFocus();
+      expect(readyCalls()).toHaveLength(3);
+    });
+
+    it("opens Apps do dock in place and comes back to its row", async () => {
+      await renderPanel();
+      show("settings");
+      const row = () =>
+        screen.getByRole("button", {
+          name: new RegExp(ptBR.apps.title),
+        });
+
+      fireEvent.click(row());
+
+      // It brings its own title, in place of Configurações.
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole("heading", { name: ptBR.apps.title }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("textbox", { name: ptBR.apps.searchLabel }),
+      ).toBeInTheDocument();
+      expect(readyCalls()).toHaveLength(2);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: ptBR.widgets.common.back }),
+      );
+
+      expect(
+        screen.getByRole("heading", { name: ptBR.panel.titles.settings }),
+      ).toBeInTheDocument();
+      // The focus goes back to the row that opened it.
       expect(row()).toHaveFocus();
       expect(readyCalls()).toHaveLength(3);
     });

@@ -141,6 +141,25 @@
   stroke-linejoin: round;
 }
 
+/* A pinned program: its icon on the plate (spec 0006 §3.4). */
+.dock-app-icon {
+  position: relative;
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* The first letter of the name, while the icon is not there. */
+.dock-app-letter {
+  position: relative;
+  font-size: calc(var(--icon) * 0.42);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--app-ink);
+}
+
 /* Attention badge on the Configurações tile while the widget database was
    recovered or is unavailable (DESIGN.md "Dock item": badge): 10 px of
    --danger with a 2 px ring of the surface, at the top right corner. */

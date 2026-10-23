@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LOOK, type Settings } from "../core/settings";
 import type { WidgetInstance, WidgetsSnapshot } from "../core/widgets";
+import type { AppsSnapshot } from "../core/apps";
 import { ptBR } from "../i18n/pt-BR";
 import SettingsPanel from "./SettingsPanel";
 
@@ -432,6 +433,79 @@ describe("SettingsPanel › Aparência do dock row", () => {
     expect(
       screen.getByRole("button", { name: new RegExp(look.title) }),
     ).toHaveFocus();
+  });
+});
+
+describe("SettingsPanel › Apps do dock row", () => {
+  const apps = ptBR.apps;
+  const pinned = (count: number): AppsSnapshot => ({
+    storage: { state: "ok" },
+    apps: Array.from({ length: count }, (_, n) => ({
+      id: `0199a4c0-0000-7000-8000-${String(n).padStart(12, "0")}`,
+      appId: `app${n}!App`,
+      name: `App ${n}`,
+    })),
+  });
+  const row = () =>
+    screen.getByRole("button", { name: new RegExp(apps.title) });
+
+  it("counts the pinned programs and opens the subview", () => {
+    const onOpenApps = vi.fn();
+    render(
+      <SettingsPanel
+        settings={SETTINGS}
+        apps={pinned(3)}
+        onOpenApps={onOpenApps}
+      />,
+    );
+
+    expect(row()).toHaveTextContent("3 de 40");
+
+    fireEvent.click(row());
+
+    expect(onOpenApps).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("says Indisponível while the apps are loading, unreadable or unusable", () => {
+    const { rerender } = render(
+      <SettingsPanel settings={SETTINGS} onOpenApps={vi.fn()} />,
+    );
+    expect(row()).toHaveTextContent(apps.unavailable);
+
+    rerender(
+      <SettingsPanel
+        settings={SETTINGS}
+        apps={{
+          storage: { state: "unavailable", reason: "openFailed" },
+          apps: [],
+        }}
+        onOpenApps={vi.fn()}
+      />,
+    );
+    expect(row()).toHaveTextContent(apps.unavailable);
+  });
+
+  it("has no row without a way to open it", () => {
+    render(<SettingsPanel settings={SETTINGS} apps={pinned(1)} />);
+
+    expect(
+      screen.queryByRole("button", { name: new RegExp(apps.title) }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("takes the focus when it is the row the user comes back to", () => {
+    render(
+      <SettingsPanel
+        settings={SETTINGS}
+        apps={pinned(1)}
+        onOpenApps={vi.fn()}
+        onOpenItems={vi.fn()}
+        focusAppsRow
+      />,
+    );
+
+    expect(row()).toHaveFocus();
   });
 });
 

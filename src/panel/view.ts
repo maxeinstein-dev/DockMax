@@ -1,6 +1,6 @@
 /** The subviews a panel has: a widget's Ajustes, and Configurações ›
- * Itens do dock or Aparência do dock. */
-export type SubView = "items" | "look";
+ * Itens do dock, Apps do dock or Aparência do dock. */
+export type SubView = "items" | "look" | "apps";
 
 /** Which view of the panel shows: its main view, or one of its subviews. */
 export interface PanelView {
@@ -35,4 +35,16 @@ export const BACK_FROM_LOOK_VIEW: PanelView = {
   sub: null,
   returned: true,
   from: "look",
+};
+/** Configurações › Apps do dock. */
+export const APPS_VIEW: PanelView = {
+  sub: "apps",
+  returned: false,
+  from: null,
+};
+/** Voltar from Apps do dock. */
+export const BACK_FROM_APPS_VIEW: PanelView = {
+  sub: null,
+  returned: true,
+  from: "apps",
 };

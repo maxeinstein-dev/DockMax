@@ -200,24 +200,37 @@ mod tests {
         }
     }
 
+    /// The files the TypeScript side checks against its own types
+    /// (`src/core/apps.test.ts`): changing one side alone breaks one of the
+    /// two tests.
+    fn fixture(name: &str) -> serde_json::Value {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/apps")
+            .join(name);
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("{name}: {error}"));
+        serde_json::from_str(&text).unwrap_or_else(|error| panic!("{name}: {error}"))
+    }
+
     #[test]
-    fn error_codes_serialize_to_the_names_the_interface_expects() {
-        let codes: Vec<String> = AppErrorCode::ALL
+    fn error_codes_serialize_to_the_names_in_the_contract_file() {
+        let codes: Vec<serde_json::Value> = AppErrorCode::ALL
             .iter()
-            .map(|code| serde_json::to_string(code).unwrap())
+            .map(|code| serde_json::to_value(code).unwrap())
             .collect();
 
-        assert_eq!(
-            codes,
-            [
-                "\"limitReached\"",
-                "\"notFound\"",
-                "\"alreadyPinned\"",
-                "\"invalidApp\"",
-                "\"launchFailed\"",
-                "\"unavailable\"",
-                "\"writeFailed\"",
-            ]
-        );
+        assert_eq!(serde_json::Value::Array(codes), fixture("error-codes.json"));
+    }
+
+    #[test]
+    fn the_snapshot_sample_reads_and_writes_back_the_same() {
+        let expected = fixture("snapshot-sample.json");
+
+        let snapshot: AppsSnapshot = serde_json::from_value(expected.clone()).unwrap();
+
+        assert_eq!(snapshot.apps.len(), 2);
+        assert_eq!(serde_json::to_value(&snapshot).unwrap(), expected);
+        for app in &snapshot.apps {
+            assert!(is_valid_app_id(&app.app_id) && is_valid_app_name(&app.name));
+        }
     }
 }

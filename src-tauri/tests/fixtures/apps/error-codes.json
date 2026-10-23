@@ -1,0 +1,9 @@
+[
+  "limitReached",
+  "notFound",
+  "alreadyPinned",
+  "invalidApp",
+  "launchFailed",
+  "unavailable",
+  "writeFailed"
+]
