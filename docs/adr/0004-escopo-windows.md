@@ -1,6 +1,6 @@
 # ADR 0004 — Windows primeiro e evolução da barra de tarefas
 
-- **Status:** Aceita como proposta inicial
+- **Status:** Aceita como proposta inicial. A convivência com a barra nativa foi substituída pelo [ADR 0009](0009-dock-substitui-a-barra-de-tarefas.md).
 - **Data:** 2026-10-14
 
 ## Contexto

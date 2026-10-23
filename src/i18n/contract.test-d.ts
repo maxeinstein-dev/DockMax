@@ -36,6 +36,7 @@ export const otherText: Messages = {
   about: {
     description: "Windows 11 dock, built with Tauri.",
     labels: { version: "Version", license: "License", code: "Code" },
+    licenseValue: "Personal use",
     repository: "github.com/maxeinstein-dev/DockMax",
     footer: "Independent project",
   },

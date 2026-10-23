@@ -90,6 +90,8 @@ const messages = {
       license: "Licença",
       code: "Código",
     },
+    /** The license, by name: the text is in the LICENSE file. */
+    licenseValue: "Uso pessoal",
     /** The source code repository, shown as selectable text (a link from Fase 3). */
     repository: "github.com/maxeinstein-dev/DockMax",
     footer: "Projeto independente",

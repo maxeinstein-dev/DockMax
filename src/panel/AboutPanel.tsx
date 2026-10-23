@@ -4,7 +4,6 @@ import PanelFooter from "./PanelFooter";
 
 /** Names, not texts: they stay the same in every locale. */
 const PRODUCT_NAME = "DockMax";
-const LICENSE = "MIT";
 
 /**
  * The About panel (DESIGN.md "Sobre"): the app tile, name and description,
@@ -38,7 +37,7 @@ function AboutPanel() {
         </div>
         <div>
           <dt>{t.about.labels.license}</dt>
-          <dd>{LICENSE}</dd>
+          <dd>{t.about.licenseValue}</dd>
         </div>
         <div>
           <dt>{t.about.labels.code}</dt>

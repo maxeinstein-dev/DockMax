@@ -1,21 +1,24 @@
-MIT License
+DockMax — Licença de uso pessoal
 
-Copyright (c) 2026 Maxsuel Einstein
+Copyright (c) 2026 Maxsuel Einstein. Todos os direitos reservados.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Este software e a documentação que o acompanha são de uso pessoal e não
+comercial. Você pode baixar, compilar e executar o DockMax para uso próprio e
+estudar o código-fonte.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Sem autorização prévia e por escrito do titular, é proibido:
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+- redistribuir o software ou o código-fonte, no todo ou em parte, modificados
+  ou não;
+- vender, alugar, sublicenciar ou oferecer o software como produto ou serviço;
+- usar o software, o nome DockMax ou a identidade visual em atividade
+  comercial.
+
+O software é fornecido "no estado em que se encontra", sem garantia de
+qualquer espécie. O titular não responde por danos decorrentes do uso.
+
+Versões anteriores à 0.3.0 foram publicadas sob a licença MIT; quem as obteve
+sob essa licença mantém os direitos que ela concede sobre aquelas versões.
+
+Componentes de terceiros usados pelo DockMax (React, Tauri, Rust e demais
+dependências) mantêm suas próprias licenças, listadas em seus pacotes.
