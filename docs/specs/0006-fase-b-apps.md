@@ -1,6 +1,6 @@
 # Spec 0006 — Fase B: apps no dock
 
-- **Status:** B1 implementado e verificado no app real; falta o clique de abrir um programa, pelo autor
+- **Status:** B1 e B3 implementados e verificados no app real; falta o autor abrir um programa e escolher uma entrada de menu
 - **Data:** 2026-10-23
 - **Origem:** [spec 0004](0004-paridade-primodock.md) §3.4, §3.7c e §6 (fase B) e [ADR 0009](../adr/0009-dock-substitui-a-barra-de-tarefas.md)
 
@@ -14,7 +14,7 @@ Com o dock no lugar da barra do Windows (fase A e spike da barra), ele só tem C
 |---|---|---|
 | **B1** | Catálogo dos programas instalados, fixar, desafixar, reordenar, abrir ao clicar e o ícone real de cada um | banco (migração 2), `windows/apps.rs`, `commands/apps.rs`, `Dock.tsx`, Configurações |
 | **B2** | Formato dos ícones (Placas arredondadas, Mesmo tamanho, Como vieram), animação de abertura (Pulo, Pulso, Tremor), arrastar para reordenar e soltar um programa no dock para fixá-lo | `settings`, `Dock.tsx`, CSS |
-| **B3** | Menu do app no dock: a Jump List do Windows (spike antes de prometer), "Remover do Dock", "Mostrar no Explorador" | `windows/` |
+| **B3** | Menu do app no dock (botão direito): a Jump List do Windows, Abrir, "Remover do dock" e "Mostrar no Explorador" (§6 e §7) | `windows/jumplist.rs`, `commands/apps.rs`, painel |
 | **B4** | Pacotes de ícones, ícone por item e imagem personalizada | a definir |
 
 B1 não depende de apps em execução (fase D): o dock ainda não sabe quais janelas estão abertas, então o indicador de app aberto fica para a fase D.
@@ -132,3 +132,21 @@ O menu de um ícone da barra é a **Jump List** do app: tarefas (por exemplo "No
 2. Comando `app_menu(id)` do app fixado, e `run_app_entry`, que só aceita uma entrada que o último `app_menu` desse app devolveu (o menu guarda o que mostrou).
 3. Interface: o botão direito num app abre o menu no painel (novo `PanelId`, ancorado no ícone), com as seções Tarefas, Recentes e Frequentes e, no fim, Abrir, Remover do Dock e Mostrar no Explorador de Arquivos.
 4. O botão direito no dock ainda não existe: entra junto, com a hospedagem do menu no painel.
+
+## 7. B3 implementado e verificado
+
+O desenho de §6.3 foi implementado como proposto, com estas escolhas:
+
+- **Quem mostra o quê:** um programa com categorias próprias (VS Code, Word, ChatGPT) mostra só elas, mais as tarefas, como a barra; os outros mostram os Recentes, ou os Frequentes quando não há recentes, e as tarefas. Até 10 entradas por lista e 15 tarefas.
+- **Títulos:** o `System.Title` do atalho; resolvido por `SHLoadIndirectString` quando é um recurso (os cinco modos da Calculadora saem como "Padrão", "Científica" e assim por diante); sem título, o nome do arquivo de destino.
+- **Executar:** `run_app_entry` recebe só a chave do último menu mostrado para aquele app fixado; a página nunca guarda um caminho nem um atalho. Um atalho vira um `.lnk` temporário aberto por `ShellExecuteW`; os temporários com mais de 10 minutos são varridos a cada execução.
+- **Mostrar no Explorador:** só para app cujo id é o caminho de um arquivo (programa clássico listado pelo executável); a interface recebe `canReveal` e oculta a ação nos outros.
+- **Interface:** o botão direito (ou a tecla de menu) num app fixado abre o painel do menu (`PanelId::App`, ancorado no ícone). Setas, Home e End andam pelos itens; o painel fecha sozinho se o app sair do dock.
+
+Verificação em 2026-10-23, no app real, sem mouse e sem abrir programa (o botão direito foi o evento `contextmenu` da própria página, pela porta de depuração):
+
+- Na leitura das listas desta máquina, 38 dos 197 programas têm menu; o formato de cada um confere com o do spike.
+- Calculadora: Tarefas × 5 (os modos, com os títulos resolvidos) e as ações. Chrome: Recentes × 10, Tarefas × 2. VS Code: Pastas Recentes × 10, Tarefas × 2. PowerShell: Tarefas × 3. Bloco de notas: Recentes × 10.
+- O evento teve o padrão cancelado nos cinco apps, o painel abriu com o nome do app como título e o ícone ficou `aria-expanded`; a barra do Windows voltou e o arquivo de estado foi removido ao encerrar.
+
+Pendente do autor: escolher uma entrada de um menu (por exemplo "Nova janela" do Chrome), que o teste automático não faz.
