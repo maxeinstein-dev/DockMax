@@ -7,6 +7,7 @@ import {
   type TaskbarMode,
   type Theme,
 } from "../core/settings";
+import { MAX_APPS, type AppsSnapshot } from "../core/apps";
 import { MAX_WIDGETS, type WidgetsSnapshot } from "../core/widgets";
 import { format, useT, type Messages } from "../i18n";
 import OptionGroup, { type Option } from "./OptionGroup";
@@ -45,6 +46,15 @@ function itemsValue(t: Messages, widgets: WidgetsSnapshot | null): string {
   });
 }
 
+/** The value of the "Apps do dock" row: `3 de 40`, or `Indisponível`
+ * while the apps can't be used or read. */
+function appsValue(t: Messages, apps: AppsSnapshot | null): string {
+  if (apps === null || apps.storage.state === "unavailable") {
+    return t.apps.unavailable;
+  }
+  return format(t.apps.count, { count: apps.apps.length, max: MAX_APPS });
+}
+
 type SettingsPanelProps = {
   /** The settings in use (`useSettings`), or null while they can't be
    * read. The only source of the confirmed values. */
@@ -56,6 +66,12 @@ type SettingsPanelProps = {
   /** Opens Configurações › Itens do dock (`DockItems`): the panel host
    * swaps this view for the subview. Without it there is no row. */
   onOpenItems?: () => void;
+  /** The pinned programs (`useApps`), for the count of the "Apps do dock"
+   * row; null (the default) while loading or unreadable. */
+  apps?: AppsSnapshot | null;
+  /** Opens Configurações › Apps do dock (`AppsPanel`). Without it there
+   * is no row. */
+  onOpenApps?: () => void;
   /** Opens Configurações › Aparência do dock (`LookPanel`). Without it
    * there is no row. */
   onOpenLook?: () => void;
@@ -64,6 +80,8 @@ type SettingsPanelProps = {
   focusItemsRow?: boolean;
   /** The same for the "Aparência do dock" row. */
   focusLookRow?: boolean;
+  /** The same for the "Apps do dock" row. */
+  focusAppsRow?: boolean;
 };
 
 /**
@@ -75,10 +93,13 @@ type SettingsPanelProps = {
 function SettingsPanel({
   settings,
   widgets = null,
+  apps = null,
   onOpenItems,
+  onOpenApps,
   onOpenLook,
   focusItemsRow = false,
   focusLookRow = false,
+  focusAppsRow = false,
 }: SettingsPanelProps) {
   const t = useT();
   const { shown, change, error } = useSettingsEditor(settings);
@@ -146,6 +167,15 @@ function SettingsPanel({
           value={shown ? t.settings.look.styles[shown.dock.style] : ""}
           onClick={onOpenLook}
           focusOnMount={focusLookRow}
+        />
+      ) : null}
+      {onOpenApps ? (
+        <NavRow
+          label={t.apps.title}
+          value={appsValue(t, apps)}
+          warning={apps !== null && apps.storage.state !== "ok"}
+          onClick={onOpenApps}
+          focusOnMount={focusAppsRow}
         />
       ) : null}
       {onOpenItems ? (

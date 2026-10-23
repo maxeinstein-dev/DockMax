@@ -280,7 +280,10 @@ function glazeMiddle(name: string): Rgb {
 /** Each tile glaze's top colour (DESIGN.md "Dock item / ladrilho": the
  * hue's lightness + 7% at the top, where the glaze is lightest). */
 function glazeTops(): { name: string; rgb: Rgb }[] {
-  const tiles = [...css.matchAll(/\.(t-[\w-]+)\s*\{/g)];
+  // `t-app` is a pale plate under a program's own icon, with no white glyph.
+  const tiles = [...css.matchAll(/\.(t-[\w-]+)\s*\{/g)].filter(
+    (match) => match[1] !== "t-app",
+  );
   if (tiles.length === 0) throw new Error("no tile glaze in tokens.css");
   return tiles.map((match) => {
     const name = match[1] as string;
@@ -329,6 +332,15 @@ describe("contrast (WCAG AA)", () => {
       expect(ratio).toBeGreaterThanOrEqual(min);
     },
   );
+
+  // The first letter of a program's name, on its plate (the plate is pale and
+  // the same under the whole letter).
+  it("the first letter on the plate of a program is readable", () => {
+    const ink = parse(rule(css, ".t-app").get("--app-ink") ?? "").rgb;
+    const ratio = contrast(ink, glazeMiddle("t-app"));
+
+    expect(ratio).toBeGreaterThanOrEqual(TEXT);
+  });
 
   it("parses what it checks", () => {
     expect(contrast(BLACK, WHITE)).toBeCloseTo(21, 5);

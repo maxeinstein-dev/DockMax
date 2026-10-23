@@ -204,6 +204,24 @@ describe("placeDock", () => {
     expect(placement.bar.width).toBeCloseTo(third + 48 + 7, 9);
     expect(placement.items[2]?.x).toBeCloseTo(placement.bar.x + third, 9);
   });
+
+  it("leaves room for two separators between three groups: programs, widgets, system", () => {
+    const placement = placeDock({
+      size: "m",
+      groups: [1, 1, 2],
+      viewport: { width: 600, height: 123 },
+      edge: "bottom",
+      magnified: null,
+    });
+
+    // The padding twice, four items, three gaps and two separators with a gap more each.
+    const width = 7 + 4 * 48 + 3 * 7 + 2 * (separatorWidth(7) + 7) + 7;
+    expect(placement.bar.width).toBeCloseTo(width, 9);
+    expect(placement.items[3]?.x).toBeCloseTo(
+      placement.bar.x + width - 7 - 48,
+      9,
+    );
+  });
 });
 
 describe("tipAnchor", () => {

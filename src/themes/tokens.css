@@ -244,6 +244,15 @@
   --l: 36%;
 }
 
+/* Neutral plate under a program's icon: pale, so any icon reads on it. */
+.t-app {
+  --h: 220;
+  --sat: 10%;
+  --l: 95%;
+  /* The first letter of a name, while the icon is not there. */
+  --app-ink: #2b3140;
+}
+
 /* Items of later phases shown only as illustration: saturation × 0.55. */
 .illustrative {
   --sat-k: 0.55;

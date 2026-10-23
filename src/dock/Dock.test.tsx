@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LOOK, type Settings } from "../core/settings";
+import { forgetIcons, type AppsSnapshot } from "../core/apps";
 import type { WidgetInstance, WidgetsSnapshot } from "../core/widgets";
 import { WIDGET_FIXTURES } from "../core/widgets.fixtures";
 import { ptBR } from "../i18n/pt-BR";
@@ -187,9 +188,26 @@ const withWidgets = (
   storage: WidgetsSnapshot["storage"] = { state: "ok" },
 ): WidgetsSnapshot => ({ storage, widgets });
 
+/** No programs pinned. */
+const NO_APPS: AppsSnapshot = { storage: { state: "ok" }, apps: [] };
+
+const CALCULATOR = {
+  id: "0199a4c0-0000-7000-8000-000000000001",
+  appId: "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
+  name: "Calculadora",
+};
+const NOTEPAD = {
+  id: "0199a4c0-0000-7000-8000-000000000002",
+  appId: "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\notepad.exe",
+  name: "Bloco de notas",
+};
+const ICON = "data:image/png;base64,iVBORw0KGgo=";
+
 describe("Dock", () => {
   let current: Settings;
   let snapshot: WidgetsSnapshot;
+  let pinned: AppsSnapshot;
+  let icon: string | null;
 
   beforeEach(() => {
     handlers.clear();
@@ -197,6 +215,9 @@ describe("Dock", () => {
     listen.mockClear();
     current = MEDIUM;
     snapshot = NO_WIDGETS;
+    pinned = NO_APPS;
+    icon = ICON;
+    forgetIcons();
     invoke.mockReset();
     invoke.mockImplementation((command: string) =>
       Promise.resolve(
@@ -204,7 +225,11 @@ describe("Dock", () => {
           ? current
           : command === "list_widgets"
             ? snapshot
-            : undefined,
+            : command === "list_apps"
+              ? pinned
+              : command === "app_icon"
+                ? icon
+                : undefined,
       ),
     );
     vi.stubGlobal("innerWidth", MEDIUM_WINDOW.width);
@@ -1093,6 +1118,166 @@ describe("Dock", () => {
     });
   });
 
+  describe("pinned programs", () => {
+    const withApps = (...apps: AppsSnapshot["apps"]): AppsSnapshot => ({
+      storage: { state: "ok" },
+      apps,
+    });
+    const program = (name: string) => screen.getByRole("button", { name });
+
+    it("puts the programs first, in order, then a separator and the system items", async () => {
+      pinned = withApps(CALCULATOR, NOTEPAD);
+      await renderDock();
+
+      const names = screen
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label"));
+      expect(names).toEqual([
+        "Calculadora",
+        "Bloco de notas",
+        text.items.settings,
+        text.items.about,
+      ]);
+      expect(document.querySelectorAll(".dock-separator")).toHaveLength(1);
+    });
+
+    it("separates the programs, the widgets and the system items", async () => {
+      pinned = withApps(CALCULATOR);
+      snapshot = withWidgets([CLOCK]);
+      await renderDock();
+
+      const bar = document.querySelector(".dock-bar");
+      const kinds = Array.from(bar?.children ?? []).map((child) =>
+        child.classList.contains("dock-separator") ? "|" : "item",
+      );
+      expect(kinds.join(" ")).toBe("item | item | item item");
+    });
+
+    it("draws the icon on the neutral plate", async () => {
+      pinned = withApps(CALCULATOR);
+      await renderDock();
+
+      const tile = program("Calculadora").querySelector(".dock-tile");
+      expect(tile).toHaveClass("t-app");
+      expect(tile?.querySelector("img")).toHaveAttribute("src", ICON);
+      expect(invoke).toHaveBeenCalledWith("app_icon", {
+        appId: CALCULATOR.appId,
+        size: 96,
+      });
+    });
+
+    it("shows the first letter of the name while the icon is not there, and when Windows has none", async () => {
+      pinned = withApps(CALCULATOR);
+      icon = null;
+      await renderDock();
+
+      const tile = program("Calculadora").querySelector(".dock-tile");
+      expect(tile?.querySelector("img")).toBeNull();
+      expect(tile?.textContent).toBe("C");
+    });
+
+    it("opens the program on a click, by the id of the pinned item, and no panel", async () => {
+      pinned = withApps(CALCULATOR, NOTEPAD);
+      await renderDock();
+
+      fireEvent.click(program("Bloco de notas"));
+
+      expect(invoke).toHaveBeenCalledWith("launch_app", { id: NOTEPAD.id });
+      expect(panelCalls()).toHaveLength(0);
+    });
+
+    it("opens it with Enter and Space, once per press", async () => {
+      pinned = withApps(CALCULATOR);
+      await renderDock();
+      const button = program("Calculadora");
+
+      fireEvent.keyDown(button, { key: "Enter" });
+      fireEvent.keyDown(button, { key: "Enter", repeat: true });
+      fireEvent.keyDown(button, { key: " " });
+
+      const launches = invoke.mock.calls.filter(
+        ([command]) => command === "launch_app",
+      );
+      expect(launches).toHaveLength(2);
+    });
+
+    it("is not expanded and points to no panel", async () => {
+      pinned = withApps(CALCULATOR);
+      await renderDock();
+
+      expect(program("Calculadora")).not.toHaveAttribute("aria-expanded");
+    });
+
+    it("labels the hovered program, even while a panel is open", async () => {
+      pinned = withApps(CALCULATOR);
+      await renderDock();
+
+      fireEvent.pointerOver(program("Calculadora"));
+
+      expect(shownTip()?.textContent).toBe("Calculadora");
+    });
+
+    it("keeps a failure to open it to the log: the dock stays as it is", async () => {
+      pinned = withApps(CALCULATOR);
+      await renderDock();
+      invoke.mockImplementation((command: string) =>
+        command === "launch_app"
+          ? Promise.reject({ code: "launchFailed" })
+          : Promise.resolve(undefined),
+      );
+
+      fireEvent.click(program("Calculadora"));
+      await act(async () => {});
+
+      expect(screen.getAllByRole("button")).toHaveLength(3);
+    });
+
+    it("shows no program while the storage is unavailable", async () => {
+      pinned = {
+        storage: { state: "unavailable", reason: "openFailed" },
+        apps: [CALCULATOR],
+      };
+      await renderDock();
+
+      expect(screen.queryByRole("button", { name: "Calculadora" })).toBeNull();
+      expect(screen.getAllByRole("button")).toHaveLength(2);
+    });
+
+    it("follows apps-changed: items and names", async () => {
+      await renderDock();
+
+      emit("apps-changed", withApps(CALCULATOR));
+      expect(program("Calculadora")).toBeInTheDocument();
+
+      emit("apps-changed", withApps(NOTEPAD));
+      expect(screen.queryByRole("button", { name: "Calculadora" })).toBeNull();
+      expect(program("Bloco de notas")).toBeInTheDocument();
+    });
+
+    it("keeps the arrows, Home and End across the programs and the system items", async () => {
+      pinned = withApps(CALCULATOR, NOTEPAD);
+      await renderDock();
+      const first = program("Calculadora");
+      focus(first);
+
+      fireEvent.keyDown(first, { key: "End" });
+
+      expect(about()).toHaveFocus();
+      fireEvent.keyDown(about(), { key: "Home" });
+      expect(first).toHaveFocus();
+    });
+
+    it("tells Rust the window it needs, with the programs in it", async () => {
+      await renderDock();
+      const before = layoutCalls().length;
+
+      emit("apps-changed", withApps(CALCULATOR, NOTEPAD));
+      await act(async () => {});
+
+      expect(layoutCalls().length).toBeGreaterThan(before);
+    });
+  });
+
   describe("cleanup", () => {
     it("drops every listener and observer when unmounted", async () => {
       const disconnect = vi.fn();
@@ -1113,6 +1298,7 @@ describe("Dock", () => {
           "dock-request-panel",
           "settings-changed",
           "widgets-changed",
+          "apps-changed",
         ]),
       );
 

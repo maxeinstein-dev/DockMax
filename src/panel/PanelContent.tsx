@@ -1,3 +1,4 @@
+import type { AppsSnapshot } from "../core/apps";
 import { isWidgetPanel, type PanelId } from "../core/panels";
 import type { Settings } from "../core/settings";
 import {
@@ -12,11 +13,14 @@ import type { WidgetUpdate } from "../widgets/contract";
 import { SECOND_MS, useNow } from "../widgets/now";
 import { definitionOf } from "../widgets/registry";
 import AboutPanel from "./AboutPanel";
+import AppsPanel from "./AppsPanel";
 import DockItems from "./DockItems";
 import SettingsPanel from "./SettingsPanel";
 import TrayPanel from "./TrayPanel";
 import LookPanel from "./LookPanel";
 import {
+  APPS_VIEW,
+  BACK_FROM_APPS_VIEW,
   BACK_FROM_LOOK_VIEW,
   BACK_VIEW,
   LOOK_VIEW,
@@ -30,6 +34,9 @@ type PanelContentProps = {
   settings: Settings | null;
   /** The widgets (`useWidgets`), or null while loading or unreadable. */
   widgets: WidgetsSnapshot | null;
+  /** The pinned programs (`useApps`), or null while loading or
+   * unreadable. */
+  apps: AppsSnapshot | null;
   /** The instance of a widget panel, or null when the list doesn't have
    * it (then the panel shows nothing and the host closes it). */
   instance: WidgetInstance<CreatableKind> | null;
@@ -101,6 +108,7 @@ function PanelContent({
   panelId,
   settings,
   widgets,
+  apps,
   instance,
   view,
   onView,
@@ -129,6 +137,14 @@ function PanelContent({
           <DockItems snapshot={widgets} onBack={() => onView(BACK_VIEW)} />
         );
       }
+      if (view.sub === "apps") {
+        return (
+          <AppsPanel
+            snapshot={apps}
+            onBack={() => onView(BACK_FROM_APPS_VIEW)}
+          />
+        );
+      }
       if (view.sub === "look") {
         return (
           <LookPanel
@@ -141,10 +157,13 @@ function PanelContent({
         <SettingsPanel
           settings={settings}
           widgets={widgets}
+          apps={apps}
           onOpenItems={() => onView(SUB_VIEW)}
+          onOpenApps={() => onView(APPS_VIEW)}
           onOpenLook={() => onView(LOOK_VIEW)}
-          focusItemsRow={view.returned && view.from !== "look"}
+          focusItemsRow={view.returned && view.from === "items"}
           focusLookRow={view.returned && view.from === "look"}
+          focusAppsRow={view.returned && view.from === "apps"}
         />
       );
     case "about":

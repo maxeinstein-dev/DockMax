@@ -31,6 +31,12 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // The clock opens the Windows calendar (ADR 0009); the command
             // takes the name of a panel and nothing else.
             "allow-open-flyout",
+            // The dock shows the pinned programs, with their icons, and
+            // opens one by the id of a pinned item (spec 0006); pinning and
+            // ordering go through the panel.
+            "allow-list-apps",
+            "allow-app-icon",
+            "allow-launch-app",
             "log:allow-log",
         ],
     ),
@@ -57,6 +63,14 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // icons (ADR 0009, Fase E); a click names an icon the list gave.
             "allow-list-tray",
             "allow-tray-click",
+            // The apps list in Configurações: the catalog to choose from,
+            // and pin, unpin and reorder (spec 0006).
+            "allow-list-apps",
+            "allow-list-catalog",
+            "allow-app-icon",
+            "allow-pin-app",
+            "allow-unpin-app",
+            "allow-move-app",
             "log:allow-log",
         ],
     ),

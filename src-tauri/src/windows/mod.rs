@@ -1,5 +1,6 @@
 #[cfg(windows)]
 pub mod appbar;
+pub mod apps;
 pub mod dock;
 #[cfg(windows)]
 pub mod flyout;

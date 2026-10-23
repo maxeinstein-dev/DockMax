@@ -1,0 +1,129 @@
+/* Configurações › Apps do dock (spec 0006 §3.5). Only tokens from
+   tokens.css; no inline style (strict CSP). */
+
+/* The pinned programs in dock order: scrolls above 268 px. */
+.apps-list,
+.apps-catalog {
+  display: grid;
+  margin: 0;
+  padding: 0 2px 0 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-2) 50%, transparent) transparent;
+}
+
+.apps-list {
+  max-height: 268px;
+}
+
+/* The catalog is a list to choose from: shorter, so the field and the list
+   fit with the pinned ones. */
+.apps-catalog {
+  max-height: 200px;
+}
+
+/* Icon, name, subir, descer and remover. */
+.apps-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 2px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.apps-row:last-child {
+  border-bottom: 0;
+}
+
+.apps-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+}
+
+.apps-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.apps-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apps-empty {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.apps-failed {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+/* Adicionar: the label with the count at the right, the search field, then
+   the list. */
+.apps-add {
+  display: grid;
+  gap: 8px;
+}
+
+.apps-add-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.apps-add-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.apps-count {
+  font-size: 12px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* One program of the catalog: a quiet row-wide button. */
+.apps-pick {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: var(--r-segment);
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.apps-pick:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+.apps-pick:disabled {
+  cursor: default;
+  color: var(--ink-2);
+}
+
+.apps-pick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}

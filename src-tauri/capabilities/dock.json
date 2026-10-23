@@ -11,6 +11,9 @@
     "allow-get-settings",
     "allow-list-widgets",
     "allow-open-flyout",
+    "allow-list-apps",
+    "allow-app-icon",
+    "allow-launch-app",
     "log:allow-log"
   ]
 }

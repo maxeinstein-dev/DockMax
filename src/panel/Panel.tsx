@@ -11,6 +11,7 @@ import {
   type PanelReadyArgs,
   type PanelShowPayload,
 } from "../core/panels";
+import { useApps } from "../core/apps";
 import { useSettings } from "../core/settings";
 import {
   useWidgets,
@@ -84,6 +85,7 @@ function Panel() {
   // first shows.
   const settings = useSettings();
   const widgets = useWidgets();
+  const apps = useApps();
   /** The size last sent for the current request. */
   const sentSize = useRef<LogicalSize | null>(null);
   /** The request whose panel was closed for its instance being gone. */
@@ -212,6 +214,7 @@ function Panel() {
             panelId={panelId}
             settings={settings}
             widgets={widgets}
+            apps={apps}
             instance={instance}
             view={view}
             onView={onView}

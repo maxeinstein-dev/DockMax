@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -10,6 +11,13 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import {
+  launchApp,
+  useAppIcon,
+  useApps,
+  type AppsSnapshot,
+  type PinnedApp,
+} from "../core/apps";
 import { DEFAULT_DOCK_LOOK, dockSize, useAppearance } from "../core/appearance";
 import { DEFAULT_LOOK } from "../core/settings";
 import { OPEN_FLYOUT_COMMAND, type OpenFlyoutArgs } from "../core/system";
@@ -71,22 +79,36 @@ const GLAZE: Record<SystemPanelId, string> = {
 
 /** One item of the dock. */
 interface DockEntry {
-  panelId: PanelId;
-  /** `panelKey`: React key and identity across changes of the list. */
+  /** The panel it opens; null for a pinned program, which opens itself. */
+  panelId: PanelId | null;
+  /** `panelKey` (`app:<id>` for a program): React key and identity across
+   * changes of the list. */
   key: string;
   /** The item's name: its `aria-label` (plus "(com aviso)" while badged)
    * and its label pill. Never the time (spec 0003 §2.3 item 4). */
   name: string;
   /** The widget it shows, for its live face; null for a system item. */
   instance: WidgetInstance<CreatableKind> | null;
+  /** The program it opens; null for a widget or a system item. */
+  app: PinnedApp | null;
 }
 
-/** The dock's items in order: the widgets in the order chosen, then
- * Configurações and Sobre (spec 0003 §2.1 item 2). Without a readable
- * list, or with the storage unavailable, only the system items. */
+/** The pinned programs the dock shows: none while they are loading, or with
+ * the storage unavailable (spec 0006 §3.2). */
+function pinnedApps(snapshot: AppsSnapshot | null): readonly PinnedApp[] {
+  return snapshot === null || snapshot.storage.state === "unavailable"
+    ? []
+    : snapshot.apps;
+}
+
+/** The dock's items in order: the pinned programs, the widgets in the order
+ * chosen, then Configurações and Sobre (spec 0003 §2.1 item 2, spec 0006
+ * §3.4). Without a readable list, or with the storage unavailable, only the
+ * system items. */
 function dockEntries(
   t: Messages,
   snapshot: WidgetsSnapshot | null,
+  apps: readonly PinnedApp[],
   systems: readonly SystemPanelId[],
 ): DockEntry[] {
   const widgets =
@@ -94,6 +116,13 @@ function dockEntries(
       ? []
       : snapshot.widgets.filter(isCreatableInstance);
   return [
+    ...apps.map((app) => ({
+      panelId: null,
+      key: `app:${app.id}`,
+      name: app.name,
+      instance: null,
+      app,
+    })),
     ...widgets.map((instance) => {
       const panelId = widgetPanel(instance.id);
       return {
@@ -101,6 +130,7 @@ function dockEntries(
         key: panelKey(panelId),
         name: widgetName(t, instance),
         instance,
+        app: null,
       };
     }),
     ...systems.map((panelId) => ({
@@ -108,18 +138,20 @@ function dockEntries(
       key: panelId,
       name: t.dock.items[panelId],
       instance: null,
+      app: null,
     })),
   ];
 }
 
-/** The size of each group of items: a separator stands between them, so
- * only when there are widgets. */
+/** The size of each group of items: a separator stands between the groups
+ * that have items (the programs, the widgets, the system items). */
 function groupSizes(
   entries: readonly DockEntry[],
-  systems: readonly SystemPanelId[],
+  apps: number,
+  systems: number,
 ): number[] {
-  const widgets = entries.length - systems.length;
-  return widgets > 0 ? [widgets, systems.length] : [systems.length];
+  const widgets = entries.length - apps - systems;
+  return [apps, widgets, systems].filter((size) => size > 0);
 }
 
 /** Whether the Configurações icon carries the attention badge: while the
@@ -129,9 +161,23 @@ function needsAttention(storage: StorageStatus | undefined): boolean {
   return storage !== undefined && storage.state !== "ok";
 }
 
-/** The face inside an item's glaze: a widget's live face, or a system
- * item's glyph. */
+/** A program's icon on its plate, or the first letter of its name while the
+ * icon is not read yet and when Windows has none. */
+function AppFace({ app }: { app: PinnedApp }) {
+  const icon = useAppIcon(app.appId);
+  return icon === null ? (
+    <span className="dock-app-letter" aria-hidden="true">
+      {Array.from(app.name.trim())[0]?.toUpperCase() ?? "?"}
+    </span>
+  ) : (
+    <img className="dock-app-icon" src={icon} alt="" draggable={false} />
+  );
+}
+
+/** The face inside an item's glaze: a program's icon, a widget's live face,
+ * or a system item's glyph. */
 function TileFace({ entry, now }: { entry: DockEntry; now: Date }) {
+  if (entry.app !== null) return <AppFace app={entry.app} />;
   if (entry.instance === null) {
     return <Glyph id={entry.panelId as SystemPanelId} />;
   }
@@ -140,6 +186,7 @@ function TileFace({ entry, now }: { entry: DockEntry; now: Date }) {
 }
 
 function glazeOf(entry: DockEntry): string {
+  if (entry.app !== null) return "t-app";
   return entry.instance === null
     ? GLAZE[entry.panelId as SystemPanelId]
     : definitionOf(entry.instance).glaze;
@@ -217,6 +264,13 @@ function openCalendar() {
   });
 }
 
+function openApp(app: PinnedApp) {
+  launchApp(app.id).catch((error: unknown) => {
+    // `launchApp` logged anything unexpected; a code from Rust is the kind.
+    log.warn(`dock: opening a program failed: ${errorKind(error)}`);
+  });
+}
+
 function openPanel(panelId: PanelId, anchor: LogicalRect) {
   invoke("toggle_panel", { panelId, anchor }).catch((error: unknown) => {
     log.error(`dock: toggle panel failed: ${errorKind(error)}`);
@@ -233,6 +287,7 @@ function Dock() {
   const t = useT();
   const settings = useAppearance("dock");
   const snapshot = useWidgets();
+  const appsSnapshot = useApps();
   const motion = !useReducedMotion();
   const viewport = useViewport();
   // The dock's single timer, for every live face.
@@ -243,9 +298,9 @@ function Dock() {
   // clock and the date, while it is hidden in either way.
   const taskbar = settings?.dock.taskbar ?? DEFAULT_LOOK.taskbar;
   const systems = systemItems(taskbar === "hidden");
-  const entries = dockEntries(t, snapshot, systems);
-  const groups = groupSizes(entries, systems);
-  const widgetCount = entries.length - systems.length;
+  const apps = pinnedApps(appsSnapshot);
+  const entries = dockEntries(t, snapshot, apps, systems);
+  const groups = groupSizes(entries, apps.length, systems.length);
   const badge = needsAttention(snapshot?.storage);
   // Changes whenever an item or a name changes: the pills are measured
   // again then.
@@ -315,8 +370,15 @@ function Dock() {
     openRef.current = open;
   });
 
+  // A program opens no panel, so its label shows whatever panel is open.
+  const activePanel = active === null ? null : entries[active]?.panelId;
   const tipIndex =
-    active !== null && !samePanel(entries[active]?.panelId ?? null, open)
+    active !== null &&
+    !(
+      activePanel !== null &&
+      activePanel !== undefined &&
+      samePanel(activePanel, open)
+    )
       ? active
       : null;
   const tipTile = tipIndex === null ? undefined : placement.tiles[tipIndex];
@@ -373,8 +435,9 @@ function Dock() {
       }),
       listen<DockRequestPanel>(DOCK_REQUEST_PANEL_EVENT, ({ payload }) => {
         const { panelId } = payload;
-        const index = entriesRef.current.findIndex((entry) =>
-          samePanel(entry.panelId, panelId),
+        const index = entriesRef.current.findIndex(
+          (entry) =>
+            entry.panelId !== null && samePanel(entry.panelId, panelId),
         );
         const anchor = restItemsRef.current[index];
         if (!anchor || samePanel(openRef.current, panelId)) return;
@@ -389,7 +452,11 @@ function Dock() {
   const toggle = (index: number) => {
     const entry = entries[index];
     const anchor = restItems[index];
-    if (entry && anchor) openPanel(entry.panelId, anchor);
+    if (entry?.app) {
+      openApp(entry.app);
+    } else if (entry?.panelId && anchor) {
+      openPanel(entry.panelId, anchor);
+    }
   };
 
   const onPointer = (event: PointerEvent<HTMLElement>) => {
@@ -449,7 +516,9 @@ function Dock() {
         }
         // No aria-controls: the panel is in another window, which an IDREF
         // can't reach.
-        aria-expanded={samePanel(open, entry.panelId)}
+        aria-expanded={
+          entry.panelId === null ? undefined : samePanel(open, entry.panelId)
+        }
         tabIndex={index === currentIndex ? 0 : -1}
         data-magnify={magnifyRole(index, magnified, hover.effect) ?? undefined}
         style={
@@ -481,15 +550,21 @@ function Dock() {
         onPointerLeave={() => setHovered(null)}
         onKeyDown={onKeyDown}
       >
-        {entries
-          .slice(0, widgetCount)
-          .map((entry, index) => item(entry, index))}
-        {widgetCount > 0 ? (
-          <span className="dock-separator" aria-hidden="true" />
-        ) : null}
-        {entries
-          .slice(widgetCount)
-          .map((entry, offset) => item(entry, widgetCount + offset))}
+        {groups.map((size, group) => {
+          const start = groups
+            .slice(0, group)
+            .reduce((sum, before) => sum + before, 0);
+          return (
+            <Fragment key={start}>
+              {group > 0 ? (
+                <span className="dock-separator" aria-hidden="true" />
+              ) : null}
+              {entries
+                .slice(start, start + size)
+                .map((entry, offset) => item(entry, start + offset))}
+            </Fragment>
+          );
+        })}
         {status ? (
           <>
             <span className="dock-separator" aria-hidden="true" />

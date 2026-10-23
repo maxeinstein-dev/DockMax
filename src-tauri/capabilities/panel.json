@@ -20,6 +20,12 @@
     "allow-dismiss-storage-notice",
     "allow-list-tray",
     "allow-tray-click",
+    "allow-list-apps",
+    "allow-list-catalog",
+    "allow-app-icon",
+    "allow-pin-app",
+    "allow-unpin-app",
+    "allow-move-app",
     "log:allow-log"
   ]
 }
