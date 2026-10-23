@@ -19,6 +19,7 @@ fn resolve(storage: &Storage, id: PanelId) -> Result<Panel, WidgetError> {
     match id {
         PanelId::Settings => Ok(Panel::Settings),
         PanelId::About => Ok(Panel::About),
+        PanelId::Tray => Ok(Panel::Tray),
         PanelId::Widget(id) => {
             let kind = widgets::panel_kind(storage, &id)?;
             Ok(Panel::Widget { id, kind })

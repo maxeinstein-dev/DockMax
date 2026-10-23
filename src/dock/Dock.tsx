@@ -11,6 +11,8 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { DEFAULT_DOCK_LOOK, dockSize, useAppearance } from "../core/appearance";
+import { DEFAULT_LOOK } from "../core/settings";
+import { OPEN_FLYOUT_COMMAND, type OpenFlyoutArgs } from "../core/system";
 import {
   DOCK_RELEASED_EVENT,
   DOCK_REQUEST_PANEL_EVENT,
@@ -41,6 +43,7 @@ import { widgetName } from "../widgets/names";
 import { MINUTE_MS, useNow } from "../widgets/now";
 import { definitionOf, isCreatableInstance } from "../widgets/registry";
 import Glyph from "./Glyph";
+import { clockText } from "./status";
 import {
   dockLayout,
   dockWindowSize,
@@ -52,14 +55,18 @@ import { hoverConfigOf, magnificationOf, magnifyRole } from "./magnification";
 import "./Dock.css";
 
 /** The system items, always last and never removed (spec 0003 §2.1 item
- * 2). */
-const SYSTEM_ITEMS: readonly SystemPanelId[] = ["settings", "about"];
+ * 2); with the Windows taskbar hidden altogether, the tray is one more
+ * (ADR 0009). */
+function systemItems(tray: boolean): readonly SystemPanelId[] {
+  return tray ? ["settings", "about", "tray"] : ["settings", "about"];
+}
 
 /** Static glaze class of each system item's tile (tokens.css, The Own Glaze
  * Rule). */
 const GLAZE: Record<SystemPanelId, string> = {
   settings: "t-settings",
   about: "t-about",
+  tray: "t-tray",
 };
 
 /** One item of the dock. */
@@ -80,6 +87,7 @@ interface DockEntry {
 function dockEntries(
   t: Messages,
   snapshot: WidgetsSnapshot | null,
+  systems: readonly SystemPanelId[],
 ): DockEntry[] {
   const widgets =
     snapshot === null || snapshot.storage.state === "unavailable"
@@ -95,7 +103,7 @@ function dockEntries(
         instance,
       };
     }),
-    ...SYSTEM_ITEMS.map((panelId) => ({
+    ...systems.map((panelId) => ({
       panelId,
       key: panelId,
       name: t.dock.items[panelId],
@@ -106,9 +114,12 @@ function dockEntries(
 
 /** The size of each group of items: a separator stands between them, so
  * only when there are widgets. */
-function groupSizes(entries: readonly DockEntry[]): number[] {
-  const widgets = entries.length - SYSTEM_ITEMS.length;
-  return widgets > 0 ? [widgets, SYSTEM_ITEMS.length] : [SYSTEM_ITEMS.length];
+function groupSizes(
+  entries: readonly DockEntry[],
+  systems: readonly SystemPanelId[],
+): number[] {
+  const widgets = entries.length - systems.length;
+  return widgets > 0 ? [widgets, systems.length] : [systems.length];
 }
 
 /** Whether the Configurações icon carries the attention badge: while the
@@ -181,9 +192,12 @@ function useViewport() {
 
 /** Index of the item under the pointer, or null between items. */
 function itemIndex(bar: HTMLElement, target: EventTarget): number | null {
-  const button = target instanceof Element ? target.closest("button") : null;
+  const button =
+    target instanceof Element ? target.closest("button.dock-item") : null;
   if (!button) return null;
-  const index = Array.from(bar.querySelectorAll("button")).indexOf(button);
+  const index = Array.from(bar.querySelectorAll("button.dock-item")).indexOf(
+    button,
+  );
   return index < 0 ? null : index;
 }
 
@@ -194,6 +208,13 @@ function focusVisible(element: Element): boolean {
   } catch {
     return true;
   }
+}
+
+function openCalendar() {
+  const args: OpenFlyoutArgs = { flyout: "calendar" };
+  invoke(OPEN_FLYOUT_COMMAND, { ...args }).catch((error: unknown) => {
+    log.error(`dock: opening the calendar failed: ${errorKind(error)}`);
+  });
 }
 
 function openPanel(panelId: PanelId, anchor: LogicalRect) {
@@ -217,9 +238,14 @@ function Dock() {
   // The dock's single timer, for every live face.
   const now = useNow(MINUTE_MS);
 
-  const entries = dockEntries(t, snapshot);
-  const groups = groupSizes(entries);
-  const widgetCount = entries.length - SYSTEM_ITEMS.length;
+  const clock = clockText(now);
+  // The tray is the dock's only while the taskbar is hidden altogether; the
+  // clock and the date, while it is hidden in either way.
+  const taskbar = settings?.dock.taskbar ?? DEFAULT_LOOK.taskbar;
+  const systems = systemItems(taskbar === "hidden");
+  const entries = dockEntries(t, snapshot, systems);
+  const groups = groupSizes(entries, systems);
+  const widgetCount = entries.length - systems.length;
   const badge = needsAttention(snapshot?.storage);
   // Changes whenever an item or a name changes: the pills are measured
   // again then.
@@ -252,7 +278,9 @@ function Dock() {
     ? { size: dockSize(settings.dock.iconSize), edge: settings.dock.edge }
     : DEFAULT_DOCK_LOOK;
   const hover = hoverConfigOf(settings?.dock);
-  const shape: DockShape = { size, groups, hover };
+  // The clock and the date stand in for the taskbar's while it is hidden.
+  const status = taskbar !== "visible";
+  const shape: DockShape = { size, groups, hover, status };
   // Edge and icon size as set, not as drawn: several sizes draw the same
   // preset.
   const placeKey = settings
@@ -462,6 +490,20 @@ function Dock() {
         {entries
           .slice(widgetCount)
           .map((entry, offset) => item(entry, widgetCount + offset))}
+        {status ? (
+          <>
+            <span className="dock-separator" aria-hidden="true" />
+            <button
+              type="button"
+              className="dock-status"
+              aria-label={t.dock.status.calendar}
+              onClick={openCalendar}
+            >
+              <span className="dock-status-time">{clock.time}</span>
+              <span className="dock-status-date">{clock.date}</span>
+            </button>
+          </>
+        ) : null}
       </nav>
       {entries.map((entry, index) => {
         const at = index === tipIndex ? tipAt : null;

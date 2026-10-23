@@ -14,6 +14,7 @@ import { definitionOf } from "../widgets/registry";
 import AboutPanel from "./AboutPanel";
 import DockItems from "./DockItems";
 import SettingsPanel from "./SettingsPanel";
+import TrayPanel from "./TrayPanel";
 import LookPanel from "./LookPanel";
 import {
   BACK_FROM_LOOK_VIEW,
@@ -148,6 +149,8 @@ function PanelContent({
       );
     case "about":
       return <AboutPanel />;
+    case "tray":
+      return <TrayPanel />;
   }
 }
 

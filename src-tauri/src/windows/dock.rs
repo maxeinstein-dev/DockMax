@@ -529,6 +529,7 @@ fn apply_taskbar(app: &AppHandle, mode: crate::domain::settings::TaskbarMode) {
         return;
     }
     if mode == TaskbarMode::Visible && super::taskbar::is_held() {
+        commands::tray::stop(app);
         super::taskbar::release();
         return;
     }
@@ -541,6 +542,14 @@ fn apply_taskbar(app: &AppHandle, mode: crate::domain::settings::TaskbarMode) {
     };
     if let Err(error) = super::taskbar::hold(mode, &path) {
         log::warn!("taskbar: could not be taken: {error}");
+        return;
+    }
+    // The notification area is the dock's only while the taskbar is hidden
+    // altogether: with it hiding on its own, its own tray is a hover away.
+    if mode == TaskbarMode::Hidden {
+        commands::tray::start(app);
+    } else {
+        commands::tray::stop(app);
     }
 }
 

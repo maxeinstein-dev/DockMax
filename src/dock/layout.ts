@@ -43,6 +43,10 @@ export const TIP_GAP = 10;
  * below (Dock.css `.dock-tip`). */
 export const TIP_HEIGHT = 24;
 
+/** Width of the clock and date at the end of the bar, in logical pixels
+ * (`.dock-status` in Dock.css, pinned by layout.test.ts). */
+export const STATUS_WIDTH = 76;
+
 /** Transparent room the window keeps beyond the label and on both sides of
  * the widest bar, for the pill's ring and shadow and the bar's shadow. */
 export const ROOM = 8;
@@ -61,6 +65,10 @@ export interface DockShape {
   size: DockSize;
   groups: readonly number[];
   hover?: HoverConfig;
+  /** The clock and the date at the end, after a separator: shown while the
+   * Windows taskbar is hidden. Not an item: it never magnifies and has no
+   * label. */
+  status?: boolean;
 }
 
 interface Row {
@@ -74,7 +82,7 @@ interface Row {
 /** Lays the items out along the bar while the item at `magnified` is
  * magnified (null: at rest). */
 function row(
-  { size, groups, hover = MAGNIFY_HOVER }: DockShape,
+  { size, groups, hover = MAGNIFY_HOVER, status = false }: DockShape,
   magnified: number | null,
 ): Row {
   const { icon, pad, gap } = SIZE_GEOMETRY[size];
@@ -92,7 +100,12 @@ function row(
       first = false;
     }
   });
-  const width = items.length ? x - gap + pad : 2 * pad;
+  if (status) {
+    // [item][gap][separator][gap][status][gap]: the same way two groups meet.
+    if (!first) x += separatorWidth(gap) + gap;
+    x += STATUS_WIDTH + gap;
+  }
+  const width = items.length || status ? x - gap + pad : 2 * pad;
   return { width, items };
 }
 

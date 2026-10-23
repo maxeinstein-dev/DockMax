@@ -18,6 +18,8 @@
     "allow-get-note",
     "allow-save-note",
     "allow-dismiss-storage-notice",
+    "allow-list-tray",
+    "allow-tray-click",
     "log:allow-log"
   ]
 }

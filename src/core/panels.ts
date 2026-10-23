@@ -1,7 +1,7 @@
 import type { WidgetId } from "./widgets";
 
 /** The system panels: always on the dock, whatever the widgets. */
-export type SystemPanelId = "settings" | "about";
+export type SystemPanelId = "settings" | "about" | "tray";
 
 /** The panel of a widget instance. */
 export interface WidgetPanelId {
@@ -9,7 +9,8 @@ export interface WidgetPanelId {
 }
 
 /** Panels the dock can open; must match `PanelId` in
- * `src-tauri/src/windows/panel.rs`. In JSON: `"settings"`, `"about"` or
+ * `src-tauri/src/windows/panel.rs`. In JSON: `"settings"`, `"about"`,
+ * `"tray"` or
  * `{ "widget": "<id>" }`. Rust refuses (`toggle_panel` fails, nothing
  * opens) a widget ID that isn't an instance the dock has. An object, so
  * compare two with `samePanel`, never with `===`. */

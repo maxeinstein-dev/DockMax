@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import css from "./Dock.css?raw";
 import { DOCK_STYLES } from "../core/settings";
+import { STATUS_WIDTH } from "./layout";
 import {
   DEFAULT_HOVER,
   MAGNIFICATION,
@@ -163,5 +164,10 @@ describe("Dock.css", () => {
     expect(rule(':root[data-indicator="dash"] .dock-dot')).toContain(
       "height: 3px",
     );
+  });
+
+  it("gives the clock the width layout.ts reserves for it", () => {
+    expect(rule(".dock-status")).toContain(`width: ${STATUS_WIDTH}px`);
+    expect(rule(".dock-status")).toContain("height: var(--icon)");
   });
 });

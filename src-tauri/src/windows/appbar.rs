@@ -235,6 +235,7 @@ unsafe extern "system" fn procedure(
         WM_ENDSESSION if wparam.0 != 0 => {
             shared().wanted = None;
             apply(hwnd);
+            super::tray_host::stop();
             super::taskbar::release();
         }
         _ if msg == TASKBAR_CREATED.load(Ordering::Relaxed) && msg != 0 => {

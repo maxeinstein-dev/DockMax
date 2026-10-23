@@ -151,7 +151,10 @@ pub fn run() {
             commands::widgets::update_widget,
             commands::widgets::get_note,
             commands::widgets::save_note,
-            commands::widgets::dismiss_storage_notice
+            commands::widgets::dismiss_storage_notice,
+            commands::system::open_flyout,
+            commands::tray::list_tray,
+            commands::tray::tray_click
         ]);
     // Test build only: the WebDriver server the E2E suite drives the windows
     // through, on the port in `TAURI_WEBDRIVER_PORT` (4445 by default).
@@ -165,6 +168,7 @@ pub fn run() {
                 // The edge and the taskbar go back before anything else.
                 #[cfg(windows)]
                 {
+                    windows::tray_host::stop();
                     windows::appbar::remove();
                     windows::taskbar::release();
                 }

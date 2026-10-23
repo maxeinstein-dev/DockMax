@@ -46,6 +46,10 @@ uuid = { version = "1", features = ["v7", "serde"] }
 # looked up in the copy of the database compiled into the binary, the same on
 # every machine.
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
+# The icons of the notification area, as PNG `data:` URLs for the dock's
+# pages (ADR 0009): both are already in the build through Tauri.
+png = "0.17"
+base64 = "0.22"
 # Syntax check of shortcut URLs (spec 0003 §2.5); never opens them.
 url = "2"
 
@@ -59,8 +63,11 @@ tauri = { version = "2", features = ["test"] }
 windows = { version = "0.62.2", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
+    "Win32_System_DataExchange",
     "Win32_System_LibraryLoader",
     "Win32_System_Threading",
+    "Win32_UI_Accessibility",
+    "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }

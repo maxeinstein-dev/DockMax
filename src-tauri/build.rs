@@ -28,6 +28,9 @@ fn main() {
             "get_note",
             "save_note",
             "dismiss_storage_notice",
+            "open_flyout",
+            "list_tray",
+            "tray_click",
         ]),
     ))
     .expect("failed to run tauri-build");

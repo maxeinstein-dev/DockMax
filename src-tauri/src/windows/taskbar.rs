@@ -268,6 +268,8 @@ fn hide_visible(windows: &[HWND], saved: &mut Saved, state_path: &Path) -> io::R
             )
         };
     }
+    // Explorer may have put its window back on top: so does the host.
+    super::tray_host::raise();
     Ok(())
 }
 

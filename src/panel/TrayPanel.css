@@ -1,0 +1,61 @@
+/* The notification area in its panel (ADR 0009, Fase E): a grid of icons.
+   Only tokens from tokens.css. */
+.tray-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 36px);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tray-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-segment);
+  background: var(--track);
+  cursor: pointer;
+}
+
+.tray-icon:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 11%, transparent);
+}
+
+.tray-icon:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tray-icon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.tray-icon-blank {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ink-2);
+  opacity: 0.5;
+}
+
+.tray-empty {
+  display: grid;
+  gap: 4px;
+}
+
+.tray-empty p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.tray-empty .tray-empty-hint {
+  font-size: 12px;
+  color: var(--ink-2);
+}

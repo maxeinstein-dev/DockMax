@@ -10,6 +10,7 @@
     "allow-set-dock-layout",
     "allow-get-settings",
     "allow-list-widgets",
+    "allow-open-flyout",
     "log:allow-log"
   ]
 }

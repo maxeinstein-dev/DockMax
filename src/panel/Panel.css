@@ -41,6 +41,10 @@
   width: 300px;
 }
 
+.panel[data-panel="tray"] {
+  width: 280px;
+}
+
 /* Widget panels, by the kind of the instance (DESIGN.md "Painel": Relógio,
    Progresso do tempo, Nota). The page sets data-widget on the card. */
 .panel[data-widget="clock"] {

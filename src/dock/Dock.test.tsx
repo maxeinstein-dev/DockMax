@@ -35,6 +35,9 @@ const MEDIUM: Settings = {
     opacity: "translucent",
     ...DEFAULT_LOOK,
     hover: "magnify",
+    // The taskbar stays: no clock at the end, so the numbers below are the
+    // bar of the items alone.
+    taskbar: "visible",
   },
 };
 
@@ -60,9 +63,11 @@ const rect = (x: number, y: number, width: number, height: number) => ({
 // window (the size it asks for).
 const REST_BAR = rect(36, 61, 117, 62);
 const MEDIUM_WINDOW = { width: 189, height: 123 };
-// The same dock with the default hover (Escala 110 %): nothing lifts, the
-// tile grows to 52.8 px and the label sets the width.
-const SCALE_WINDOW = { width: 181, height: 102 };
+// With the taskbar hidden, which is the default: the tray is a third item
+// (7 + 48 = 55 px) and the clock and the date follow a separator (7 + 6.6 +
+// 7 + 76 = 96.6 px); the widest label reaches 158.3 px from the middle.
+const STATUS_BAR = rect(-39.8, 61, 268.6, 62);
+const STATUS_WINDOW = { width: 333, height: 102 };
 const SETTINGS_AT_REST = rect(43, 68, 48, 48);
 const ABOUT_AT_REST = rect(98, 68, 48, 48);
 
@@ -284,15 +289,18 @@ describe("Dock", () => {
   describe("layout", () => {
     it("reports the bar and the window it needs once on mount", async () => {
       // The settings the dock starts with, so nothing changes when they load.
-      current = withDock({ hover: DEFAULT_LOOK.hover });
+      current = withDock({
+        hover: DEFAULT_LOOK.hover,
+        taskbar: DEFAULT_LOOK.taskbar,
+      });
 
       await renderDock();
 
       expect(layoutCalls()).toHaveLength(1);
       expectClose(lastLayout(), {
-        bar: REST_BAR,
+        bar: STATUS_BAR,
         hold: [],
-        window: SCALE_WINDOW,
+        window: STATUS_WINDOW,
       });
     });
 
@@ -391,9 +399,9 @@ describe("Dock", () => {
 
       expect(layoutCalls()).toHaveLength(1);
       expectClose(lastLayout(), {
-        bar: REST_BAR,
+        bar: STATUS_BAR,
         hold: [],
-        window: SCALE_WINDOW,
+        window: STATUS_WINDOW,
       });
     });
 
@@ -424,6 +432,128 @@ describe("Dock", () => {
         hold: [],
         window: MEDIUM_WINDOW,
       });
+    });
+  });
+
+  describe("clock and date", () => {
+    const status = () =>
+      screen.getByRole("button", { name: text.status.calendar });
+
+    afterEach(() => vi.useRealTimers());
+
+    it("stands in for the taskbar's at the end of the bar, after a separator", async () => {
+      current = withDock({ taskbar: "hidden" });
+
+      await renderDock();
+
+      const children = Array.from(bar().children);
+      expect(children[children.length - 1]).toBe(status());
+      expect(children[children.length - 2]).toHaveClass("dock-separator");
+    });
+
+    it("shows the time of the minute timer and the date", async () => {
+      current = withDock({ taskbar: "autohide" });
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(2026, 9, 22, 18, 5));
+
+      await renderDock();
+
+      expect(status().querySelector(".dock-status-time")).toHaveTextContent(
+        "18:05",
+      );
+      expect(
+        status().querySelector(".dock-status-date"),
+      ).not.toBeEmptyDOMElement();
+    });
+
+    it("is not drawn while the taskbar stays: it has its own clock", async () => {
+      current = withDock({ taskbar: "visible" });
+
+      await renderDock();
+
+      expect(
+        screen.queryByRole("button", { name: text.status.calendar }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("opens the Windows calendar on a click", async () => {
+      current = withDock({ taskbar: "hidden" });
+      await renderDock();
+
+      fireEvent.click(status());
+
+      expect(invoke).toHaveBeenCalledWith("open_flyout", {
+        flyout: "calendar",
+      });
+    });
+
+    it("is not an item: no magnification, no label, no arrow-key stop", async () => {
+      current = withDock({ taskbar: "hidden" });
+      await renderDock();
+
+      fireEvent.pointerOver(status());
+
+      expect(document.querySelector("[data-magnify]")).toBeNull();
+      expect(shownTip()).toBeNull();
+      expect(document.querySelectorAll(".dock-item")).toHaveLength(3);
+      // The arrows move among the items only: the tray is the last of them.
+      settings().focus();
+      fireEvent.keyDown(settings(), { key: "End" });
+      const tray = screen.getByRole("button", { name: text.items.tray });
+      expect(tray).toHaveFocus();
+      fireEvent.keyDown(tray, { key: "ArrowRight" });
+      expect(tray).toHaveFocus();
+    });
+
+    it("makes the bar wider by a separator and its own width, and no item moves", async () => {
+      current = withDock({ taskbar: "visible" });
+      const without = await renderDock();
+      const barWithout = (lastLayout() as { bar: { width: number } }).bar.width;
+      without.unmount();
+      invoke.mockClear();
+
+      // Hiding on its own: the clock, and no tray.
+      current = withDock({ taskbar: "autohide" });
+      await renderDock();
+      const barWith = (lastLayout() as { bar: { width: number } }).bar.width;
+
+      // A separator (1 + 0.8 × 7) and the clock (76) between two gaps of 7.
+      expect(barWith - barWithout).toBeCloseTo(7 + 6.6 + 7 + 76 - 0, 6);
+    });
+  });
+
+  describe("tray item", () => {
+    const tray = () => screen.queryByRole("button", { name: text.items.tray });
+
+    it("is the last item while the taskbar is hidden altogether", async () => {
+      current = withDock({ taskbar: "hidden" });
+
+      await renderDock();
+
+      const items = Array.from(document.querySelectorAll(".dock-item"));
+      expect(items[items.length - 1]).toBe(tray());
+    });
+
+    it("is not an item while the taskbar hides on its own or stays: it has its own tray", async () => {
+      for (const taskbar of ["autohide", "visible"] as const) {
+        current = withDock({ taskbar });
+        const view = await renderDock();
+
+        expect(tray(), taskbar).toBeNull();
+        view.unmount();
+      }
+    });
+
+    it("opens the tray panel anchored where the item rests", async () => {
+      current = withDock({ taskbar: "hidden" });
+      await renderDock();
+
+      fireEvent.click(tray() as HTMLElement);
+
+      expect(invoke).toHaveBeenCalledWith(
+        "toggle_panel",
+        expect.objectContaining({ panelId: "tray" }),
+      );
     });
   });
 
@@ -696,6 +826,7 @@ describe("Dock", () => {
   describe("reduced motion", () => {
     it("never magnifies, holds only the bar and needs a smaller window", async () => {
       stubReducedMotion(true);
+      current = withDock({ taskbar: DEFAULT_LOOK.taskbar });
       await renderDock();
 
       fireEvent.pointerOver(settings());
@@ -704,9 +835,9 @@ describe("Dock", () => {
       expect(shownTip()).toHaveTextContent("Configurações");
       expect(layoutCalls()).toHaveLength(1);
       expectClose(lastLayout(), {
-        bar: REST_BAR,
+        bar: STATUS_BAR,
         hold: [],
-        window: { width: 181, height: 97 },
+        window: { width: 333, height: 97 },
       });
     });
 

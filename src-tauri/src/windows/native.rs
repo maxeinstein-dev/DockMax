@@ -7,10 +7,10 @@ use std::error::Error;
 use ::windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, WPARAM};
 use ::windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use ::windows::Win32::UI::WindowsAndMessaging::{
-    GWL_EXSTYLE, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId, LWA_ALPHA,
-    PostMessageW, SPI_SETWORKAREA, STYLESTRUCT, SetLayeredWindowAttributes, SetWindowLongPtrW,
-    WM_APP, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_NCDESTROY, WM_SETTINGCHANGE, WM_STYLECHANGING,
-    WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_TOOLWINDOW,
+    GWL_EXSTYLE, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId, IsWindowVisible,
+    LWA_ALPHA, PostMessageW, SPI_SETWORKAREA, STYLESTRUCT, SetLayeredWindowAttributes,
+    SetWindowLongPtrW, WM_APP, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_NCDESTROY, WM_SETTINGCHANGE,
+    WM_STYLECHANGING, WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_TOOLWINDOW,
 };
 use tauri::WebviewWindow;
 
@@ -76,6 +76,19 @@ pub fn owns_foreground() -> bool {
     let mut process_id = 0;
     unsafe { GetWindowThreadProcessId(GetForegroundWindow(), Some(&mut process_id)) };
     process_id == std::process::id()
+}
+
+/// Whether the foreground window is a visible window of another program: the
+/// user went there. The hidden window of a tray program that has just shown a
+/// menu is not.
+pub fn foreground_is_other_visible_window() -> bool {
+    let window = unsafe { GetForegroundWindow() };
+    if window.0.is_null() {
+        return false;
+    }
+    let mut process_id = 0;
+    unsafe { GetWindowThreadProcessId(window, Some(&mut process_id)) };
+    process_id != std::process::id() && unsafe { IsWindowVisible(window) }.as_bool()
 }
 
 /// The extended style DockMax keeps: a tool window without

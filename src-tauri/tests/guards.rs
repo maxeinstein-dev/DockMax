@@ -28,6 +28,9 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // The dock only reads the widgets; every change goes through the
             // panel (spec 0003 §2.7).
             "allow-list-widgets",
+            // The clock opens the Windows calendar (ADR 0009); the command
+            // takes the name of a panel and nothing else.
+            "allow-open-flyout",
             "log:allow-log",
         ],
     ),
@@ -50,6 +53,10 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-get-note",
             "allow-save-note",
             "allow-dismiss-storage-notice",
+            // The tray panel lists the notification area and clicks its
+            // icons (ADR 0009, Fase E); a click names an icon the list gave.
+            "allow-list-tray",
+            "allow-tray-click",
             "log:allow-log",
         ],
     ),
