@@ -23,6 +23,7 @@ use crate::domain::widgets::{MoveDirection, WidgetId};
 use crate::persistence::apps_repo;
 use crate::persistence::database::Storage;
 use crate::windows::apps;
+use crate::windows::jumplist::{self, Runnable, Section, SectionKind};
 
 /// Event sent to every window with the full [`AppsSnapshot`] after a change.
 pub const CHANGED_EVENT: &str = "apps-changed";
@@ -255,6 +256,137 @@ pub async fn launch_app(
     }
 }
 
+/// One entry of the menu of a program, as the panel shows it: the key names
+/// it for `run_app_entry`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuEntryView {
+    pub key: u32,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuSectionView {
+    pub kind: SectionKind,
+    /// The name of the program's own category.
+    pub title: Option<String>,
+    pub entries: Vec<MenuEntryView>,
+}
+
+/// What `app_menu` returns: the Jump List of the program (spec 0006 §6) and
+/// whether its file can be shown in Explorer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppMenuView {
+    pub sections: Vec<MenuSectionView>,
+    pub can_reveal: bool,
+}
+
+/// The menu last shown and what each of its keys runs. Only an entry of this
+/// menu runs, so the page never names a link or a path: it names a key.
+struct ShownMenu {
+    app: WidgetId,
+    runs: Vec<Runnable>,
+}
+
+static MENU: Mutex<Option<ShownMenu>> = Mutex::new(None);
+
+/// The sections as the page gets them, with a key for each entry, and what
+/// each key runs.
+fn view_of(sections: Vec<Section>) -> (Vec<MenuSectionView>, Vec<Runnable>) {
+    let mut runs = Vec::new();
+    let views = sections
+        .into_iter()
+        .map(|section| MenuSectionView {
+            kind: section.kind,
+            title: section.title,
+            entries: section
+                .entries
+                .into_iter()
+                .map(|entry| {
+                    let key = runs.len() as u32;
+                    runs.push(entry.run);
+                    MenuEntryView {
+                        key,
+                        title: entry.title,
+                    }
+                })
+                .collect(),
+        })
+        .collect();
+    (views, runs)
+}
+
+/// The run of `key` in the menu last shown for the pinned program `app`.
+fn run_of(app: &WidgetId, key: u32) -> Result<Runnable, AppError> {
+    let shown = MENU.lock().unwrap_or_else(PoisonError::into_inner);
+    shown
+        .as_ref()
+        .filter(|menu| &menu.app == app)
+        .and_then(|menu| menu.runs.get(key as usize))
+        .cloned()
+        .ok_or(AppError::NotFound)
+}
+
+/// The menu of the pinned program `id`, as the taskbar shows it: its
+/// categories, the recent and frequent destinations and its tasks. Runs off
+/// the main thread: it reads the program's list from disk.
+#[tauri::command]
+pub async fn app_menu(
+    state: State<'_, Mutex<Storage>>,
+    id: String,
+) -> Result<AppMenuView, AppCommandError> {
+    let pinned = WidgetId::parse(&id).map_err(AppError::from)?;
+    let target = target_of(&mut lock(&state), &id).inspect_err(|error| {
+        log::warn!("apps: menu rejected: {error}");
+    })?;
+    let can_reveal = apps::file_of(&target).is_some();
+    let read = tauri::async_runtime::spawn_blocking(move || jumplist::menu(&target)).await;
+    let Ok(sections) = read else {
+        log::warn!("apps: the menu task did not finish");
+        return Err(AppError::Unavailable.into());
+    };
+    let (sections, runs) = view_of(sections);
+    *MENU.lock().unwrap_or_else(PoisonError::into_inner) = Some(ShownMenu { app: pinned, runs });
+    Ok(AppMenuView {
+        sections,
+        can_reveal,
+    })
+}
+
+/// Runs an entry of the menu `app_menu` last returned for the pinned program
+/// `id`: a task, a recent document or a category's item.
+#[tauri::command]
+pub async fn run_app_entry(id: String, key: u32) -> Result<(), AppCommandError> {
+    let pinned = WidgetId::parse(&id).map_err(AppError::from)?;
+    let run = run_of(&pinned, key).inspect_err(|error| {
+        log::warn!("apps: entry rejected: {error}");
+    })?;
+    let opened = tauri::async_runtime::spawn_blocking(move || jumplist::run(&run)).await;
+    match opened {
+        Ok(Ok(())) => Ok(()),
+        _ => {
+            log::warn!("apps: a menu entry could not be opened");
+            Err(AppError::LaunchFailed.into())
+        }
+    }
+}
+
+/// Shows the file of the pinned program `id` in File Explorer, for the
+/// programs that have one (`app_menu` says which).
+#[tauri::command]
+pub fn reveal_app(state: State<'_, Mutex<Storage>>, id: String) -> Result<(), AppCommandError> {
+    let target = target_of(&mut lock(&state), &id).inspect_err(|error| {
+        log::warn!("apps: reveal rejected: {error}");
+    })?;
+    let path = apps::file_of(&target).ok_or(AppError::NotFound)?;
+    apps::reveal(&path).map_err(|_| {
+        log::warn!("apps: a file could not be shown");
+        AppCommandError::from(AppError::LaunchFailed)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use tempfile::{TempDir, tempdir};
@@ -343,6 +475,73 @@ mod tests {
         assert_eq!(
             cached_icon(&(format!("bounded-{ICON_CACHE_LIMIT}"), 32)),
             Some(None)
+        );
+    }
+
+    use crate::windows::jumplist::Entry;
+
+    fn section(kind: SectionKind, titles: &[&str]) -> Section {
+        Section {
+            kind,
+            title: None,
+            entries: titles
+                .iter()
+                .map(|title| Entry {
+                    title: (*title).to_owned(),
+                    run: Runnable::Open(format!("open {title}")),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn every_entry_gets_a_key_that_runs_what_it_shows() {
+        let (views, runs) = view_of(vec![
+            section(SectionKind::Recent, &["a", "b"]),
+            section(SectionKind::Tasks, &["c"]),
+        ]);
+
+        let keys: Vec<Vec<u32>> = views
+            .iter()
+            .map(|view| view.entries.iter().map(|entry| entry.key).collect())
+            .collect();
+        assert_eq!(keys, vec![vec![0, 1], vec![2]]);
+        assert_eq!(runs[2], Runnable::Open("open c".into()));
+    }
+
+    #[test]
+    fn only_the_last_menu_of_that_program_runs() {
+        let first = WidgetId::new();
+        let other = WidgetId::new();
+        *MENU.lock().unwrap() = Some(ShownMenu {
+            app: first.clone(),
+            runs: vec![Runnable::Open("x".into())],
+        });
+
+        assert_eq!(run_of(&first, 0), Ok(Runnable::Open("x".into())));
+        assert_eq!(run_of(&first, 1), Err(AppError::NotFound));
+        assert_eq!(run_of(&other, 0), Err(AppError::NotFound));
+        *MENU.lock().unwrap() = None;
+        assert_eq!(run_of(&first, 0), Err(AppError::NotFound));
+    }
+
+    #[test]
+    fn the_menu_goes_to_the_page_as_json_without_what_it_runs() {
+        let (sections, _) = view_of(vec![Section {
+            kind: SectionKind::Category,
+            title: Some("Recent chats".into()),
+            entries: section(SectionKind::Category, &["a"]).entries,
+        }]);
+
+        let json = serde_json::to_string(&AppMenuView {
+            sections,
+            can_reveal: true,
+        })
+        .unwrap();
+
+        assert_eq!(
+            json,
+            r#"{"sections":[{"kind":"category","title":"Recent chats","entries":[{"key":0,"title":"a"}]}],"canReveal":true}"#
         );
     }
 }
