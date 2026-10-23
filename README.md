@@ -4,7 +4,7 @@
 
 Aplicativo desktop para Windows inspirado em docks personalizáveis, com foco em produtividade, widgets integrados e integração progressiva com o sistema operacional.
 
-> **Status:** Fase 2 concluída (v0.2.0): dock flutuante acima da barra de tarefas com os widgets Relógio, Progresso do tempo e Nota, painéis de Configurações e Sobre, e dados locais em SQLite. O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O DockMax é um projeto independente e não é afiliado ao PrimoDock.
+> **Status:** em desenvolvimento rumo à paridade com o PrimoDock ([spec 0004](docs/specs/0004-paridade-primodock.md)). Já faz: dock no lugar da barra de tarefas do Windows (com restauração garantida), nove estilos de barra, apps fixados com o ícone real, relógio, bandeja do sistema, os widgets Relógio, Progresso do tempo e Nota, e dados locais em SQLite. O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O DockMax é um projeto independente e não é afiliado ao PrimoDock.
 
 ## Objetivos
 
@@ -105,9 +105,12 @@ pnpm test:e2e             # roda os specs do WebdriverIO
 
 ## Estado atual
 
-Fase 2 concluída (v0.2.0). O DockMax abre um dock no estilo do macOS (visual B1 · Big Sur, ver [`DESIGN.md`](DESIGN.md)) acima da barra de tarefas do Windows:
+O DockMax abre um dock que **ocupa o lugar da barra de tarefas do Windows**: reserva a borda da tela, esconde a barra nativa (por padrão; dá para deixá-la visível ou automática em Configurações) e a devolve exatamente como estava ao encerrar, de qualquer jeito que o programa termine ([ADR 0009](docs/adr/0009-dock-substitui-a-barra-de-tarefas.md)):
 
 - ícones com ampliação, rótulo e ponto indicador; o clique atravessa a área transparente em volta do dock;
+- **apps fixados** ([spec 0006](docs/specs/0006-fase-b-apps.md)): escolha na lista de programas instalados (a mesma do menu Iniciar), com o ícone real; o clique abre o programa; a ordem se muda em Configurações › Apps do dock;
+- nove **estilos de barra** (Nativo, Liquid Glass, Meia-noite, Rocket, Prateleira Aqua, Neon, Canarinho, Papel e Flutuante), efeito ao passar o mouse e indicador, em Configurações › Aparência do dock;
+- **relógio com data** no fim do dock e **bandeja do sistema** hospedada pelo DockMax: o botão direito num ícone abre o menu do próprio programa;
 - **widgets**, cada um um item do dock que abre o próprio painel:
   - **Relógio**: hora viva no ícone (digital ou analógica), fuso, 12/24 h e segundos no painel;
   - **Progresso do tempo**: anel no ícone e painel com dia, semana, mês, ano e expediente;
@@ -124,7 +127,7 @@ Onde ficam os seus dados (nada sai da máquina):
 | Cópias de segurança e recuperação | `dockmax.db.bak-v*` e `dockmax.db.corrompido-*`, na mesma pasta: o DockMax nunca apaga seu banco, só renomeia um banco danificado |
 | Logs, sem dados pessoais | `%LOCALAPPDATA%\dev.maxsueleinstein.dockmax\logs` |
 
-A próxima etapa é a Fase 3 (atalhos, arquivos e prateleira); veja o [roadmap](docs/roadmap.md).
+As próximas etapas seguem as fases da [spec 0004](docs/specs/0004-paridade-primodock.md) (menus dos apps, pacotes de ícones, espaços de trabalho, prévias e mais widgets); o [roadmap](docs/roadmap.md) ainda traz o plano anterior.
 
 ## Licença
 

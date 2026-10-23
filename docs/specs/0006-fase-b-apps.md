@@ -1,6 +1,6 @@
 # Spec 0006 — Fase B: apps no dock
 
-- **Status:** rascunho em implementação (recorte B1)
+- **Status:** B1 implementado e verificado no app real; falta o clique de abrir um programa, pelo autor
 - **Data:** 2026-10-23
 - **Origem:** [spec 0004](0004-paridade-primodock.md) §3.4, §3.7c e §6 (fase B) e [ADR 0009](../adr/0009-dock-substitui-a-barra-de-tarefas.md)
 
@@ -88,4 +88,13 @@ Reordenar arrastando, soltar um programa no dock, menus de contexto, indicador d
 
 ## 5. Verificação
 
-(preenchida ao fim da implementação)
+Feita em 2026-10-23, no app real (build de depuração), com o banco e as configurações do autor guardados antes e devolvidos depois. Sem mouse, sem menu e sem abrir nenhum programa: os fixados vêm dos comandos do próprio painel, pela porta de depuração do WebView2.
+
+- **Catálogo:** 197 programas em 0,6 s a frio, pela página do painel.
+- **Dock:** Calculadora, Bloco de notas e Claude fixados aparecem antes dos widgets, com ícone de 96 × 96 e três separadores (apps, widgets, sistema e relógio). Mover o terceiro para cima reordena o dock.
+- **Painel:** a linha Apps do dock abre a subvisão com os três fixados na ordem do dock e 80 programas do catálogo (o limite de linhas); só 9 ícones foram lidos, os das linhas à vista (a leitura é preguiçosa).
+- **Banco:** a migração 2 rodou sobre o banco real (versão 1) sem perder widgets; o teste de unidade cobre a cópia de segurança `bak-v1`.
+- **Memória** (privada, dock e processos filhos): 173–177 MB parado, 208–220 MB com o painel aberto e três apps fixados. O painel sozinho custa uns 20 MB do processo dele, e o processo do dock cresce uns 6 MB ao carregar o código do shell que extrai ícones. A meta de ~220 MB do roadmap está no limite: qualquer item novo de interface precisa de medida.
+- **Restauração:** a barra do Windows voltou e o arquivo de estado foi removido ao encerrar.
+
+Pendente do autor: abrir um programa a partir do dock (clique no ícone), que o teste automático não faz.
