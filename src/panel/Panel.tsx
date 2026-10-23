@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import {
   PANEL_READY_COMMAND,
   PANEL_SHOW_EVENT,
+  isAppPanel,
   isWidgetPanel,
   panelKey,
   type LogicalSize,
@@ -11,7 +12,7 @@ import {
   type PanelReadyArgs,
   type PanelShowPayload,
 } from "../core/panels";
-import { useApps } from "../core/apps";
+import { useApps, type AppsSnapshot, type PinnedApp } from "../core/apps";
 import { useSettings } from "../core/settings";
 import {
   useWidgets,
@@ -73,6 +74,16 @@ function instanceOf(
   return found && isCreatableInstance(found) ? found : null;
 }
 
+/** The pinned program an app panel is the menu of; null when the list
+ * doesn't have it (unpinned, or not read). */
+function appOf(
+  snapshot: AppsSnapshot | null,
+  panelId: PanelId,
+): PinnedApp | null {
+  if (!isAppPanel(panelId) || snapshot === null) return null;
+  return snapshot.apps.find((app) => app.id === panelId.app) ?? null;
+}
+
 const sameSize = (a: LogicalSize | null, b: LogicalSize) =>
   a !== null && a.width === b.width && a.height === b.height;
 
@@ -118,11 +129,14 @@ function Panel() {
   const instance = request ? instanceOf(widgets, request.panelId) : null;
   // A widget panel whose instance is gone (removed elsewhere, or the
   // storage became unavailable) closes, once the list is known.
+  const app = request ? appOf(apps, request.panelId) : null;
+  // The same for the menu of a program that was unpinned.
   const gone =
     request !== null &&
-    isWidgetPanel(request.panelId) &&
-    widgets !== null &&
-    instance === null;
+    ((isWidgetPanel(request.panelId) &&
+      widgets !== null &&
+      instance === null) ||
+      (isAppPanel(request.panelId) && apps !== null && app === null));
   // What the window shows: the size is sent again whenever it changes.
   const viewKey = `${view.sub} ${instance?.kind ?? ""}`;
 
@@ -184,10 +198,10 @@ function Panel() {
   if (request === null) return null;
   const { panelId, seq } = request;
   const onView = (next: PanelView) => setChosen({ ...next, seq });
-  // Itens do dock and the widget views bring their own title
-  // (`PanelHeader`).
-  const ownTitle =
-    isWidgetPanel(panelId) || (panelId === "settings" && view.sub);
+  // Itens do dock, the widget views and the menu of a program bring their
+  // own title (`PanelHeader`).
+  const system = typeof panelId === "string" ? panelId : null;
+  const ownTitle = system === null || (system === "settings" && view.sub);
 
   return (
     <div
@@ -200,11 +214,19 @@ function Panel() {
       <section
         key={seq}
         className="panel"
-        data-panel={isWidgetPanel(panelId) ? "widget" : panelId}
+        data-panel={
+          isWidgetPanel(panelId)
+            ? "widget"
+            : isAppPanel(panelId)
+              ? "app"
+              : panelId
+        }
         data-widget={instance?.kind}
         aria-labelledby="panel-title"
       >
-        {ownTitle ? null : <h1 id="panel-title">{t.panel.titles[panelId]}</h1>}
+        {system === null || ownTitle ? null : (
+          <h1 id="panel-title">{t.panel.titles[system]}</h1>
+        )}
         <PanelBoundary
           resetKey={`${panelKey(panelId)} ${view.sub}`}
           fallback={t.panel.failed}
@@ -215,6 +237,7 @@ function Panel() {
             settings={settings}
             widgets={widgets}
             apps={apps}
+            app={app}
             instance={instance}
             view={view}
             onView={onView}

@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AppsSnapshot } from "../core/apps";
 import type { PanelReadyArgs, PanelShowPayload } from "../core/panels";
 import { DEFAULT_LOOK, type Settings } from "../core/settings";
 import type {
@@ -94,6 +95,7 @@ const LIST: WidgetsSnapshot = {
 };
 
 let widgets: WidgetsSnapshot | Error;
+let apps: AppsSnapshot;
 let waits = 0;
 /** The frame's fake height: grows to tell one measure from another. */
 let frameHeight = 200;
@@ -134,15 +136,26 @@ describe("Panel routing", () => {
     waits = 0;
     frameHeight = 200;
     widgets = LIST;
+    apps = { storage: { state: "ok" }, apps: [] };
     props.panel = null;
     props.settings = null;
     invoke.mockReset();
     invoke.mockImplementation((command: string) => {
       if (command === "get_settings") return Promise.resolve(SETTINGS);
-      if (command === "list_apps") {
-        return Promise.resolve({ storage: { state: "ok" }, apps: [] });
-      }
+      if (command === "list_apps") return Promise.resolve(apps);
       if (command === "list_catalog") return Promise.resolve([]);
+      if (command === "app_menu") {
+        return Promise.resolve({
+          canReveal: false,
+          sections: [
+            {
+              kind: "tasks",
+              title: null,
+              entries: [{ key: 0, title: "Nova janela" }],
+            },
+          ],
+        });
+      }
       if (command === "list_widgets") {
         return widgets instanceof Error
           ? Promise.reject(widgets)
@@ -462,6 +475,65 @@ describe("Panel routing", () => {
         screen.getByRole("heading", { name: ptBR.panel.titles.about }),
       ).toBeInTheDocument();
       expect(card()).not.toHaveAttribute("data-widget");
+    });
+  });
+
+  describe("the menu of a pinned program", () => {
+    const PROGRAM = {
+      id: "0199a4c0-0000-7000-8000-000000000001",
+      appId: "Some.App!App",
+      name: "Algum App",
+    };
+    const SECOND = { ...PROGRAM, id: "0199a4c0-0000-7000-8000-000000000002" };
+
+    it("shows the menu of the program under its own title", async () => {
+      apps = { storage: { state: "ok" }, apps: [PROGRAM] };
+      await renderPanel();
+
+      show({ app: PROGRAM.id });
+      await act(async () => {});
+
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+      expect(
+        screen.getByRole("heading", { name: "Algum App" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("menuitem", { name: "Nova janela" }),
+      ).toBeInTheDocument();
+      expect(card()).toHaveAttribute("data-panel", "app");
+      expect(readyCalls().length).toBeGreaterThan(0);
+    });
+
+    it("closes when the program is unpinned, once", async () => {
+      apps = { storage: { state: "ok" }, apps: [PROGRAM, SECOND] };
+      await renderPanel();
+      show({ app: PROGRAM.id });
+      expect(hides()).toBe(0);
+
+      emit("apps-changed", { storage: { state: "ok" }, apps: [SECOND] });
+
+      expect(hides()).toBe(1);
+      expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+      emit("apps-changed", { storage: { state: "ok" }, apps: [] });
+      expect(hides()).toBe(1);
+    });
+
+    it("does not close while the list is not read", async () => {
+      apps = undefined as unknown as AppsSnapshot;
+      await renderPanel();
+
+      show({ app: PROGRAM.id });
+
+      expect(hides()).toBe(0);
+    });
+
+    it("shows nothing for a program the list does not have", async () => {
+      await renderPanel();
+
+      show({ app: PROGRAM.id });
+
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(hides()).toBe(1);
     });
   });
 });

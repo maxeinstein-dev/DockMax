@@ -1,5 +1,5 @@
-import type { AppsSnapshot } from "../core/apps";
-import { isWidgetPanel, type PanelId } from "../core/panels";
+import type { AppsSnapshot, PinnedApp } from "../core/apps";
+import { isAppPanel, isWidgetPanel, type PanelId } from "../core/panels";
 import type { Settings } from "../core/settings";
 import {
   removeWidget,
@@ -13,6 +13,7 @@ import type { WidgetUpdate } from "../widgets/contract";
 import { SECOND_MS, useNow } from "../widgets/now";
 import { definitionOf } from "../widgets/registry";
 import AboutPanel from "./AboutPanel";
+import AppMenuPanel from "./AppMenuPanel";
 import AppsPanel from "./AppsPanel";
 import DockItems from "./DockItems";
 import SettingsPanel from "./SettingsPanel";
@@ -37,13 +38,16 @@ type PanelContentProps = {
   /** The pinned programs (`useApps`), or null while loading or
    * unreadable. */
   apps: AppsSnapshot | null;
+  /** The pinned program of an app panel, or null when the list doesn't
+   * have it (then the panel shows nothing and the host closes it). */
+  app: PinnedApp | null;
   /** The instance of a widget panel, or null when the list doesn't have
    * it (then the panel shows nothing and the host closes it). */
   instance: WidgetInstance<CreatableKind> | null;
   view: PanelView;
   onView: (view: PanelView) => void;
-  /** The instance was removed from its Ajustes: the host closes the
-   * panel. */
+  /** The instance was removed from its Ajustes, or an entry of a
+   * program's menu was done: the host closes the panel. */
   onRemoved: () => void;
 };
 
@@ -109,11 +113,15 @@ function PanelContent({
   settings,
   widgets,
   apps,
+  app,
   instance,
   view,
   onView,
   onRemoved,
 }: PanelContentProps) {
+  if (isAppPanel(panelId)) {
+    return app === null ? null : <AppMenuPanel app={app} onDone={onRemoved} />;
+  }
   if (isWidgetPanel(panelId)) {
     if (instance === null) return null;
     return view.sub ? (

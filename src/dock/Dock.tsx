@@ -7,6 +7,7 @@ import {
   type CSSProperties,
   type FocusEvent,
   type KeyboardEvent,
+  type MouseEvent,
   type PointerEvent,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -31,6 +32,7 @@ import {
 import { errorKind, log } from "../core/log";
 import {
   PANEL_CHANGED_EVENT,
+  appPanel,
   type LogicalRect,
   panelKey,
   samePanel,
@@ -79,8 +81,9 @@ const GLAZE: Record<SystemPanelId, string> = {
 
 /** One item of the dock. */
 interface DockEntry {
-  /** The panel it opens; null for a pinned program, which opens itself. */
-  panelId: PanelId | null;
+  /** The panel it opens; for a pinned program, its menu (the program itself
+   * opens on a click). */
+  panelId: PanelId;
   /** `panelKey` (`app:<id>` for a program): React key and identity across
    * changes of the list. */
   key: string;
@@ -117,8 +120,8 @@ function dockEntries(
       : snapshot.widgets.filter(isCreatableInstance);
   return [
     ...apps.map((app) => ({
-      panelId: null,
-      key: `app:${app.id}`,
+      panelId: appPanel(app.id),
+      key: panelKey(appPanel(app.id)),
       name: app.name,
       instance: null,
       app,
@@ -370,15 +373,8 @@ function Dock() {
     openRef.current = open;
   });
 
-  // A program opens no panel, so its label shows whatever panel is open.
-  const activePanel = active === null ? null : entries[active]?.panelId;
   const tipIndex =
-    active !== null &&
-    !(
-      activePanel !== null &&
-      activePanel !== undefined &&
-      samePanel(activePanel, open)
-    )
+    active !== null && !samePanel(entries[active]?.panelId ?? null, open)
       ? active
       : null;
   const tipTile = tipIndex === null ? undefined : placement.tiles[tipIndex];
@@ -435,9 +431,8 @@ function Dock() {
       }),
       listen<DockRequestPanel>(DOCK_REQUEST_PANEL_EVENT, ({ payload }) => {
         const { panelId } = payload;
-        const index = entriesRef.current.findIndex(
-          (entry) =>
-            entry.panelId !== null && samePanel(entry.panelId, panelId),
+        const index = entriesRef.current.findIndex((entry) =>
+          samePanel(entry.panelId, panelId),
         );
         const anchor = restItemsRef.current[index];
         if (!anchor || samePanel(openRef.current, panelId)) return;
@@ -454,9 +449,18 @@ function Dock() {
     const anchor = restItems[index];
     if (entry?.app) {
       openApp(entry.app);
-    } else if (entry?.panelId && anchor) {
+    } else if (entry && anchor) {
       openPanel(entry.panelId, anchor);
     }
+  };
+
+  /** The menu of a pinned program, on a right click or the menu key. */
+  const openMenu = (index: number, event: MouseEvent<HTMLElement>) => {
+    const entry = entries[index];
+    const anchor = restItems[index];
+    if (!entry?.app || !anchor) return;
+    event.preventDefault();
+    openPanel(entry.panelId, anchor);
   };
 
   const onPointer = (event: PointerEvent<HTMLElement>) => {
@@ -516,9 +520,8 @@ function Dock() {
         }
         // No aria-controls: the panel is in another window, which an IDREF
         // can't reach.
-        aria-expanded={
-          entry.panelId === null ? undefined : samePanel(open, entry.panelId)
-        }
+        aria-expanded={samePanel(open, entry.panelId)}
+        aria-haspopup={entry.app ? "menu" : undefined}
         tabIndex={index === currentIndex ? 0 : -1}
         data-magnify={magnifyRole(index, magnified, hover.effect) ?? undefined}
         style={
@@ -528,6 +531,7 @@ function Dock() {
           } as CSSProperties
         }
         onClick={() => toggle(index)}
+        onContextMenu={(event) => openMenu(index, event)}
         onFocus={(event) => onFocus(index, event)}
         onBlur={() => setFocused(null)}
       >

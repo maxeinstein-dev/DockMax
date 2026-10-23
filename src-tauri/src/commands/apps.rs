@@ -526,22 +526,41 @@ mod tests {
     }
 
     #[test]
-    fn the_menu_goes_to_the_page_as_json_without_what_it_runs() {
-        let (sections, _) = view_of(vec![Section {
-            kind: SectionKind::Category,
-            title: Some("Recent chats".into()),
-            entries: section(SectionKind::Category, &["a"]).entries,
-        }]);
+    fn the_menu_goes_to_the_page_as_the_contract_file_says() {
+        let entry = |title: &str| Entry {
+            title: title.to_owned(),
+            run: Runnable::Open(format!("never sent: {title}")),
+        };
+        let (sections, _) = view_of(vec![
+            Section {
+                kind: SectionKind::Category,
+                title: Some("Recent chats".into()),
+                entries: vec![entry("First"), entry("Second")],
+            },
+            Section {
+                kind: SectionKind::Recent,
+                title: None,
+                entries: vec![entry("notes.txt")],
+            },
+            Section {
+                kind: SectionKind::Tasks,
+                title: None,
+                entries: vec![entry("New window")],
+            },
+        ]);
 
-        let json = serde_json::to_string(&AppMenuView {
+        let json = serde_json::to_value(AppMenuView {
             sections,
             can_reveal: true,
         })
         .unwrap();
 
-        assert_eq!(
-            json,
-            r#"{"sections":[{"kind":"category","title":"Recent chats","entries":[{"key":0,"title":"a"}]}],"canReveal":true}"#
-        );
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/apps/menu-sample.json");
+        let expected: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        assert_eq!(json, expected);
+        // What an entry runs never goes to the page.
+        assert!(!json.to_string().contains("never sent"));
     }
 }

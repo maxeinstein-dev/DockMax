@@ -34,6 +34,36 @@ export interface CatalogEntry {
   name: string;
 }
 
+/** One entry of the menu of a program: the key names it for
+ * `runAppEntry`. */
+export interface MenuEntry {
+  key: number;
+  title: string;
+}
+
+export type MenuSectionKind = "tasks" | "category" | "recent" | "frequent";
+
+export const MENU_SECTION_KINDS = [
+  "tasks",
+  "category",
+  "recent",
+  "frequent",
+] as const satisfies readonly MenuSectionKind[];
+
+export interface MenuSection {
+  kind: MenuSectionKind;
+  /** The name of the program's own category; null for the others. */
+  title: string | null;
+  entries: MenuEntry[];
+}
+
+/** The menu of a pinned program, as the Windows taskbar shows it (its Jump
+ * List): `canReveal` says whether its file can be shown in Explorer. */
+export interface AppMenu {
+  sections: MenuSection[];
+  canReveal: boolean;
+}
+
 export type AppErrorCode =
   | "limitReached"
   | "notFound"
@@ -80,6 +110,9 @@ export const APP_COMMANDS = {
   unpin: "unpin_app",
   move: "move_app",
   launch: "launch_app",
+  menu: "app_menu",
+  runEntry: "run_app_entry",
+  reveal: "reveal_app",
 } as const;
 
 /** Event every window receives with an `AppsSnapshot` after a change. */
@@ -142,6 +175,28 @@ export function moveApp(id: WidgetId, direction: MoveDirection): Promise<void> {
 export function launchApp(id: WidgetId): Promise<void> {
   return run(APP_COMMANDS.launch, { id }, (error) =>
     log.warn(`apps: launch failed: ${errorKind(error)}`),
+  );
+}
+
+/** The menu of a pinned program: its categories, recent items and tasks.
+ * Reads the program's list from disk. */
+export function appMenu(id: WidgetId): Promise<AppMenu> {
+  return run(APP_COMMANDS.menu, { id }, (error) =>
+    log.warn(`apps: menu failed: ${errorKind(error)}`),
+  );
+}
+
+/** Runs an entry of the menu `appMenu` last returned for `id`. */
+export function runAppEntry(id: WidgetId, key: number): Promise<void> {
+  return run(APP_COMMANDS.runEntry, { id, key }, (error) =>
+    log.warn(`apps: entry failed: ${errorKind(error)}`),
+  );
+}
+
+/** Shows the program's file in File Explorer. */
+export function revealApp(id: WidgetId): Promise<void> {
+  return run(APP_COMMANDS.reveal, { id }, (error) =>
+    log.warn(`apps: reveal failed: ${errorKind(error)}`),
   );
 }
 

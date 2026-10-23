@@ -1,0 +1,23 @@
+{
+  "sections": [
+    {
+      "kind": "category",
+      "title": "Recent chats",
+      "entries": [
+        { "key": 0, "title": "First" },
+        { "key": 1, "title": "Second" }
+      ]
+    },
+    {
+      "kind": "recent",
+      "title": null,
+      "entries": [{ "key": 2, "title": "notes.txt" }]
+    },
+    {
+      "kind": "tasks",
+      "title": null,
+      "entries": [{ "key": 3, "title": "New window" }]
+    }
+  ],
+  "canReveal": true
+}

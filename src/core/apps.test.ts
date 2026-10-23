@@ -4,15 +4,19 @@ import {
   APP_ERROR_CODES,
   APPS_CHANGED_EVENT,
   appIcon,
+  appMenu,
   forgetIcons,
   isAppCommandError,
   launchApp,
   listApps,
   moveApp,
   pinApp,
+  revealApp,
+  runAppEntry,
   unpinApp,
   useAppIcon,
   useApps,
+  type AppMenu,
   type AppsSnapshot,
 } from "./apps";
 import { readSource } from "../test/sources";
@@ -84,6 +88,60 @@ describe("apps contract fixtures", () => {
     };
 
     expect(read("snapshot-sample.json")).toEqual(sample);
+  });
+});
+
+describe("the menu of a program", () => {
+  it("matches what Rust sends", () => {
+    const sample: AppMenu = {
+      sections: [
+        {
+          kind: "category",
+          title: "Recent chats",
+          entries: [
+            { key: 0, title: "First" },
+            { key: 1, title: "Second" },
+          ],
+        },
+        {
+          kind: "recent",
+          title: null,
+          entries: [{ key: 2, title: "notes.txt" }],
+        },
+        {
+          kind: "tasks",
+          title: null,
+          entries: [{ key: 3, title: "New window" }],
+        },
+      ],
+      canReveal: true,
+    };
+
+    expect(
+      JSON.parse(readSource("src-tauri/tests/fixtures/apps/menu-sample.json")),
+    ).toEqual(sample);
+  });
+
+  it("is asked for, run by key and revealed by the pinned id", async () => {
+    invoke.mockResolvedValue(undefined);
+
+    await appMenu("one");
+    await runAppEntry("one", 3);
+    await revealApp("one");
+
+    expect(invoke.mock.calls).toEqual([
+      ["app_menu", { id: "one" }],
+      ["run_app_entry", { id: "one", key: 3 }],
+      ["reveal_app", { id: "one" }],
+    ]);
+  });
+
+  it("passes a code through and hides any other failure", async () => {
+    invoke.mockRejectedValueOnce({ code: "notFound" });
+    await expect(appMenu("one")).rejects.toEqual({ code: "notFound" });
+
+    invoke.mockRejectedValueOnce(new Error("C:\\secret"));
+    await expect(runAppEntry("one", 0)).rejects.toEqual({ code: "notReady" });
   });
 });
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  appPanel,
+  isAppPanel,
   isWidgetPanel,
   panelKey,
   samePanel,
@@ -21,6 +23,28 @@ describe("panel IDs", () => {
     expect(isWidgetPanel(widgetPanel(CLOCK))).toBe(true);
     expect(isWidgetPanel("settings")).toBe(false);
     expect(isWidgetPanel("about")).toBe(false);
+  });
+
+  it("names the menu of a program as Rust reads it", () => {
+    // `{ "app": "<id>" }`, as `PanelId::App` in panel.rs.
+    expect(JSON.stringify(appPanel(CLOCK))).toBe(`{"app":"${CLOCK}"}`);
+  });
+
+  it("tells the menu of a program from a widget and from the system panels", () => {
+    expect(isAppPanel(appPanel(CLOCK))).toBe(true);
+    expect(isAppPanel(widgetPanel(CLOCK))).toBe(false);
+    expect(isAppPanel("settings")).toBe(false);
+    expect(isWidgetPanel(appPanel(CLOCK))).toBe(false);
+  });
+
+  it("does not take a program's menu for the widget with the same id", () => {
+    expect(samePanel(appPanel(CLOCK), appPanel(CLOCK))).toBe(true);
+    expect(samePanel(appPanel(CLOCK), appPanel(NOTE))).toBe(false);
+    expect(samePanel(appPanel(CLOCK), widgetPanel(CLOCK))).toBe(false);
+    expect(samePanel(widgetPanel(CLOCK), appPanel(CLOCK))).toBe(false);
+    expect(samePanel(appPanel(CLOCK), "settings")).toBe(false);
+    expect(samePanel(null, appPanel(CLOCK))).toBe(false);
+    expect(panelKey(appPanel(CLOCK))).toBe(`app:${CLOCK}`);
   });
 
   it("compares panels by what they name, not by reference", () => {

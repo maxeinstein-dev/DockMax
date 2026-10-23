@@ -8,35 +8,55 @@ export interface WidgetPanelId {
   widget: WidgetId;
 }
 
+/** The menu of a pinned program (spec 0006 §6): `app` is the pinned
+ * item's id. */
+export interface AppPanelId {
+  app: WidgetId;
+}
+
 /** Panels the dock can open; must match `PanelId` in
  * `src-tauri/src/windows/panel.rs`. In JSON: `"settings"`, `"about"`,
- * `"tray"` or
- * `{ "widget": "<id>" }`. Rust refuses (`toggle_panel` fails, nothing
- * opens) a widget ID that isn't an instance the dock has. An object, so
- * compare two with `samePanel`, never with `===`. */
-export type PanelId = SystemPanelId | WidgetPanelId;
+ * `"tray"`, `{ "widget": "<id>" }` or `{ "app": "<id>" }`. Rust refuses
+ * (`toggle_panel` fails, nothing opens) an ID that isn't an instance, or a
+ * pinned program, the dock has. An object, so compare two with
+ * `samePanel`, never with `===`. */
+export type PanelId = SystemPanelId | WidgetPanelId | AppPanelId;
 
 /** The panel of the instance `id`. */
 export function widgetPanel(id: WidgetId): WidgetPanelId {
   return { widget: id };
 }
 
+/** The menu panel of the pinned program `id`. */
+export function appPanel(id: WidgetId): AppPanelId {
+  return { app: id };
+}
+
 /** Whether `id` is a widget instance's panel. */
 export function isWidgetPanel(id: PanelId): id is WidgetPanelId {
-  return typeof id === "object";
+  return typeof id === "object" && "widget" in id;
+}
+
+/** Whether `id` is the menu of a pinned program. */
+export function isAppPanel(id: PanelId): id is AppPanelId {
+  return typeof id === "object" && "app" in id;
 }
 
 /** Whether `a` and `b` name the same panel. */
 export function samePanel(a: PanelId | null, b: PanelId | null): boolean {
   if (a === null || b === null) return a === b;
   if (isWidgetPanel(a)) return isWidgetPanel(b) && a.widget === b.widget;
+  if (isAppPanel(a)) return isAppPanel(b) && a.app === b.app;
   return a === b;
 }
 
 /** A string that names the panel, for React keys and `resetKey`s:
- * `settings`, `about` or `widget:<id>`. Never shown and never sent. */
+ * `settings`, `about`, `widget:<id>` or `app:<id>`. Never shown and never
+ * sent. */
 export function panelKey(id: PanelId): string {
-  return isWidgetPanel(id) ? `widget:${id.widget}` : id;
+  if (isWidgetPanel(id)) return `widget:${id.widget}`;
+  if (isAppPanel(id)) return `app:${id.app}`;
+  return id;
 }
 
 /** Rectangle in CSS pixels, relative to the window's client area. */
