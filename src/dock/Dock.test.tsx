@@ -249,6 +249,7 @@ describe("Dock", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
     const root = document.documentElement;
     for (const key of ["mode", "opacity", "size", "edge"]) {
       delete root.dataset[key];
@@ -1184,6 +1185,48 @@ describe("Dock", () => {
 
       expect(invoke).toHaveBeenCalledWith("launch_app", { id: NOTEPAD.id });
       expect(panelCalls()).toHaveLength(0);
+    });
+
+    it("animates the icon of a program that is opening, and only its own", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      pinned = withApps(CALCULATOR, NOTEPAD);
+      await renderDock();
+      expect(program("Calculadora")).not.toHaveAttribute("data-opening");
+
+      fireEvent.click(program("Calculadora"));
+
+      expect(program("Calculadora")).toHaveAttribute("data-opening");
+      expect(program("Bloco de notas")).not.toHaveAttribute("data-opening");
+      expect(settings()).not.toHaveAttribute("data-opening");
+      await act(() => vi.advanceTimersByTimeAsync(1600));
+      expect(program("Calculadora")).not.toHaveAttribute("data-opening");
+    });
+
+    it("stops the animation at once when the program could not be opened", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      pinned = withApps(CALCULATOR);
+      await renderDock();
+      invoke.mockImplementation((command: string) =>
+        command === "launch_app"
+          ? Promise.reject({ code: "launchFailed" })
+          : Promise.resolve(undefined),
+      );
+
+      fireEvent.click(program("Calculadora"));
+      await act(async () => {});
+
+      expect(program("Calculadora")).not.toHaveAttribute("data-opening");
+    });
+
+    it("leaves no timer behind when the dock goes", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      pinned = withApps(CALCULATOR);
+      const { unmount } = await renderDock();
+      fireEvent.click(program("Calculadora"));
+
+      unmount();
+
+      expect(vi.getTimerCount()).toBe(0);
     });
 
     it("opens it with Enter and Space, once per press", async () => {

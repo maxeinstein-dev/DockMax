@@ -267,10 +267,17 @@ function openCalendar() {
   });
 }
 
-function openApp(app: PinnedApp) {
-  launchApp(app.id).catch((error: unknown) => {
+/** How long a program's icon animates after a click: the animations of
+ * Dock.css last 1.4 s (bounce and shake) and 1.5 s (pulse). */
+const OPENING_MS = 1500;
+
+/** Opens the program; resolves when it was asked to, rejects when it could
+ * not be. */
+function openApp(app: PinnedApp): Promise<void> {
+  return launchApp(app.id).catch((error: unknown) => {
     // `launchApp` logged anything unexpected; a code from Rust is the kind.
     log.warn(`dock: opening a program failed: ${errorKind(error)}`);
+    throw error;
   });
 }
 
@@ -315,6 +322,9 @@ function Dock() {
   const [currentKey, setCurrentKey] = useState<string | null>(null);
   const [open, setOpen] = useState<PanelId | null>(null);
   const [labels, setLabels] = useState<LabelWidths | null>(null);
+  /** The programs whose icon is animating after a click, by item key. */
+  const [opening, setOpening] = useState<ReadonlySet<string>>(new Set());
+  const openingTimers = useRef(new Map<string, number>());
 
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const tips = useRef<(HTMLSpanElement | null)[]>([]);
@@ -444,11 +454,49 @@ function Dock() {
     };
   }, []);
 
+  // No timer outlives the dock.
+  useEffect(() => {
+    const timers = openingTimers.current;
+    return () => {
+      for (const timer of timers.values()) window.clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
+
+  const setOpeningOf = (key: string, on: boolean) =>
+    setOpening((previous) => {
+      if (previous.has(key) === on) return previous;
+      const next = new Set(previous);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+
+  /** Opens the program and animates its icon for a moment; a program that
+   * could not be opened stops at once. */
+  const launch = (key: string, app: PinnedApp) => {
+    const timers = openingTimers.current;
+    window.clearTimeout(timers.get(key));
+    setOpeningOf(key, true);
+    timers.set(
+      key,
+      window.setTimeout(() => {
+        timers.delete(key);
+        setOpeningOf(key, false);
+      }, OPENING_MS),
+    );
+    openApp(app).catch(() => {
+      window.clearTimeout(timers.get(key));
+      timers.delete(key);
+      setOpeningOf(key, false);
+    });
+  };
+
   const toggle = (index: number) => {
     const entry = entries[index];
     const anchor = restItems[index];
     if (entry?.app) {
-      openApp(entry.app);
+      launch(entry.key, entry.app);
     } else if (entry && anchor) {
       openPanel(entry.panelId, anchor);
     }
@@ -524,6 +572,7 @@ function Dock() {
         aria-haspopup={entry.app ? "menu" : undefined}
         tabIndex={index === currentIndex ? 0 : -1}
         data-magnify={magnifyRole(index, magnified, hover.effect) ?? undefined}
+        data-opening={opening.has(entry.key) ? "" : undefined}
         style={
           {
             "--s": String(scale),

@@ -14,6 +14,8 @@ Com o dock no lugar da barra do Windows (fase A e spike da barra), ele só tem C
 |---|---|---|
 | **B1** | Catálogo dos programas instalados, fixar, desafixar, reordenar, abrir ao clicar e o ícone real de cada um | banco (migração 2), `windows/apps.rs`, `commands/apps.rs`, `Dock.tsx`, Configurações |
 | **B2** | Formato dos ícones (Placas arredondadas, Mesmo tamanho, Como vieram), animação de abertura (Pulo, Pulso, Tremor), arrastar para reordenar e soltar um programa no dock para fixá-lo | `settings`, `Dock.tsx`, CSS |
+
+O B2 sai em duas partes: o formato dos ícones e a animação de abertura primeiro (§8); arrastar e soltar depois.
 | **B3** | Menu do app no dock (botão direito): a Jump List do Windows, Abrir, "Remover do dock" e "Mostrar no Explorador" (§6 e §7) | `windows/jumplist.rs`, `commands/apps.rs`, painel |
 | **B4** | Pacotes de ícones, ícone por item e imagem personalizada | a definir |
 
@@ -150,3 +152,18 @@ Verificação em 2026-10-23, no app real, sem mouse e sem abrir programa (o bot�
 - O evento teve o padrão cancelado nos cinco apps, o painel abriu com o nome do app como título e o ícone ficou `aria-expanded`; a barra do Windows voltou e o arquivo de estado foi removido ao encerrar.
 
 Pendente do autor: escolher uma entrada de um menu (por exemplo "Nova janela" do Chrome), que o teste automático não faz.
+
+## 8. B2 (parte 1): formato dos ícones e animação de abertura
+
+Duas configurações novas em `dock`, aditivas na versão 1 (um arquivo antigo carrega com o padrão): `iconShape` (`plate`, `uniform`, `original`; padrão `plate`) e `openAnimation` (`bounce`, `pulse`, `shake`; padrão `bounce`). Ficam em Configurações › Aparência do dock, como "Formato dos ícones" (Placas arredondadas, Mesmo tamanho, Como vieram) e "Animação de abertura" (Pulo, Pulso, Tremor).
+
+- **Formato:** só vale para os apps fixados. Placas: o ícone a 78 % sobre a placa. Mesmo tamanho: sem placa, todo ícone preenche o mesmo quadrado. Como vieram: sem placa, a 90 %, como o programa o desenhou. A placa volta embaixo da inicial que faz as vezes de um ícone ausente.
+- **Animação:** ao clicar num app, o ícone anima por 1,5 s, ou até o Rust dizer que não abriu. Usa `translate` e `scale`, que convivem com o `transform` do efeito de passar o mouse; o pulo vai para longe da borda (para cima embaixo, para baixo em cima). "Reduzir movimento" a desliga, como o guarda de movimento exige. Sem apps em execução (fase D), o dock não sabe quando o programa terminou de abrir: o tempo é fixo.
+
+Verificação em 2026-10-25, no app real, sem mouse e sem abrir programa (as formas e as animações foram postas pela própria página, pela porta de depuração):
+
+- Tamanho do ícone dentro de uma ficha de 40 px: 31 px na placa, 40 px em Mesmo tamanho e 36 px em Como vieram; a placa deixa de existir nos dois últimos.
+- As três animações rodam sobre o ícone (`dock-open-bounce` com `translate` de −4 px aos 170 ms, `pulse` com `scale` 1,22, `shake` com `translate` de −2,7 px).
+- Memória (privada, dock e filhos): 177 MB parado; 218 MB com quatro apps fixados e o catálogo lido, estável 40 s depois.
+
+Ainda do B2: arrastar para reordenar no dock e soltar um programa no dock para fixá-lo.

@@ -92,6 +92,13 @@ export const INDICATOR_COLORS = [
 /** One of the colors offered. */
 export type IndicatorColor = (typeof INDICATOR_COLORS)[number];
 
+/** How a pinned program's icon sits in its tile; must match `IconShape` in
+ * `src-tauri/src/domain/settings.rs`. */
+export type IconShape = "plate" | "uniform" | "original";
+
+/** What a program's icon does while it opens; must match `OpenAnimation`. */
+export type OpenAnimation = "bounce" | "pulse" | "shake";
+
 /** What the dock does with the Windows taskbar (ADR 0009); must match
  * `TaskbarMode` in `src-tauri/src/domain/settings.rs`. */
 export type TaskbarMode = "visible" | "autohide" | "hidden";
@@ -109,6 +116,8 @@ export const DEFAULT_LOOK = {
   hoverScale: DEFAULT_HOVER_SCALE,
   indicator: "dot",
   indicatorColor: null,
+  iconShape: "plate",
+  openAnimation: "bounce",
   taskbar: "hidden",
   bottomSpace: DEFAULT_BOTTOM_SPACE,
 } as const satisfies Pick<
@@ -119,6 +128,8 @@ export const DEFAULT_LOOK = {
   | "hoverScale"
   | "indicator"
   | "indicatorColor"
+  | "iconShape"
+  | "openAnimation"
   | "taskbar"
   | "bottomSpace"
 >;
@@ -138,6 +149,8 @@ export interface DockSettings {
   indicator: Indicator;
   /** `#RRGGBB`, or null for the style's own color. */
   indicatorColor: string | null;
+  iconShape: IconShape;
+  openAnimation: OpenAnimation;
   taskbar: TaskbarMode;
   /** Distance between the dock and the screen edge, in logical pixels,
    * 0–`MAX_BOTTOM_SPACE`. */

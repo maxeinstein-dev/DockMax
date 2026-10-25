@@ -315,6 +315,44 @@ describe("LookPanel", () => {
     expect(sentSettings().dock.indicator).toBe("dash");
   });
 
+  it("offers the three icon shapes and saves the one chosen", () => {
+    render(<LookPanel settings={SETTINGS} onBack={vi.fn()} />);
+
+    expect(chosen(text.iconShape)).toEqual(["Placas arredondadas"]);
+    expect(
+      within(group(text.iconShape))
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Placas arredondadas", "Mesmo tamanho", "Como vieram"]);
+
+    fireEvent.click(
+      within(group(text.iconShape)).getByRole("button", {
+        name: "Mesmo tamanho",
+      }),
+    );
+
+    expect(sentSettings().dock.iconShape).toBe("uniform");
+  });
+
+  it("offers the three opening animations and saves the one chosen", () => {
+    render(<LookPanel settings={SETTINGS} onBack={vi.fn()} />);
+
+    expect(chosen(text.openAnimation)).toEqual(["Pulo"]);
+    expect(
+      within(group(text.openAnimation))
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Pulo", "Pulso", "Tremor"]);
+
+    fireEvent.click(
+      within(group(text.openAnimation)).getByRole("button", {
+        name: "Tremor",
+      }),
+    );
+
+    expect(sentSettings().dock.openAnimation).toBe("shake");
+  });
+
   it("offers the style's own color and the palette, and saves the color", () => {
     render(<LookPanel settings={SETTINGS} onBack={vi.fn()} />);
 

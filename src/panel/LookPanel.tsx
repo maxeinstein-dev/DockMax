@@ -9,7 +9,9 @@ import {
   type DockSettings,
   type DockStyle,
   type HoverEffect,
+  type IconShape,
   type Indicator,
+  type OpenAnimation,
   type Settings,
   type StyleTweaks,
 } from "../core/settings";
@@ -26,6 +28,8 @@ import "./Look.css";
 
 const HOVERS: readonly HoverEffect[] = ["none", "scale", "magnify"];
 const INDICATORS: readonly Indicator[] = ["dot", "dash"];
+const ICON_SHAPES: readonly IconShape[] = ["plate", "uniform", "original"];
+const OPEN_ANIMATIONS: readonly OpenAnimation[] = ["bounce", "pulse", "shake"];
 
 function options<V extends string>(
   values: readonly V[],
@@ -251,6 +255,18 @@ function LookPanel({ settings, onBack }: LookPanelProps) {
         options={options(INDICATORS, text.indicatorOptions)}
         selected={dock?.indicator ?? null}
         onSelect={(indicator) => update({ indicator })}
+      />
+      <OptionGroup
+        label={text.iconShape}
+        options={options(ICON_SHAPES, text.iconShapeOptions)}
+        selected={dock?.iconShape ?? null}
+        onSelect={(iconShape) => update({ iconShape })}
+      />
+      <OptionGroup
+        label={text.openAnimation}
+        options={options(OPEN_ANIMATIONS, text.openAnimationOptions)}
+        selected={dock?.openAnimation ?? null}
+        onSelect={(openAnimation) => update({ openAnimation })}
       />
       <SwatchGroup
         label={text.indicatorColor}

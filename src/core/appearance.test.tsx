@@ -145,6 +145,31 @@ describe("applyAppearance", () => {
     expect(root.style.getPropertyValue("--indicator-color")).toBe("#0A84FF");
   });
 
+  it("gives the dock the shape of the icons and the opening animation", () => {
+    applyAppearance(
+      root,
+      {
+        ...DEFAULTS,
+        dock: {
+          ...DEFAULTS.dock,
+          iconShape: "original",
+          openAnimation: "shake",
+        },
+      },
+      { window: "dock" },
+    );
+
+    expect(root.dataset.iconShape).toBe("original");
+    expect(root.dataset.openAnimation).toBe("shake");
+  });
+
+  it("starts from plates and the bounce", () => {
+    applyAppearance(root, DEFAULTS, { window: "dock" });
+
+    expect(root.dataset.iconShape).toBe("plate");
+    expect(root.dataset.openAnimation).toBe("bounce");
+  });
+
   it("puts the changes of the chosen style over its own look", () => {
     applyAppearance(
       root,
