@@ -129,6 +129,12 @@ pub fn run() {
         .on_page_load(|webview, payload| {
             if payload.event() == PageLoadEvent::Finished {
                 windows::memory::page_loaded(webview.app_handle(), webview.label());
+                #[cfg(windows)]
+                if webview.label() == windows::dock::LABEL
+                    && let Some(window) = webview.app_handle().get_webview_window(webview.label())
+                {
+                    windows::drop_target::install(&window);
+                }
             }
         })
         .setup(|app| {

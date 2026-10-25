@@ -259,7 +259,7 @@ pub fn place_app(
 }
 
 /// Pins what was dropped on the dock, at the end of the programs. Comes from
-/// the window's own drop event (`windows::dock`), not from the page, so only
+/// the dock's own drop target (`windows::drop_target`), not from the page, so only
 /// what the user really dropped can be pinned. Reading the names takes the
 /// shell's time: off the event loop.
 pub fn pin_dropped(app: &AppHandle, paths: Vec<std::path::PathBuf>) {

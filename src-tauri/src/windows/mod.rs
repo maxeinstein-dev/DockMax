@@ -3,6 +3,8 @@ pub mod appbar;
 pub mod apps;
 pub mod dock;
 #[cfg(windows)]
+pub mod drop_target;
+#[cfg(windows)]
 pub mod flyout;
 pub mod hit_test;
 pub mod jumplist;
