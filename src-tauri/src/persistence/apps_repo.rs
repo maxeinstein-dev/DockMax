@@ -139,6 +139,22 @@ pub fn shift(
     Ok(())
 }
 
+/// Puts a program at `index` among the pinned ones the interface sees, the
+/// others closing up around it. An index past the end is the end.
+pub fn place(conn: &mut Connection, id: &WidgetId, index: usize) -> Result<(), AppError> {
+    let tx = begin(conn)?;
+    let mut ids = order(&tx)?;
+    let from = ids
+        .iter()
+        .position(|stored| stored == id.as_str())
+        .ok_or(AppError::NotFound)?;
+    let moved = ids.remove(from);
+    ids.insert(index.min(ids.len()), moved);
+    renumber(&tx, &ids)?;
+    tx.commit().map_err(write_failed)?;
+    Ok(())
+}
+
 /// The ids of every row in dock order, hidden ones included: they keep
 /// their place.
 fn order(conn: &Connection) -> Result<Vec<String>, AppError> {
@@ -313,6 +329,41 @@ mod tests {
             shift(conn, &WidgetId::new(), MoveDirection::Up),
             Err(AppError::NotFound)
         );
+    }
+
+    #[test]
+    fn placing_moves_a_program_to_the_index_and_the_others_close_up() {
+        let (_dir, mut storage) = open();
+        let conn = storage.connection().unwrap();
+        let apps = pin_n(conn, &["A", "B", "C", "D"]);
+
+        place(conn, &apps[3].id, 0).unwrap();
+        assert_eq!(names(conn), ["D", "A", "B", "C"]);
+        place(conn, &apps[0].id, 2).unwrap();
+        assert_eq!(names(conn), ["D", "B", "A", "C"]);
+        place(conn, &apps[1].id, 3).unwrap();
+        assert_eq!(names(conn), ["D", "A", "C", "B"]);
+    }
+
+    #[test]
+    fn placing_in_the_same_place_or_past_the_end_is_harmless() {
+        let (_dir, mut storage) = open();
+        let conn = storage.connection().unwrap();
+        let apps = pin_n(conn, &["A", "B", "C"]);
+
+        place(conn, &apps[1].id, 1).unwrap();
+        assert_eq!(names(conn), ["A", "B", "C"]);
+        place(conn, &apps[0].id, 99).unwrap();
+        assert_eq!(names(conn), ["B", "C", "A"]);
+        assert_eq!(place(conn, &WidgetId::new(), 0), Err(AppError::NotFound));
+        let positions: Vec<i64> = conn
+            .prepare("SELECT position FROM pinned_apps ORDER BY position")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(positions, [0, 1, 2]);
     }
 
     #[test]

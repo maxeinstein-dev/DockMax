@@ -331,13 +331,20 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         apply_taskbar(app, commands::settings::current(app).dock.taskbar);
     }
     let handle = app.clone();
-    window.on_window_event(move |event| {
-        if let WindowEvent::CloseRequested { api, .. } = event {
+    window.on_window_event(move |event| match event {
+        WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
             if let Err(error) = hide(&handle) {
                 log::warn!("dock: failed to hide: {error}");
             }
         }
+        // A program or a shortcut dropped on the bar is pinned (spec 0006
+        // B2): the window hears the drop itself, so the page has no say in
+        // what is pinned.
+        WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+            commands::apps::pin_dropped(&handle, paths.clone());
+        }
+        _ => {}
     });
     show(&window)
 }

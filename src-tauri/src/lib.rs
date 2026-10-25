@@ -161,6 +161,7 @@ pub fn run() {
             commands::apps::pin_app,
             commands::apps::unpin_app,
             commands::apps::move_app,
+            commands::apps::place_app,
             commands::apps::launch_app,
             commands::apps::app_menu,
             commands::apps::run_app_entry,

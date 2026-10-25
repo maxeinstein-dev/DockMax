@@ -30,6 +30,28 @@ pub fn is_valid_app_id(id: &str) -> bool {
         && !id.chars().any(char::is_control)
 }
 
+/// The kinds of file dropped on the dock that become a pinned program: the
+/// program itself and a shortcut to one.
+const PINNABLE_EXTENSIONS: [&str; 2] = ["exe", "lnk"];
+
+/// Whether `path` can be pinned when it is dropped on the dock: an absolute
+/// path on a drive (`C:\...`, no UNC, no relative part) to a program or a
+/// shortcut. The id of a pinned program is then this very path. Looks at the
+/// text only; whether the file exists is checked where the file is read.
+pub fn is_pinnable_path(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    let drive =
+        bytes.len() > 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'\\';
+    let extension = path
+        .rsplit_once('.')
+        .map(|(_, extension)| extension.to_ascii_lowercase());
+    drive
+        && is_valid_app_id(path)
+        && !path.contains("\\..\\")
+        && !path.ends_with("\\..")
+        && extension.is_some_and(|extension| PINNABLE_EXTENSIONS.contains(&extension.as_str()))
+}
+
 /// Whether `name` can be kept as the name of a program.
 pub fn is_valid_app_name(name: &str) -> bool {
     !name.trim().is_empty()
@@ -154,6 +176,23 @@ mod tests {
         assert!(!is_valid_app_id("note\0pad"));
         assert!(!is_valid_app_id(&"a".repeat(MAX_APP_ID_CHARS + 1)));
         assert!(is_valid_app_id(&"a".repeat(MAX_APP_ID_CHARS)));
+    }
+
+    #[test]
+    fn only_a_program_or_a_shortcut_on_a_drive_can_be_dropped_on_the_dock() {
+        assert!(is_pinnable_path(r"C:\Tools\Tool.exe"));
+        assert!(is_pinnable_path(r"d:\apps\Tool.EXE"));
+        assert!(is_pinnable_path(r"C:\Users\Me\Desktop\Tool.lnk"));
+        assert!(!is_pinnable_path(r"C:\Tools\notes.txt"));
+        assert!(!is_pinnable_path(r"C:\Tools\script.bat"));
+        assert!(!is_pinnable_path(r"C:\Tools\Tool.exe.txt"));
+        assert!(!is_pinnable_path(r"C:\Tools"));
+        assert!(!is_pinnable_path(r"\\server\share\Tool.exe"));
+        assert!(!is_pinnable_path(r"Tools\Tool.exe"));
+        assert!(!is_pinnable_path(r"C:\Tools\..\Windows\Tool.exe"));
+        assert!(!is_pinnable_path("C:\\Tools\\Tool\n.exe"));
+        assert!(!is_pinnable_path(""));
+        assert!(!is_pinnable_path("exe"));
     }
 
     #[test]
