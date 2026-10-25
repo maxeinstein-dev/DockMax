@@ -152,6 +152,7 @@ Ordem sugerida: A → B → D → C → E → F → G. A fase D vem cedo porque 
 
 ## 7. Pendências para o autor
 
-- Capturas que ainda faltam: ver a lista pedida ao autor em 2026-10-22 (seletor de indicador, painel da bandeja, menu de um app, configurações dos widgets de relógio, clima, água e IA, e o Dock nos outros temas).
+- Capturas: feitas em 2026-10-25 e descritas em [`docs/reference/primodock/interface.md`](../reference/primodock/interface.md) (menus, bandeja, todas as abas de configuração, os temas e as quatro bordas no dock). Faltam só a animação de abertura num app de verdade, o mascote comendo e o tour.
+- **Prioridade (autor, 2026-10-25):** os temas sazonais e o tema Canarinho ficam de fora por enquanto. O Canarinho já existe no DockMax desde a fase A1 e continua lá, sem mais trabalho; os sazonais saem da fase G até segunda ordem.
 - Confirmar a ordem das fases e se o spike da barra de aplicativos vem primeiro.
 - Feito em 2026-10-22: `PRODUCT.md`, ADR 0009 (substitui a convivência do ADR 0004) e licença de uso pessoal. Falta atualizar o roadmap quando a ordem das fases for aprovada.
