@@ -10,6 +10,8 @@
 - **REA** (`rea-agents` 6.7.0, usado pelo CLI, sem registrar o MCP na configuração do Claude Code): o inspetor .NET recusa o executável porque o limite de memória dele é 128 MB. A extração de nomes por strings do binário só devolveu ruído e foi abandonada; o inventário abaixo vem da configuração e do log.
 - **Capturas de tela do autor** (11 imagens do painel de configurações): preencheram as listas fechadas (temas, formatos, efeitos, animações, posições, pets) que a configuração não mostra. Faltam ainda o seletor de indicador, o IconStudio, a Licença (fora de escopo), a bandeja e a lista completa de widgets (só "Mídia e tempo" apareceu).
 
+- **Referência detalhada** (2026-10-25): os dados observados (esquema das configurações, espaços de trabalho, os 31 tipos de widget, formato dos pacotes de ícones e catálogo da galeria, comportamentos lidos do registro de execução, processos e memória) ficam em [`docs/reference/primodock/`](../reference/primodock/README.md), sem código, ativos nem dados de licença.
+
 ## 2. Limites da réplica
 
 | Replicar | Não replicar |
