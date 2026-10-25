@@ -30,3 +30,6 @@ dist-ssr
 
 # Agent worktrees (temporary)
 .claude/worktrees/
+
+# Local captures of third-party apps (clean-room: descriptions go in docs, images stay out)
+.local/

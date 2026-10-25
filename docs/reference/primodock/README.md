@@ -10,6 +10,7 @@ Observações do PrimoDock 0.7.0-beta (Windows) guardadas aqui para o futuro, en
 | [pacotes-de-icones.md](pacotes-de-icones.md) | Formato do pacote de ícones (`pack.json`), as 11 categorias, o catálogo da galeria e os tons dos widgets |
 | [comportamentos.md](comportamentos.md) | O que o PrimoDock faz com a barra do Windows, a bandeja, os monitores e os apps em tela cheia, lido do registro de execução |
 | [instalacao.md](instalacao.md) | Como está instalado, de que é feito e quais as licenças de terceiros |
+| [interface.md](interface.md) | A interface em uso: o dock, os menus, a bandeja, os espaços de trabalho e a janela de configurações, por capturas descritas (as imagens ficam fora do git) |
 
 ## Como foi levantado
 
@@ -23,6 +24,6 @@ O DockMax é uma reimplementação a partir do comportamento observado, com deci
 - **Não tem** dados pessoais: caminhos, nomes de apps e de espaços de trabalho do autor viraram exemplos genéricos.
 - **Tem** nomes de campos e valores de configuração, formatos de arquivo, números medidos e a descrição de comportamentos. São fatos observáveis de um produto instalado, para guiar o desenho do DockMax, não uma cópia dele.
 
-## O que ainda falta e depende de olhar a interface
+## O que ainda falta
 
-Estes pontos não aparecem nos arquivos e pedem o PrimoDock aberto, com capturas de tela e uso do mouse (a combinar antes com o autor): o aspecto exato de cada tema no dock, as animações (pulo, pulso, tremor, ampliação), o mascote, o menu de cada item, a prévia de janela, a janela de configurações e o tour. As capturas de 2026-10-22 e 2026-10-23 já cobrem parte (spec 0004 §3.7a e §3.7b).
+A interface em uso está em [interface.md](interface.md). Ainda sem registro, porque pede trocar a configuração do PrimoDock e olhar o dock real: cada um dos nove temas e dos seis sazonais **no próprio dock** (hoje só as miniaturas da aba Aparência), o dock no topo e nas laterais, a animação de abertura num app de verdade, o mascote comendo e o tour.
