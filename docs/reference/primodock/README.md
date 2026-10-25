@@ -26,4 +26,4 @@ O DockMax é uma reimplementação a partir do comportamento observado, com deci
 
 ## O que ainda falta
 
-A interface em uso está em [interface.md](interface.md). Ainda sem registro, porque pede trocar a configuração do PrimoDock e olhar o dock real: cada um dos nove temas e dos seis sazonais **no próprio dock** (hoje só as miniaturas da aba Aparência), o dock no topo e nas laterais, a animação de abertura num app de verdade, o mascote comendo e o tour.
+A interface em uso está em [interface.md](interface.md), incluindo os 15 temas e as quatro bordas no próprio dock. Ainda sem registro: a animação de abertura num app de verdade (Pulo, Pulso, Tremor), o mascote comendo depois de "Colocar comida" e o tour.

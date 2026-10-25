@@ -17,6 +17,45 @@ Da esquerda para a direita:
 
 Ícones de 52 px; a janela do dock tem 1189 × 175 px (bem maior que a barra, para caber a ampliação e o rótulo), e a faixa reservada é de uns 71 px.
 
+## Os temas no próprio dock
+
+Vistos numa gravação do autor trocando de tema na aba Aparência, com o mesmo dock (Iniciar, cinco apps, dois widgets, três apps abertos, bandeja e relógio). Em todos, os ícones, os widgets, as bolinhas e o mascote ficam iguais: o tema muda só o que está **atrás** e **em volta** deles.
+
+| Tema | Barra |
+|---|---|
+| Flutuante | sem barra: os ícones soltos sobre o papel de parede |
+| Nativo | retângulo cinza-escuro translúcido, borda clara fina, cantos médios (uns 12 px) |
+| Liquid Glass | pílula (cantos inteiros) de vidro escuro translúcido, com borda branca mais forte e um brilho interno no topo |
+| Meia-noite | retângulo quase preto, borda branca fina, cantos pequenos |
+| Rocket | azul-marinho escuro, borda e brilho externo azuis, cantos médios |
+| Prateleira Aqua | sem barra: uma **prateleira prateada em perspectiva** (um trapézio mais largo embaixo) onde os ícones se apoiam; o relógio fica por cima dela |
+| Neon | pílula preta com a borda em **degradê ciano para magenta** e brilho das duas cores |
+| Canarinho | pílula em degradê amarelo para verde |
+| Papel | pílula **branca opaca**; o relógio e os ícones da bandeja passam a escuros, e as bolinhas ficam em tons pastel |
+| Halloween | roxo-escuro com borda laranja, **abóboras** enfileiradas na borda de cima e **teias de aranha** nos dois cantos |
+| Noite Assombrada | preto com uma borda **verde-neon escorrendo** (gosma) e **fantasminhas** flutuando acima |
+| Candy Corn | creme com a borda pontilhada de doces coloridos e doces e abóboras por cima |
+| Natal | verde-escuro, **capa de neve** na borda de cima, um **cordão de luzes coloridas** acima e flocos caindo |
+| Noite de neve | azul-marinho com capa de neve, luzes brancas e flocos |
+| Candy Cane | branco com a borda **listrada em vermelho e branco** (bengala de doce), luzes e neve |
+
+- Os sazonais têm **enfeites que se mexem** (flocos caindo, luzes piscando, fantasmas flutuando); a opção "Economia de bateria" da aba Geral os para.
+- Em "Personalizar este tema", os sazonais trocam as opções de borda por **"Top color"** (a cor de cima, com uma paleta de cores; o rótulo aparece em inglês mesmo com a interface em português).
+- Trocar de tema recria o dock: ele some e volta em menos de um segundo.
+
+## As quatro bordas
+
+Vistas na mesma gravação, trocando a posição com o dock carregado:
+
+- **No topo**: a mesma ordem, da esquerda para a direita; o indicador de app aberto passa para **cima** do ícone (do lado da borda da tela) e a seta da bandeja aponta para baixo (∨).
+- **Esquerda**: o dock vira uma **coluna**. De cima para baixo: as bolinhas de espaço de trabalho (agora **em linha**), separador, Iniciar e os apps, os widgets **girados 90°** (o texto e o gráfico na vertical), os apps abertos, e no pé a bandeja em duas colunas, a seta apontando para a direita (›) e o relógio com a data em duas linhas pequenas. O indicador fica do lado esquerdo do ícone.
+- **Direita**: o **espelho girado** da esquerda, e não só refletido: o relógio e a bandeja ficam **no topo** e o Iniciar e as bolinhas no **pé**, com a seta apontando para a esquerda (‹). O indicador fica do lado direito.
+- Em todas, a faixa reservada (barra de aplicativos) empurra a área de trabalho: os ícones da área de trabalho do Windows se rearrumam para longe do dock.
+
+## Ocultar automaticamente
+
+Com "Ocultar automaticamente" ligado (pelo menu do dock), o dock **some esmaecendo** (a opacidade cai até zero, sem deslizar) quando o ponteiro sai dele, e **volta esmaecendo** quando o ponteiro chega à borda da tela, depois do atraso de revelação (0,5 s).
+
 ## Ao passar o mouse
 
 - **Rótulo**: uma pílula escura pequena aparece acima do item com o nome: o do app fixado ("FileZilla", "WhatsApp", "Terminal", "Google Chrome"), o do widget ("Atividade do sistema", "Atividade de rede"), o nome do executável para um app aberto não fixado ("Code.exe") e "Ícones de outros apps" sobre a seta da bandeja.
