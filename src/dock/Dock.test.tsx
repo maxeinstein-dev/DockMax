@@ -1,11 +1,14 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LOOK, type Settings } from "../core/settings";
+import { dockSize } from "../core/appearance";
 import { forgetIcons, type AppsSnapshot } from "../core/apps";
 import type { WidgetInstance, WidgetsSnapshot } from "../core/widgets";
 import { WIDGET_FIXTURES } from "../core/widgets.fixtures";
 import { ptBR } from "../i18n/pt-BR";
 import Dock from "./Dock";
+import { placeDock } from "./layout";
+import { hoverConfigOf } from "./magnification";
 
 type Handler = (event: { payload: unknown }) => void;
 
@@ -1227,6 +1230,202 @@ describe("Dock", () => {
       unmount();
 
       expect(vi.getTimerCount()).toBe(0);
+    });
+
+    describe("dragging to reorder", () => {
+      const THIRD = {
+        id: "0199a4c0-0000-7000-8000-000000000003",
+        appId: "Third!App",
+        name: "Terceiro",
+      };
+
+      /** Where the programs rest, as the dock lays them out. */
+      const rest = (count: number) =>
+        placeDock({
+          size: dockSize(MEDIUM.dock.iconSize),
+          groups: [count, 2],
+          hover: hoverConfigOf(MEDIUM.dock),
+          status: false,
+          edge: "bottom",
+          magnified: null,
+          viewport: {
+            width: MEDIUM_WINDOW.width,
+            height: MEDIUM_WINDOW.height,
+          },
+        }).items;
+      const centerOf = (index: number, count = 3) => {
+        const item = rest(count)[index];
+        return (item?.x ?? 0) + (item?.width ?? 0) / 2;
+      };
+      const placeCalls = () =>
+        invoke.mock.calls.filter(([command]) => command === "place_app");
+
+      const press = (name: string, x: number) =>
+        fireEvent.pointerDown(program(name), {
+          pointerId: 1,
+          button: 0,
+          clientX: x,
+        });
+      const move = (name: string, x: number) =>
+        fireEvent.pointerMove(program(name), { pointerId: 1, clientX: x });
+      const release = (name: string, x: number) =>
+        fireEvent.pointerUp(program(name), { pointerId: 1, clientX: x });
+
+      beforeEach(() => {
+        pinned = withApps(CALCULATOR, NOTEPAD, THIRD);
+      });
+
+      it("puts the program where it is let go, among the pinned ones", async () => {
+        await renderDock();
+
+        press("Calculadora", centerOf(0));
+        move("Calculadora", centerOf(1));
+        move("Calculadora", centerOf(2) + 3);
+        release("Calculadora", centerOf(2) + 3);
+
+        expect(placeCalls()).toEqual([
+          ["place_app", { id: CALCULATOR.id, index: 2 }],
+        ]);
+      });
+
+      it("moves a program to the start as well", async () => {
+        await renderDock();
+
+        press("Terceiro", centerOf(2));
+        move("Terceiro", centerOf(0) - 5);
+        release("Terceiro", centerOf(0) - 5);
+
+        expect(placeCalls()).toEqual([
+          ["place_app", { id: THIRD.id, index: 0 }],
+        ]);
+      });
+
+      it("does nothing when it is let go where it was", async () => {
+        await renderDock();
+
+        press("Bloco de notas", centerOf(1));
+        move("Bloco de notas", centerOf(1) + 8);
+        release("Bloco de notas", centerOf(1) + 8);
+
+        expect(placeCalls()).toHaveLength(0);
+      });
+
+      it("shows the item following the pointer and a mark where it would land", async () => {
+        await renderDock();
+        press("Calculadora", centerOf(0));
+
+        move("Calculadora", centerOf(1) + 3);
+
+        expect(program("Calculadora")).toHaveAttribute("data-dragging");
+        expect(program("Calculadora").style.getPropertyValue("--drag-x")).toBe(
+          `${centerOf(1) + 3 - centerOf(0)}px`,
+        );
+        // Over the second: it would go after it, before the third.
+        expect(program("Terceiro")).toHaveAttribute("data-drop", "before");
+        expect(program("Bloco de notas")).not.toHaveAttribute("data-drop");
+
+        release("Calculadora", centerOf(1) + 3);
+        expect(program("Calculadora")).not.toHaveAttribute("data-dragging");
+        expect(program("Terceiro")).not.toHaveAttribute("data-drop");
+      });
+
+      it("marks the end of the bar after the last program", async () => {
+        await renderDock();
+        press("Calculadora", centerOf(0));
+
+        move("Calculadora", centerOf(2) + 10);
+
+        expect(program("Terceiro")).toHaveAttribute("data-drop", "after");
+      });
+
+      it("is a click while the pointer stays within a few pixels", async () => {
+        await renderDock();
+
+        press("Calculadora", centerOf(0));
+        move("Calculadora", centerOf(0) + 3);
+        release("Calculadora", centerOf(0) + 3);
+        fireEvent.click(program("Calculadora"));
+
+        expect(placeCalls()).toHaveLength(0);
+        expect(invoke).toHaveBeenCalledWith("launch_app", {
+          id: CALCULATOR.id,
+        });
+      });
+
+      it("does not open the program the drag ended on", async () => {
+        await renderDock();
+
+        press("Calculadora", centerOf(0));
+        move("Calculadora", centerOf(2));
+        release("Calculadora", centerOf(2));
+        fireEvent.click(program("Calculadora"));
+
+        expect(invoke).not.toHaveBeenCalledWith(
+          "launch_app",
+          expect.anything(),
+        );
+      });
+
+      it("is called off with Esc, and nothing moves", async () => {
+        await renderDock();
+        press("Calculadora", centerOf(0));
+        move("Calculadora", centerOf(2));
+
+        fireEvent.keyDown(program("Calculadora"), { key: "Escape" });
+        release("Calculadora", centerOf(2));
+
+        expect(placeCalls()).toHaveLength(0);
+        expect(program("Calculadora")).not.toHaveAttribute("data-dragging");
+      });
+
+      it("is called off when the pointer leaves the dock for good", async () => {
+        await renderDock();
+        press("Calculadora", centerOf(0));
+        move("Calculadora", centerOf(2));
+        expect(program("Calculadora")).toHaveAttribute("data-dragging");
+
+        emit("dock-released", null);
+        release("Calculadora", centerOf(2));
+
+        expect(program("Calculadora")).not.toHaveAttribute("data-dragging");
+        expect(placeCalls()).toHaveLength(0);
+      });
+
+      it("is only for the programs: the other items do not drag", async () => {
+        await renderDock();
+
+        press(text.items.settings, centerOf(0));
+        move(text.items.settings, centerOf(2));
+        release(text.items.settings, centerOf(2));
+
+        expect(settings()).not.toHaveAttribute("data-dragging");
+        expect(placeCalls()).toHaveLength(0);
+      });
+
+      it("only starts with the main button", async () => {
+        await renderDock();
+
+        fireEvent.pointerDown(program("Calculadora"), {
+          pointerId: 1,
+          button: 2,
+          clientX: centerOf(0),
+        });
+        move("Calculadora", centerOf(2));
+
+        expect(program("Calculadora")).not.toHaveAttribute("data-dragging");
+      });
+
+      it("shows no label and no magnification while it drags", async () => {
+        await renderDock();
+        fireEvent.pointerOver(program("Bloco de notas"));
+        expect(shownTip()).not.toBeNull();
+
+        press("Calculadora", centerOf(0));
+        move("Calculadora", centerOf(2));
+
+        expect(shownTip()).toBeNull();
+        expect(program("Bloco de notas")).not.toHaveAttribute("data-magnify");
+      });
     });
 
     it("opens it with Enter and Space, once per press", async () => {

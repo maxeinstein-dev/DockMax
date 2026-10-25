@@ -79,6 +79,38 @@
   outline: none;
 }
 
+/* Dragging a pinned program along the bar (spec 0006 B2): the item follows
+   the pointer (--drag-x), over the others, with no transition; a mark of the
+   accent stands where it would land. */
+.dock-item[data-dragging] {
+  z-index: 3;
+  transform: translateX(var(--drag-x, 0px));
+  transition: none;
+  cursor: grabbing;
+}
+
+.dock-item[data-dragging] .dock-tile {
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.35));
+}
+
+.dock-item[data-drop]::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.dock-item[data-drop="before"]::before {
+  left: -4px;
+}
+
+.dock-item[data-drop="after"]::before {
+  right: -4px;
+}
+
 /* Glazed tile: grows from the middle of its screen-side edge and moves
    --lift away from it. The drop shadow sits on this unmasked wrapper so it
    follows the superellipse of the glaze below. */

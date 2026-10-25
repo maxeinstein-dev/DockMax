@@ -14,6 +14,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
   launchApp,
+  placeApp,
   useAppIcon,
   useApps,
   type AppsSnapshot,
@@ -52,6 +53,7 @@ import { format, useT, type Messages } from "../i18n";
 import { widgetName } from "../widgets/names";
 import { MINUTE_MS, useNow } from "../widgets/now";
 import { definitionOf, isCreatableInstance } from "../widgets/registry";
+import { DRAG_THRESHOLD, dragOffset, dropIndex, dropMark } from "./drag";
 import Glyph from "./Glyph";
 import { clockText } from "./status";
 import {
@@ -273,6 +275,27 @@ const OPENING_MS = 1500;
 
 /** Opens the program; resolves when it was asked to, rejects when it could
  * not be. */
+/** A press on a pinned program that may become a drag. */
+interface Press {
+  key: string;
+  /** The program's index among the pinned ones. */
+  from: number;
+  id: PinnedApp["id"];
+  pointer: number;
+  startX: number;
+  /** The pointer went far enough: it is a drag, not a click. */
+  dragging: boolean;
+}
+
+/** What the drag shows: the dragged item, how far it is from where it rests
+ * and where it would land. */
+interface DragView {
+  key: string;
+  offset: number;
+  target: number;
+  from: number;
+}
+
 function openApp(app: PinnedApp): Promise<void> {
   return launchApp(app.id).catch((error: unknown) => {
     // `launchApp` logged anything unexpected; a code from Rust is the kind.
@@ -325,6 +348,10 @@ function Dock() {
   /** The programs whose icon is animating after a click, by item key. */
   const [opening, setOpening] = useState<ReadonlySet<string>>(new Set());
   const openingTimers = useRef(new Map<string, number>());
+  const press = useRef<Press | null>(null);
+  /** The click that ends a drag is not a click on the program. */
+  const dragged = useRef(false);
+  const [drag, setDrag] = useState<DragView | null>(null);
 
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const tips = useRef<(HTMLSpanElement | null)[]>([]);
@@ -362,7 +389,7 @@ function Dock() {
 
   // Frozen while a panel is open, off with reduced motion.
   const active = hovered ?? focused;
-  const magnified = motion && open === null ? active : null;
+  const magnified = motion && open === null && drag === null ? active : null;
   const placement = placeDock({ ...shape, edge, magnified, viewport });
   const windowSize = dockWindowSize({ ...shape, motion, labelWidths });
   const layoutKey = JSON.stringify(dockLayout(placement, windowSize));
@@ -384,7 +411,9 @@ function Dock() {
   });
 
   const tipIndex =
-    active !== null && !samePanel(entries[active]?.panelId ?? null, open)
+    drag === null &&
+    active !== null &&
+    !samePanel(entries[active]?.panelId ?? null, open)
       ? active
       : null;
   const tipTile = tipIndex === null ? undefined : placement.tiles[tipIndex];
@@ -433,7 +462,12 @@ function Dock() {
     const stops = [
       // Once released, the page may get no pointer events at all, so a
       // magnified item would stay stuck.
-      listen(DOCK_RELEASED_EVENT, () => setHovered(null)),
+      listen(DOCK_RELEASED_EVENT, () => {
+        setHovered(null);
+        // The pointer left the dock for good: the drag is over.
+        press.current = null;
+        setDrag(null);
+      }),
       listen<PanelChanged>(PANEL_CHANGED_EVENT, ({ payload }) => {
         openRef.current = payload.panelId;
         setOpen(payload.panelId);
@@ -512,9 +546,93 @@ function Dock() {
   };
 
   const onPointer = (event: PointerEvent<HTMLElement>) => {
+    if (press.current !== null) {
+      dragTo(event);
+      return;
+    }
     // The magnification is frozen while a panel is open.
     if (open !== null) return;
     setHovered(itemIndex(event.currentTarget, event.target));
+  };
+
+  /** The programs at rest: their centres along the bar, in order. */
+  const appCenters = () =>
+    restItemsRef.current
+      .slice(0, apps.length)
+      .map((rect) => rect.x + rect.width / 2);
+
+  /** A press on a pinned program: a drag if the pointer goes far enough. */
+  const onPress = (index: number, event: PointerEvent<HTMLButtonElement>) => {
+    const entry = entries[index];
+    if (!entry?.app || event.button !== 0 || open !== null) return;
+    press.current = {
+      key: entry.key,
+      from: index,
+      id: entry.app.id,
+      pointer: event.pointerId,
+      startX: event.clientX,
+      dragging: false,
+    };
+    dragged.current = false;
+    // The moves and the release come here even outside the item.
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const dragTo = (event: PointerEvent<HTMLElement>) => {
+    const current = press.current;
+    if (current === null || event.pointerId !== current.pointer) return;
+    if (
+      !current.dragging &&
+      Math.abs(event.clientX - current.startX) < DRAG_THRESHOLD
+    ) {
+      return;
+    }
+    current.dragging = true;
+    const rest = restItemsRef.current[current.from];
+    const bar = restItemsRef.current.slice(0, apps.length);
+    if (!rest || bar.length === 0) return;
+    const first = bar[0];
+    const last = bar[bar.length - 1];
+    if (!first || !last) return;
+    setHovered(null);
+    setDrag({
+      key: current.key,
+      from: current.from,
+      offset: dragOffset(
+        event.clientX,
+        current.startX,
+        rest.x,
+        rest.width,
+        first.x,
+        last.x + last.width,
+      ),
+      target: dropIndex(appCenters(), current.from, event.clientX),
+    });
+  };
+
+  /** Lets go: a drag puts the program where it was let go. */
+  const onRelease = (event: PointerEvent<HTMLElement>) => {
+    const current = press.current;
+    if (current === null || event.pointerId !== current.pointer) return;
+    press.current = null;
+    setDrag(null);
+    if (!current.dragging) return;
+    dragged.current = true;
+    // The click that follows is the drag's, not the program's.
+    window.setTimeout(() => {
+      dragged.current = false;
+    }, 100);
+    const target = dropIndex(appCenters(), current.from, event.clientX);
+    if (target !== current.from) {
+      placeApp(current.id, target).catch((error: unknown) => {
+        log.warn(`dock: placing a program failed: ${errorKind(error)}`);
+      });
+    }
+  };
+
+  const cancelDrag = () => {
+    press.current = null;
+    setDrag(null);
   };
 
   const moveFocus = (index: number) => {
@@ -523,6 +641,10 @@ function Dock() {
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === "Escape" && press.current !== null) {
+      cancelDrag();
+      return;
+    }
     const index = itemIndex(event.currentTarget, event.target);
     if (index === null) return;
     const last = entries.length - 1;
@@ -549,6 +671,13 @@ function Dock() {
     setFocused(focusVisible(event.currentTarget) ? index : null);
   };
 
+  /** Which side of the item the mark of the drop stands on, if it does. */
+  const dropSide = (index: number): string | undefined => {
+    if (drag === null) return undefined;
+    const mark = dropMark(apps.length, drag.from, drag.target);
+    return mark?.index === index ? mark.side : undefined;
+  };
+
   const item = (entry: DockEntry, index: number) => {
     const { scale, lift } = magnificationOf(index, magnified, hover);
     // The badge is aria-hidden: the name says it instead.
@@ -573,13 +702,23 @@ function Dock() {
         tabIndex={index === currentIndex ? 0 : -1}
         data-magnify={magnifyRole(index, magnified, hover.effect) ?? undefined}
         data-opening={opening.has(entry.key) ? "" : undefined}
+        data-dragging={drag?.key === entry.key ? "" : undefined}
+        data-drop={dropSide(index)}
         style={
           {
             "--s": String(scale),
             "--lift": `${lift}px`,
+            "--drag-x": drag?.key === entry.key ? `${drag.offset}px` : "0px",
           } as CSSProperties
         }
-        onClick={() => toggle(index)}
+        onPointerDown={(event) => onPress(index, event)}
+        onClick={() => {
+          if (dragged.current) {
+            dragged.current = false;
+            return;
+          }
+          toggle(index);
+        }}
         onContextMenu={(event) => openMenu(index, event)}
         onFocus={(event) => onFocus(index, event)}
         onBlur={() => setFocused(null)}
@@ -601,6 +740,8 @@ function Dock() {
         onPointerOver={onPointer}
         onPointerMove={onPointer}
         onPointerLeave={() => setHovered(null)}
+        onPointerUp={onRelease}
+        onPointerCancel={cancelDrag}
         onKeyDown={onKeyDown}
       >
         {groups.map((size, group) => {

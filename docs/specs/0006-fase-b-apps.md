@@ -167,3 +167,12 @@ Verificação em 2026-10-25, no app real, sem mouse e sem abrir programa (as for
 - Memória (privada, dock e filhos): 177 MB parado; 218 MB com quatro apps fixados e o catálogo lido, estável 40 s depois.
 
 Ainda do B2: arrastar para reordenar no dock e soltar um programa no dock para fixá-lo.
+
+## 9. B2 (parte 2): arrastar para reordenar e soltar para fixar
+
+- **Arrastar no dock:** pressionar um app fixado e mover o ponteiro por mais de 6 px vira arrasto (menos que isso continua sendo um clique). O item acompanha o ponteiro, limitado à faixa dos apps; uma marca na cor de destaque mostra onde ele cairia (antes de um app, ou depois do último); ao soltar, o dock pede `place_app(id, índice)` e o Rust grava a nova ordem. Soltar onde estava não faz nada; Esc, ou o ponteiro sair do dock (`dock-released`), cancela; o clique que fecha o arrasto não abre o app. Enquanto se arrasta não há rótulo nem ampliação. Só os apps fixados arrastam, e só com o botão principal. Por ponteiros (`pointerdown`, captura do ponteiro, `pointerup`) e não pelo arrastar do HTML5, que a janela desliga para entregar os arquivos soltos ao Rust.
+- **`place_app`:** o dock passa a poder pedir uma escrita, a única: ordena o que já está fixado (id validado, índice além do fim vale o fim). A capacidade `allow-place-app` do dock está pinada no guarda.
+- **Soltar um programa no dock:** um `.exe` ou um `.lnk` num disco (`C:\...`, sem UNC e sem `..`), solto na barra, é fixado ao fim dos apps. O Rust ouve o evento de soltar da própria janela do dock: a página não participa, então só o que o usuário soltou de verdade pode ser fixado, e nenhuma capacidade nova foi dada à página. Outros tipos de arquivo, arquivos que não existem e repetidos (sem diferenciar maiúsculas) são ignorados. O que a pasta Aplicativos não lista tem como id o próprio caminho: abre como o arquivo, o nome e o ícone vêm do arquivo (o ícone de um atalho é o do destino), "Mostrar no Explorador" funciona e a Jump List usa o caminho como AppID.
+- **Ficou de fora:** soltar pastas e arquivos comuns (a spec 0004 os trata à parte, em "Pastas e arquivos"), e escolher onde soltar (hoje vai ao fim).
+
+Verificação: testes de unidade (a lógica pura do arrasto, o dock com ponteiros simulados, o repositório, o filtro dos caminhos soltos). **Ainda não verificado no app real:** arrastar com o mouse e soltar um arquivo da área de trabalho no dock, que dependem de usar o dock e o mouse de verdade.
