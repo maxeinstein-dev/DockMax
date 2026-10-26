@@ -87,6 +87,11 @@ static CATALOG_BY_FILE: Mutex<Option<Vec<(String, String, String)>>> = Mutex::ne
 /// changed).
 static DIRTY: AtomicBool = AtomicBool::new(false);
 
+/// A window moved, changed size, showed or hid: whether a monitor is in full
+/// screen is checked again (spec 0010 D4). Cheap, and apart from `DIRTY`,
+/// which a move alone does not set.
+static GEOMETRY_DIRTY: AtomicBool = AtomicBool::new(true);
+
 /// When the last event came, in milliseconds since `START`.
 static LAST_EVENT: AtomicU64 = AtomicU64::new(0);
 
@@ -461,10 +466,10 @@ mod imp {
     use ::windows::Win32::UI::WindowsAndMessaging::MsgWaitForMultipleObjects;
     use ::windows::Win32::UI::WindowsAndMessaging::{
         DispatchMessageW, EVENT_OBJECT_CLOAKED, EVENT_OBJECT_CREATE, EVENT_OBJECT_HIDE,
-        EVENT_OBJECT_UNCLOAKED, EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_MINIMIZEEND,
-        EVENT_SYSTEM_MINIMIZESTART, GA_PARENT, GetAncestor, GetDesktopWindow, MSG, OBJID_WINDOW,
-        PM_REMOVE, PeekMessageW, PostThreadMessageW, QS_ALLINPUT, TranslateMessage,
-        WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP,
+        EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_UNCLOAKED, EVENT_SYSTEM_FOREGROUND,
+        EVENT_SYSTEM_MINIMIZEEND, EVENT_SYSTEM_MINIMIZESTART, GA_PARENT, GetAncestor,
+        GetDesktopWindow, MSG, OBJID_WINDOW, PM_REMOVE, PeekMessageW, PostThreadMessageW,
+        QS_ALLINPUT, TranslateMessage, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP,
     };
 
     use super::*;
@@ -474,7 +479,7 @@ mod imp {
 
     unsafe extern "system" fn on_event(
         _hook: HWINEVENTHOOK,
-        _event: u32,
+        event: u32,
         hwnd: HWND,
         object: i32,
         child: i32,
@@ -490,7 +495,11 @@ mod imp {
         if !top_level {
             return;
         }
-        DIRTY.store(true, Ordering::SeqCst);
+        GEOMETRY_DIRTY.store(true, Ordering::SeqCst);
+        // A move or a resize changes no program's windows.
+        if event != EVENT_OBJECT_LOCATIONCHANGE {
+            DIRTY.store(true, Ordering::SeqCst);
+        }
         LAST_EVENT.store(now_ms(), Ordering::SeqCst);
     }
 
@@ -522,6 +531,8 @@ mod imp {
             hook(EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND),
             hook(EVENT_OBJECT_CREATE, EVENT_OBJECT_HIDE),
             hook(EVENT_OBJECT_CLOAKED, EVENT_OBJECT_UNCLOAKED),
+            // A video entering or leaving full screen is a resize.
+            hook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE),
         ];
         // CREATE..HIDE also takes DESTROY and SHOW, which lie between. The
         // hooks live as long as the program does.
@@ -532,7 +543,7 @@ mod imp {
         DIRTY.store(true, Ordering::SeqCst);
         LAST_EVENT.store(now_ms().saturating_sub(QUIET_MS), Ordering::SeqCst);
         loop {
-            let wait = if DIRTY.load(Ordering::SeqCst) {
+            let wait = if DIRTY.load(Ordering::SeqCst) || GEOMETRY_DIRTY.load(Ordering::SeqCst) {
                 let due = LAST_EVENT.load(Ordering::SeqCst) + QUIET_MS;
                 due.saturating_sub(now_ms()).max(1) as u32
             } else {
@@ -552,6 +563,9 @@ mod imp {
                 }
             }
             let quiet = now_ms().saturating_sub(LAST_EVENT.load(Ordering::SeqCst)) >= QUIET_MS;
+            if quiet && GEOMETRY_DIRTY.swap(false, Ordering::SeqCst) {
+                crate::windows::fullscreen::check(app);
+            }
             if DIRTY.load(Ordering::SeqCst) && quiet {
                 DIRTY.store(false, Ordering::SeqCst);
                 look(app);

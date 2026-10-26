@@ -396,6 +396,38 @@ pub fn settings_changed(app: &AppHandle, before: &DockSettings, after: &DockSett
     }
 }
 
+/// The dock is hidden because a program is in full screen on its monitor
+/// (spec 0010 D4): it comes back when that ends. A dock the user hid stays
+/// hidden.
+static HIDDEN_FOR_FULLSCREEN: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// Hides the dock while a program is in full screen on its monitor, and shows
+/// it again after, unless the user hid it meanwhile.
+pub fn set_fullscreen(app: &AppHandle, full: bool) {
+    use std::sync::atomic::Ordering;
+    let Some(window) = app.get_webview_window(LABEL) else {
+        return;
+    };
+    let result = if full {
+        if !window.is_visible().unwrap_or(false) {
+            return;
+        }
+        HIDDEN_FOR_FULLSCREEN.store(true, Ordering::SeqCst);
+        log::info!("dock: a program is in full screen, stepping aside");
+        hide(app)
+    } else {
+        if !HIDDEN_FOR_FULLSCREEN.swap(false, Ordering::SeqCst) {
+            return;
+        }
+        log::info!("dock: full screen is over, back");
+        show(&window)
+    };
+    if let Err(error) = result {
+        log::warn!("dock: could not follow the full screen: {error}");
+    }
+}
+
 /// Whether the dock window is on screen. `false` when it can't be told.
 pub fn is_visible(app: &AppHandle) -> bool {
     app.get_webview_window(LABEL)
@@ -408,6 +440,7 @@ pub fn toggle(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let window = app
         .get_webview_window(LABEL)
         .ok_or("dock window is missing")?;
+    HIDDEN_FOR_FULLSCREEN.store(false, std::sync::atomic::Ordering::SeqCst);
     if window.is_visible()? {
         hide(app)
     } else {

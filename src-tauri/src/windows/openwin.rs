@@ -45,6 +45,13 @@ mod imp {
     use ::windows::core::{BOOL, PWSTR};
 
     use super::OpenWindow;
+    use crate::domain::fullscreen::{Bounds, Candidate};
+    use ::windows::Win32::Foundation::{POINT, RECT};
+    use ::windows::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY, MONITORINFO,
+        MonitorFromPoint, MonitorFromWindow,
+    };
+    use ::windows::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetWindowRect};
 
     /// `System.AppUserModel.ID`.
     const PKEY_APP_USER_MODEL_ID: PROPERTYKEY = PROPERTYKEY {
@@ -167,6 +174,85 @@ mod imp {
         true.into()
     }
 
+    /// The shell's own windows, which cover a monitor without being a
+    /// program in full screen: the desktop and the taskbars.
+    const SHELL_CLASSES: [&str; 4] = [
+        "Progman",
+        "WorkerW",
+        "Shell_TrayWnd",
+        "Shell_SecondaryTrayWnd",
+    ];
+
+    fn class_of(hwnd: HWND) -> String {
+        let mut buffer = [0u16; 64];
+        let read = unsafe { GetClassNameW(hwnd, &mut buffer) };
+        String::from_utf16_lossy(&buffer[..read.max(0) as usize])
+    }
+
+    unsafe extern "system" fn collect_candidate(hwnd: HWND, state: LPARAM) -> BOOL {
+        let found = unsafe { &mut *(state.0 as *mut Vec<Candidate>) };
+        if !has_button(hwnd) || unsafe { IsIconic(hwnd) }.as_bool() {
+            return true.into();
+        }
+        let mut pid = 0u32;
+        unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+        if pid == unsafe { GetCurrentProcessId() } {
+            return true.into();
+        }
+        if SHELL_CLASSES.contains(&class_of(hwnd).as_str()) {
+            return true.into();
+        }
+        let mut rect = RECT::default();
+        if unsafe { GetWindowRect(hwnd, &mut rect) }.is_err() {
+            return true.into();
+        }
+        let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+        found.push(Candidate {
+            monitor: monitor.0 as isize,
+            bounds: Bounds {
+                left: rect.left,
+                top: rect.top,
+                right: rect.right,
+                bottom: rect.bottom,
+            },
+        });
+        true.into()
+    }
+
+    /// The windows that could be in full screen, top first.
+    pub fn candidates() -> Vec<Candidate> {
+        let mut found: Vec<Candidate> = Vec::new();
+        let _ = unsafe {
+            EnumWindows(
+                Some(collect_candidate),
+                LPARAM(&mut found as *mut Vec<Candidate> as isize),
+            )
+        };
+        found
+    }
+
+    /// The primary monitor's handle and rectangle.
+    pub fn primary_monitor() -> Option<(isize, Bounds)> {
+        let monitor = unsafe { MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY) };
+        let mut info = MONITORINFO {
+            cbSize: size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if !unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
+            return None;
+        }
+        let rect = info.rcMonitor;
+        Some((
+            monitor.0 as isize,
+            Bounds {
+                left: rect.left,
+                top: rect.top,
+                right: rect.right,
+                bottom: rect.bottom,
+            },
+        ))
+    }
+
     /// The window the user is working in: the one in front, or, if that is
     /// a dialog, the window that owns it.
     pub fn foreground() -> Option<isize> {
@@ -250,6 +336,19 @@ pub fn close(hwnd: isize) {
     imp::close(hwnd);
 }
 
+/// The windows that could be a program in full screen (`domain::fullscreen`),
+/// top first.
+#[cfg(windows)]
+pub fn fullscreen_candidates() -> Vec<crate::domain::fullscreen::Candidate> {
+    imp::candidates()
+}
+
+/// The primary monitor's handle and rectangle.
+#[cfg(windows)]
+pub fn primary_monitor() -> Option<(isize, crate::domain::fullscreen::Bounds)> {
+    imp::primary_monitor()
+}
+
 /// Whether the window `hwnd` still exists.
 #[cfg(windows)]
 pub fn exists(hwnd: isize) -> bool {
@@ -314,6 +413,15 @@ mod tests {
                     how.join("\n    ")
                 }
             );
+        }
+    }
+
+    #[test]
+    #[ignore = "reads the windows of the machine"]
+    fn spike_lists_the_fullscreen_candidates() {
+        println!("primary: {:?}", primary_monitor());
+        for candidate in fullscreen_candidates().iter().take(8) {
+            println!("{candidate:?}");
         }
     }
 
