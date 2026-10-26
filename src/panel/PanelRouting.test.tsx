@@ -79,6 +79,7 @@ vi.mock("../widgets/registry", async (importOriginal) => {
 const SETTINGS: Settings = {
   version: 1,
   theme: "system",
+  launchAtLogin: false,
   dock: {
     edge: "bottom",
     iconSize: 48,

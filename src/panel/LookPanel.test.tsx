@@ -9,6 +9,7 @@ const text = ptBR.settings.look;
 const SETTINGS: Settings = {
   version: 1,
   theme: "dark",
+  launchAtLogin: false,
   dock: {
     edge: "bottom",
     iconSize: 48,

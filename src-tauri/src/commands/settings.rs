@@ -33,6 +33,7 @@ pub struct SettingsInput {
     version: u32,
     theme: Theme,
     dock: DockSettingsInput,
+    launch_at_login: bool,
 }
 
 /// The `dock` part of [`SettingsInput`], as strict.
@@ -65,10 +66,12 @@ impl From<SettingsInput> for Settings {
             version,
             theme,
             dock,
+            launch_at_login,
         } = input;
         Settings {
             version,
             theme,
+            launch_at_login,
             dock: DockSettings {
                 edge: dock.edge,
                 icon_size: dock.icon_size,
@@ -183,6 +186,31 @@ pub fn get_settings(state: State<'_, Mutex<SettingsState>>) -> Settings {
     lock(&state).settings.clone()
 }
 
+/// Puts the sign-in entry as the setting says. The build the end-to-end tests
+/// drive never touches the real `Run` key of whoever runs them. A failure is
+/// logged: the setting stays as the user chose it, and the next run of a
+/// release build writes the entry again (`sync_launch_at_login`).
+fn apply_launch_at_login(enabled: bool) {
+    if cfg!(feature = "e2e") {
+        return;
+    }
+    if let Err(error) = crate::windows::autostart::apply(enabled) {
+        log::warn!("settings: starting with Windows could not be changed: {error}");
+    }
+}
+
+/// At startup of a release build: a program that moved (an update, a new
+/// folder) is found at sign-in again. The debug builds of development never
+/// register themselves.
+pub fn sync_launch_at_login(app: &AppHandle) {
+    if cfg!(debug_assertions) {
+        return;
+    }
+    if current(app).launch_at_login {
+        apply_launch_at_login(true);
+    }
+}
+
 /// Called by the panel on every change, with the full settings (a partial or
 /// unknown payload is rejected by Tauri before this runs). Returns the
 /// settings now in use; on failure, the error code (no path, no value) and
@@ -197,9 +225,10 @@ pub fn update_settings(
     state: State<'_, Mutex<SettingsState>>,
     settings: SettingsInput,
 ) -> Result<Settings, SettingsCommandError> {
-    let (before, updated) = {
+    let (before, updated, launch_before) = {
         let mut state = lock(&state);
         let before = state.settings.dock.clone();
+        let launch_before = state.settings.launch_at_login;
         let updated = state
             .update(settings.into())
             .map_err(|error| {
@@ -207,7 +236,7 @@ pub fn update_settings(
                 SettingsCommandError::from(&error)
             })?
             .clone();
-        (before, updated)
+        (before, updated, launch_before)
     };
     // The lock is released before emitting and placing the dock, which
     // reads the settings.
@@ -215,6 +244,9 @@ pub fn update_settings(
         log::warn!("settings: saved, but failed to notify the windows: {error}");
     }
     dock::settings_changed(&app, &before, &updated.dock);
+    if updated.launch_at_login != launch_before {
+        apply_launch_at_login(updated.launch_at_login);
+    }
     Ok(updated)
 }
 
@@ -329,7 +361,7 @@ mod tests {
 
     fn full() -> String {
         format!(
-            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}}}}"#
+            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}},"launchAtLogin":true}}"#
         )
     }
 
@@ -342,6 +374,7 @@ mod tests {
             Settings {
                 version: 1,
                 theme: Theme::Dark,
+                launch_at_login: true,
                 dock: DockSettings {
                     edge: DockEdge::Top,
                     icon_size: 64,

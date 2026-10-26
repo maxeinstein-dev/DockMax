@@ -167,6 +167,8 @@ export interface Settings {
   version: number;
   theme: Theme;
   dock: DockSettings;
+  /** Whether the DockMax opens when the user signs in to Windows. */
+  launchAtLogin: boolean;
 }
 
 /** Named icon sizes offered by the Settings panel; must match `SizePreset`

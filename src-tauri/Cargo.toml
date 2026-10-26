@@ -1,6 +1,6 @@
 [package]
 name = "dockmax"
-version = "0.2.0"
+version = "0.3.0"
 description = "Windows desktop dock built with Tauri"
 authors = ["Maxsuel Einstein"]
 license-file = "../LICENSE"
@@ -67,6 +67,7 @@ windows = { version = "0.62.2", features = [
     "Win32_System_DataExchange",
     "Win32_System_LibraryLoader",
     "Win32_System_Ole",
+    "Win32_System_Registry",
     "Win32_System_SystemServices",
     "Win32_System_Threading",
     "Win32_UI_Accessibility",

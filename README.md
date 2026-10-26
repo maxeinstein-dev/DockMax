@@ -4,7 +4,11 @@
 
 Aplicativo desktop para Windows inspirado em docks personalizáveis, com foco em produtividade, widgets integrados e integração progressiva com o sistema operacional.
 
-> **Status:** em desenvolvimento rumo à paridade com o PrimoDock ([spec 0004](docs/specs/0004-paridade-primodock.md)). Já faz: dock no lugar da barra de tarefas do Windows (com restauração garantida), nove estilos de barra, apps fixados com o ícone real, relógio, bandeja do sistema, os widgets Relógio, Progresso do tempo e Nota, e dados locais em SQLite. O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O DockMax é um projeto independente e não é afiliado ao PrimoDock.
+> **Status:** versão 0.3.0, o **MVP**: um dock que ocupa o lugar da barra de tarefas do Windows (com restauração garantida), nove estilos de barra, apps fixados com o ícone real e o menu do programa, relógio, bandeja do sistema, os widgets Relógio, Progresso do tempo e Nota, início com o Windows e dados locais em SQLite. O que ainda não existe (apps abertos, prévias, espaços de trabalho, mais widgets, ícones personalizados) está em [limitações](docs/limitacoes.md) e no [escopo do MVP](docs/roadmap.md). O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O DockMax é um projeto independente e não é afiliado ao PrimoDock.
+
+## Instalar
+
+Gere o instalador (`pnpm tauri build`, ver abaixo) e execute `src-tauri/target/release/bundle/nsis/DockMax_0.3.0_x64-setup.exe`. Ele instala **só para o seu usuário** (sem pedir administrador) e é **em português**. O instalador **não é assinado**: o SmartScreen do Windows avisa, e é preciso escolher "Mais informações › Executar assim mesmo". Em Configurações, "Iniciar com o Windows" abre o DockMax ao entrar. Para desinstalar, use "Aplicativos instalados" do Windows; os seus dados ficam, a menos que você peça para apagá-los.
 
 ## Objetivos
 
@@ -16,7 +20,8 @@ Aplicativo desktop para Windows inspirado em docks personalizáveis, com foco em
 
 ## Documentos
 
-- [`roadmap.md`](docs/roadmap.md): etapas, entregas e critérios de aceitação.
+- [`roadmap.md`](docs/roadmap.md): etapas, entregas, escopo do MVP e critérios de aceitação.
+- [`limitacoes.md`](docs/limitacoes.md): o que o DockMax não faz hoje e o que pode surpreender.
 - [`architecture.md`](docs/architecture.md): arquitetura, componentes, dados e contratos.
 - [`adr/README.md`](docs/adr/README.md): registro de decisões arquiteturais.
 - [`adr/0001-stack-desktop.md`](docs/adr/0001-stack-desktop.md): stack.
@@ -67,7 +72,7 @@ As versões exatas de todas as dependências ficam travadas em `pnpm-lock.yaml` 
 ```bash
 pnpm install              # dependências do frontend
 pnpm tauri dev            # abre o app em modo desenvolvimento
-pnpm tauri build          # build de release com instalador
+pnpm tauri build          # build de release com o instalador NSIS
 pnpm tauri build --no-bundle  # só o executável, sem instalador
 ```
 
@@ -108,7 +113,7 @@ pnpm test:e2e             # roda os specs do WebdriverIO
 O DockMax abre um dock que **ocupa o lugar da barra de tarefas do Windows**: reserva a borda da tela, esconde a barra nativa (por padrão; dá para deixá-la visível ou automática em Configurações) e a devolve exatamente como estava ao encerrar, de qualquer jeito que o programa termine ([ADR 0009](docs/adr/0009-dock-substitui-a-barra-de-tarefas.md)):
 
 - ícones com ampliação, rótulo e ponto indicador; o clique atravessa a área transparente em volta do dock;
-- **apps fixados** ([spec 0006](docs/specs/0006-fase-b-apps.md)): escolha na lista de programas instalados (a mesma do menu Iniciar), com o ícone real; o clique abre o programa e o botão direito mostra o mesmo menu da barra do Windows (tarefas, recentes, Abrir, Remover); a ordem se muda em Configurações › Apps do dock;
+- **apps fixados** ([spec 0006](docs/specs/0006-fase-b-apps.md)): escolha na lista de programas instalados (a mesma do menu Iniciar) ou **solte um programa ou atalho no dock** para fixá-lo, com o ícone real; o clique abre o programa e o botão direito mostra o mesmo menu da barra do Windows (tarefas, recentes, Abrir, Remover); **arraste um app no dock** para mudar a ordem (ou use Configurações › Apps do dock);
 - nove **estilos de barra** (Nativo, Liquid Glass, Meia-noite, Rocket, Prateleira Aqua, Neon, Canarinho, Papel e Flutuante), efeito ao passar o mouse e indicador, em Configurações › Aparência do dock;
 - **relógio com data** no fim do dock e **bandeja do sistema** hospedada pelo DockMax: o botão direito num ícone abre o menu do próprio programa;
 - **widgets**, cada um um item do dock que abre o próprio painel:
@@ -116,7 +121,9 @@ O DockMax abre um dock que **ocupa o lugar da barra de tarefas do Windows**: res
   - **Progresso do tempo**: anel no ícone e painel com dia, semana, mês, ano e expediente;
   - **Nota**: texto com salvamento automático;
 - painel de **Configurações** (tema, posição, tamanho, opacidade e **Itens do dock**, onde se adiciona, reordena e remove widgets) e painel **Sobre**;
-- ícone na bandeja para mostrar ou ocultar o dock, abrir as Configurações e sair.
+- ícone na bandeja para mostrar ou ocultar o dock, abrir as Configurações e sair;
+- **Iniciar com o Windows** ([spec 0008](docs/specs/0008-fechamento-do-mvp.md)), desligado por padrão;
+- leitura de **pacotes de ícones** próprios da pasta `IconPacks` ([spec 0007](docs/specs/0007-fase-b4-icones.md)), como recurso avançado: há um pacote de exemplo em [`docs/examples/icon-packs`](docs/examples/icon-packs/).
 
 Onde ficam os seus dados (nada sai da máquina):
 
@@ -124,10 +131,11 @@ Onde ficam os seus dados (nada sai da máquina):
 |---|---|
 | Preferências | `%APPDATA%\dev.maxsueleinstein.dockmax\settings.json` |
 | Widgets e notas | `%APPDATA%\dev.maxsueleinstein.dockmax\dockmax.db` (SQLite) |
-| Cópias de segurança e recuperação | `dockmax.db.bak-v*` e `dockmax.db.corrompido-*`, na mesma pasta: o DockMax nunca apaga seu banco, só renomeia um banco danificado |
+| Cópias de segurança e recuperação | `dockmax.db.bak-v*` e `dockmax.db.corrompido-*`, na mesma pasta: o DockMax nunca apaga seu banco nem esses arquivos, só renomeia um banco danificado |
+| Pacotes de ícones (opcional) | `%APPDATA%\dev.maxsueleinstein.dockmax\IconPacks\<id>\` |
 | Logs, sem dados pessoais | `%LOCALAPPDATA%\dev.maxsueleinstein.dockmax\logs` |
 
-As próximas etapas seguem as fases da [spec 0004](docs/specs/0004-paridade-primodock.md) (menus dos apps, pacotes de ícones, espaços de trabalho, prévias e mais widgets); o [roadmap](docs/roadmap.md) ainda traz o plano anterior.
+Depois do MVP, as próximas etapas seguem as fases da [spec 0004](docs/specs/0004-paridade-primodock.md): apps abertos e prévias de janela, espaços de trabalho e mais widgets. A personalização de ícones (por app, imagem própria, pacote embutido) ficou para o futuro por decisão do autor.
 
 ## Licença
 

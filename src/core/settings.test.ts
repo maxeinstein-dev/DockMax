@@ -32,6 +32,7 @@ vi.mock("./log", async (importOriginal) => ({
 const DEFAULTS: Settings = {
   version: 1,
   theme: "system",
+  launchAtLogin: false,
   dock: {
     edge: "bottom",
     iconSize: 48,

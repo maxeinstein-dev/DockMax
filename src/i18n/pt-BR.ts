@@ -65,6 +65,9 @@ const messages = {
       opacity: "Opacidade do dock",
       taskbar: "Barra de tarefas do Windows",
     },
+    /** The switch that opens the DockMax when the user signs in. */
+    launchAtLogin: "Iniciar com o Windows",
+    launchAtLoginHint: "Abre o DockMax ao entrar no Windows",
     theme: {
       system: "Sistema",
       light: "Claro",

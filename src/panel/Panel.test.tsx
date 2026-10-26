@@ -10,6 +10,7 @@ const text = ptBR.panel;
 const SETTINGS: Settings = {
   version: 1,
   theme: "system",
+  launchAtLogin: false,
   dock: {
     edge: "bottom",
     iconSize: 48,

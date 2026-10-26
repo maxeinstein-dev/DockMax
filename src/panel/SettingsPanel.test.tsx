@@ -11,6 +11,7 @@ const text = ptBR.settings;
 const SETTINGS: Settings = {
   version: 1,
   theme: "dark",
+  launchAtLogin: false,
   dock: {
     edge: "bottom",
     iconSize: 48,
@@ -147,6 +148,28 @@ describe("SettingsPanel", () => {
 
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(invoke).toHaveBeenCalledWith("update_settings", { settings: sent });
+  });
+
+  it("turns starting with Windows on and off, saving the full settings", () => {
+    invoke.mockReturnValue(new Promise(() => {}));
+    const { rerender } = render(<SettingsPanel settings={SETTINGS} />);
+    const toggle = () =>
+      screen.getByRole("switch", { name: text.launchAtLogin });
+    expect(toggle()).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(toggle());
+
+    expect(invoke).toHaveBeenLastCalledWith("update_settings", {
+      settings: { ...SETTINGS, launchAtLogin: true },
+    });
+    expect(toggle()).toHaveAttribute("aria-checked", "true");
+
+    rerender(<SettingsPanel settings={{ ...SETTINGS, launchAtLogin: true }} />);
+    fireEvent.click(toggle());
+
+    expect(invoke).toHaveBeenLastCalledWith("update_settings", {
+      settings: { ...SETTINGS, launchAtLogin: false },
+    });
   });
 
   it("does nothing on choosing the option already chosen", () => {

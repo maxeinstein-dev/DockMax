@@ -13,6 +13,7 @@ import { format, useT, type Messages } from "../i18n";
 import OptionGroup, { type Option } from "./OptionGroup";
 import PanelFooter from "./PanelFooter";
 import NavRow from "./parts/NavRow";
+import ToggleField from "./parts/ToggleField";
 import { useSettingsEditor } from "./useSettingsEditor";
 
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
@@ -160,6 +161,13 @@ function SettingsPanel({
             dock: { ...s.dock, taskbar: value },
           }))
         }
+      />
+      <ToggleField
+        label={t.settings.launchAtLogin}
+        hint={t.settings.launchAtLoginHint}
+        checked={shown?.launchAtLogin ?? false}
+        disabled={shown === null}
+        onChange={(launchAtLogin) => change((s) => ({ ...s, launchAtLogin }))}
       />
       {onOpenLook ? (
         <NavRow

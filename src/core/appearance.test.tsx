@@ -40,6 +40,7 @@ vi.mock("@tauri-apps/api/event", () => ({ listen }));
 const DEFAULTS: Settings = {
   version: 1,
   theme: "system",
+  launchAtLogin: false,
   dock: {
     edge: "bottom",
     iconSize: 48,

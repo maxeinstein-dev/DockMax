@@ -46,6 +46,9 @@ pub struct Settings {
     pub version: u32,
     pub theme: Theme,
     pub dock: DockSettings,
+    /// Whether the DockMax opens when the user signs in to Windows (the entry
+    /// in the user's `Run` key). Off unless the user turns it on.
+    pub launch_at_login: bool,
 }
 
 impl Default for Settings {
@@ -54,6 +57,7 @@ impl Default for Settings {
             version: CURRENT_VERSION,
             theme: Theme::default(),
             dock: DockSettings::default(),
+            launch_at_login: false,
         }
     }
 }
@@ -492,7 +496,8 @@ mod tests {
                 "indicator": "dot", "indicatorColor": null,
                 "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
                 "taskbar": "hidden", "bottomSpace": 2
-              }
+              },
+              "launchAtLogin": false
             }"#,
         )
         .unwrap();
