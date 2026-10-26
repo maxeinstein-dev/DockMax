@@ -114,9 +114,7 @@ pub struct Tile {
     pub dragging: bool,
     /// The mark under it: its centre and opacity (0 for none).
     pub dot: Option<(f64, f32)>,
-    /// The mark of a drop beside it: the x of the line.
-    pub drop: Option<f64>,
-    /// The item's box (for the drop mark and the focus ring).
+    /// The item's box (for the focus ring).
     pub item: Area,
 }
 
@@ -1084,7 +1082,6 @@ impl Painter {
             attention: false,
             dragging: false,
             dot: None,
-            drop: None,
             item: tile.item,
         };
         self.tile(scene, &plain);
@@ -1481,24 +1478,6 @@ impl Painter {
                     &danger,
                 );
             }
-        }
-        if let Some(x) = tile.drop {
-            let accent = self.solid(scene.palette.accent).clone();
-            unsafe {
-                self.target.FillRoundedRectangle(
-                    &D2D1_ROUNDED_RECT {
-                        rect: rect(Area {
-                            x: x - 1.0,
-                            y: tile.item.y + 4.0,
-                            width: 2.0,
-                            height: tile.item.height - 8.0,
-                        }),
-                        radiusX: 1.0,
-                        radiusY: 1.0,
-                    },
-                    &accent,
-                )
-            };
         }
     }
 
