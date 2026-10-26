@@ -407,29 +407,39 @@ const ANCHOR_SIDE: i32 = 32;
 /// How long a click keeps the answer about where the icon is.
 const ANCHOR_LIFETIME: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// Where the last click was, for answering "where is this icon?" while its
-/// program opens a menu: Explorer, with its taskbar hidden, answers with the
-/// top right corner of the screen, so the menu opened there.
-static ANCHOR: Mutex<Option<(i32, i32, std::time::Instant)>> = Mutex::new(None);
+/// A rectangle on the screen: left, top, width, height, in physical pixels.
+pub type ScreenRect = (i32, i32, i32, i32);
 
-fn remember_click(x: i32, y: i32) {
+/// Where the icon last clicked is, for answering "where is this icon?" while
+/// its program opens a menu: Explorer, with its taskbar hidden, answers with
+/// the top right corner of the screen, so the menu opened there.
+static ANCHOR: Mutex<Option<(ScreenRect, std::time::Instant)>> = Mutex::new(None);
+
+/// The icon was clicked at `rect`: its own place on the dock, or a square
+/// `ANCHOR_SIDE` around the click (the tray panel's).
+fn remember_click(rect: ScreenRect) {
     *ANCHOR.lock().unwrap_or_else(PoisonError::into_inner) =
-        Some((x, y, std::time::Instant::now()));
+        Some((rect, std::time::Instant::now()));
 }
 
-/// The rectangle to give an icon: `ANCHOR_SIDE` square around the click, for
-/// `ANCHOR_LIFETIME` after it; `None` otherwise (Explorer's answer stands).
-fn anchored_rect(
-    anchor: Option<(i32, i32, std::time::Instant)>,
-    now: std::time::Instant,
-) -> Option<(i32, i32, i32, i32)> {
-    let (x, y, at) = anchor?;
-    (now.saturating_duration_since(at) <= ANCHOR_LIFETIME).then_some((
+/// The square `ANCHOR_SIDE` around the point.
+fn around(x: i32, y: i32) -> ScreenRect {
+    (
         x - ANCHOR_SIDE / 2,
         y - ANCHOR_SIDE / 2,
         ANCHOR_SIDE,
         ANCHOR_SIDE,
-    ))
+    )
+}
+
+/// The rectangle to give an icon: the one of the click, for
+/// `ANCHOR_LIFETIME` after it; `None` otherwise (Explorer's answer stands).
+fn anchored_rect(
+    anchor: Option<(ScreenRect, std::time::Instant)>,
+    now: std::time::Instant,
+) -> Option<ScreenRect> {
+    let (rect, at) = anchor?;
+    (now.saturating_duration_since(at) <= ANCHOR_LIFETIME).then_some(rect)
 }
 
 /// The answer to a question about an icon's rectangle, when the host knows
@@ -787,6 +797,13 @@ fn click_messages(icon: &Icon, button: Button, cursor: (i32, i32)) -> Vec<(WPARA
 /// Clicks the icon `key` the way the taskbar would: sends its program the
 /// messages it asked for, and lets it take the foreground (for its menu).
 pub fn click(key: &str, button: Button) -> Result<(), String> {
+    click_at(key, button, None)
+}
+
+/// `click`, for an icon at `place` on the screen (the dock's cell of it):
+/// asked where the icon is, the host answers with it, so the program opens
+/// its menu right at the icon.
+pub fn click_at(key: &str, button: Button, place: Option<ScreenRect>) -> Result<(), String> {
     let icon = icons()
         .into_iter()
         .find(|icon| icon.key == key)
@@ -800,7 +817,10 @@ pub fn click(key: &str, button: Button) -> Result<(), String> {
     let _ = unsafe { AllowSetForegroundWindow(process) };
     let mut cursor = POINT::default();
     let _ = unsafe { GetCursorPos(&mut cursor) };
-    remember_click(cursor.x, cursor.y);
+    remember_click(place.unwrap_or_else(|| around(cursor.x, cursor.y)));
+    // The program asks the first `Shell_TrayWnd` where its icon is: the
+    // host's, not the hidden taskbar's, which says the corner of the screen.
+    raise();
     for (wparam, lparam) in click_messages(&icon, button, (cursor.x, cursor.y)) {
         unsafe { PostMessageW(Some(target), icon.callback, wparam, lparam) }
             .map_err(|error| error.to_string())?;
@@ -823,7 +843,7 @@ pub fn send_events(key: &str, events: &[u32]) -> Result<(), String> {
     let _ = unsafe { AllowSetForegroundWindow(process) };
     let mut cursor = POINT::default();
     let _ = unsafe { GetCursorPos(&mut cursor) };
-    remember_click(cursor.x, cursor.y);
+    remember_click(around(cursor.x, cursor.y));
     let at = ((cursor.x as u32 & 0xFFFF) | ((cursor.y as u32 & 0xFFFF) << 16)) as usize;
     for &event in events {
         let (wparam, lparam) = if icon.version >= 4 {
@@ -1386,14 +1406,20 @@ mod tests {
         let now = std::time::Instant::now();
 
         assert_eq!(anchored_rect(None, now), None);
+        assert_eq!(around(100, 200), (84, 184, 32, 32));
         assert_eq!(
-            anchored_rect(Some((100, 200, now)), now),
+            anchored_rect(Some((around(100, 200), now)), now),
             Some((84, 184, 32, 32))
         );
+        // The dock's cell of the icon, as it is.
+        assert_eq!(
+            anchored_rect(Some(((990, 1040, 30, 30), now)), now),
+            Some((990, 1040, 30, 30))
+        );
         let late = now + ANCHOR_LIFETIME + std::time::Duration::from_millis(1);
-        assert_eq!(anchored_rect(Some((100, 200, now)), late), None);
+        assert_eq!(anchored_rect(Some((around(100, 200), now)), late), None);
         // A clock that went back is not a stale click.
-        assert!(anchored_rect(Some((1, 1, late)), now).is_some());
+        assert!(anchored_rect(Some((around(1, 1), late)), now).is_some());
     }
 
     #[test]

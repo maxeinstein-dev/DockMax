@@ -621,8 +621,17 @@ impl Dock {
                 } else {
                     super::tray_host::Button::Left
                 };
+                // Its cell on the screen: the program opens its menu there.
+                let place = self.strip_cells().get(index).map(|area| {
+                    (
+                        self.window.x + (area.x * self.scale).round() as i32,
+                        self.window.y + (area.y * self.scale).round() as i32,
+                        (area.width * self.scale).round() as i32,
+                        (area.height * self.scale).round() as i32,
+                    )
+                });
                 self.effects.push(Box::new(move |_| {
-                    if let Err(error) = super::tray_host::click(&icon.key, button) {
+                    if let Err(error) = super::tray_host::click_at(&icon.key, button, place) {
                         log::warn!("dock: a tray icon refused the click: {error}");
                     }
                 }));
