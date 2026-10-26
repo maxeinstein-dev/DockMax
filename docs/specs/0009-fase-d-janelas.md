@@ -44,6 +44,14 @@ Perguntas: dá para saber, com pouco custo, quais janelas o Windows daria um bot
 - **Botão do meio** (a roda), nos fixados e nestes: abre uma **nova instância** do programa, como a barra do Windows (um programa de instância única só traz a janela que já tem). É a configuração `dock.middleClick` ("Botão do meio", em Configurações): `newInstance` (padrão) ou `none`; mais ações (como "Fechar janela") entram com o menu do D3. Para um programa aberto que não está fixado, o dock envia `launch_open(key)` (a mesma chave opaca) e o Rust abre o programa pelo id que descreveu. A página impede o modo de rolagem do navegador no botão do meio.
 - **Indicador:** o mesmo ponto ou traço, sempre visível nesses itens (eles só existem enquanto estão abertos).
 
+## 3.2 D3 em detalhe: o menu dos programas abertos
+
+- **Programa aberto que não está fixado** (botão direito no item): um menu no painel, com **Nova instância**, **Fechar janela** (ou **Fechar todas as janelas**, se tem mais de uma) e **Fixar no dock**. O painel é `{ "open": "<chave>" }` (nova variante de `PanelId`, `Panel::Open` no Rust): o `toggle_panel` só o abre para uma chave de 16 dígitos hexadecimais que **está aberta agora**; se o programa fecha com o menu aberto, o painel fecha.
+- **Programa fixado que está aberto:** o menu que já existia (a Jump List, Abrir, Mostrar no Explorador, Remover do dock) ganha **Fechar janela / Fechar todas as janelas** enquanto ele tem janela.
+- **Fechar:** `WM_CLOSE` em cada janela do programa, como o botão de fechar de cada uma: o programa pode perguntar se quer salvar ou recusar. Nada é encerrado à força. Comandos `close_app(id do item fixado)` e `close_open(chave)`.
+- **Fixar:** `pin_open(chave)`. O id e o nome que se fixam são os que o Rust já tinha descrito ao mostrar o programa (a página só nomeia a chave opaca); depois de fixado, o item passa para os fixados.
+- **Capacidades:** os cinco comandos novos (`launch_open`, `close_app`, `close_open`, `pin_open` e a leitura `list_open_apps`) ficam na janela do painel, pinados no guarda; o dock só ganhou o que já tinha.
+
 ## 4. Testes
 
 - Rust: a regra de casamento (AppID sem diferenciar maiúsculas; executável contra alvo; programa sem alvo; dois programas com o mesmo executável); o resumo por programa (contagem, ativo); a escolha de a quem passar o foco (minimizar, próxima, mais acima).
@@ -73,3 +81,14 @@ No app real (build de debug, sem mouse), com Calculadora e Mapa de Caracteres ab
 - **memória e CPU** (release, nada fixado, cinco programas abertos mostrados no dock, 25 s depois de abrir): 201 MB privados (198 MB 30 s depois) e 0,04 % do total dos 16 processadores. A meta do roadmap é cerca de 220 MB e menos de 1 %; o D2 custa pouco, mas a margem continua pequena.
 - **Não verificado:** o clique de mouse real, vários monitores e áreas de trabalho virtuais (como no D1).
 - **botão do meio:** no Mapa de Caracteres aberto, o evento do botão do meio abriu uma segunda instância (1 → 2 processos); com "Botão do meio" em "Nada", não abriu outra (continuou 2). O botão físico do mouse não foi usado: o evento foi enviado à página.
+
+## 7. Verificado (D3)
+
+No app real (build de debug, sem mouse: os comandos pela janela do dock e do painel), com a Calculadora e o Mapa de Caracteres abertos pelo teste:
+
+- o menu do Mapa de Caracteres abre com "Nova instância", "Fechar janela" e "Fixar no dock"; uma chave inválida é recusada;
+- "Fechar janela" fecha o programa (1 → 0 processos) e o item sai do dock;
+- "Fixar no dock" na Calculadora a põe entre os fixados (com o indicador de aberto) e a tira dos abertos não fixados; chave inválida ou desconhecida é recusada (`notFound`);
+- o menu da Calculadora fixada traz "Fechar janela" junto da Jump List, e escolhê-lo a fecha.
+
+**Não verificado:** o clique do botão direito do mouse de verdade (o painel foi aberto pelo comando), o rótulo do menu com vários monitores e o comportamento de um programa que pergunta se quer salvar ao fechar.

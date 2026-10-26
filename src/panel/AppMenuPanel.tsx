@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { closeApp } from "../core/openApps";
+import { moveInMenu } from "./parts/menu";
 import {
   appMenu,
   isAppCommandError,
@@ -20,6 +22,9 @@ import "./AppMenuPanel.css";
  * dock. */
 export interface AppMenuPanelProps {
   app: PinnedApp;
+  /** How many windows the program has open (spec 0009 D3): with any, the menu
+   * offers to close them. */
+  openCount?: number;
   /** An entry or an action was done: the host closes the panel. */
   onDone: () => void;
 }
@@ -38,7 +43,7 @@ interface Read {
  * Choosing an entry runs it by its key (Rust remembers what each key runs);
  * the page never holds a path.
  */
-function AppMenuPanel({ app, onDone }: AppMenuPanelProps) {
+function AppMenuPanel({ app, openCount = 0, onDone }: AppMenuPanelProps) {
   const t = useT();
   const text = t.apps.menu;
   const headings = useId();
@@ -81,27 +86,8 @@ function AppMenuPanel({ app, onDone }: AppMenuPanelProps) {
     action.then(onDone, fail);
   }
 
-  const items = () =>
-    Array.from(
-      root.current?.querySelectorAll<HTMLButtonElement>(
-        'button[role="menuitem"]:not(:disabled)',
-      ) ?? [],
-    );
-
-  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    const buttons = items();
-    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const target = {
-      ArrowDown: buttons[Math.min(at + 1, buttons.length - 1)],
-      ArrowUp: buttons[Math.max(at - 1, 0)],
-      Home: buttons[0],
-      End: buttons[buttons.length - 1],
-    }[event.key];
-    if (target) {
-      event.preventDefault();
-      target.focus();
-    }
-  };
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) =>
+    moveInMenu(root.current, event);
 
   const sections = menu !== null && menu !== "failed" ? menu.sections : [];
   const canReveal = menu !== null && menu !== "failed" && menu.canReveal;
@@ -169,6 +155,16 @@ function AppMenuPanel({ app, onDone }: AppMenuPanelProps) {
               onClick={() => done(revealApp(app.id))}
             >
               {text.reveal}
+            </button>
+          ) : null}
+          {openCount > 0 ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="app-menu-item"
+              onClick={() => done(closeApp(app.id))}
+            >
+              {openCount > 1 ? text.closeWindows : text.closeWindow}
             </button>
           ) : null}
           <button

@@ -24,7 +24,7 @@ mod imp {
     use std::path::PathBuf;
 
     use ::windows::Win32::Foundation::{
-        CloseHandle, ERROR_SUCCESS, HWND, LPARAM, MAX_PATH, PROPERTYKEY,
+        CloseHandle, ERROR_SUCCESS, HWND, LPARAM, MAX_PATH, PROPERTYKEY, WPARAM,
     };
     use ::windows::Win32::Graphics::Dwm::{DWMWA_CLOAKED, DwmGetWindowAttribute};
     use ::windows::Win32::Storage::Packaging::Appx::GetApplicationUserModelId;
@@ -38,8 +38,9 @@ mod imp {
     use ::windows::Win32::UI::WindowsAndMessaging::{
         BringWindowToTop, EnumWindows, GA_ROOTOWNER, GW_OWNER, GWL_EXSTYLE, GetAncestor,
         GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
-        GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, SW_MINIMIZE, SW_RESTORE,
-        SetForegroundWindow, ShowWindow, WS_EX_APPWINDOW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+        GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, PostMessageW, SW_MINIMIZE,
+        SW_RESTORE, SetForegroundWindow, ShowWindow, WM_CLOSE, WS_EX_APPWINDOW, WS_EX_NOACTIVATE,
+        WS_EX_TOOLWINDOW,
     };
     use ::windows::core::{BOOL, PWSTR};
 
@@ -177,6 +178,12 @@ mod imp {
         Some(if root.is_invalid() { front.0 } else { root.0 } as isize)
     }
 
+    /// Asks the window to close, as its close button does: the program may
+    /// ask to save first or refuse.
+    pub fn close(hwnd: isize) {
+        let _ = unsafe { PostMessageW(Some(HWND(hwnd as _)), WM_CLOSE, WPARAM(0), LPARAM(0)) };
+    }
+
     /// Whether the window still exists.
     pub fn exists(hwnd: isize) -> bool {
         unsafe { IsWindow(Some(HWND(hwnd as _))) }.as_bool()
@@ -235,6 +242,12 @@ pub fn enumerate() -> Vec<OpenWindow> {
 #[cfg(windows)]
 pub fn foreground() -> Option<isize> {
     imp::foreground()
+}
+
+/// Asks the window `hwnd` to close.
+#[cfg(windows)]
+pub fn close(hwnd: isize) {
+    imp::close(hwnd);
 }
 
 /// Whether the window `hwnd` still exists.

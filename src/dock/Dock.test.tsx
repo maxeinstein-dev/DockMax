@@ -1507,6 +1507,27 @@ describe("Dock", () => {
         });
       });
 
+      it("opens the menu of an open program that is not pinned on a right click", async () => {
+        openOthers = [
+          {
+            key: "00000000000000aa",
+            appId: "C:\\Apps\\code.exe",
+            name: "code",
+            count: 1,
+            active: false,
+          },
+        ];
+        await renderDock();
+
+        const proceeded = fireEvent.contextMenu(program("code"));
+
+        expect(proceeded).toBe(false);
+        expect(panelCalls()).toHaveLength(1);
+        const [, args] = panelCalls()[0] as [string, { panelId: unknown }];
+        expect(args.panelId).toEqual({ open: "00000000000000aa" });
+        expect(program("code")).toHaveAttribute("aria-haspopup", "menu");
+      });
+
       it("opens a program that is not open, as before", async () => {
         pinned = withApps(CALCULATOR, NOTEPAD);
         openNow = [{ id: CALCULATOR.id, count: 1, active: false }];

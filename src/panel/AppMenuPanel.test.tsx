@@ -51,8 +51,10 @@ function answer(
 
 const flush = () => act(() => Promise.resolve());
 
-async function renderMenu(onDone: () => void = () => {}) {
-  const view = render(<AppMenuPanel app={APP} onDone={onDone} />);
+async function renderMenu(onDone: () => void = () => {}, openCount?: number) {
+  const view = render(
+    <AppMenuPanel app={APP} openCount={openCount} onDone={onDone} />,
+  );
   await flush();
   return view;
 }
@@ -201,5 +203,36 @@ describe("AppMenuPanel", () => {
     expect(first).toHaveFocus();
     fireEvent.keyDown(first, { key: "ArrowUp" });
     expect(first).toHaveFocus();
+  });
+
+  describe("closing the windows of an open program (spec 0009 D3)", () => {
+    it("offers nothing to close while the program has no window", async () => {
+      await renderMenu();
+
+      expect(
+        screen.queryByRole("menuitem", { name: text.closeWindow }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("menuitem", { name: text.closeWindows }),
+      ).toBeNull();
+    });
+
+    it("offers to close the window, or all of them, and asks Rust by the pinned id", async () => {
+      const onDone = vi.fn();
+      await renderMenu(onDone, 1);
+      expect(item(text.closeWindow)).toBeInTheDocument();
+
+      fireEvent.click(item(text.closeWindow));
+      await flush();
+
+      expect(sent("close_app")).toEqual([{ id: APP.id }]);
+      expect(onDone).toHaveBeenCalledTimes(1);
+    });
+
+    it("says all the windows when there are several", async () => {
+      await renderMenu(() => {}, 2);
+
+      expect(item(text.closeWindows)).toBeInTheDocument();
+    });
   });
 });

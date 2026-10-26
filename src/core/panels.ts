@@ -14,19 +14,18 @@ export interface AppPanelId {
   app: WidgetId;
 }
 
-/** An open program that is not pinned (spec 0009 D2): `open` is the opaque
- * key Rust gave it. It names the item of the dock only; the dock never asks
- * Rust to open a panel for it (its menu is the D3 recorte). */
+/** The menu of an open program that is not pinned (spec 0009 D2 and D3):
+ * `open` is the opaque key Rust gave it. */
 export interface OpenPanelId {
   open: string;
 }
 
 /** Panels the dock can open; must match `PanelId` in
- * `src-tauri/src/windows/panel.rs`, but for `OpenPanelId`, which names an
- * item and is never sent. In JSON: `"settings"`, `"about"`, `"tray"`,
- * `{ "widget": "<id>" }` or `{ "app": "<id>" }`. Rust refuses
- * (`toggle_panel` fails, nothing opens) an ID that isn't an instance, or a
- * pinned program, the dock has. An object, so compare two with
+ * `src-tauri/src/windows/panel.rs`. In JSON: `"settings"`, `"about"`,
+ * `"tray"`, `{ "widget": "<id>" }`, `{ "app": "<id>" }` or
+ * `{ "open": "<key>" }`. Rust refuses
+ * (`toggle_panel` fails, nothing opens) an ID that isn't an instance, a
+ * pinned program or an open program the dock has. An object, so compare two with
  * `samePanel`, never with `===`. */
 export type PanelId = SystemPanelId | WidgetPanelId | AppPanelId | OpenPanelId;
 

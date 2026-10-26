@@ -293,7 +293,13 @@ const messages = {
       open: "Abrir",
       reveal: "Mostrar no Explorador de Arquivos",
       remove: "Remover do dock",
+      /** Spec 0009 D3. */
+      newInstance: "Nova instância",
+      closeWindow: "Fechar janela",
+      closeWindows: "Fechar todas as janelas",
+      pin: "Fixar no dock",
       footer: "O menu da barra de tarefas",
+      openFooter: "Um app aberto, que não está fixado",
     },
     /** Notice of a database that can't be used in this run. */
     unavailableNotice: {

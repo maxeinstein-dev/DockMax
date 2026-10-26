@@ -384,8 +384,7 @@ pub fn activate_app(app: AppHandle, id: String) -> Result<bool, AppCommandError>
 /// window). `false` when it is no longer open.
 #[tauri::command]
 pub fn activate_open(app: AppHandle, key: String) -> Result<bool, AppCommandError> {
-    // What the dock was given: 16 hexadecimal digits.
-    if key.len() != 16 || !key.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if !is_open_key_text(&key) {
         return Err(AppError::NotFound.into());
     }
     #[cfg(windows)]
@@ -404,7 +403,7 @@ pub fn activate_open(app: AppHandle, key: String) -> Result<bool, AppCommandErro
 /// was given for it. Fails with `notFound` when it is no longer open.
 #[tauri::command]
 pub async fn launch_open(key: String) -> Result<(), AppCommandError> {
-    if key.len() != 16 || !key.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if !is_open_key_text(&key) {
         return Err(AppError::NotFound.into());
     }
     #[cfg(windows)]
@@ -424,6 +423,78 @@ pub async fn launch_open(key: String) -> Result<(), AppCommandError> {
         let _ = key;
         Err(AppError::LaunchFailed.into())
     }
+}
+
+/// Asks the windows of the open pinned program `id` to close, as the close
+/// button of each does (spec 0009 D3). How many it asked; 0 when it has none.
+#[tauri::command]
+pub fn close_app(app: AppHandle, id: String) -> Result<usize, AppCommandError> {
+    let id = WidgetId::parse(&id).map_err(|_| AppCommandError::from(AppError::NotFound))?;
+    #[cfg(windows)]
+    {
+        Ok(crate::windows::open_apps::close_pinned(&app, id.as_str()))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, id);
+        Ok(0)
+    }
+}
+
+/// The same for an open program that is not pinned, by its `key`.
+#[tauri::command]
+pub fn close_open(app: AppHandle, key: String) -> Result<usize, AppCommandError> {
+    if !is_open_key_text(&key) {
+        return Err(AppError::NotFound.into());
+    }
+    #[cfg(windows)]
+    {
+        Ok(crate::windows::open_apps::close_other(&app, &key))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = app;
+        Ok(0)
+    }
+}
+
+/// Pins the open program `key` that is not pinned (spec 0009 D3), at the end
+/// of the pinned ones. The id and the name are the ones Rust described when it
+/// showed the program, so the page names nothing but the opaque key.
+#[tauri::command]
+pub fn pin_open(
+    app: AppHandle,
+    state: State<'_, Mutex<Storage>>,
+    key: String,
+) -> Result<PinnedApp, AppCommandError> {
+    if !is_open_key_text(&key) {
+        return Err(AppError::NotFound.into());
+    }
+    #[cfg(windows)]
+    {
+        let (app_id, name) =
+            crate::windows::open_apps::pin_target_of_other(&key).ok_or(AppError::NotFound)?;
+        if !is_valid_app_id(&app_id) || !is_valid_app_name(&name) {
+            return Err(AppError::InvalidApp.into());
+        }
+        let pinned = change(&app, &state, "pin open", |storage| {
+            pin(storage, &app_id, &name)
+        })?;
+        // It is pinned now: the dock shows it with the pinned ones.
+        crate::windows::open_apps::wake(&app);
+        Ok(pinned)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, state);
+        Err(AppError::NotFound.into())
+    }
+}
+
+/// What the dock was given as the key of an open program: 16 hexadecimal
+/// digits.
+fn is_open_key_text(key: &str) -> bool {
+    key.len() == 16 && key.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 /// One entry of the menu of a program, as the panel shows it: the key names

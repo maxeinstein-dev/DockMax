@@ -55,8 +55,9 @@ pub const MAX_INSET: f64 = MARGIN;
 
 /// Which panel the dock asks for, as the pages send and get it:
 /// `"settings"`, `"about"`, `"tray"`, `{ "widget": "<id>" }` or
-/// `{ "app": "<id>" }`, the menu of a pinned program (`PanelId` in
-/// `src/core/panels.ts`). The widget ID is checked when deserialized
+/// `{ "app": "<id>" }`, the menu of a pinned program, or
+/// `{ "open": "<key>" }`, the menu of an open program that is not pinned
+/// (`PanelId` in `src/core/panels.ts`). The widget ID is checked when deserialized
 /// ([`WidgetId::parse`]): a malformed one is refused before any command
 /// runs. Whether the instance exists is checked by `toggle_panel`, which
 /// turns the ID into a [`Panel`].
@@ -71,6 +72,10 @@ pub enum PanelId {
     /// The menu of a pinned program (spec 0006 §6): the ID is the pinned
     /// item's, checked like a widget's.
     App(WidgetId),
+    /// The menu of an open program that is not pinned (spec 0009 D3): the key
+    /// is the opaque one the dock was given for it, checked against the
+    /// programs that are open.
+    Open(String),
 }
 
 /// Transparent inset the panel page lays around the card, in logical
@@ -95,6 +100,10 @@ pub enum Panel {
     App {
         id: WidgetId,
     },
+    /// The menu of the open program `key` that is not pinned.
+    Open {
+        key: String,
+    },
 }
 
 impl Panel {
@@ -106,6 +115,7 @@ impl Panel {
             Panel::Tray => PanelId::Tray,
             Panel::Widget { id, .. } => PanelId::Widget(id.clone()),
             Panel::App { id } => PanelId::App(id.clone()),
+            Panel::Open { key } => PanelId::Open(key.clone()),
         }
     }
 
@@ -117,6 +127,7 @@ impl Panel {
             | (Panel::Tray, PanelId::Tray) => true,
             (Panel::Widget { id: own, .. }, PanelId::Widget(other)) => own == other,
             (Panel::App { id: own }, PanelId::App(other)) => own == other,
+            (Panel::Open { key: own }, PanelId::Open(other)) => own == other,
             _ => false,
         }
     }
@@ -132,6 +143,8 @@ impl Panel {
             Panel::Tray => (280.0, 150.0),
             // Title, a few entries, the actions, footer.
             Panel::App { .. } => (280.0, 300.0),
+            // Title, three actions, footer.
+            Panel::Open { .. } => (280.0, 190.0),
             Panel::Widget { kind, .. } => match kind {
                 // Title, time and date, footer.
                 WidgetKind::Clock => (300.0, 170.0),
@@ -1023,6 +1036,22 @@ mod tests {
         assert!(
             !widget(WIDGET, WidgetKind::Clock).is(&PanelId::App(WidgetId::parse(WIDGET).unwrap()))
         );
+    }
+
+    #[test]
+    fn an_open_program_panel_is_named_by_its_key_and_only_by_it() {
+        let open = Panel::Open {
+            key: "00000000000000aa".into(),
+        };
+
+        assert_eq!(open.id(), PanelId::Open("00000000000000aa".into()));
+        assert!(open.is(&PanelId::Open("00000000000000aa".into())));
+        assert!(!open.is(&PanelId::Open("00000000000000bb".into())));
+        assert!(!open.is(&PanelId::App(WidgetId::parse(WIDGET).unwrap())));
+        assert!(!open.is(&widget_id(WIDGET)));
+        let parsed: PanelId = serde_json::from_str(r#"{"open":"00000000000000aa"}"#).unwrap();
+        assert_eq!(parsed, PanelId::Open("00000000000000aa".into()));
+        assert!(serde_json::from_str::<PanelId>(r#"{"open":7}"#).is_err());
     }
 
     #[test]

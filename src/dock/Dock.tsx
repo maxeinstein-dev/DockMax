@@ -649,7 +649,7 @@ function Dock() {
   const openMenu = (index: number, event: MouseEvent<HTMLElement>) => {
     const entry = entries[index];
     const anchor = restItems[index];
-    if (!entry?.app || !anchor) return;
+    if ((!entry?.app && !entry?.other) || !anchor) return;
     event.preventDefault();
     openPanel(entry.panelId, anchor);
   };
@@ -807,7 +807,7 @@ function Dock() {
         // No aria-controls: the panel is in another window, which an IDREF
         // can't reach.
         aria-expanded={samePanel(open, entry.panelId)}
-        aria-haspopup={entry.app ? "menu" : undefined}
+        aria-haspopup={entry.app || entry.other ? "menu" : undefined}
         tabIndex={index === currentIndex ? 0 : -1}
         data-magnify={magnifyRole(index, magnified, hover.effect) ?? undefined}
         data-opening={opening.has(entry.key) ? "" : undefined}
