@@ -17,7 +17,7 @@ Com o dock no lugar da barra do Windows (fase A e spike da barra), ele só tem C
 
 O B2 sai em duas partes: o formato dos ícones e a animação de abertura primeiro (§8); arrastar e soltar depois.
 | **B3** | Menu do app no dock (botão direito): a Jump List do Windows, Abrir, "Remover do dock" e "Mostrar no Explorador" (§6 e §7) | `windows/jumplist.rs`, `commands/apps.rs`, painel |
-| **B4** | Pacotes de ícones, ícone por item e imagem personalizada | a definir |
+| **B4** | Pacotes de ícones, ícone por item e imagem personalizada, em três recortes (spec 0007) | `windows/apps.rs`, `commands/icons.rs`, Configurações |
 
 B1 não depende de apps em execução (fase D): o dock ainda não sabe quais janelas estão abertas, então o indicador de app aberto fica para a fase D.
 

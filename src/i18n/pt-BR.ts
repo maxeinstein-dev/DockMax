@@ -1,4 +1,5 @@
 import type { AppErrorCode } from "../core/apps";
+import type { PackErrorCode } from "../core/iconPacks";
 import type {
   DockEdge,
   DockOpacity,
@@ -132,6 +133,31 @@ const messages = {
         uniform: "Mesmo tamanho",
         original: "Como vieram",
       } satisfies Record<IconShape, string>,
+      /** The icon packs (spec 0007). `{name}`, `{covers}`, `{total}`,
+       * `{count}` and `{id}` are filled in by the panel. */
+      iconPack: "Ícones dos apps",
+      iconPackHint:
+        "Troque os ícones de todos os apps por um pacote da pasta de pacotes",
+      iconPackOriginal: "Original",
+      iconPackCovers: "{name} · veste {covers} de {total} apps",
+      iconPackCount: "{name} · {count} ícones",
+      iconPackMissing: "{id} (indisponível)",
+      iconPackLoading: "Lendo os pacotes…",
+      iconPackFailed: "Não foi possível ler os pacotes",
+      openPacksFolder: "Abrir pasta de pacotes",
+      reloadPacks: "Recarregar pacotes",
+      packProblem: "Pacote {id}: {reason}",
+      packErrors: {
+        manifestMissing: "falta o pack.json",
+        manifestTooBig: "o pack.json é grande demais",
+        manifestInvalid: "o pack.json não é válido",
+        noName: "o pacote não tem nome",
+        textTooLong: "um texto do pacote é longo demais",
+        badAccent: "a cor de destaque não é um #RRGGBB",
+        tooManyEntries: "o pacote cita programas demais",
+        badKey: "o nome de um programa está vazio ou é longo demais",
+        badPath: "o caminho de uma imagem não é permitido",
+      } satisfies Record<PackErrorCode, string>,
       openAnimation: "Animação de abertura",
       openAnimationOptions: {
         bounce: "Pulo",

@@ -13,6 +13,8 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
+  ICON_SIZES,
+  dropIcons,
   launchApp,
   placeApp,
   useAppIcon,
@@ -30,6 +32,7 @@ import {
   type DockRequestPanel,
   type SetDockLayoutArgs,
 } from "../core/dock";
+import { ICONS_CHANGED_EVENT } from "../core/iconPacks";
 import { errorKind, log } from "../core/log";
 import {
   PANEL_CHANGED_EVENT,
@@ -168,8 +171,8 @@ function needsAttention(storage: StorageStatus | undefined): boolean {
 
 /** A program's icon on its plate, or the first letter of its name while the
  * icon is not read yet and when Windows has none. */
-function AppFace({ app }: { app: PinnedApp }) {
-  const icon = useAppIcon(app.appId);
+function AppFace({ app, variant }: { app: PinnedApp; variant: string }) {
+  const icon = useAppIcon(app.appId, ICON_SIZES.dock, variant);
   return icon === null ? (
     <span className="dock-app-letter" aria-hidden="true">
       {Array.from(app.name.trim())[0]?.toUpperCase() ?? "?"}
@@ -181,8 +184,18 @@ function AppFace({ app }: { app: PinnedApp }) {
 
 /** The face inside an item's glaze: a program's icon, a widget's live face,
  * or a system item's glyph. */
-function TileFace({ entry, now }: { entry: DockEntry; now: Date }) {
-  if (entry.app !== null) return <AppFace app={entry.app} />;
+function TileFace({
+  entry,
+  now,
+  iconVariant,
+}: {
+  entry: DockEntry;
+  now: Date;
+  iconVariant: string;
+}) {
+  if (entry.app !== null) {
+    return <AppFace app={entry.app} variant={iconVariant} />;
+  }
   if (entry.instance === null) {
     return <Glyph id={entry.panelId as SystemPanelId} />;
   }
@@ -321,6 +334,10 @@ function Dock() {
   const settings = useAppearance("dock");
   const snapshot = useWidgets();
   const appsSnapshot = useApps();
+  // The icons depend on the pack in use and on what the pack folder holds
+  // (spec 0007): either changing asks for them again.
+  const [iconsEpoch, setIconsEpoch] = useState(0);
+  const iconVariant = `${settings?.dock.iconPack ?? ""}#${iconsEpoch}`;
   const motion = !useReducedMotion();
   const viewport = useViewport();
   // The dock's single timer, for every live face.
@@ -467,6 +484,10 @@ function Dock() {
         // The pointer left the dock for good: the drag is over.
         press.current = null;
         setDrag(null);
+      }),
+      listen(ICONS_CHANGED_EVENT, () => {
+        dropIcons();
+        setIconsEpoch((epoch) => epoch + 1);
       }),
       listen<PanelChanged>(PANEL_CHANGED_EVENT, ({ payload }) => {
         openRef.current = payload.panelId;
@@ -724,7 +745,7 @@ function Dock() {
         onBlur={() => setFocused(null)}
       >
         <span className={`dock-tile ${glazeOf(entry)}`}>
-          <TileFace entry={entry} now={now} />
+          <TileFace entry={entry} now={now} iconVariant={iconVariant} />
           {badged ? <span className="dock-badge" aria-hidden="true" /> : null}
         </span>
         <span className="dock-dot" aria-hidden="true" />

@@ -3,6 +3,7 @@
 
 pub mod apps_repo;
 pub mod database;
+pub mod icon_packs;
 pub mod notes_repo;
 pub mod settings_file;
 pub mod widgets_repo;

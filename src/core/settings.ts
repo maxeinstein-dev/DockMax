@@ -117,6 +117,7 @@ export const DEFAULT_LOOK = {
   indicator: "dot",
   indicatorColor: null,
   iconShape: "plate",
+  iconPack: null,
   openAnimation: "bounce",
   taskbar: "hidden",
   bottomSpace: DEFAULT_BOTTOM_SPACE,
@@ -129,6 +130,7 @@ export const DEFAULT_LOOK = {
   | "indicator"
   | "indicatorColor"
   | "iconShape"
+  | "iconPack"
   | "openAnimation"
   | "taskbar"
   | "bottomSpace"
@@ -150,6 +152,9 @@ export interface DockSettings {
   /** `#RRGGBB`, or null for the style's own color. */
   indicatorColor: string | null;
   iconShape: IconShape;
+  /** The icon pack every program wears (spec 0007): the id of a folder of
+   * the packs folder, or null for the icons Windows gives. */
+  iconPack: string | null;
   openAnimation: OpenAnimation;
   taskbar: TaskbarMode;
   /** Distance between the dock and the screen edge, in logical pixels,

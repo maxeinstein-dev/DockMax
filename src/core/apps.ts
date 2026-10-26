@@ -228,12 +228,15 @@ function pump() {
 
 /** The icon of a program as an image URL, or null when Windows has none (or
  * it can't be read). Each program and size is asked once per page; the
- * requests go a few at a time. */
+ * requests go a few at a time. `variant` names what else the icon depends on
+ * (the icon pack in use, spec 0007): the same program in another variant is
+ * asked again. */
 export function appIcon(
   appId: string,
   size: number = ICON_SIZES.dock,
+  variant = "",
 ): Promise<string | null> {
-  const key = `${size} ${appId}`;
+  const key = `${size} ${variant} ${appId}`;
   let icon = icons.get(key);
   if (icon === undefined) {
     icon = new Promise<string | null>((resolve) => {
@@ -258,7 +261,13 @@ export function appIcon(
   return icon;
 }
 
-/** Forgets the icons read (for the tests). */
+/** Forgets the icons read, for the ones that changed on disk; what is being
+ * read still ends. */
+export function dropIcons(): void {
+  icons.clear();
+}
+
+/** Forgets the icons read and what waits to be read (for the tests). */
 export function forgetIcons(): void {
   icons.clear();
   waiting.length = 0;
@@ -308,19 +317,20 @@ export function useApps(): AppsSnapshot | null {
 export function useAppIcon(
   appId: string,
   size: number = ICON_SIZES.dock,
+  variant = "",
 ): string | null {
   const [icon, setIcon] = useState<{ key: string; url: string | null } | null>(
     null,
   );
-  const key = `${size} ${appId}`;
+  const key = `${size} ${variant} ${appId}`;
   useEffect(() => {
     let active = true;
-    void appIcon(appId, size).then((url) => {
+    void appIcon(appId, size, variant).then((url) => {
       if (active) setIcon({ key, url });
     });
     return () => {
       active = false;
     };
-  }, [appId, size, key]);
+  }, [appId, size, variant, key]);
   return icon !== null && icon.key === key ? icon.url : null;
 }

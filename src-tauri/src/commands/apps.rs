@@ -15,6 +15,7 @@ use base64::engine::general_purpose::STANDARD;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
+use super::icons;
 use super::widgets::lock;
 use crate::domain::apps::{
     AppError, AppErrorCode, AppsSnapshot, PinnedApp, is_pinnable_path, is_valid_app_id,
@@ -170,18 +171,27 @@ const ICON_SIZES: [u32; 2] = [32, 96];
 /// cap keeps the cache small: the panel's catalog can ask for a few hundred.
 const ICON_CACHE_LIMIT: usize = 300;
 
+/// What an icon is read for: the icon pack in use (`None` for the icons
+/// Windows gives), the program and the size.
+type IconKey = (Option<String>, String, u32);
+
 /// The icon of a program at a size; `None` for a program with no icon, which
 /// is also remembered.
-type IconCache = HashMap<(String, u32), Option<String>>;
+type IconCache = HashMap<IconKey, Option<String>>;
 
 static ICONS: Mutex<Option<IconCache>> = Mutex::new(None);
 
-fn cached_icon(key: &(String, u32)) -> Option<Option<String>> {
+/// Drops the icons read, for a pack that changed on disk (spec 0007).
+pub fn forget_icons() {
+    *ICONS.lock().unwrap_or_else(PoisonError::into_inner) = None;
+}
+
+fn cached_icon(key: &IconKey) -> Option<Option<String>> {
     let cache = ICONS.lock().unwrap_or_else(PoisonError::into_inner);
     cache.as_ref().and_then(|icons| icons.get(key).cloned())
 }
 
-fn remember_icon(key: (String, u32), icon: Option<String>) {
+fn remember_icon(key: IconKey, icon: Option<String>) {
     let mut cache = ICONS.lock().unwrap_or_else(PoisonError::into_inner);
     let icons = cache.get_or_insert_with(HashMap::new);
     if icons.len() >= ICON_CACHE_LIMIT {
@@ -190,11 +200,17 @@ fn remember_icon(key: (String, u32), icon: Option<String>) {
     icons.insert(key, icon);
 }
 
-/// The icon of a program as a PNG `data:` URL, or `null` when Windows has
-/// none (the dock then shows the first letter of its name). `size` is 32 or
-/// 96; any other value is the nearest of the two.
+/// The icon of a program as a PNG `data:` URL, or `null` when there is none
+/// (the dock then shows the first letter of its name). `size` is 32 or 96; any
+/// other value is the nearest of the two. At the dock's size the icon pack in
+/// use (spec 0007) answers first, then Windows; the panel's list (32) always
+/// shows the program's own icon.
 #[tauri::command]
-pub async fn app_icon(app_id: String, size: u32) -> Result<Option<String>, AppCommandError> {
+pub async fn app_icon(
+    app: AppHandle,
+    app_id: String,
+    size: u32,
+) -> Result<Option<String>, AppCommandError> {
     if !is_valid_app_id(&app_id) {
         return Err(AppError::InvalidApp.into());
     }
@@ -203,14 +219,26 @@ pub async fn app_icon(app_id: String, size: u32) -> Result<Option<String>, AppCo
     } else {
         ICON_SIZES[1]
     };
-    let key = (app_id, size);
+    let pack = if size == ICON_SIZES[1] {
+        super::settings::current(&app).dock.icon_pack
+    } else {
+        None
+    };
+    let key = (pack, app_id, size);
     if let Some(icon) = cached_icon(&key) {
         return Ok(icon);
     }
     let lookup = key.clone();
-    let read = tauri::async_runtime::spawn_blocking(move || apps::icon_png(&lookup.0, lookup.1))
-        .await
-        .map_err(|_| AppCommandError::from(AppError::Unavailable))?;
+    let read = tauri::async_runtime::spawn_blocking(move || {
+        let (pack, app_id, size) = lookup;
+        let from_pack = pack.and_then(|pack| {
+            let shown = apps::name_of(&app_id).unwrap_or_default();
+            icons::pack_icon(&app, &pack, &icons::names_of(&app_id, &shown))
+        });
+        from_pack.or_else(|| apps::icon_png(&app_id, size))
+    })
+    .await
+    .map_err(|_| AppCommandError::from(AppError::Unavailable))?;
     let icon = read.map(|png| format!("data:image/png;base64,{}", STANDARD.encode(png)));
     remember_icon(key, icon.clone());
     Ok(icon)
@@ -572,13 +600,13 @@ mod tests {
     #[test]
     fn the_icon_cache_is_bounded() {
         for n in 0..=ICON_CACHE_LIMIT {
-            remember_icon((format!("bounded-{n}"), 32), None);
+            remember_icon((None, format!("bounded-{n}"), 32), None);
         }
 
         let len = ICONS.lock().unwrap().as_ref().map_or(0, HashMap::len);
         assert!(len <= ICON_CACHE_LIMIT, "{len}");
         assert_eq!(
-            cached_icon(&(format!("bounded-{ICON_CACHE_LIMIT}"), 32)),
+            cached_icon(&(None, format!("bounded-{ICON_CACHE_LIMIT}"), 32)),
             Some(None)
         );
     }

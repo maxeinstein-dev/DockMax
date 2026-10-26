@@ -1170,6 +1170,31 @@ describe("Dock", () => {
       });
     });
 
+    it("asks for the icons again when the icon pack changes", async () => {
+      pinned = withApps(CALCULATOR);
+      await renderDock();
+      const iconCalls = () =>
+        invoke.mock.calls.filter(([command]) => command === "app_icon");
+      expect(iconCalls()).toHaveLength(1);
+
+      emit("settings-changed", withDock({ iconPack: "cores" }));
+      await act(async () => {});
+
+      expect(iconCalls()).toHaveLength(2);
+    });
+
+    it("asks for the icons again when the packs folder changes", async () => {
+      pinned = withApps(CALCULATOR);
+      await renderDock();
+      const iconCalls = () =>
+        invoke.mock.calls.filter(([command]) => command === "app_icon");
+
+      emit("icons-changed", null);
+      await act(async () => {});
+
+      expect(iconCalls()).toHaveLength(2);
+    });
+
     it("shows the first letter of the name while the icon is not there, and when Windows has none", async () => {
       pinned = withApps(CALCULATOR);
       icon = null;

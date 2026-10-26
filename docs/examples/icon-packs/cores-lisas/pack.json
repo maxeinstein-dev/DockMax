@@ -1,0 +1,17 @@
+{
+  "name": "Cores lisas",
+  "author": "DockMax",
+  "version": "1.0.0",
+  "description": "Placas lisas com a inicial do programa. Serve de exemplo do formato.",
+  "accent": "#2E7D6B",
+  "icons": {
+    "Calculadora": "apps/calculadora.png",
+    "Bloco de notas": "apps/bloco-de-notas.png",
+    "Claude": "apps/claude.png",
+    "Relógio": "apps/relogio.png",
+    "Explorador de Arquivos": "apps/explorador-de-arquivos.png",
+    "Configurações": "apps/configuracoes.png",
+    "Paint": "apps/paint.png"
+  },
+  "fallback": "fallback.png"
+}
