@@ -18,7 +18,6 @@ pub struct Messages {
 #[derive(Debug)]
 pub struct DockMessages {
     pub settings: &'static str,
-    pub about: &'static str,
     pub tray: &'static str,
     /// The names of the widget kinds, for an instance without a label.
     pub clock: &'static str,
@@ -62,7 +61,6 @@ const PT_BR: Messages = Messages {
     },
     dock: DockMessages {
         settings: "Configurações",
-        about: "Sobre",
         tray: "Bandeja do sistema",
         clock: "Relógio",
         time_progress: "Progresso do tempo",

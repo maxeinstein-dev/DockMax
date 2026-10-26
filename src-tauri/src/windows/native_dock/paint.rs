@@ -65,15 +65,8 @@ pub const SETTINGS_GLYPH: &[&str] = &[
     "M13.5 7.5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
     "M7.5 16.5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
 ];
-pub const TRAY_GLYPH: &[&str] = &[
-    "M6 9.5l6 6 6-6",
-    "M4.5 5h15a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5h-15a1.5 1.5 0 0 1-1.5-1.5v-11A1.5 1.5 0 0 1 4.5 5z",
-];
-pub const ABOUT_GLYPH: &[&str] = &[
-    "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0",
-    "M12 11v5.5",
-    "M12 7.6h.01",
-];
+/// The tray: the arrow up of the Windows taskbar's "show hidden icons".
+pub const TRAY_GLYPH: &[&str] = &["M6 14.5l6-6 6 6"];
 pub const NOTE_GLYPH: &[&str] = &[
     "M7.5 3.5h9a2.5 2.5 0 0 1 2.5 2.5v12a2.5 2.5 0 0 1-2.5 2.5h-9a2.5 2.5 0 0 1-2.5-2.5v-12a2.5 2.5 0 0 1 2.5-2.5z",
     "M8.5 8.5h7M8.5 12h7M8.5 15.5h4",

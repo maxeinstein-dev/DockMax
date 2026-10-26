@@ -39,23 +39,26 @@ function header(path: string): string | null {
 }
 
 describe("Dock", () => {
-  it("opens with Settings and About", async () => {
-    // The dock reads its items once started: waited for, not assumed.
+  it("opens with the seeded widgets, and Configurações in its menu", async () => {
+    // The run's database is new: the seed (Relógio, Progresso do tempo,
+    // Nota). The dock reads its items once started: waited for, not assumed.
+    const seed = [
+      t.widgets.kinds.clock,
+      t.widgets.kinds["time-progress"],
+      t.widgets.kinds.note,
+    ];
     await browser.waitUntil(
       async () => {
         const names = (await dockView()).items.map((item) => item.name);
-        return (
-          names.includes(t.dock.items.settings) &&
-          names.includes(t.dock.items.about)
-        );
+        return seed.every((name) => names.includes(name));
       },
-      { timeoutMsg: "the dock never showed Configurações and Sobre" },
+      { timeoutMsg: "the dock never showed the seeded widgets" },
     );
+    // Configurações and Sobre left the dock: the app opens from the dock's
+    // menu, with Sobre inside (2026-10-26).
     const names = (await dockView()).items.map((item) => item.name);
-    expect(names.slice(-2)).toEqual([
-      t.dock.items.settings,
-      t.dock.items.about,
-    ]);
+    expect(names).not.toContain(t.dock.items.settings);
+    expect(names).not.toContain(t.dock.items.about);
   });
 
   it("makes the widget database in the run's data folder", async () => {

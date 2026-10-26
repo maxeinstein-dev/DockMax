@@ -353,7 +353,6 @@ fn names() -> Names {
     let dock = &crate::i18n::messages().dock;
     Names {
         settings: dock.settings,
-        about: dock.about,
         tray: dock.tray,
         clock: dock.clock,
         time_progress: dock.time_progress,
@@ -370,7 +369,6 @@ fn panel_of(item: &Item) -> PanelId {
         Item::Widget(widget) => PanelId::Widget(widget.id.clone()),
         Item::Other(other) => PanelId::Open(other.key.clone()),
         Item::System(SystemItem::Settings) => PanelId::Settings,
-        Item::System(SystemItem::About) => PanelId::About,
         Item::System(SystemItem::Tray) => PanelId::Tray,
     }
 }
@@ -906,10 +904,6 @@ impl Dock {
                 glaze: theme::Glaze::SETTINGS,
                 paths: paint::SETTINGS_GLYPH,
             },
-            Item::System(SystemItem::About) => Face::Glyph {
-                glaze: theme::Glaze::ABOUT,
-                paths: paint::ABOUT_GLYPH,
-            },
             Item::System(SystemItem::Tray) => Face::Glyph {
                 glaze: theme::Glaze::TRAY,
                 paths: paint::TRAY_GLYPH,
@@ -1187,6 +1181,25 @@ impl Dock {
         self.toggle(panel_of(&item), anchor);
     }
 
+    /// The dock's own menu, on the right button away from a program:
+    /// Configurações (author's decision, 2026-10-26: it left the dock's
+    /// items). Shown once the dock's state is let go: the menu runs a loop of
+    /// its own.
+    fn dock_menu(&mut self) {
+        self.hovered = None;
+        self.animate();
+        self.paint();
+        let hwnd = self.hwnd.0 as isize;
+        let edge = self.edge();
+        self.effects.push(Box::new(move |app| {
+            if show_dock_menu(HWND(hwnd as _), edge) == Some(MenuChoice::Settings)
+                && let Err(error) = super::settings_window::open(app)
+            {
+                log::warn!("dock: the settings could not be opened: {error}");
+            }
+        }));
+    }
+
     // ---- What the app tells the dock ----
 
     fn set_open(&mut self, panel: Option<PanelId>) {
@@ -1280,6 +1293,52 @@ fn opening_offset(
     }
 }
 
+/// What the dock's menu offers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MenuChoice {
+    Settings,
+}
+
+/// Shows the dock's menu at the pointer, opening away from the screen edge,
+/// and returns what was chosen.
+fn show_dock_menu(hwnd: HWND, edge: DockEdge) -> Option<MenuChoice> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, MF_STRING, SetForegroundWindow,
+        TPM_BOTTOMALIGN, TPM_CENTERALIGN, TPM_RETURNCMD, TPM_RIGHTBUTTON, TPM_TOPALIGN,
+        TrackPopupMenu, WM_NULL,
+    };
+    const SETTINGS: usize = 1;
+    let text = windows::core::HSTRING::from(crate::i18n::messages().tray.open_settings);
+    unsafe {
+        let menu = CreatePopupMenu().ok()?;
+        if AppendMenuW(menu, MF_STRING, SETTINGS, &text).is_err() {
+            let _ = DestroyMenu(menu);
+            return None;
+        }
+        let mut at = POINT::default();
+        let _ = GetCursorPos(&mut at);
+        // A menu closes on a click elsewhere only if its window is in front;
+        // the click on the dock was the last input, so Windows allows it.
+        let _ = SetForegroundWindow(hwnd);
+        let vertical = match edge {
+            DockEdge::Bottom => TPM_BOTTOMALIGN,
+            DockEdge::Top => TPM_TOPALIGN,
+        };
+        let chosen = TrackPopupMenu(
+            menu,
+            TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_CENTERALIGN | vertical,
+            at.x,
+            at.y,
+            None,
+            hwnd,
+            None,
+        );
+        let _ = PostMessageW(Some(hwnd), WM_NULL, WPARAM(0), LPARAM(0));
+        let _ = DestroyMenu(menu);
+        (chosen.0 as usize == SETTINGS).then_some(MenuChoice::Settings)
+    }
+}
+
 fn local_now() -> windows::Win32::Foundation::SYSTEMTIME {
     unsafe { windows::Win32::System::SystemInformation::GetLocalTime() }
 }
@@ -1313,8 +1372,12 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
         WM_RBUTTONUP => with_dock(|dock| {
             shared().clicked = Some(Instant::now());
             let (x, y) = dock.point(lparam);
-            if let Some(index) = dock.hit(x, y) {
-                dock.right_click(index);
+            match dock.hit(x, y) {
+                Some(index) if dock.items.get(index).is_some_and(Item::is_program) => {
+                    dock.right_click(index);
+                }
+                // Anywhere else on the dock: its own menu.
+                _ => dock.dock_menu(),
             }
         }),
         WM_CAPTURECHANGED => with_dock(|dock| {
@@ -1443,7 +1506,17 @@ pub fn press_named(name: String) -> bool {
             shared().clicked = Some(Instant::now());
             dock.press(key);
         }
-        let _ = sent.send(key.is_some());
+        // Configurações is in the dock's menu, not an item.
+        let menu = key.is_none() && name == crate::i18n::messages().tray.open_settings;
+        if menu {
+            let app = dock.app.clone();
+            dock.effects.push(Box::new(move |_| {
+                if let Err(error) = super::settings_window::open(&app) {
+                    log::warn!("e2e: the settings could not be opened: {error}");
+                }
+            }));
+        }
+        let _ = sent.send(key.is_some() || menu);
     });
     received
         .recv_timeout(Duration::from_secs(5))

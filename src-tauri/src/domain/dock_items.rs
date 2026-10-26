@@ -2,6 +2,11 @@
 //! the pinned programs, the widgets in the order chosen, the open programs
 //! that are not pinned, then the system items. A separator stands between
 //! the groups that have items.
+//!
+//! Configurações and Sobre left the dock (author's decision, 2026-10-26):
+//! the app opens from the dock's menu (right button) and has Sobre inside.
+//! Configurações comes back only while it carries the attention badge, so
+//! the notice is not lost.
 
 use super::apps::{AppsSnapshot, PinnedApp};
 use super::open_apps::{OpenOther, OpenSnapshot};
@@ -10,8 +15,8 @@ use super::widgets::{StorageStatus, WidgetInstance, WidgetKind, WidgetsSnapshot}
 /// The items DockMax itself puts at the end of the dock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SystemItem {
+    /// Only while the storage needs attention (`needs_attention`).
     Settings,
-    About,
     /// The notification area: only while the Windows taskbar is hidden
     /// altogether (ADR 0009).
     Tray,
@@ -38,7 +43,6 @@ impl Item {
             Item::Widget(widget) => format!("widget:{}", widget.id.as_str()),
             Item::Other(other) => format!("open:{}", other.key),
             Item::System(SystemItem::Settings) => "settings".into(),
-            Item::System(SystemItem::About) => "about".into(),
             Item::System(SystemItem::Tray) => "tray".into(),
         }
     }
@@ -53,7 +57,6 @@ impl Item {
 #[derive(Debug, Clone, Copy)]
 pub struct Names {
     pub settings: &'static str,
-    pub about: &'static str,
     pub tray: &'static str,
     pub clock: &'static str,
     pub time_progress: &'static str,
@@ -79,7 +82,6 @@ impl Names {
                 .to_string()
             }),
             Item::System(SystemItem::Settings) => self.settings.into(),
-            Item::System(SystemItem::About) => self.about.into(),
             Item::System(SystemItem::Tray) => self.tray.into(),
         }
     }
@@ -95,6 +97,12 @@ pub struct Sources<'a> {
     pub show_open: bool,
     /// Whether the tray is the dock's (the taskbar hidden altogether).
     pub tray: bool,
+}
+
+impl Sources<'_> {
+    fn attention(&self) -> bool {
+        needs_attention(self.widgets)
+    }
 }
 
 /// The items in order and the size of each group that has items.
@@ -140,10 +148,10 @@ pub fn items(sources: Sources<'_>) -> Items {
     } else {
         Vec::new()
     };
-    let mut systems = vec![
-        Item::System(SystemItem::Settings),
-        Item::System(SystemItem::About),
-    ];
+    let mut systems = Vec::new();
+    if sources.attention() {
+        systems.push(Item::System(SystemItem::Settings));
+    }
     if sources.tray {
         systems.push(Item::System(SystemItem::Tray));
     }
@@ -187,7 +195,6 @@ mod tests {
 
     const NAMES: Names = Names {
         settings: "Configurações",
-        about: "Sobre",
         tray: "Bandeja do sistema",
         clock: "Relógio",
         time_progress: "Progresso do tempo",
@@ -266,26 +273,34 @@ mod tests {
                 format!("app:{}", id(2).as_str()),
                 format!("widget:{}", id(10).as_str()),
                 "open:00000000000000aa".to_string(),
-                "settings".into(),
-                "about".into(),
             ]
         );
-        assert_eq!(groups, vec![2, 1, 1, 2]);
+        assert_eq!(groups, vec![2, 1, 1]);
     }
 
     #[test]
-    fn without_lists_only_the_system_items_show() {
+    fn without_lists_the_dock_is_empty() {
         let open = OpenSnapshot::default();
 
         let found = items(sources(None, None, &open));
 
-        assert_eq!(found.groups, vec![2]);
-        assert!(
-            found
-                .items
-                .iter()
-                .all(|item| matches!(item, Item::System(_)))
-        );
+        assert!(found.items.is_empty());
+        assert!(found.groups.is_empty());
+    }
+
+    #[test]
+    fn configuracoes_shows_only_while_the_storage_needs_attention() {
+        let recovered = WidgetsSnapshot {
+            storage: StorageStatus::Recovered,
+            widgets: vec![widget(10, WidgetKind::Note, None)],
+        };
+        let open = OpenSnapshot::default();
+
+        let found = items(sources(Some(&recovered), None, &open));
+
+        assert_eq!(found.groups, vec![1, 1]);
+        assert_eq!(found.items[1], Item::System(SystemItem::Settings));
+        assert_eq!(NAMES.of(&found.items[1]), "Configurações");
     }
 
     #[test]
@@ -305,7 +320,9 @@ mod tests {
 
         let found = items(sources(Some(&widgets), Some(&apps), &open));
 
-        assert_eq!(found.groups, vec![2]);
+        // Only Configurações, with the badge.
+        assert_eq!(found.groups, vec![1]);
+        assert_eq!(found.items, vec![Item::System(SystemItem::Settings)]);
         assert!(needs_attention(Some(&widgets)));
     }
 
@@ -321,8 +338,8 @@ mod tests {
             ..sources(None, None, &open)
         });
 
-        assert_eq!(found.groups, vec![3]);
-        assert_eq!(found.items[2], Item::System(SystemItem::Tray));
+        assert_eq!(found.groups, vec![1]);
+        assert_eq!(found.items, vec![Item::System(SystemItem::Tray)]);
     }
 
     #[test]
@@ -338,7 +355,7 @@ mod tests {
 
         let found = items(sources(Some(&widgets), None, &open));
 
-        assert_eq!(found.groups, vec![1, 2]);
+        assert_eq!(found.groups, vec![1]);
     }
 
     #[test]
@@ -375,7 +392,7 @@ mod tests {
             running(&open, &Item::Other(other("00000000000000aa", false))),
             Some(false)
         );
-        assert_eq!(running(&open, &Item::System(SystemItem::About)), None);
+        assert_eq!(running(&open, &Item::System(SystemItem::Tray)), None);
         assert!(!needs_attention(None));
     }
 }

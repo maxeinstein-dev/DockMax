@@ -151,12 +151,6 @@ impl Glaze {
         s: 14.0,
         l: 34.0,
     };
-    /// Ardósia.
-    pub const ABOUT: Glaze = Glaze {
-        h: 214.0,
-        s: 22.0,
-        l: 46.0,
-    };
     /// Teal.
     pub const TRAY: Glaze = Glaze {
         h: 176.0,
