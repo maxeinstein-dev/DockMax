@@ -12,6 +12,10 @@ pub mod jumplist;
 pub mod memory;
 #[cfg(windows)]
 mod native;
+#[cfg(windows)]
+pub mod open_apps;
+#[cfg(windows)]
+pub mod openwin;
 pub mod panel;
 #[cfg(windows)]
 pub mod popup_menu;

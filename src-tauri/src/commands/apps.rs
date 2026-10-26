@@ -21,6 +21,7 @@ use crate::domain::apps::{
     AppError, AppErrorCode, AppsSnapshot, PinnedApp, is_pinnable_path, is_valid_app_id,
     is_valid_app_name,
 };
+use crate::domain::open_apps::OpenApp;
 use crate::domain::widgets::{MoveDirection, WidgetId};
 use crate::persistence::apps_repo;
 use crate::persistence::database::Storage;
@@ -342,6 +343,39 @@ pub async fn launch_app(
             log::warn!("apps: a program could not be opened");
             Err(AppError::LaunchFailed.into())
         }
+    }
+}
+
+/// The pinned programs that have windows open (spec 0009), for the dock's
+/// first read; after that `open-windows-changed` carries the same list. No
+/// window handle leaves Rust.
+#[tauri::command]
+pub fn list_open_apps() -> Vec<OpenApp> {
+    #[cfg(windows)]
+    {
+        crate::windows::open_apps::snapshot()
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+/// A click on a pinned program that is open (spec 0009): brings its window
+/// to the front, minimizes it if the user is in it, or passes to its next
+/// window. `false` when it has no window, so the dock opens it instead. The
+/// page names the pinned item by its id; the window is Rust's to find.
+#[tauri::command]
+pub fn activate_app(app: AppHandle, id: String) -> Result<bool, AppCommandError> {
+    let id = WidgetId::parse(&id).map_err(|_| AppCommandError::from(AppError::NotFound))?;
+    #[cfg(windows)]
+    {
+        Ok(crate::windows::open_apps::activate(&app, id.as_str()))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, id);
+        Ok(false)
     }
 }
 

@@ -39,6 +39,8 @@ fn main() {
             "move_app",
             "place_app",
             "launch_app",
+            "list_open_apps",
+            "activate_app",
             "app_menu",
             "run_app_entry",
             "reveal_app",
