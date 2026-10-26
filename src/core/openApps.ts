@@ -40,6 +40,7 @@ export const OPEN_APPS_COMMANDS = {
   list: "list_open_apps",
   activate: "activate_app",
   activateOpen: "activate_open",
+  launchOpen: "launch_open",
 } as const;
 
 /** Event every window receives with the `OpenSnapshot` after a change. */
@@ -94,6 +95,18 @@ export function activateOpen(key: string): Promise<boolean> {
     (error: unknown) => {
       log.warn(`apps: activate open failed: ${errorKind(error)}`);
       return false;
+    },
+  );
+}
+
+/** Opens a new instance of the open program that is not pinned, named by
+ * `key` (the middle button). Rejects when it is no longer open or could not be
+ * opened. */
+export function launchOpen(key: string): Promise<void> {
+  return invoke<void>(OPEN_APPS_COMMANDS.launchOpen, { key }).catch(
+    (error: unknown) => {
+      log.warn(`apps: launch open failed: ${errorKind(error)}`);
+      throw error;
     },
   );
 }

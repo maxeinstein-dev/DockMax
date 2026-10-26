@@ -150,6 +150,23 @@ describe("SettingsPanel", () => {
     expect(invoke).toHaveBeenCalledWith("update_settings", { settings: sent });
   });
 
+  it("chooses what the middle button does", () => {
+    invoke.mockReturnValue(new Promise(() => {}));
+    render(<SettingsPanel settings={SETTINGS} />);
+    expect(chosen(text.groups.middleClick)).toEqual([
+      text.middleClick.newInstance,
+    ]);
+
+    fireEvent.click(option(text.groups.middleClick, text.middleClick.none));
+
+    expect(invoke).toHaveBeenLastCalledWith("update_settings", {
+      settings: {
+        ...SETTINGS,
+        dock: { ...SETTINGS.dock, middleClick: "none" },
+      },
+    });
+  });
+
   it("turns showing the open apps on and off, in the dock settings", () => {
     invoke.mockReturnValue(new Promise(() => {}));
     render(<SettingsPanel settings={SETTINGS} />);

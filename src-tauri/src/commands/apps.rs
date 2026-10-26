@@ -399,6 +399,33 @@ pub fn activate_open(app: AppHandle, key: String) -> Result<bool, AppCommandErro
     }
 }
 
+/// A middle click on an open program that is not pinned (spec 0009 D2): opens
+/// a new instance of it, as the Windows taskbar does, by the `key` the dock
+/// was given for it. Fails with `notFound` when it is no longer open.
+#[tauri::command]
+pub async fn launch_open(key: String) -> Result<(), AppCommandError> {
+    if key.len() != 16 || !key.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(AppError::NotFound.into());
+    }
+    #[cfg(windows)]
+    {
+        let target = crate::windows::open_apps::app_id_of_other(&key).ok_or(AppError::NotFound)?;
+        let opened = tauri::async_runtime::spawn_blocking(move || apps::launch(&target)).await;
+        match opened {
+            Ok(Ok(())) => Ok(()),
+            _ => {
+                log::warn!("apps: a program could not be opened");
+                Err(AppError::LaunchFailed.into())
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = key;
+        Err(AppError::LaunchFailed.into())
+    }
+}
+
 /// One entry of the menu of a program, as the panel shows it: the key names
 /// it for `run_app_entry`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

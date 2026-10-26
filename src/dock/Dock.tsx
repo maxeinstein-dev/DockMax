@@ -36,6 +36,7 @@ import { ICONS_CHANGED_EVENT } from "../core/iconPacks";
 import {
   activateApp,
   activateOpen,
+  launchOpen,
   useOpenApps,
   type OpenOther,
 } from "../core/openApps";
@@ -589,7 +590,7 @@ function Dock() {
 
   /** Opens the program and animates its icon for a moment; a program that
    * could not be opened stops at once. */
-  const launch = (key: string, app: PinnedApp) => {
+  const launch = (key: string, run: () => Promise<void>) => {
     const timers = openingTimers.current;
     window.clearTimeout(timers.get(key));
     setOpeningOf(key, true);
@@ -600,7 +601,7 @@ function Dock() {
         setOpeningOf(key, false);
       }, OPENING_MS),
     );
-    openApp(app).catch(() => {
+    run().catch(() => {
       window.clearTimeout(timers.get(key));
       timers.delete(key);
       setOpeningOf(key, false);
@@ -616,10 +617,10 @@ function Dock() {
         // Open already: to the front (or away, or to its next window); a
         // program whose windows closed meanwhile is opened.
         void activateApp(app.id).then((done) => {
-          if (!done) launch(entry.key, app);
+          if (!done) launch(entry.key, () => openApp(app));
         });
       } else {
-        launch(entry.key, app);
+        launch(entry.key, () => openApp(app));
       }
     } else if (entry?.other) {
       // An open program that is not pinned: to the front, away, or to its
@@ -627,6 +628,20 @@ function Dock() {
       void activateOpen(entry.other.key);
     } else if (entry && anchor) {
       openPanel(entry.panelId, anchor);
+    }
+  };
+
+  /** The middle button on a program: what the setting says, a new instance
+   * unless the user turned it off. */
+  const middleClick = (index: number) => {
+    if ((settings?.dock.middleClick ?? "newInstance") !== "newInstance") return;
+    const entry = entries[index];
+    if (entry?.app) {
+      const app = entry.app;
+      launch(entry.key, () => openApp(app));
+    } else if (entry?.other) {
+      const key = entry.other.key;
+      launch(entry.key, () => launchOpen(key));
     }
   };
 
@@ -822,6 +837,15 @@ function Dock() {
             return;
           }
           toggle(index);
+        }}
+        // The middle button: without this the page starts its scroll mode.
+        onMouseDown={(event) => {
+          if (event.button === 1) event.preventDefault();
+        }}
+        onAuxClick={(event) => {
+          if (event.button !== 1) return;
+          event.preventDefault();
+          middleClick(index);
         }}
         onContextMenu={(event) => openMenu(index, event)}
         onFocus={(event) => onFocus(index, event)}

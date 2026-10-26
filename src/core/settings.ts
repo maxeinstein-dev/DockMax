@@ -96,6 +96,10 @@ export type IndicatorColor = (typeof INDICATOR_COLORS)[number];
  * `src-tauri/src/domain/settings.rs`. */
 export type IconShape = "plate" | "uniform" | "original";
 
+/** What the middle button (the wheel) does on a program of the dock; must
+ * match `MiddleClick` in `src-tauri/src/domain/settings.rs`. */
+export type MiddleClick = "newInstance" | "none";
+
 /** What a program's icon does while it opens; must match `OpenAnimation`. */
 export type OpenAnimation = "bounce" | "pulse" | "shake";
 
@@ -120,6 +124,7 @@ export const DEFAULT_LOOK = {
   iconPack: null,
   openAnimation: "bounce",
   showOpenApps: true,
+  middleClick: "newInstance",
   taskbar: "hidden",
   bottomSpace: DEFAULT_BOTTOM_SPACE,
 } as const satisfies Pick<
@@ -134,6 +139,7 @@ export const DEFAULT_LOOK = {
   | "iconPack"
   | "openAnimation"
   | "showOpenApps"
+  | "middleClick"
   | "taskbar"
   | "bottomSpace"
 >;
@@ -161,6 +167,8 @@ export interface DockSettings {
   /** Whether the open programs that are not pinned show on the dock, after
    * the widgets (spec 0009 D2). */
   showOpenApps: boolean;
+  /** What the middle button does on a program of the dock. */
+  middleClick: MiddleClick;
   taskbar: TaskbarMode;
   /** Distance between the dock and the screen edge, in logical pixels,
    * 0–`MAX_BOTTOM_SPACE`. */

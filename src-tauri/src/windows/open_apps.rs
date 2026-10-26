@@ -205,46 +205,36 @@ fn describe(key: &str, window: &OpenWindow) -> Option<(String, String)> {
     described
 }
 
-/// The open programs that are not pinned, one for each program as the shell
-/// names it: the windows are grouped by what they declare, and groups that
-/// turn out to be one program (the profiles of a browser each have an AppID of
-/// their own) are one item. In the order shown last, the new ones at the end.
-fn merged_others(
+/// The open programs that are not pinned, one for each AppID the windows
+/// declare, as the Windows taskbar groups them (the profiles of a browser each
+/// have an AppID of their own, so each is an item). In the order shown last,
+/// the new ones at the end.
+fn described_others(
     windows: &[WindowFacts],
     open_windows: &[OpenWindow],
     found: &[Found],
     foreground: Option<isize>,
     order: &[String],
 ) -> Vec<Other> {
-    let mut merged: Vec<Other> = Vec::new();
-    for group in others(windows, found, &[]) {
-        let Some(sample) = open_windows
-            .iter()
-            .find(|window| group.hwnds.contains(&window.hwnd))
-        else {
-            continue;
-        };
-        let Some((app_id, name)) = describe(&group.key, sample) else {
-            continue;
-        };
-        let key = app_id.to_lowercase();
-        match merged.iter_mut().find(|other| other.key == key) {
-            Some(other) => other.hwnds.extend(group.hwnds),
-            None => merged.push(Other {
-                id: short_id(&key),
-                key,
+    let mut described: Vec<Other> = others(windows, found, order)
+        .into_iter()
+        .filter_map(|group| {
+            let sample = open_windows
+                .iter()
+                .find(|window| group.hwnds.contains(&window.hwnd))?;
+            let (app_id, name) = describe(&group.key, sample)?;
+            Some(Other {
+                id: short_id(&group.key),
+                active: foreground.is_some_and(|front| group.hwnds.contains(&front)),
+                key: group.key,
                 app_id,
                 name,
                 hwnds: group.hwnds,
-                active: false,
-            }),
-        }
-    }
-    for other in &mut merged {
-        other.active = foreground.is_some_and(|front| other.hwnds.contains(&front));
-    }
-    keep_order(&mut merged, |other| &other.key, order);
-    merged
+            })
+        })
+        .collect();
+    keep_order(&mut described, |other| &other.key, order);
+    described
 }
 
 /// Looks at the windows and, if what the dock shows changed, tells it.
@@ -287,7 +277,7 @@ fn look(app: &AppHandle) {
     let show_others = crate::commands::settings::current(app).dock.show_open_apps;
     let previous_order = state().order.clone();
     let others_now: Vec<Other> = if show_others {
-        merged_others(&windows, &open_windows, &found, foreground, &previous_order)
+        described_others(&windows, &open_windows, &found, foreground, &previous_order)
     } else {
         Vec::new()
     };
@@ -349,6 +339,16 @@ pub fn activate_other(app: &AppHandle, key: &str) -> bool {
         .map(|other| other.hwnds.clone())
         .unwrap_or_default();
     click_on(app, &hwnds)
+}
+
+/// What `app_icon` and `launch` take for the open program that is not pinned
+/// named by `key`: for a new instance of it. `None` when it is no longer open.
+pub fn app_id_of_other(key: &str) -> Option<String> {
+    state()
+        .others
+        .iter()
+        .find(|other| other.id == key)
+        .map(|other| other.app_id.clone())
 }
 
 /// Asks the listening thread to look at the windows again.

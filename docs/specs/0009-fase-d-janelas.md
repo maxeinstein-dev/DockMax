@@ -37,10 +37,11 @@ Perguntas: dá para saber, com pouco custo, quais janelas o Windows daria um bot
 ## 3.1 D2 em detalhe: os programas abertos que não estão fixados
 
 - **Onde:** depois dos widgets e antes dos itens do sistema, com um separador, na ordem em que **apareceram** (a ordem não muda quando a pilha de janelas muda; um programa novo vai para o fim). A configuração `dock.showOpenApps` ("Mostrar apps abertos", ligada por padrão) os mostra ou esconde; desligada, o Rust nem os procura. A ordem é guardada enquanto estão escondidos.
-- **Quais:** as janelas com botão que nenhum programa fixado reivindica, agrupadas pelo AppID que declaram ou, sem AppID, pelo executável; e, depois de descritas, **um item por programa** (os perfis de um navegador, cada um com um AppID, viram um item).
+- **Quais:** as janelas com botão que nenhum programa fixado reivindica, agrupadas pelo AppID que declaram ou, sem AppID, pelo executável: **um item por AppID, como a barra do Windows** (os perfis de um navegador, cada um com o seu, ficam em itens separados).
 - **Nome e ícone:** o item da pasta Aplicativos do mesmo AppID; senão, o programa da pasta Aplicativos que roda o mesmo executável (lido uma vez, cerca de um segundo); senão, o próprio executável e o nome do arquivo (o mesmo caminho de um programa solto no dock). Janelas sem nenhuma dessas coisas não aparecem.
 - **O que a página recebe:** `{ key, appId, name, count, active }`. A `key` é opaca (16 dígitos hexadecimais, do hash do programa): o clique envia `activate_open(key)` e o Rust acha as janelas. A página não vê janela nem caminho de executável de um programa da pasta Aplicativos; para um executável solto o `appId` é o caminho, como o de um programa fixado por soltar. O `list_open_apps` e o evento `open-windows-changed` passam a levar `{ apps, others }`.
 - **Clique:** o mesmo dos fixados (traz, minimiza, próxima janela). Não arrasta e ainda não tem menu (D3).
+- **Botão do meio** (a roda), nos fixados e nestes: abre uma **nova instância** do programa, como a barra do Windows (um programa de instância única só traz a janela que já tem). É a configuração `dock.middleClick` ("Botão do meio", em Configurações): `newInstance` (padrão) ou `none`; mais ações (como "Fechar janela") entram com o menu do D3. Para um programa aberto que não está fixado, o dock envia `launch_open(key)` (a mesma chave opaca) e o Rust abre o programa pelo id que descreveu. A página impede o modo de rolagem do navegador no botão do meio.
 - **Indicador:** o mesmo ponto ou traço, sempre visível nesses itens (eles só existem enquanto estão abertos).
 
 ## 4. Testes
@@ -65,9 +66,10 @@ No app real (build de debug e de release, sem mexer no mouse: os comandos chamad
 
 No app real (build de debug, sem mouse), com Calculadora e Mapa de Caracteres abertos pelo teste e o Terminal, o Chrome (dois perfis), o Claude e o WhatsApp que já estavam abertos, nada fixado:
 
-- aparecem seis itens com ícone real, depois dos widgets e antes de Configurações; o Chrome com os dois perfis é **um** item;
+- aparecem seis itens com ícone real, depois dos widgets e antes de Configurações; o Chrome com **dois perfis são dois itens**, como na barra do Windows;
 - ativar a Calculadora pela chave traz a janela e o indicador "ativo" passa para ela; uma chave com formato errado é recusada (`notFound`) e uma chave desconhecida devolve `false`;
 - fechar o Mapa de Caracteres pelo botão de fechar tira o item na hora;
 - desligar "Mostrar apps abertos" tira todos; ligar de novo os traz de volta **na mesma ordem**.
 - **memória e CPU** (release, nada fixado, cinco programas abertos mostrados no dock, 25 s depois de abrir): 201 MB privados (198 MB 30 s depois) e 0,04 % do total dos 16 processadores. A meta do roadmap é cerca de 220 MB e menos de 1 %; o D2 custa pouco, mas a margem continua pequena.
 - **Não verificado:** o clique de mouse real, vários monitores e áreas de trabalho virtuais (como no D1).
+- **botão do meio:** no Mapa de Caracteres aberto, o evento do botão do meio abriu uma segunda instância (1 → 2 processos); com "Botão do meio" em "Nada", não abriu outra (continuou 2). O botão físico do mouse não foi usado: o evento foi enviado à página.

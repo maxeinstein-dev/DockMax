@@ -1400,6 +1400,113 @@ describe("Dock", () => {
         });
       });
 
+      describe("the middle button", () => {
+        const CODE: OtherForTest = {
+          key: "00000000000000aa",
+          appId: "C:\\Apps\\code.exe",
+          name: "code",
+          count: 1,
+          active: false,
+        };
+        const middle = (name: string) =>
+          fireEvent(
+            program(name),
+            new MouseEvent("auxclick", {
+              bubbles: true,
+              cancelable: true,
+              button: 1,
+            }),
+          );
+
+        it("opens a new instance of an open pinned program, and does not bring the old one", async () => {
+          pinned = withApps(CALCULATOR);
+          openNow = [{ id: CALCULATOR.id, count: 1, active: false }];
+          await renderDock();
+
+          middle("Calculadora");
+          await act(async () => {});
+
+          expect(invoke).toHaveBeenCalledWith("launch_app", {
+            id: CALCULATOR.id,
+          });
+          expect(invoke).not.toHaveBeenCalledWith(
+            "activate_app",
+            expect.anything(),
+          );
+          expect(program("Calculadora")).toHaveAttribute("data-opening");
+        });
+
+        it("opens a new instance of an open program that is not pinned, by its key", async () => {
+          openOthers = [CODE];
+          await renderDock();
+
+          middle("code");
+          await act(async () => {});
+
+          expect(invoke).toHaveBeenCalledWith("launch_open", {
+            key: CODE.key,
+          });
+          expect(invoke).not.toHaveBeenCalledWith(
+            "activate_open",
+            expect.anything(),
+          );
+        });
+
+        it("does nothing when the setting is off", async () => {
+          current = withDock({ middleClick: "none" });
+          pinned = withApps(CALCULATOR);
+          openOthers = [CODE];
+          await renderDock();
+
+          middle("Calculadora");
+          middle("code");
+          await act(async () => {});
+
+          expect(invoke).not.toHaveBeenCalledWith(
+            "launch_app",
+            expect.anything(),
+          );
+          expect(invoke).not.toHaveBeenCalledWith(
+            "launch_open",
+            expect.anything(),
+          );
+        });
+
+        it("keeps the page from starting its scroll mode", async () => {
+          pinned = withApps(CALCULATOR);
+          await renderDock();
+
+          const notPrevented = fireEvent.mouseDown(program("Calculadora"), {
+            button: 1,
+          });
+          const leftButton = fireEvent.mouseDown(program("Calculadora"), {
+            button: 0,
+          });
+
+          expect(notPrevented).toBe(false);
+          expect(leftButton).toBe(true);
+        });
+
+        it("does not react to the other buttons", async () => {
+          pinned = withApps(CALCULATOR);
+          await renderDock();
+
+          fireEvent(
+            program("Calculadora"),
+            new MouseEvent("auxclick", {
+              bubbles: true,
+              cancelable: true,
+              button: 2,
+            }),
+          );
+
+          expect(invoke).not.toHaveBeenCalledWith(
+            "launch_app",
+            expect.anything(),
+          );
+        });
+      });
+
       it("opens a program that is not open, as before", async () => {
         pinned = withApps(CALCULATOR, NOTEPAD);
         openNow = [{ id: CALCULATOR.id, count: 1, active: false }];
