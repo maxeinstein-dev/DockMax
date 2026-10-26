@@ -1,12 +1,16 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "e2e",
-  "description": "The hidden window the E2E suite drives the native dock through. It exists only in the test build (tauri.e2e.conf.json), where the two commands are registered.",
+  "description": "The hidden window the E2E suite drives the native dock through. It exists only in the test build (tauri.e2e.conf.json), where its commands are registered.",
   "windows": [
     "e2e"
   ],
   "permissions": [
     "allow-e2e-dock-view",
-    "allow-e2e-press-dock"
+    "allow-e2e-press-dock",
+    "allow-e2e-launcher-view",
+    "allow-e2e-launcher-toggle",
+    "allow-e2e-launcher-type",
+    "allow-e2e-launcher-key"
   ]
 }

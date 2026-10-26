@@ -101,6 +101,18 @@ const messages = {
       "Cada monitor com o seu dock, no lugar da barra de tarefas",
     launchAtLogin: "Iniciar com o Windows",
     launchAtLoginHint: "Abre o DockMax ao entrar no Windows",
+    /** The launcher (spec 0012): its switch, the notice when another
+     * program holds Alt+Space, and its history. */
+    launcher: {
+      label: "Lançador (Alt+Espaço)",
+      hint: "Busca e abre apps de qualquer lugar; também em Buscar apps…, no menu do dock",
+      taken: "Alt+Espaço está em uso por outro programa.",
+      takenDetail: "Abra o lançador por Buscar apps…, no menu do dock.",
+      history: "Histórico do lançador",
+      historyHint: "Os apps que você mais abre por ele aparecem primeiro",
+      clear: "Limpar o histórico",
+      cleared: "Histórico limpo",
+    },
     theme: {
       system: "Sistema",
       light: "Claro",

@@ -129,7 +129,9 @@ macro_rules! handler {
             commands::apps::reveal_app,
             commands::icons::list_icon_packs,
             commands::icons::reload_icon_packs,
-            commands::icons::open_icon_packs_folder
+            commands::icons::open_icon_packs_folder,
+            commands::launcher::launcher_status,
+            commands::launcher::clear_launcher_history
         ]
     };
 }
@@ -176,8 +178,14 @@ macro_rules! handler {
             commands::icons::list_icon_packs,
             commands::icons::reload_icon_packs,
             commands::icons::open_icon_packs_folder,
+            commands::launcher::launcher_status,
+            commands::launcher::clear_launcher_history,
             e2e::e2e_dock_view,
-            e2e::e2e_press_dock
+            e2e::e2e_press_dock,
+            e2e::e2e_launcher_view,
+            e2e::e2e_launcher_toggle,
+            e2e::e2e_launcher_type,
+            e2e::e2e_launcher_key
         ]
     };
 }

@@ -10,6 +10,8 @@ pub mod flyout;
 #[cfg(windows)]
 pub mod fullscreen;
 pub mod jumplist;
+#[cfg(windows)]
+pub mod launcher;
 pub mod memory;
 #[cfg(windows)]
 pub mod monitors;

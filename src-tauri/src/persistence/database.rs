@@ -68,10 +68,13 @@ const MIGRATION_1: &str = include_str!("../../migrations/0001_widgets.sql");
 /// SQL of migration 2: the pinned apps (spec 0006).
 const MIGRATION_2: &str = include_str!("../../migrations/0002_apps.sql");
 
+/// SQL of migration 3: what the launcher opened (spec 0012).
+const MIGRATION_3: &str = include_str!("../../migrations/0003_launcher.sql");
+
 /// The SQL of the schema migrations, in order; the database's
 /// `user_version` is the number of them applied. Never change or reorder one
 /// that has shipped: add the next file in `src-tauri/migrations/` instead.
-pub const MIGRATIONS: &[&str] = &[MIGRATION_1, MIGRATION_2];
+pub const MIGRATIONS: &[&str] = &[MIGRATION_1, MIGRATION_2, MIGRATION_3];
 
 /// `application_id` of a new database that replaces one set aside, until
 /// the transaction that makes its schema commits with the recovery notice.
@@ -803,7 +806,7 @@ pub(super) fn read_failed(error: rusqlite::Error) -> WidgetError {
 }
 
 /// Now, in milliseconds since the Unix epoch.
-pub(super) fn now_ms() -> i64 {
+pub(crate) fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| {

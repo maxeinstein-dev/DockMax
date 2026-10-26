@@ -166,6 +166,7 @@ Tudo o que as specs e os PRs marcaram como **não verificado**, para uma rodada 
 - [ ] Leitor de tela.
 - [ ] O dock nativo (spec 0011 H3) com o **mouse de verdade**: a ampliação nos três efeitos, arrastar para reordenar, soltar arquivos, os botões do meio e direito; os nove estilos e os reflexos na tela; a borda de cima; escala de 150 %.
 - [ ] Um dock por monitor (spec 0010 D4b): o mouse no segundo dock, ligar e desligar um monitor com o DockMax aberto, mudar "Dock em todos os monitores" com ele aberto, tela cheia de verdade no segundo monitor.
+- [ ] O lançador (spec 0012 L1): o Alt+Espaço com o teclado físico, o Narrador lendo a lista e a seleção, o IME de outro idioma na caixa de busca, o alto contraste, escala de 150 % e dois monitores.
 
 ### Medição de recursos (build de release 0.3.0, 2026-10-26)
 

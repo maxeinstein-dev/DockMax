@@ -74,6 +74,7 @@ function SettingsApp() {
                 widgets={widgets}
                 apps={apps}
                 withTrayInDock
+                withLauncher
               />
             </>
           ) : null}

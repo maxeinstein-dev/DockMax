@@ -215,6 +215,9 @@ export interface Settings {
   dock: DockSettings;
   /** Whether the DockMax opens when the user signs in to Windows. */
   launchAtLogin: boolean;
+  /** Whether Alt+Space opens the launcher (spec 0012); the menus open it
+   * either way. */
+  launcher: boolean;
 }
 
 /** Named icon sizes offered by the Settings panel; must match `SizePreset`

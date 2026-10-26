@@ -10,6 +10,7 @@ use crate::windows::dock;
 /// The product name: the same in every locale.
 const TOOLTIP: &str = "DockMax";
 
+const LAUNCHER_ID: &str = "launcher";
 const TASK_MANAGER_ID: &str = "task-manager";
 const AUTO_HIDE_ID: &str = "auto-hide";
 const OPEN_SETTINGS_ID: &str = "open-settings";
@@ -23,6 +24,7 @@ struct AutoHideItem(CheckMenuItem<Wry>);
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let text = &i18n::messages().tray;
     let item = |id: &str, label: &str| MenuItem::with_id(app, id, label, true, None::<&str>);
+    let launcher = item(LAUNCHER_ID, text.search_apps)?;
     let task_manager = item(TASK_MANAGER_ID, text.task_manager)?;
     let settings = item(OPEN_SETTINGS_ID, text.open_settings)?;
     let auto_hide = CheckMenuItem::with_id(
@@ -37,6 +39,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let menu = Menu::with_items(
         app,
         &[
+            &launcher,
             &task_manager,
             &PredefinedMenuItem::separator(app)?,
             &settings,
@@ -70,6 +73,8 @@ pub fn show_auto_hide(app: &AppHandle, on: bool) {
 
 fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     match event.id().as_ref() {
+        #[cfg(windows)]
+        LAUNCHER_ID => crate::windows::launcher::toggle(),
         TASK_MANAGER_ID => {
             if let Err(error) = crate::windows::apps::open_task_manager() {
                 log::warn!("tray: the Task Manager could not be opened: {error}");

@@ -80,6 +80,7 @@ const SETTINGS: Settings = {
   version: 1,
   theme: "system",
   launchAtLogin: false,
+  launcher: true,
   dock: {
     edge: "bottom",
     iconSize: 48,

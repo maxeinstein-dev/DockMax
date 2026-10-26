@@ -1913,6 +1913,7 @@ impl Dock {
                         log::warn!("dock: the settings could not be opened: {error}");
                     }
                 }
+                Some(MenuChoice::Launcher) => super::launcher::toggle(),
                 Some(MenuChoice::AutoHide) => {
                     let changed = crate::commands::settings::change(app, |settings| {
                         settings.dock.auto_hide = !settings.dock.auto_hide;
@@ -2075,15 +2076,17 @@ fn opening_offset(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MenuChoice {
     TaskManager,
+    Launcher,
     Settings,
     AutoHide,
     Quit,
 }
 
 /// The dock's menu, in order; `None` is a separator.
-fn dock_menu_items() -> [Option<(MenuChoice, &'static str)>; 6] {
+fn dock_menu_items() -> [Option<(MenuChoice, &'static str)>; 7] {
     let text = &crate::i18n::messages().tray;
     [
+        Some((MenuChoice::Launcher, text.search_apps)),
         Some((MenuChoice::TaskManager, text.task_manager)),
         None,
         Some((MenuChoice::Settings, text.open_settings)),
@@ -2444,6 +2447,11 @@ pub fn settings_moved(app: &AppHandle) {
     }));
 }
 
+/// Whether Windows shows apps dark (the launcher follows it too).
+pub fn system_dark() -> bool {
+    theme::system_dark()
+}
+
 /// Whether a dock is on screen.
 pub fn is_visible() -> bool {
     shared().docks.iter().any(|placed| placed.visible)
@@ -2545,6 +2553,7 @@ mod tests {
         assert_eq!(
             labels,
             [
+                Some("Buscar apps…"),
                 Some("Gerenciador de Tarefas"),
                 None,
                 Some("Configurações"),

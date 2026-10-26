@@ -64,6 +64,9 @@ pub struct Settings {
     /// Whether the DockMax opens when the user signs in to Windows (the entry
     /// in the user's `Run` key). Off unless the user turns it on.
     pub launch_at_login: bool,
+    /// Whether Alt+Space opens the launcher (spec 0012). On unless the user
+    /// turns it off; the menus open it either way.
+    pub launcher: bool,
 }
 
 impl Default for Settings {
@@ -73,6 +76,7 @@ impl Default for Settings {
             theme: Theme::default(),
             dock: DockSettings::default(),
             launch_at_login: false,
+            launcher: true,
         }
     }
 }
@@ -576,7 +580,8 @@ mod tests {
                 "showOpenApps": true, "middleClick": "newInstance",
                 "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2
               },
-              "launchAtLogin": false
+              "launchAtLogin": false,
+              "launcher": true
             }"#,
         )
         .unwrap();

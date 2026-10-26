@@ -92,6 +92,34 @@ pub async fn e2e_press_dock(name: String) -> Result<(), String> {
     }
 }
 
+/// What the launcher shows now (spec 0012 L1).
+#[tauri::command]
+pub async fn e2e_launcher_view() -> Result<crate::windows::launcher::View, String> {
+    crate::windows::launcher::view().ok_or_else(|| "the launcher did not answer".into())
+}
+
+/// Opens the launcher, or closes it when open, as Alt+Space does.
+#[tauri::command]
+pub async fn e2e_launcher_toggle() {
+    crate::windows::launcher::toggle();
+}
+
+/// Types `text` into the launcher's box.
+#[tauri::command]
+pub async fn e2e_launcher_type(text: String) {
+    crate::windows::launcher::type_text(text);
+}
+
+/// Presses `up`, `down` or `escape` in the launcher's box.
+#[tauri::command]
+pub async fn e2e_launcher_key(key: String) -> Result<(), String> {
+    if crate::windows::launcher::press_key(key) {
+        Ok(())
+    } else {
+        Err("no such key, or no launcher".into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

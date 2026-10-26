@@ -24,6 +24,8 @@
     "allow-reload-icon-packs",
     "allow-open-icon-packs-folder",
     "allow-list-tray",
+    "allow-launcher-status",
+    "allow-clear-launcher-history",
     "log:allow-log"
   ]
 }

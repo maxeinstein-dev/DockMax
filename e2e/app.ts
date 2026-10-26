@@ -53,6 +53,38 @@ export async function pressDockItem(name: string) {
   await invoke("e2e_press_dock", { name });
 }
 
+/** What the launcher shows (`e2e_launcher_view`, test build only). */
+export interface LauncherView {
+  open: boolean;
+  query: string;
+  /** The names of the results, in order. */
+  results: string[];
+  selected: number | null;
+  /** What the list says besides the rows: `none`, `reading`, `hint` or
+   * `nothingFound`. */
+  note: string;
+}
+
+/** What the launcher shows now (spec 0012 L1): a native window. */
+export function launcherView(): Promise<LauncherView> {
+  return invoke<LauncherView>("e2e_launcher_view");
+}
+
+/** Opens the launcher, or closes it, as Alt+Space does. */
+export async function toggleLauncher() {
+  await invoke("e2e_launcher_toggle");
+}
+
+/** Types `text` into the launcher's box (replacing what was there). */
+export async function typeInLauncher(text: string) {
+  await invoke("e2e_launcher_type", { text });
+}
+
+/** Presses `up`, `down` or `escape` in the launcher's box. */
+export async function pressLauncherKey(key: "up" | "down" | "escape") {
+  await invoke("e2e_launcher_key", { key });
+}
+
 /** The test build's identifier (`src-tauri/tauri.e2e.conf.json`). */
 export const E2E_IDENTIFIER = "dev.maxsueleinstein.dockmax.e2e";
 
