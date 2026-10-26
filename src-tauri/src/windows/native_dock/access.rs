@@ -40,18 +40,32 @@ pub struct Entry {
     pub rect: (f64, f64, f64, f64),
 }
 
-static ENTRIES: Mutex<Vec<Entry>> = Mutex::new(Vec::new());
+/// Each dock's items, by its window (one dock per monitor).
+static ENTRIES: Mutex<Vec<(isize, Vec<Entry>)>> = Mutex::new(Vec::new());
 
-/// What the dock shows now.
-pub fn publish(entries: Vec<Entry>) {
-    *ENTRIES.lock().unwrap_or_else(PoisonError::into_inner) = entries;
+/// What the dock of the window `hwnd` shows now.
+pub fn publish(hwnd: isize, entries: Vec<Entry>) {
+    let mut all = ENTRIES.lock().unwrap_or_else(PoisonError::into_inner);
+    all.retain(|(window, _)| *window != hwnd);
+    all.push((hwnd, entries));
 }
 
-fn entries() -> Vec<Entry> {
+/// The dock of the window `hwnd` is gone.
+pub fn forget(hwnd: isize) {
     ENTRIES
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .clone()
+        .retain(|(window, _)| *window != hwnd);
+}
+
+fn entries(hwnd: isize) -> Vec<Entry> {
+    ENTRIES
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .iter()
+        .find(|(window, _)| *window == hwnd)
+        .map(|(_, entries)| entries.clone())
+        .unwrap_or_default()
 }
 
 /// The dock's name for assistive technology.
@@ -112,7 +126,7 @@ impl IRawElementProviderSimple_Impl for Root_Impl {
 
 impl IRawElementProviderFragment_Impl for Root_Impl {
     fn Navigate(&self, direction: NavigateDirection) -> Result<IRawElementProviderFragment> {
-        let entries = entries();
+        let entries = entries(self.hwnd);
         let found = match direction {
             NavigateDirection_FirstChild => entries.first(),
             NavigateDirection_LastChild => entries.last(),
@@ -149,7 +163,7 @@ impl IRawElementProviderFragment_Impl for Root_Impl {
 
 impl IRawElementProviderFragmentRoot_Impl for Root_Impl {
     fn ElementProviderFromPoint(&self, x: f64, y: f64) -> Result<IRawElementProviderFragment> {
-        let found = entries().into_iter().find(|entry| {
+        let found = entries(self.hwnd).into_iter().find(|entry| {
             let (left, top, width, height) = entry.rect;
             x >= left && y >= top && x < left + width && y < top + height
         });
@@ -176,7 +190,7 @@ struct Item {
 
 impl Item_Impl {
     fn entry(&self) -> Option<(usize, Entry)> {
-        entries()
+        entries(self.hwnd)
             .into_iter()
             .enumerate()
             .find(|(_, entry)| entry.key == self.key)
@@ -233,7 +247,7 @@ impl IRawElementProviderFragment_Impl for Item_Impl {
             let root: IRawElementProviderFragment = Root { hwnd: self.hwnd }.into();
             return Ok(root);
         }
-        let entries = entries();
+        let entries = entries(self.hwnd);
         let Some(index) = entries.iter().position(|entry| entry.key == self.key) else {
             return none();
         };

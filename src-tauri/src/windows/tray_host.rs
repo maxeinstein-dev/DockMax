@@ -38,12 +38,12 @@ use ::windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use ::windows::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, CopyIcon, CreateWindowExW, DefWindowProcW, DestroyIcon,
     DestroyWindow, DispatchMessageW, EnumWindows, GetClassNameW, GetCursorPos, GetIconInfo,
-    GetMessageW, GetWindowThreadProcessId, HICON, HWND_BROADCAST, HWND_NOTOPMOST, HWND_TOPMOST,
-    ICONINFO, IsWindow, KillTimer, MSG, PostMessageW, PostQuitMessage, RegisterClassW,
-    RegisterWindowMessageW, SMTO_ABORTIFHUNG, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    SendMessageTimeoutW, SetTimer, SetWindowPos, TranslateMessage, WM_CLOSE, WM_COPYDATA,
-    WM_DESTROY, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_TIMER, WNDCLASSW,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    GetMessageW, GetWindowThreadProcessId, HICON, HWND_BOTTOM, HWND_BROADCAST, HWND_NOTOPMOST,
+    HWND_TOPMOST, ICONINFO, IsWindow, KillTimer, MSG, PostMessageW, PostQuitMessage,
+    RegisterClassW, RegisterWindowMessageW, SMTO_ABORTIFHUNG, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOSIZE, SendMessageTimeoutW, SetTimer, SetWindowPos, TranslateMessage, WM_CLOSE,
+    WM_COPYDATA, WM_DESTROY, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_TIMER,
+    WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 use ::windows::core::{BOOL, PCWSTR, w};
 use base64::Engine as _;
@@ -654,6 +654,22 @@ pub fn raise() {
     // again puts it at the top of the topmost windows.
     let _ = unsafe { SetWindowPos(hwnd, Some(HWND_NOTOPMOST), 0, 0, 0, 0, flags) };
     let _ = unsafe { SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, flags) };
+}
+
+/// Runs `call` with the host's window below the taskbar's, so what `call`
+/// sends to `Shell_TrayWnd` reaches Explorer itself: the dock's own app bar
+/// bands, which Explorer grants through the host but leaves out of the work
+/// area. An icon sent in that instant goes to Explorer alone, as when the
+/// host is not running.
+pub fn aside<T>(call: impl FnOnce() -> T) -> T {
+    let Some(hwnd) = window() else {
+        return call();
+    };
+    let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
+    let _ = unsafe { SetWindowPos(hwnd, Some(HWND_BOTTOM), 0, 0, 0, 0, flags) };
+    let result = call();
+    raise();
+    result
 }
 
 /// Starts the host: the window on a thread of its own. `on_change` is called

@@ -179,6 +179,15 @@ function SettingsPanel({
         />
       ) : null}
       <ToggleField
+        label={t.settings.everyMonitor}
+        hint={t.settings.everyMonitorHint}
+        checked={shown?.dock.everyMonitor ?? true}
+        disabled={shown === null}
+        onChange={(everyMonitor) =>
+          change((s) => ({ ...s, dock: { ...s.dock, everyMonitor } }))
+        }
+      />
+      <ToggleField
         label={t.settings.showOpenApps}
         hint={t.settings.showOpenAppsHint}
         checked={shown?.dock.showOpenApps ?? true}

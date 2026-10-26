@@ -116,7 +116,7 @@ Revisão de 2026-10-19 (fim da Fase 2): a direção foi mantida e o roadmap ganh
 - [ ] Orçamento de CPU em repouso, medido junto com a memória.
 - [ ] Implementar provedores de bateria e rede.
 - [ ] Investigar enumeração, foco, ativação e minimização de janelas.
-- [ ] Definir comportamento em múltiplos monitores (tela cheia já tratada na 3a).
+- [x] Definir comportamento em múltiplos monitores: um dock por monitor, cada um com a sua faixa e a sua regra de tela cheia ([spec 0010](specs/0010-fase-d4-monitores-e-tela-cheia.md), D4b).
 - [ ] Testar inicialização com o Windows.
 - [ ] Avaliar limites de acesso a métricas de hardware.
 - [ ] Adicionar testes e fallback quando uma API não estiver disponível.
@@ -165,6 +165,7 @@ Tudo o que as specs e os PRs marcaram como **não verificado**, para uma rodada 
 - [ ] Uso longo (horas): memória e CPU em repouso.
 - [ ] Leitor de tela.
 - [ ] O dock nativo (spec 0011 H3) com o **mouse de verdade**: a ampliação nos três efeitos, arrastar para reordenar, soltar arquivos, os botões do meio e direito; os nove estilos e os reflexos na tela; a borda de cima; escala de 150 %.
+- [ ] Um dock por monitor (spec 0010 D4b): o mouse no segundo dock, ligar e desligar um monitor com o DockMax aberto, mudar "Dock em todos os monitores" com ele aberto, tela cheia de verdade no segundo monitor.
 
 ### Medição de recursos (build de release 0.3.0, 2026-10-26)
 
@@ -178,6 +179,8 @@ Máquina do autor (Windows 11, 16 processadores lógicos, um monitor, escala de 
 A memória subiu 13 MB entre as duas medições; as duas ficam abaixo da meta. Não foi medido um uso longo (horas).
 
 **Com o dock nativo** (spec 0011 H3, release, 2026-10-26, mesma máquina): **64,5 MB** de memória privada em repouso, num processo só (nenhum WebView2), 0 % de CPU; com um painel aberto o WebView2 volta enquanto ele estiver aberto, e sai 45 s depois de fechado (spec 0011 §7).
+
+**Com um dock por monitor** (spec 0010 D4b, release, 2026-10-26, dois monitores): cerca de **88 MB** de memória privada com os dois docks, num processo só, medido 7 s depois de abrir.
 
 ### Verificação do instalador (2026-10-26)
 

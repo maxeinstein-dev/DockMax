@@ -130,6 +130,7 @@ export const DEFAULT_LOOK = {
   showOpenApps: true,
   middleClick: "newInstance",
   taskbar: "hidden",
+  everyMonitor: true,
   bottomSpace: DEFAULT_BOTTOM_SPACE,
 } as const satisfies Pick<
   DockSettings,
@@ -145,6 +146,7 @@ export const DEFAULT_LOOK = {
   | "showOpenApps"
   | "middleClick"
   | "taskbar"
+  | "everyMonitor"
   | "bottomSpace"
 >;
 
@@ -178,6 +180,9 @@ export interface DockSettings {
    * out while it is empty. */
   trayInDock?: string[];
   taskbar: TaskbarMode;
+  /** A dock on every monitor, each holding its own edge, or only on the
+   * primary one (spec 0010 D4b). */
+  everyMonitor: boolean;
   /** Distance between the dock and the screen edge, in logical pixels,
    * 0–`MAX_BOTTOM_SPACE`. */
   bottomSpace: number;

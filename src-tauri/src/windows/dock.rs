@@ -1,10 +1,10 @@
-//! Where the dock sits and what the rest of the app asks of it (spec 0011
-//! H3): the dock itself is the native window of `native_dock`; this places
-//! it on the edge, holds the edge as an app bar when the taskbar is taken,
-//! and shows, hides and tells it what changed.
+//! Where the docks sit and what the rest of the app asks of them (spec 0011
+//! H3, spec 0010 D4b): each dock is a native window of `native_dock`, one per
+//! monitor; this places each on its monitor's edge, holds that edge as an app
+//! bar when the taskbar is taken, and shows, hides and tells them what
+//! changed.
 
 use std::error::Error;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use tauri::{AppHandle, Manager};
 
@@ -144,6 +144,7 @@ pub fn moves_the_dock(before: &DockSettings, after: &DockSettings) -> bool {
         || before.icon_size != after.icon_size
         || before.taskbar != after.taskbar
         || before.bottom_space != after.bottom_space
+        || before.every_monitor != after.every_monitor
 }
 
 /// Makes the dock and shows it on the primary monitor. On the main thread.
@@ -194,28 +195,11 @@ pub fn settings_changed(app: &AppHandle, before: &DockSettings, after: &DockSett
     native_dock::settings_moved(app);
 }
 
-/// The dock is hidden because a program is in full screen on its monitor
-/// (spec 0010 D4): it comes back when that ends. A dock the user hid stays
-/// hidden.
-static HIDDEN_FOR_FULLSCREEN: AtomicBool = AtomicBool::new(false);
-
-/// Hides the dock while a program is in full screen on its monitor, and shows
-/// it again after, unless the user hid it meanwhile.
-pub fn set_fullscreen(app: &AppHandle, full: bool) {
-    if full {
-        if !is_visible() {
-            return;
-        }
-        HIDDEN_FOR_FULLSCREEN.store(true, Ordering::SeqCst);
-        log::info!("dock: a program is in full screen, stepping aside");
-        hide(app);
-    } else {
-        if !HIDDEN_FOR_FULLSCREEN.swap(false, Ordering::SeqCst) {
-            return;
-        }
-        log::info!("dock: full screen is over, back");
-        native_dock::show();
-    }
+/// A program is in full screen on the monitor `key` (`full`), or not any
+/// more: that monitor's dock steps aside, and comes back after unless the user
+/// hid the docks meanwhile (spec 0010 D4).
+pub fn set_fullscreen(key: &str, full: bool) {
+    native_dock::set_fullscreen(key.to_string(), full);
 }
 
 /// Whether the dock is on screen.
@@ -223,9 +207,9 @@ pub fn is_visible() -> bool {
     native_dock::is_visible()
 }
 
-/// Hides the dock (and its panel) when visible, shows it otherwise.
+/// Hides the docks (and the panel) when one is visible, shows them
+/// otherwise.
 pub fn toggle(app: &AppHandle) -> Result<(), Box<dyn Error>> {
-    HIDDEN_FOR_FULLSCREEN.store(false, Ordering::SeqCst);
     if is_visible() {
         hide(app);
     } else {
@@ -255,76 +239,32 @@ pub fn geometry() -> Option<((i32, i32), f64, Rect)> {
     native_dock::geometry()
 }
 
-/// The primary monitor: its rectangle, its work area and its scale.
-#[cfg(windows)]
-fn primary_monitor() -> Option<(Rect, Rect, f64)> {
-    use windows::Win32::Foundation::POINT;
-    use windows::Win32::Graphics::Gdi::{
-        GetMonitorInfoW, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint,
-    };
-    use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
-
-    let monitor = unsafe { MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY) };
-    let mut info = MONITORINFO {
-        cbSize: size_of::<MONITORINFO>() as u32,
-        ..Default::default()
-    };
-    if !unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
-        return None;
-    }
-    let (mut dpi_x, mut dpi_y) = (96u32, 96u32);
-    let _ = unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) };
-    let rect = |r: windows::Win32::Foundation::RECT| Rect {
-        x: r.left,
-        y: r.top,
-        width: u32::try_from(r.right - r.left).unwrap_or(0),
-        height: u32::try_from(r.bottom - r.top).unwrap_or(0),
-    };
-    Some((
-        rect(info.rcMonitor),
-        rect(info.rcWork),
-        f64::from(dpi_x) / 96.0,
-    ))
-}
-
-/// The primary monitor's work area, in physical pixels, and its scale.
+/// The work area of the monitor of the dock the panel anchors to, in physical
+/// pixels, and its scale.
 pub fn work_area() -> Option<(Rect, f64)> {
-    #[cfg(windows)]
-    {
-        primary_monitor().map(|(_, work, scale)| (work, scale))
-    }
-    #[cfg(not(windows))]
-    {
-        None
-    }
+    native_dock::work_area()
 }
 
-/// Where the dock window of `size` logical pixels goes, with a bar
-/// `bar_height` tall, and the monitor's scale: on the edge of the primary
-/// monitor the settings choose, in the band of its own when it holds the
-/// edge. Called by the dock on the main thread.
+/// Where the dock window of `size` logical pixels goes on `monitor`, with a
+/// bar `bar_height` tall, and the monitor's scale: on the edge the settings
+/// choose, in the band of its own when it holds the edge. Called by the dock
+/// on the main thread.
+#[cfg(windows)]
 pub fn place_native(
     app: &AppHandle,
     settings: &DockSettings,
+    monitor: &super::monitors::Monitor,
     size: (f64, f64),
     bar_height: f64,
 ) -> Option<(Rect, f64)> {
-    #[cfg(windows)]
-    {
-        let (monitor, work, scale) = primary_monitor()?;
-        let edge = Edge::from(settings.edge);
-        let margin = f64::from(settings.bottom_space);
-        let rect = match reserve_edge(app, settings, monitor, scale, bar_height) {
-            Some(band) => docked_rect(band, monitor, scale, size, edge, margin),
-            None => dock_rect_with_margin(work, scale, size, edge, margin),
-        };
-        Some((rect, scale))
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = (app, settings, size, bar_height);
-        None
-    }
+    let edge = Edge::from(settings.edge);
+    let margin = f64::from(settings.bottom_space);
+    let scale = monitor.scale;
+    let rect = match reserve_edge(app, settings, monitor, bar_height) {
+        Some(band) => docked_rect(band, monitor.rect, scale, size, edge, margin),
+        None => dock_rect_with_margin(monitor.work, scale, size, edge, margin),
+    };
+    Some((rect, scale))
 }
 
 /// Where the settings keep the taskbar's state file, in the app's local
@@ -373,32 +313,34 @@ fn apply_taskbar(app: &AppHandle, mode: crate::domain::settings::TaskbarMode) {
     }
 }
 
-/// With the taskbar taken, reserves the band along the edge of the primary
-/// monitor and returns it; `None` (and the band given back) when the taskbar
-/// stays or the band could not be had.
+/// With the taskbar taken, reserves the band along the edge of `monitor`
+/// and returns it; `None` (and the band given back) when the taskbar stays
+/// or the band could not be had.
 #[cfg(windows)]
 fn reserve_edge(
     app: &AppHandle,
     settings: &DockSettings,
-    monitor: Rect,
-    scale_factor: f64,
+    monitor: &super::monitors::Monitor,
     bar_height: f64,
 ) -> Option<Rect> {
     use super::appbar;
     let _ = app;
     if !settings.taskbar.reserves_the_edge() || !super::taskbar::is_held() {
-        appbar::set(None);
+        appbar::set(&monitor.key, None);
         return None;
     }
-    // From the app bar's thread: only queues the work for the dock.
+    // From the app bar's thread: only queues the work for the docks.
     appbar::start(native_dock::reposition);
     let thickness =
-        appbar::band_thickness(bar_height, f64::from(settings.bottom_space), scale_factor);
-    appbar::set(Some(appbar::Request {
-        edge: Edge::from(settings.edge),
-        monitor,
-        thickness,
-    }))
+        appbar::band_thickness(bar_height, f64::from(settings.bottom_space), monitor.scale);
+    appbar::set(
+        &monitor.key,
+        Some(appbar::Request {
+            edge: Edge::from(settings.edge),
+            monitor: monitor.rect,
+            thickness,
+        }),
+    )
 }
 
 #[cfg(test)]

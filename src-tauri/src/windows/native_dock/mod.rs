@@ -2,10 +2,14 @@
 //! painted with Direct2D, with no WebView2. The WebView2 is loaded only
 //! when a panel or the Configurações app opens.
 //!
-//! Everything about the dock lives on the main thread (the one of the event
-//! loop, which also runs this window's procedure). Other threads reach it
-//! through `post`, which queues the work and wakes the window; what other
-//! threads need to read (whether it is on screen, where it is) is kept in
+//! One dock per monitor (spec 0010 D4b), each with its own window, its own
+//! band on its monitor's edge and its own full screen rule; they show the
+//! same items.
+//!
+//! Everything about the docks lives on the main thread (the one of the event
+//! loop, which also runs their windows' procedure). Other threads reach them
+//! through `post`, which queues the work and wakes them; what other threads
+//! need to read (whether they are on screen, where they are) is kept in
 //! `SHARED`.
 
 mod access;
@@ -18,7 +22,7 @@ mod theme;
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -30,20 +34,22 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     ReleaseCapture, SetCapture, TME_LEAVE, TRACKMOUSEEVENT, TrackMouseEvent,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CS_DBLCLKS, CreateWindowExW, DefWindowProcW, HWND_TOPMOST, IDC_ARROW, KillTimer, LoadCursorW,
-    PostMessageW, RegisterClassW, SPI_GETCLIENTAREAANIMATION, SW_HIDE, SW_SHOWNOACTIVATE,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SetTimer,
-    SetWindowPos, ShowWindow, SystemParametersInfoW, WM_APP, WM_CAPTURECHANGED, WM_CLOSE,
-    WM_DISPLAYCHANGE, WM_DPICHANGED, WM_GETOBJECT, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP,
-    WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_RBUTTONUP, WM_SETTINGCHANGE, WM_TIMER,
-    WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CS_DBLCLKS, CreateWindowExW, DefWindowProcW, DestroyWindow, HWND_MESSAGE, HWND_TOPMOST,
+    IDC_ARROW, KillTimer, LoadCursorW, PostMessageW, RegisterClassW, SPI_GETCLIENTAREAANIMATION,
+    SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SetTimer, SetWindowPos, ShowWindow, SystemParametersInfoW,
+    WM_APP, WM_CAPTURECHANGED, WM_CLOSE, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_GETOBJECT,
+    WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE,
+    WM_RBUTTONUP, WM_SETTINGCHANGE, WM_TIMER, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
-use windows::core::w;
+use windows::core::{PCWSTR, w};
 
 use self::paint::{Face, Painter, Scene, Status, StripCell, Tile, Tip};
 use self::strip::Cell;
 use self::theme::{Color, Palette};
 use super::dock::Rect;
+use super::monitors::Monitor;
 use super::panel::{LogicalRect, PanelId};
 use crate::domain::apps::AppsSnapshot;
 use crate::domain::dock_items::{self, Item, Names, SystemItem};
@@ -55,6 +61,9 @@ use crate::domain::open_apps::OpenSnapshot;
 use crate::domain::settings::{DockEdge, MiddleClick, OpenAnimation, Settings, TaskbarMode, Theme};
 use crate::domain::widgets::WidgetsSnapshot;
 use crate::persistence::database::Storage;
+
+/// The class of the docks' windows (and of the hidden one that wakes them).
+const CLASS: PCWSTR = w!("DockMaxDock");
 
 /// `WM_MOUSELEAVE`, which the features in use do not name.
 const WM_MOUSELEAVE: u32 = 0x02A3;
@@ -80,28 +89,39 @@ const WARM_DELAY: u32 = 150;
 /// focus: the click is the last input, so Windows lets DockMax have it.
 const CLICK_GRANTS_FOCUS: Duration = Duration::from_secs(2);
 
-/// What other threads read about the dock.
-#[derive(Debug, Default)]
-struct Shared {
+/// What other threads read about one dock.
+#[derive(Debug, Clone)]
+struct Placed {
+    hwnd: isize,
+    /// Its monitor: its key, its handle (an `HMONITOR` as a number), its
+    /// rectangle and its work area.
+    monitor: String,
+    handle: isize,
+    rect: Rect,
+    work: Rect,
     visible: bool,
     /// The window on the screen, in physical pixels.
-    window: Option<Rect>,
+    window: Rect,
     scale: f64,
     /// The bar on the screen, in physical pixels.
-    bar: Option<Rect>,
-    /// Each item's box at rest, relative to the window, in logical pixels:
-    /// where the panel of each anchors.
-    anchors: Vec<(PanelId, LogicalRect)>,
-    /// When the dock was last clicked.
+    bar: Rect,
+}
+
+/// What other threads read about the docks (one per monitor).
+#[derive(Debug, Default)]
+struct Shared {
+    /// The primary monitor's first.
+    docks: Vec<Placed>,
+    /// The window of the dock whose item opened the panel last: the panel
+    /// anchors to it.
+    active: isize,
+    /// When a dock was last clicked.
     clicked: Option<Instant>,
 }
 
 static SHARED: Mutex<Shared> = Mutex::new(Shared {
-    visible: false,
-    window: None,
-    scale: 1.0,
-    bar: None,
-    anchors: Vec::new(),
+    docks: Vec::new(),
+    active: 0,
     clicked: None,
 });
 
@@ -109,15 +129,23 @@ fn shared() -> std::sync::MutexGuard<'static, Shared> {
     SHARED.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// The window, once made (0 before).
-static WINDOW: AtomicIsize = AtomicIsize::new(0);
+/// The hidden window that wakes the docks for the work of other threads
+/// (0 before it is made).
+static WAKE: AtomicIsize = AtomicIsize::new(0);
 
-type Work = Box<dyn FnOnce(&mut Dock) + Send>;
+/// Whether the docks are on screen, as the user (or the app) last said: a
+/// dock made for a monitor plugged in meanwhile shows only then.
+static SHOWN: AtomicBool = AtomicBool::new(false);
+
+static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
+
+type Work = Box<dyn FnOnce(&mut Vec<Dock>) + Send>;
 
 static QUEUE: Mutex<Vec<Work>> = Mutex::new(Vec::new());
 
 thread_local! {
-    static DOCK: RefCell<Option<Dock>> = const { RefCell::new(None) };
+    /// One per monitor, the primary monitor's first.
+    static DOCKS: RefCell<Vec<Dock>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Something the dock asks of the rest of the app, done once the dock's own
@@ -167,6 +195,8 @@ enum Loaded {
 pub struct Dock {
     app: AppHandle,
     hwnd: HWND,
+    /// The monitor it is on.
+    monitor: Monitor,
     painter: Painter,
     data: Data,
     items: Vec<Item>,
@@ -204,46 +234,102 @@ pub struct Dock {
     tracking: bool,
     animating: bool,
     visible: bool,
+    /// Hidden because a program is in full screen on its monitor (spec 0010
+    /// D4): it comes back when that ends.
+    hidden_for_fullscreen: bool,
     effects: Vec<Effect>,
 }
 
-/// Queues `work` for the dock, from any thread; nothing happens before the
-/// dock is made.
-pub fn post(work: impl FnOnce(&mut Dock) + Send + 'static) {
+/// Queues `work` for the docks, from any thread, and wakes them.
+fn queue(work: Work) {
     QUEUE
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .push(Box::new(work));
-    let hwnd = WINDOW.load(Ordering::SeqCst);
+        .push(work);
+    let hwnd = WAKE.load(Ordering::SeqCst);
     if hwnd != 0 {
         let _ = unsafe { PostMessageW(Some(HWND(hwnd as _)), WM_RUN, WPARAM(0), LPARAM(0)) };
     }
 }
 
-/// Makes the dock's window, hidden. On the main thread, once.
+/// Queues `work` for every dock.
+pub fn post(work: impl Fn(&mut Dock) + Send + 'static) {
+    queue(Box::new(move |docks| {
+        for dock in docks.iter_mut() {
+            work(dock);
+        }
+    }));
+}
+
+/// Queues `work` for the dock of the window `hwnd`, if it is still there.
+fn post_to(hwnd: isize, work: impl FnOnce(&mut Dock) + Send + 'static) {
+    queue(Box::new(move |docks| {
+        if let Some(dock) = docks.iter_mut().find(|dock| dock.hwnd.0 as isize == hwnd) {
+            work(dock);
+        }
+    }));
+}
+
+/// Queues `work` for the dock of the primary monitor.
+#[cfg_attr(not(feature = "e2e"), allow(dead_code))]
+fn post_primary(work: impl FnOnce(&mut Dock) + Send + 'static) {
+    queue(Box::new(move |docks| {
+        if let Some(dock) = docks.first_mut() {
+            work(dock);
+        }
+    }));
+}
+
+/// Makes the docks' windows, one per monitor, hidden. On the main thread,
+/// once.
 pub fn start(app: &AppHandle) -> windows::core::Result<()> {
     // COM and OLE on the main thread, for the images (WIC) and the drop
     // target: WebView2 used to do it, and none runs at startup any more.
     if let Err(error) = unsafe { windows::Win32::System::Ole::OleInitialize(None) } {
         log::warn!("dock: OLE could not be initialized: {error}");
     }
+    let _ = APP.set(app.clone());
     let instance = unsafe { GetModuleHandleW(None) }?;
-    let class = w!("DockMaxDock");
     let class_data = WNDCLASSW {
         style: CS_DBLCLKS,
         lpfnWndProc: Some(procedure),
         hInstance: instance.into(),
-        lpszClassName: class,
+        lpszClassName: CLASS,
         hCursor: unsafe { LoadCursorW(None, IDC_ARROW) }.unwrap_or_default(),
         ..Default::default()
     };
     unsafe { RegisterClassW(&class_data) };
+    // A window only for messages: what other threads ask of the docks.
+    let wake = unsafe {
+        CreateWindowExW(
+            Default::default(),
+            CLASS,
+            w!(""),
+            Default::default(),
+            0,
+            0,
+            0,
+            0,
+            Some(HWND_MESSAGE),
+            None,
+            Some(instance.into()),
+            None,
+        )
+    }?;
+    WAKE.store(wake.0 as isize, Ordering::SeqCst);
+    with_docks(sync);
+    Ok(())
+}
+
+/// Makes a dock on `monitor`, hidden.
+fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
+    let instance = unsafe { GetModuleHandleW(None) }.ok()?;
     // Never activated by a click: the program the user is in stays in
     // front, and a click on a program knows which one that is.
     let hwnd = unsafe {
         CreateWindowExW(
             WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-            class,
+            CLASS,
             w!("DockMax"),
             WS_POPUP,
             0,
@@ -255,13 +341,23 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
             Some(instance.into()),
             None,
         )
-    }?;
-    let painter = Painter::new()?;
+    }
+    .inspect_err(|error| log::warn!("dock: the window could not be made: {error}"))
+    .ok()?;
+    let painter = match Painter::new() {
+        Ok(painter) => painter,
+        Err(error) => {
+            log::warn!("dock: nothing to paint with: {error}");
+            let _ = unsafe { DestroyWindow(hwnd) };
+            return None;
+        }
+    };
     // Files dropped on the dock are pinned (spec 0006 B2).
     super::drop_target::install(app, hwnd);
     let dock = Dock {
         app: app.clone(),
         hwnd,
+        monitor,
         painter,
         data: read_data(app),
         items: Vec::new(),
@@ -294,33 +390,92 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
         tracking: false,
         animating: false,
         visible: false,
+        hidden_for_fullscreen: false,
         effects: Vec::new(),
     };
-    DOCK.with(|slot| *slot.borrow_mut() = Some(dock));
-    WINDOW.store(hwnd.0 as isize, Ordering::SeqCst);
-    with_dock(|dock| {
-        dock.rebuild();
-        dock.arm_clock();
-        unsafe { SetTimer(Some(dock.hwnd), STATUS_TIMER, STATUS_EVERY, None) };
-    });
-    Ok(())
+    dock.arm_clock();
+    unsafe { SetTimer(Some(dock.hwnd), STATUS_TIMER, STATUS_EVERY, None) };
+    Some(dock)
 }
 
-/// Runs `change` on the dock, then what it asked of the app.
-fn with_dock(change: impl FnOnce(&mut Dock)) {
-    let effects = DOCK.with(|slot| {
-        let Ok(mut slot) = slot.try_borrow_mut() else {
-            return None;
-        };
-        let dock = slot.as_mut()?;
-        change(dock);
-        Some((dock.app.clone(), std::mem::take(&mut dock.effects)))
+/// One dock per monitor (spec 0010 D4b), or only the primary monitor's when
+/// the user asks for that: a dock is made for a monitor plugged in and
+/// destroyed for one unplugged; the others learn where their monitor is now.
+fn sync(docks: &mut Vec<Dock>) {
+    let Some(app) = APP.get() else {
+        return;
+    };
+    let every = crate::commands::settings::current(app).dock.every_monitor;
+    // The primary monitor's first: alone, it is the one kept.
+    let mut monitors = super::monitors::all();
+    if !every {
+        monitors.truncate(1);
+    }
+    docks.retain_mut(|dock| {
+        let keep = monitors
+            .iter()
+            .any(|monitor| monitor.key == dock.monitor.key);
+        if !keep {
+            dock.destroy();
+        }
+        keep
     });
-    if let Some((app, effects)) = effects {
-        for effect in effects {
-            effect(&app);
+    for monitor in &monitors {
+        match docks
+            .iter_mut()
+            .find(|dock| dock.monitor.key == monitor.key)
+        {
+            Some(dock) => dock.monitor = monitor.clone(),
+            None => {
+                if let Some(dock) = make_dock(app, monitor.clone()) {
+                    docks.push(dock);
+                }
+            }
         }
     }
+    // The primary monitor's first.
+    docks.sort_by_key(|dock| {
+        monitors
+            .iter()
+            .position(|monitor| monitor.key == dock.monitor.key)
+    });
+    let keys: Vec<String> = docks.iter().map(|dock| dock.monitor.key.clone()).collect();
+    super::appbar::retain(&keys);
+    let shown = SHOWN.load(Ordering::SeqCst);
+    for dock in docks.iter_mut() {
+        dock.rebuild();
+        if shown && !dock.visible && !dock.hidden_for_fullscreen {
+            dock.show();
+        }
+    }
+}
+
+/// Runs `change` on the docks, then what they asked of the app.
+fn with_docks(change: impl FnOnce(&mut Vec<Dock>)) {
+    let effects = DOCKS.with(|slot| {
+        let Ok(mut docks) = slot.try_borrow_mut() else {
+            return Vec::new();
+        };
+        change(&mut docks);
+        docks
+            .iter_mut()
+            .flat_map(|dock| std::mem::take(&mut dock.effects))
+            .collect::<Vec<Effect>>()
+    });
+    if let Some(app) = APP.get() {
+        for effect in effects {
+            effect(app);
+        }
+    }
+}
+
+/// Runs `change` on the dock of the window `hwnd`.
+fn with_dock(hwnd: HWND, change: impl FnOnce(&mut Dock)) {
+    with_docks(|docks| {
+        if let Some(dock) = docks.iter_mut().find(|dock| dock.hwnd == hwnd) {
+            change(dock);
+        }
+    });
 }
 
 /// The work queued by other threads, in order.
@@ -332,7 +487,7 @@ fn run_queue() {
             return;
         }
         for item in work {
-            with_dock(item);
+            with_docks(item);
         }
     }
 }
@@ -650,6 +805,7 @@ impl Dock {
     /// Asks for the icons and badges not read yet, off the main thread.
     fn request_pictures(&mut self) {
         let pack = self.data.settings.dock.icon_pack.clone();
+        let hwnd = self.hwnd.0 as isize;
         for item in &self.items {
             let app_id = match item {
                 Item::App(app) => app.app_id.clone(),
@@ -662,7 +818,7 @@ impl Dock {
                 let app = self.app.clone();
                 std::thread::spawn(move || {
                     let png = crate::commands::apps::dock_icon_png(&app, &app_id);
-                    post(move |dock| {
+                    post_to(hwnd, move |dock| {
                         let bitmap = png.and_then(|png| dock.painter.bitmap(&png));
                         dock.icons.insert(key, Loaded::Ready(bitmap));
                         dock.paint();
@@ -678,7 +834,7 @@ impl Dock {
                 std::thread::spawn(move || {
                     let png = super::open_apps::aumid_of_other(&key)
                         .and_then(|aumid| super::profiles::badge_png(&aumid));
-                    post(move |dock| {
+                    post_to(hwnd, move |dock| {
                         let bitmap = png.and_then(|png| dock.painter.bitmap(&png));
                         dock.badges.insert(key, Loaded::Ready(bitmap));
                         dock.paint();
@@ -696,9 +852,13 @@ impl Dock {
             let geometry = shape.size.geometry();
             geometry.icon + 2.0 * geometry.pad
         };
-        let Some((window, scale)) =
-            super::dock::place_native(&self.app, &self.data.settings.dock, size, bar_height)
-        else {
+        let Some((window, scale)) = super::dock::place_native(
+            &self.app,
+            &self.data.settings.dock,
+            &self.monitor,
+            size,
+            bar_height,
+        ) else {
             return;
         };
         if (scale - self.scale).abs() > f64::EPSILON {
@@ -718,23 +878,40 @@ impl Dock {
             width: (area.width * self.scale).round().max(0.0) as u32,
             height: (area.height * self.scale).round().max(0.0) as u32,
         };
-        let mut shared = shared();
-        shared.window = Some(self.window);
-        shared.scale = self.scale;
-        shared.bar = Some(to_screen(rest.bar));
-        shared.anchors = self
-            .items
-            .iter()
-            .zip(&rest.items)
-            .map(|(item, area)| (panel_of(item), logical(*area)))
-            .collect();
-        shared.visible = self.visible;
-        drop(shared);
+        let hwnd = self.hwnd.0 as isize;
+        let placed = Placed {
+            hwnd,
+            monitor: self.monitor.key.clone(),
+            handle: self.monitor.handle,
+            rect: self.monitor.rect,
+            work: self.monitor.work,
+            visible: self.visible,
+            window: self.window,
+            scale: self.scale,
+            bar: to_screen(rest.bar),
+        };
+        {
+            let mut shared = shared();
+            match shared.docks.iter_mut().find(|known| known.hwnd == hwnd) {
+                Some(known) => *known = placed,
+                None => shared.docks.push(placed),
+            }
+            // The primary monitor's first, as the docks are.
+            let primary = shared
+                .docks
+                .iter()
+                .position(|known| known.monitor == self.monitor.key && self.monitor.primary);
+            if let Some(primary) = primary {
+                let first = shared.docks.remove(primary);
+                shared.docks.insert(0, first);
+            }
+        }
         // For assistive technology: each item's name (with the notice on
         // Configurações) and its box on the screen.
         let attention = dock_items::needs_attention(self.data.widgets.as_ref());
         let notice = crate::i18n::messages().dock.with_notice;
         access::publish(
+            hwnd,
             self.items
                 .iter()
                 .zip(&self.names)
@@ -787,6 +964,15 @@ impl Dock {
             self.strip_click(index, false);
             self.paint();
         }
+    }
+
+    /// The dock's monitor is gone (or the user keeps only one dock).
+    fn destroy(&mut self) {
+        self.hide();
+        let hwnd = self.hwnd.0 as isize;
+        shared().docks.retain(|known| known.hwnd != hwnd);
+        access::forget(hwnd);
+        let _ = unsafe { DestroyWindow(self.hwnd) };
     }
 
     fn show(&mut self) {
@@ -1348,10 +1534,11 @@ impl Dock {
                 let id = app.id.as_str().to_string();
                 let key = item.key();
                 let running = dock_items::running(&self.data.open, &item).is_some();
+                let hwnd = self.hwnd.0 as isize;
                 if running {
                     self.effects.push(Box::new(move |app| {
                         if !super::open_apps::activate(app, &id) {
-                            post(move |dock| dock.launch_pinned(key, id));
+                            post_to(hwnd, move |dock| dock.launch_pinned(key, id));
                         }
                     }));
                 } else {
@@ -1372,6 +1559,8 @@ impl Dock {
     }
 
     fn toggle(&mut self, panel: PanelId, anchor: Area) {
+        // The panel anchors to this dock.
+        shared().active = self.hwnd.0 as isize;
         // The panel opens where the item rests: nothing magnified.
         self.hovered = None;
         self.animate();
@@ -1387,9 +1576,10 @@ impl Dock {
     fn launch_pinned(&mut self, key: String, id: String) {
         self.opening.insert(key.clone(), Instant::now());
         self.animate();
+        let hwnd = self.hwnd.0 as isize;
         self.effects.push(Box::new(move |app| {
             crate::commands::apps::launch_pinned(app, &id, move || {
-                post(move |dock| {
+                post_to(hwnd, move |dock| {
                     dock.opening.remove(&key);
                     dock.paint();
                 });
@@ -1410,9 +1600,10 @@ impl Dock {
             Item::Other(other) => {
                 self.opening.insert(key.clone(), Instant::now());
                 self.animate();
+                let hwnd = self.hwnd.0 as isize;
                 self.effects.push(Box::new(move |_| {
                     crate::commands::apps::launch_other(&other.key, move || {
-                        post(move |dock| {
+                        post_to(hwnd, move |dock| {
                             dock.opening.remove(&key);
                             dock.paint();
                         });
@@ -1600,29 +1791,29 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
     let mut handled = true;
     match message {
         WM_RUN => run_queue(),
-        WM_MOUSEMOVE => with_dock(|dock| {
+        WM_MOUSEMOVE => with_dock(hwnd, |dock| {
             let (x, y) = dock.point(lparam);
             dock.mouse_move(x, y);
         }),
-        WM_MOUSELEAVE => with_dock(Dock::mouse_leave),
-        WM_LBUTTONDOWN | WM_LBUTTONDBLCLK => with_dock(|dock| {
+        WM_MOUSELEAVE => with_dock(hwnd, Dock::mouse_leave),
+        WM_LBUTTONDOWN | WM_LBUTTONDBLCLK => with_dock(hwnd, |dock| {
             let (x, y) = dock.point(lparam);
             dock.left_down(x, y);
         }),
-        WM_LBUTTONUP => with_dock(|dock| {
+        WM_LBUTTONUP => with_dock(hwnd, |dock| {
             let (x, y) = dock.point(lparam);
             dock.left_up(x, y);
         }),
         WM_MBUTTONDOWN => {
             shared().clicked = Some(Instant::now());
         }
-        WM_MBUTTONUP => with_dock(|dock| {
+        WM_MBUTTONUP => with_dock(hwnd, |dock| {
             let (x, y) = dock.point(lparam);
             if let Some(index) = dock.hit(x, y) {
                 dock.middle_click(index);
             }
         }),
-        WM_RBUTTONUP => with_dock(|dock| {
+        WM_RBUTTONUP => with_dock(hwnd, |dock| {
             shared().clicked = Some(Instant::now());
             let (x, y) = dock.point(lparam);
             if let Some(cell) = dock.strip_hit(x, y) {
@@ -1637,7 +1828,7 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
                 _ => dock.dock_menu(),
             }
         }),
-        WM_CAPTURECHANGED => with_dock(|dock| {
+        WM_CAPTURECHANGED => with_dock(hwnd, |dock| {
             // The capture went elsewhere: the drag is over.
             if dock.press.take().is_some() {
                 dock.pressed = None;
@@ -1646,13 +1837,13 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
             }
         }),
         WM_TIMER => match wparam.0 {
-            ANIMATION_TIMER => with_dock(Dock::step),
-            CLOCK_TIMER => with_dock(|dock| {
+            ANIMATION_TIMER => with_dock(hwnd, Dock::step),
+            CLOCK_TIMER => with_dock(hwnd, |dock| {
                 dock.paint();
                 dock.arm_clock();
             }),
-            STATUS_TIMER => with_dock(Dock::read_system),
-            WARM_TIMER => with_dock(|dock| {
+            STATUS_TIMER => with_dock(hwnd, Dock::read_system),
+            WARM_TIMER => with_dock(hwnd, |dock| {
                 let _ = unsafe { KillTimer(Some(dock.hwnd), WARM_TIMER) };
                 if dock.warmable() && dock.open.is_none() {
                     dock.effects.push(Box::new(super::panel_window::warm));
@@ -1660,18 +1851,20 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
             }),
             _ => handled = false,
         },
-        WM_SETTINGCHANGE => with_dock(|dock| {
+        WM_SETTINGCHANGE => with_dock(hwnd, |dock| {
             dock.dark = theme::system_dark();
             dock.motion = system_motion();
             dock.place();
             dock.paint();
         }),
-        WM_DISPLAYCHANGE | WM_DPICHANGED => with_dock(|dock| {
+        // A monitor came, went or changed: a dock each, placed again.
+        WM_DISPLAYCHANGE => with_docks(sync),
+        WM_DPICHANGED => with_dock(hwnd, |dock| {
             dock.place();
             dock.paint();
         }),
         // Alt+F4 hides the dock instead of closing it.
-        WM_CLOSE => with_dock(Dock::hide),
+        WM_CLOSE => with_dock(hwnd, Dock::hide),
         WM_GETOBJECT => match access::get_object(hwnd, wparam, lparam) {
             Some(result) => return result,
             None => handled = false,
@@ -1687,8 +1880,8 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
 
 // ---- What the rest of the app calls ----
 
-/// The data changed (programs, widgets, open programs, settings): reads it
-/// again.
+/// The data changed (programs, widgets, open programs, settings): the docks
+/// read it again.
 pub fn refresh() {
     post(Dock::reload);
 }
@@ -1701,8 +1894,56 @@ pub fn forget_icons() {
     });
 }
 
+/// Shows the docks, but not one whose monitor is in full screen.
 pub fn show() {
-    post(Dock::show);
+    SHOWN.store(true, Ordering::SeqCst);
+    post(|dock| {
+        if !dock.hidden_for_fullscreen {
+            dock.show();
+        }
+    });
+}
+
+/// Hides the docks (the user's choice, which a full screen ending does not
+/// undo).
+pub fn hide() {
+    SHOWN.store(false, Ordering::SeqCst);
+    post(|dock| {
+        dock.hidden_for_fullscreen = false;
+        dock.hide();
+    });
+}
+
+/// The monitor `key` is in full screen (`full`) or not any more (spec 0010
+/// D4: each dock looks only at its own monitor): its dock steps aside, and
+/// comes back after unless the user hid the docks meanwhile.
+pub fn set_fullscreen(key: String, full: bool) {
+    post(move |dock| {
+        if dock.monitor.key != key {
+            return;
+        }
+        if full && dock.visible {
+            log::info!("dock: a program is in full screen on its monitor, stepping aside");
+            dock.hidden_for_fullscreen = true;
+            dock.hide();
+        } else if !full && dock.hidden_for_fullscreen {
+            log::info!("dock: full screen is over on its monitor, back");
+            dock.hidden_for_fullscreen = false;
+            if SHOWN.load(Ordering::SeqCst) {
+                dock.show();
+            }
+        }
+    });
+}
+
+/// The monitors the docks are on: their key, handle and rectangle, for the
+/// full screen check.
+pub fn monitors() -> Vec<(String, isize, Rect)> {
+    shared()
+        .docks
+        .iter()
+        .map(|placed| (placed.monitor.clone(), placed.handle, placed.rect))
+        .collect()
 }
 
 /// What the E2E suite reads of the dock (test build only): each item's name
@@ -1713,11 +1954,12 @@ pub struct View {
     pub dark: bool,
 }
 
-/// Asks the dock for its `View`, from a thread other than the main one.
+/// Asks the primary monitor's dock for its `View`, from a thread other than
+/// the main one.
 #[cfg(feature = "e2e")]
 pub fn view() -> Option<View> {
     let (sent, received) = std::sync::mpsc::channel();
-    post(move |dock| {
+    post_primary(move |dock| {
         let items = dock
             .items
             .iter()
@@ -1748,12 +1990,13 @@ pub fn view() -> Option<View> {
     received.recv_timeout(Duration::from_secs(5)).ok()
 }
 
-/// Presses the item named `name`, as a click would (test build only, from a
-/// thread other than the main one). `false` when the dock has no such item.
+/// Presses the item named `name` on the primary monitor's dock, as a click
+/// would (test build only, from a thread other than the main one). `false`
+/// when the dock has no such item.
 #[cfg(feature = "e2e")]
 pub fn press_named(name: String) -> bool {
     let (sent, received) = std::sync::mpsc::channel();
-    post(move |dock| {
+    post_primary(move |dock| {
         let key = dock
             .names
             .iter()
@@ -1783,60 +2026,92 @@ pub fn press_named(name: String) -> bool {
 
 /// Where a tray icon dragged out of the tray panel and let go at `(x, y)`
 /// (physical pixels on the screen) goes among those the dock shows: `None`
-/// when it was not let go on the dock; else before the tray icon kept in the
+/// when it was not let go on a dock; else before the tray icon kept in the
 /// dock that follows the cell under the pointer (its lasting id), or at the
 /// end (`Some(None)`). From a thread other than the main one.
 pub fn tray_drop_index(x: i32, y: i32) -> Option<Option<String>> {
     let (sent, received) = std::sync::mpsc::channel();
-    post(move |dock| {
-        let _ = sent.send(dock.tray_drop_index(x, y));
-    });
+    queue(Box::new(move |docks| {
+        let found = docks.iter().find_map(|dock| dock.tray_drop_index(x, y));
+        let _ = sent.send(found);
+    }));
     received.recv_timeout(Duration::from_secs(5)).ok().flatten()
 }
 
-/// The monitors or the band changed under the dock: places it again.
+/// The monitors or the bands changed under the docks: they are placed again
+/// (and made or destroyed for a monitor plugged in or unplugged).
 pub fn reposition() {
-    post(|dock| {
-        dock.place();
-        dock.paint();
-    });
+    queue(Box::new(sync));
 }
 
-pub fn hide() {
-    post(Dock::hide);
-}
-
+/// The open panel changed: the dock it anchors to marks its item and stops
+/// magnifying; the others have none open.
 pub fn set_open(panel: Option<PanelId>) {
-    post(move |dock| dock.set_open(panel));
+    queue(Box::new(move |docks| {
+        let active = shared().active;
+        for dock in docks.iter_mut() {
+            let mine = dock.hwnd.0 as isize == active;
+            dock.set_open(if mine { panel.clone() } else { None });
+        }
+    }));
 }
 
-/// The settings moved the dock: lays it out again now and, once placed,
-/// reopens the panel the move closed.
+/// The settings moved the docks (or put them on every monitor or on one):
+/// lays them out again now and, once placed, reopens the panel the move
+/// closed at the dock it was anchored to.
 pub fn settings_moved(app: &AppHandle) {
     let app = app.clone();
-    post(move |dock| {
-        dock.reload();
+    queue(Box::new(move |docks| {
+        for dock in docks.iter_mut() {
+            dock.data = read_data(&dock.app);
+        }
+        sync(docks);
         let reopen = super::panel::lock(&app).dock_settled(false, Instant::now());
         if let Some(panel) = reopen {
-            dock.request(panel);
+            let active = shared().active;
+            let index = docks
+                .iter()
+                .position(|dock| dock.hwnd.0 as isize == active)
+                .unwrap_or(0);
+            if let Some(dock) = docks.get_mut(index) {
+                dock.request(panel);
+            }
         }
-    });
+    }));
 }
 
+/// Whether a dock is on screen.
 pub fn is_visible() -> bool {
-    shared().visible
+    shared().docks.iter().any(|placed| placed.visible)
 }
 
-/// The dock window's origin on the screen (physical pixels), its scale and
-/// the bar on the screen: where the panels anchor.
+/// The dock the panel anchors to: the one whose item opened it, or the
+/// primary monitor's.
+fn anchor_dock(shared: &Shared) -> Option<&Placed> {
+    shared
+        .docks
+        .iter()
+        .find(|placed| placed.hwnd == shared.active)
+        .or_else(|| shared.docks.first())
+}
+
+/// The anchoring dock's window origin on the screen (physical pixels), its
+/// scale and its bar on the screen: where the panels anchor.
 pub fn geometry() -> Option<((i32, i32), f64, Rect)> {
     let shared = shared();
-    let window = shared.window?;
-    Some(((window.x, window.y), shared.scale, shared.bar?))
+    let placed = anchor_dock(&shared)?;
+    Some(((placed.window.x, placed.window.y), placed.scale, placed.bar))
 }
 
-/// Whether the user clicked the dock a moment ago: the panel that click
-/// opens may take the focus.
+/// The work area of the anchoring dock's monitor, and its scale.
+pub fn work_area() -> Option<(Rect, f64)> {
+    let shared = shared();
+    let placed = anchor_dock(&shared)?;
+    Some((placed.work, placed.scale))
+}
+
+/// Whether the user clicked a dock a moment ago: the panel that click opens
+/// may take the focus.
 pub fn clicked_recently() -> bool {
     shared()
         .clicked

@@ -46,12 +46,11 @@ mod imp {
 
     use super::OpenWindow;
     use crate::domain::fullscreen::{Bounds, Candidate};
-    use ::windows::Win32::Foundation::{POINT, RECT};
-    use ::windows::Win32::Graphics::Gdi::{
-        GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY, MONITORINFO,
-        MonitorFromPoint, MonitorFromWindow,
+    use ::windows::Win32::Foundation::RECT;
+    use ::windows::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromWindow};
+    use ::windows::Win32::UI::WindowsAndMessaging::{
+        GWL_STYLE, GetClassNameW, GetWindowRect, IsZoomed, WS_CAPTION,
     };
-    use ::windows::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetWindowRect};
 
     /// `System.AppUserModel.ID`.
     const PKEY_APP_USER_MODEL_ID: PROPERTYKEY = PROPERTYKEY {
@@ -207,6 +206,7 @@ mod imp {
             return true.into();
         }
         let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+        let style = unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) } as u32;
         found.push(Candidate {
             monitor: monitor.0 as isize,
             bounds: Bounds {
@@ -215,6 +215,7 @@ mod imp {
                 right: rect.right,
                 bottom: rect.bottom,
             },
+            maximized: unsafe { IsZoomed(hwnd) }.as_bool() && style & WS_CAPTION.0 == WS_CAPTION.0,
         });
         true.into()
     }
@@ -229,28 +230,6 @@ mod imp {
             )
         };
         found
-    }
-
-    /// The primary monitor's handle and rectangle.
-    pub fn primary_monitor() -> Option<(isize, Bounds)> {
-        let monitor = unsafe { MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY) };
-        let mut info = MONITORINFO {
-            cbSize: size_of::<MONITORINFO>() as u32,
-            ..Default::default()
-        };
-        if !unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
-            return None;
-        }
-        let rect = info.rcMonitor;
-        Some((
-            monitor.0 as isize,
-            Bounds {
-                left: rect.left,
-                top: rect.top,
-                right: rect.right,
-                bottom: rect.bottom,
-            },
-        ))
     }
 
     /// The window the user is working in: the one in front, or, if that is
@@ -343,12 +322,6 @@ pub fn fullscreen_candidates() -> Vec<crate::domain::fullscreen::Candidate> {
     imp::candidates()
 }
 
-/// The primary monitor's handle and rectangle.
-#[cfg(windows)]
-pub fn primary_monitor() -> Option<(isize, crate::domain::fullscreen::Bounds)> {
-    imp::primary_monitor()
-}
-
 /// The file of the program that owns the window `hwnd`.
 #[cfg(windows)]
 pub fn exe_of_window(hwnd: isize) -> Option<PathBuf> {
@@ -432,7 +405,7 @@ mod tests {
     #[test]
     #[ignore = "reads the windows of the machine"]
     fn spike_lists_the_fullscreen_candidates() {
-        println!("primary: {:?}", primary_monitor());
+        println!("monitors: {:?}", super::super::monitors::all());
         for candidate in fullscreen_candidates().iter().take(8) {
             println!("{candidate:?}");
         }

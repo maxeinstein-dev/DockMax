@@ -196,6 +196,9 @@ pub struct DockSettings {
     pub middle_click: MiddleClick,
     /// What the dock does with the Windows taskbar (ADR 0009).
     pub taskbar: TaskbarMode,
+    /// A dock on every monitor, each holding its own edge (spec 0010 D4b), or
+    /// only on the primary one.
+    pub every_monitor: bool,
     /// Distance between the dock and the screen edge, in logical pixels,
     /// within `0..=MAX_BOTTOM_SPACE`.
     pub bottom_space: u8,
@@ -220,6 +223,7 @@ impl Default for DockSettings {
             tray_in_dock: Vec::new(),
             middle_click: MiddleClick::default(),
             taskbar: TaskbarMode::default(),
+            every_monitor: true,
             bottom_space: DEFAULT_BOTTOM_SPACE,
         }
     }
@@ -547,7 +551,7 @@ mod tests {
                 "indicator": "dot", "indicatorColor": null,
                 "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
                 "showOpenApps": true, "middleClick": "newInstance",
-                "taskbar": "hidden", "bottomSpace": 2
+                "taskbar": "hidden", "everyMonitor": true, "bottomSpace": 2
               },
               "launchAtLogin": false
             }"#,

@@ -21,6 +21,10 @@ pub struct Bounds {
 pub struct Candidate {
     pub monitor: isize,
     pub bounds: Bounds,
+    /// Maximized with a title bar: a window being worked in, never a full
+    /// screen, even while it spans the monitor (the taskbar just hidden,
+    /// the dock's band not yet reserved).
+    pub maximized: bool,
 }
 
 /// Whether `window` covers all of `monitor`.
@@ -41,7 +45,7 @@ pub fn is_fullscreen(candidates: &[Candidate], monitor: isize, bounds: Bounds) -
     candidates
         .iter()
         .find(|candidate| candidate.monitor == monitor)
-        .is_some_and(|top| covers(top.bounds, bounds))
+        .is_some_and(|top| !top.maximized && covers(top.bounds, bounds))
 }
 
 #[cfg(test)]
@@ -70,6 +74,7 @@ mod tests {
                 right,
                 bottom,
             },
+            maximized: false,
         }
     }
 
@@ -126,6 +131,16 @@ mod tests {
         let windows = [on(1, -8, -8, 2568, 1017)];
 
         assert!(!is_fullscreen(&windows, 1, PRIMARY));
+    }
+
+    #[test]
+    fn a_maximized_window_is_not_full_screen_before_the_band_is_reserved() {
+        // The taskbar just hidden and the band not yet reserved: the
+        // maximized window still spans the whole monitor, frame included.
+        let mut window = on(2, -1929, -3, 9, 1215);
+        window.maximized = true;
+
+        assert!(!is_fullscreen(&[window], 2, SECOND));
     }
 
     #[test]
