@@ -1771,10 +1771,10 @@ impl Dock {
         self.toggle(panel_of(&item), anchor);
     }
 
-    /// The dock's own menu, on the right button away from a program:
-    /// Configurações (author's decision, 2026-10-26: it left the dock's
-    /// items). Shown once the dock's state is let go: the menu runs a loop of
-    /// its own.
+    /// The dock's own menu, on the right button away from a program: what
+    /// the tray icon's menu has (author's decision, 2026-10-26: Configurações
+    /// left the dock's items; the Task Manager as in the taskbar's menu).
+    /// Shown once the dock's state is let go: the menu runs a loop of its own.
     fn dock_menu(&mut self) {
         self.hovered = None;
         self.animate();
@@ -1782,10 +1782,24 @@ impl Dock {
         let hwnd = self.hwnd.0 as isize;
         let edge = self.edge();
         self.effects.push(Box::new(move |app| {
-            if show_dock_menu(HWND(hwnd as _), edge) == Some(MenuChoice::Settings)
-                && let Err(error) = super::settings_window::open(app)
-            {
-                log::warn!("dock: the settings could not be opened: {error}");
+            match show_dock_menu(HWND(hwnd as _), edge) {
+                Some(MenuChoice::TaskManager) => {
+                    if let Err(error) = super::apps::open_task_manager() {
+                        log::warn!("dock: the Task Manager could not be opened: {error}");
+                    }
+                }
+                Some(MenuChoice::Settings) => {
+                    if let Err(error) = super::settings_window::open(app) {
+                        log::warn!("dock: the settings could not be opened: {error}");
+                    }
+                }
+                Some(MenuChoice::Hide) => {
+                    if let Err(error) = super::dock::toggle(app) {
+                        log::warn!("dock: the dock could not be hidden: {error}");
+                    }
+                }
+                Some(MenuChoice::Quit) => app.exit(0),
+                None => {}
             }
         }));
     }
@@ -1886,24 +1900,51 @@ fn opening_offset(
 /// What the dock's menu offers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MenuChoice {
+    TaskManager,
     Settings,
+    Hide,
+    Quit,
+}
+
+/// The dock's menu, in order; `None` is a separator.
+fn dock_menu_items() -> [Option<(MenuChoice, &'static str)>; 6] {
+    let text = &crate::i18n::messages().tray;
+    [
+        Some((MenuChoice::TaskManager, text.task_manager)),
+        None,
+        Some((MenuChoice::Settings, text.open_settings)),
+        Some((MenuChoice::Hide, text.hide_dock)),
+        None,
+        Some((MenuChoice::Quit, text.quit)),
+    ]
 }
 
 /// Shows the dock's menu at the pointer, opening away from the screen edge,
 /// and returns what was chosen.
 fn show_dock_menu(hwnd: HWND, edge: DockEdge) -> Option<MenuChoice> {
     use windows::Win32::UI::WindowsAndMessaging::{
-        AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, MF_STRING, SetForegroundWindow,
-        TPM_BOTTOMALIGN, TPM_CENTERALIGN, TPM_RETURNCMD, TPM_RIGHTBUTTON, TPM_TOPALIGN,
-        TrackPopupMenu, WM_NULL,
+        AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, MF_SEPARATOR, MF_STRING,
+        SetForegroundWindow, TPM_BOTTOMALIGN, TPM_CENTERALIGN, TPM_RETURNCMD, TPM_RIGHTBUTTON,
+        TPM_TOPALIGN, TrackPopupMenu, WM_NULL,
     };
-    const SETTINGS: usize = 1;
-    let text = windows::core::HSTRING::from(crate::i18n::messages().tray.open_settings);
+    let items = dock_menu_items();
     unsafe {
         let menu = CreatePopupMenu().ok()?;
-        if AppendMenuW(menu, MF_STRING, SETTINGS, &text).is_err() {
-            let _ = DestroyMenu(menu);
-            return None;
+        for (index, item) in items.iter().enumerate() {
+            // The command of an item is its place plus one: 0 is no choice.
+            let added = match item {
+                Some((_, label)) => AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    index + 1,
+                    &windows::core::HSTRING::from(*label),
+                ),
+                None => AppendMenuW(menu, MF_SEPARATOR, 0, None),
+            };
+            if added.is_err() {
+                let _ = DestroyMenu(menu);
+                return None;
+            }
         }
         let mut at = POINT::default();
         let _ = GetCursorPos(&mut at);
@@ -1925,7 +1966,12 @@ fn show_dock_menu(hwnd: HWND, edge: DockEdge) -> Option<MenuChoice> {
         );
         let _ = PostMessageW(Some(hwnd), WM_NULL, WPARAM(0), LPARAM(0));
         let _ = DestroyMenu(menu);
-        (chosen.0 as usize == SETTINGS).then_some(MenuChoice::Settings)
+        let chosen = usize::try_from(chosen.0).ok()?.checked_sub(1)?;
+        items
+            .get(chosen)
+            .copied()
+            .flatten()
+            .map(|(choice, _)| choice)
     }
 }
 
@@ -2267,6 +2313,26 @@ pub fn clicked_recently() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_dock_menu_has_what_the_tray_menu_has() {
+        let labels: Vec<Option<&str>> = dock_menu_items()
+            .iter()
+            .map(|item| item.map(|(_, label)| label))
+            .collect();
+
+        assert_eq!(
+            labels,
+            [
+                Some("Gerenciador de Tarefas"),
+                None,
+                Some("Configurações"),
+                Some("Ocultar dock"),
+                None,
+                Some("Sair"),
+            ]
+        );
+    }
 
     #[test]
     fn a_bounce_rises_away_from_the_edge_and_lands() {

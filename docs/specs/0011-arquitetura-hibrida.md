@@ -31,7 +31,7 @@ Os testes de ponta a ponta rodavam ao mesmo tempo, então os números podem esta
 ## 3. H1 em detalhe
 
 - **A janela:** `settings` (`windows/settings_window.rs`), uma janela comum com barra de título, 880 × 640 (mínimo 720 × 480), centralizada, com os mesmos argumentos do WebView2 das outras (um teste garante). É criada **fora da thread principal**: criar uma janela WebView2 de dentro de um comando ou do menu da bandeja (que rodam na thread principal) trava o app, como o teste no app real mostrou. Abrir de novo traz a que está aberta para a frente.
-- **Quem abre:** o item Configurações do dock (o `toggle_panel` com `settings` fecha o painel aberto e abre o app) e "Configurações" no menu da bandeja.
+- **Quem abre:** "Configurações" no menu do dock (botão direito fora de um programa) e no menu do ícone da bandeja. Os dois menus têm o mesmo conteúdo: Gerenciador de Tarefas (como no menu da barra do Windows), Configurações, ocultar o dock ("Mostrar/ocultar dock" na bandeja, já que lá o dock pode estar oculto) e Sair.
 - **A página** (`settings.html`, `src/settings/`): barra lateral com Geral, Aparência do dock, Apps do dock, Itens do dock e Sobre, e ao lado a mesma tela que o painel tinha, sem o "Voltar". Esc fecha a janela.
 - **Capacidade** `settings`: só o que as telas de ajustes usam (configurações, widgets, apps, pacotes de ícones, fechar a própria janela), pinada no guarda.
 - **O painel** continua com as telas de ajustes por enquanto, mas ninguém mais as abre; elas saem dele no H2.

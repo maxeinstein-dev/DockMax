@@ -274,6 +274,32 @@ pub fn open_folder(_path: &std::path::Path) -> Result<(), String> {
     Err("not Windows".to_owned())
 }
 
+/// Opens the Windows Task Manager, as the taskbar's menu does: through the
+/// shell, which raises it to administrator when Windows asks for that.
+#[cfg(windows)]
+pub fn open_task_manager() -> Result<(), String> {
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            PCWSTR::null(),
+            &HSTRING::from("taskmgr.exe"),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    if result.0 as usize > 32 {
+        Ok(())
+    } else {
+        Err(format!("ShellExecute answered {}", result.0 as usize))
+    }
+}
+
+#[cfg(not(windows))]
+pub fn open_task_manager() -> Result<(), String> {
+    Err("not Windows".to_owned())
+}
+
 /// Opens the program, the way the Start menu does.
 #[cfg(windows)]
 pub fn launch(id: &str) -> Result<(), String> {

@@ -48,11 +48,15 @@ pub struct SettingsMessages {
     pub window_title: &'static str,
 }
 
-/// Items of the tray icon menu.
+/// Items of the tray icon menu and of the dock's own menu.
 #[derive(Debug)]
 pub struct TrayMessages {
+    /// Opens the Windows Task Manager, as the taskbar's menu does.
+    pub task_manager: &'static str,
     /// Shows the dock when hidden, hides it otherwise.
     pub toggle_dock: &'static str,
+    /// Hides the dock (its own menu: it is on screen).
+    pub hide_dock: &'static str,
     /// Opens the Configurações app.
     pub open_settings: &'static str,
     /// Ends the app.
@@ -61,7 +65,9 @@ pub struct TrayMessages {
 
 const PT_BR: Messages = Messages {
     tray: TrayMessages {
+        task_manager: "Gerenciador de Tarefas",
         toggle_dock: "Mostrar/ocultar dock",
+        hide_dock: "Ocultar dock",
         open_settings: "Configurações",
         quit: "Sair",
     },
@@ -102,7 +108,9 @@ mod tests {
     fn pt_br_has_every_tray_text() {
         let tray = &messages().tray;
 
+        assert_eq!(tray.task_manager, "Gerenciador de Tarefas");
         assert_eq!(tray.toggle_dock, "Mostrar/ocultar dock");
+        assert_eq!(tray.hide_dock, "Ocultar dock");
         assert_eq!(tray.open_settings, "Configurações");
         assert_eq!(tray.quit, "Sair");
     }
