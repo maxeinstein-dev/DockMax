@@ -164,6 +164,7 @@ Tudo o que as specs e os PRs marcaram como **não verificado**, para uma rodada 
 - [ ] Áreas de trabalho virtuais do Windows.
 - [ ] Uso longo (horas): memória e CPU em repouso.
 - [ ] Leitor de tela.
+- [ ] O dock nativo (spec 0011 H3) com o **mouse de verdade**: a ampliação nos três efeitos, arrastar para reordenar, soltar arquivos, os botões do meio e direito; os nove estilos e os reflexos na tela; a borda de cima; escala de 150 %.
 
 ### Medição de recursos (build de release 0.3.0, 2026-10-26)
 
@@ -175,6 +176,8 @@ Máquina do autor (Windows 11, 16 processadores lógicos, um monitor, escala de 
 | CPU em repouso (30 s) | 0,02 % do total dos 16 processadores | abaixo de 1 % |
 
 A memória subiu 13 MB entre as duas medições; as duas ficam abaixo da meta. Não foi medido um uso longo (horas).
+
+**Com o dock nativo** (spec 0011 H3, release, 2026-10-26, mesma máquina): **64,5 MB** de memória privada em repouso, num processo só (nenhum WebView2), 0 % de CPU; com um painel aberto o WebView2 volta enquanto ele estiver aberto, e sai 45 s depois de fechado (spec 0011 §7).
 
 ### Verificação do instalador (2026-10-26)
 

@@ -1,6 +1,6 @@
 # ADR 0011 — Spike: o dock desenhado em Rust nativo, sem WebView2
 
-**Status:** aceito (2026-10-26): o autor escolheu a opção 2, **híbrido**. O plano está na [spec 0011](../specs/0011-arquitetura-hibrida.md), com a medição do tempo de abrir o WebView2 sob demanda.
+**Status:** aceito (2026-10-26): o autor escolheu a opção 2, **híbrido**. O plano está na [spec 0011](../specs/0011-arquitetura-hibrida.md), com a medição do tempo de abrir o WebView2 sob demanda. Implementado no H3: o dock completo ficou em **64,5 MB** de memória privada em repouso, num processo só (spec 0011 §7).
 
 ## Contexto
 
