@@ -139,7 +139,7 @@ Revisão de 2026-10-19 (fim da Fase 2): a direção foi mantida e o roadmap ganh
 - [x] README com "onde ficam seus dados" (`%APPDATA%\dev.maxsueleinstein.dockmax`). (feito na v0.2.0)
 - [ ] Criar README com imagens, arquitetura, funcionalidades e instruções.
 - [ ] Criar uma demonstração curta do aplicativo.
-- [ ] Verificar licença de dependências e atribuições necessárias.
+- [x] Verificar licença de dependências e atribuições necessárias: [licenças de terceiros](licencas-de-terceiros.md) (nenhuma exige abrir o código; os avisos para distribuir a outras pessoas ainda não foram gerados).
 
 **Critérios de aceitação do MVP**
 - [x] Instala e inicia em uma máquina Windows compatível (na do autor; ver as limitações).
