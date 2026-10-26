@@ -26,6 +26,7 @@ vi.mock("@tauri-apps/api/event", () => ({ listen }));
 
 const icon = (key: string, tip: string, extra: Partial<TrayIcon> = {}) => ({
   key,
+  id: `path:c:\\${tip.toLowerCase()}.exe#1`,
   tip,
   image: "data:image/png;base64,AAAA",
   hidden: false,
@@ -69,6 +70,17 @@ describe("TrayPanel", () => {
       "data:image/png;base64,AAAA",
     );
     expect(buttons[0]).toHaveAttribute("title", "FortiClient 7.4.3");
+  });
+
+  it("leaves out the icons the dock shows itself", async () => {
+    invoke.mockImplementation((command: string) =>
+      Promise.resolve(command === "list_tray" ? [FORTI, DOCKER] : undefined),
+    );
+    render(<TrayPanel inDock={[DOCKER.id ?? ""]} />);
+    await act(async () => {});
+
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: FORTI.tip })).toBeInTheDocument();
   });
 
   it("leaves out the icons a program asked to hide", async () => {

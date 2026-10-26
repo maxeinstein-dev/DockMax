@@ -12,6 +12,10 @@ import { errorKind, log } from "./log";
 export interface TrayIcon {
   /** Names the icon for a click. */
   key: string;
+  /** The name that survives a restart (`path:<program>#<number>`), what the
+   * settings keep the icons shown in the dock by; null when the program's
+   * file can't be read. */
+  id: string | null;
   /** The program's tooltip; may be empty. */
   tip: string;
   /** A PNG as a `data:` URL, or null when the image could not be read. */
@@ -38,6 +42,27 @@ export interface TrayClickArgs {
 /** The icons to show: the ones the programs did not ask to hide. */
 export function visibleIcons(icons: readonly TrayIcon[]): TrayIcon[] {
   return icons.filter((icon) => !icon.hidden);
+}
+
+/** The icons the tray panel shows: the visible ones the dock does not show
+ * itself (`inDock`, their ids). */
+export function panelIcons(
+  icons: readonly TrayIcon[],
+  inDock: readonly string[],
+): TrayIcon[] {
+  return visibleIcons(icons).filter(
+    (icon) => icon.id === null || !inDock.includes(icon.id),
+  );
+}
+
+/** `inDock` with `id` added at its end (`on`) or taken out. */
+export function withInDock(
+  inDock: readonly string[],
+  id: string,
+  on: boolean,
+): string[] {
+  const others = inDock.filter((kept) => kept !== id);
+  return on ? [...others, id] : others;
 }
 
 /** Clicks an icon as the taskbar would. Failures are logged by kind; the
@@ -70,7 +95,7 @@ export function useTray(): TrayIcon[] | null {
 
     invoke<TrayIcon[]>(LIST_TRAY_COMMAND).then(
       (current) => {
-        if (active && !changed) setIcons(current);
+        if (active && !changed) setIcons(Array.isArray(current) ? current : []);
       },
       (error: unknown) => {
         if (active) {

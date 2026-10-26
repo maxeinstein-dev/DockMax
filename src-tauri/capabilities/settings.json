@@ -23,6 +23,7 @@
     "allow-list-icon-packs",
     "allow-reload-icon-packs",
     "allow-open-icon-packs-folder",
+    "allow-list-tray",
     "log:allow-log"
   ]
 }

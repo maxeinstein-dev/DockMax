@@ -142,6 +142,13 @@ export const otherText: Messages = {
     emptyHint: "Some only show up after they are opened again.",
     unnamed: "Unnamed program",
     footer: "Right button opens the program's menu",
+    inDock: {
+      label: "Tray icons in the dock",
+      hint: "Beside the battery, the network and the volume. Up to {max}.",
+      panel: "Panel",
+      dock: "Dock",
+      none: "No icon in the tray now.",
+    },
   },
   about: {
     description: "Windows 11 dock, built with Tauri.",

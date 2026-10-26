@@ -36,6 +36,13 @@ pub const MAX_CORNERS: u8 = 100;
 /// pixels.
 pub const MAX_BOTTOM_SPACE: u8 = 64;
 
+/// Most icons of the notification area the dock shows itself, beside the
+/// battery, the network and the volume (as the PrimoDock).
+pub const MAX_TRAY_IN_DOCK: usize = 6;
+
+/// The longest name of a tray icon kept (`path:<program>#<id>`).
+pub const MAX_TRAY_KEY: usize = 300;
+
 /// The distance between the dock and the edge unless the user changes it:
 /// the dock takes the place of the taskbar, so it sits close to the edge.
 pub const DEFAULT_BOTTOM_SPACE: u8 = 2;
@@ -105,8 +112,28 @@ impl DockSettings {
         {
             return Err(SettingsError::LookOutOfRange);
         }
+        if self.tray_in_dock.len() > MAX_TRAY_IN_DOCK
+            || self.tray_in_dock.iter().any(|key| !is_tray_key(key))
+        {
+            return Err(SettingsError::LookOutOfRange);
+        }
         Ok(())
     }
+}
+
+/// The name of a tray icon that survives a restart: `path:` and the
+/// program's file, in lowercase, then `#` and the icon's number.
+pub fn is_tray_key(key: &str) -> bool {
+    key.len() <= MAX_TRAY_KEY
+        && key
+            .strip_prefix("path:")
+            .and_then(|rest| rest.rsplit_once('#'))
+            .is_some_and(|(path, number)| {
+                !path.is_empty()
+                    && !number.is_empty()
+                    && number.bytes().all(|byte| byte.is_ascii_digit())
+                    && !path.chars().any(char::is_control)
+            })
 }
 
 /// `#RRGGBB`: a hash and six hexadecimal digits, nothing else.
@@ -158,6 +185,12 @@ pub struct DockSettings {
     /// Whether the open programs that are not pinned show on the dock, after
     /// the widgets (spec 0009 D2).
     pub show_open_apps: bool,
+    /// The icons of the notification area the dock shows itself, at its end
+    /// beside the battery, the network and the volume, by `is_tray_key`
+    /// name; the others are behind the arrow. Left out of the file while
+    /// empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tray_in_dock: Vec<String>,
     /// What a click with the middle button (the wheel) does on a program of the
     /// dock (spec 0009).
     pub middle_click: MiddleClick,
@@ -184,6 +217,7 @@ impl Default for DockSettings {
             icon_pack: None,
             open_animation: OpenAnimation::default(),
             show_open_apps: true,
+            tray_in_dock: Vec::new(),
             middle_click: MiddleClick::default(),
             taskbar: TaskbarMode::default(),
             bottom_space: DEFAULT_BOTTOM_SPACE,
@@ -706,6 +740,34 @@ mod tests {
             assert_eq!(settings.dock.middle_click, expected, "{name}");
         }
         assert!(serde_json::from_str::<Settings>(r#"{"dock":{"middleClick":"close"}}"#).is_err());
+    }
+
+    #[test]
+    fn the_tray_icons_in_the_dock_are_up_to_six_names_of_tray_icons() {
+        let key = |n: usize| format!("path:c:\\program files\\app\\app.exe#{n}");
+        let six: Vec<String> = (0..6).map(key).collect();
+        assert_eq!(
+            with_dock(|dock| dock.tray_in_dock = six.clone()).validate(),
+            Ok(())
+        );
+        let seven: Vec<String> = (0..7).map(key).collect();
+        assert_eq!(
+            with_dock(|dock| dock.tray_in_dock = seven).validate(),
+            Err(SettingsError::LookOutOfRange)
+        );
+        for bad in [
+            "c:\\app.exe#1",
+            "path:#1",
+            "path:app.exe#",
+            "path:app.exe#x",
+            "path:a\nb#1",
+        ] {
+            assert!(!is_tray_key(bad), "{bad}");
+        }
+        assert!(!is_tray_key(&format!("path:{}#1", "a".repeat(300))));
+        // Left out of the file while empty: older files read the same.
+        let json = serde_json::to_value(Settings::default()).unwrap();
+        assert!(json["dock"].get("trayInDock").is_none());
     }
 
     #[test]

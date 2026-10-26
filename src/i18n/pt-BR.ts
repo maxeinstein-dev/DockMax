@@ -240,6 +240,17 @@ const messages = {
     unnamed: "Programa sem nome",
     /** Footer: the buttons do what the taskbar's did. */
     footer: "Botão direito abre o menu do programa",
+    /** Configurações › Geral: which tray icons the dock shows itself, at its
+     * end beside the battery, the network and the volume (as the
+     * PrimoDock). */
+    inDock: {
+      label: "Ícones da bandeja no dock",
+      hint: "Ao lado de bateria, rede e volume; os outros ficam na seta. Até {max}.",
+      panel: "Painel",
+      dock: "Dock",
+      /** While the dock holds no icon to choose. */
+      none: "Nenhum ícone na bandeja agora.",
+    },
   },
   about: {
     /** One line under the app name. */

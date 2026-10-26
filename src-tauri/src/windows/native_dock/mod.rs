@@ -12,6 +12,7 @@ mod access;
 mod faces;
 mod look;
 mod paint;
+mod strip;
 mod svg;
 mod theme;
 
@@ -39,7 +40,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::w;
 
-use self::paint::{Face, Painter, Scene, Status, Tile, Tip};
+use self::paint::{Face, Painter, Scene, Status, StripCell, Tile, Tip};
+use self::strip::Cell;
 use self::theme::{Color, Palette};
 use super::dock::Rect;
 use super::panel::{LogicalRect, PanelId};
@@ -62,6 +64,10 @@ const WM_RUN: u32 = WM_APP + 0x31;
 const ANIMATION_TIMER: usize = 1;
 const CLOCK_TIMER: usize = 2;
 const WARM_TIMER: usize = 3;
+const STATUS_TIMER: usize = 4;
+
+/// How often the battery, the network and the volume are read again.
+const STATUS_EVERY: u32 = 3_000;
 
 /// A frame of the animations.
 const FRAME: Duration = Duration::from_millis(16);
@@ -148,6 +154,8 @@ struct Data {
     open: OpenSnapshot,
     /// How the programs and the widgets mix (`Storage::dock_order`).
     order: Vec<String>,
+    /// The icons of the notification area (while the dock holds it).
+    tray: Vec<crate::commands::tray::TrayIcon>,
 }
 
 /// A program's icon: being read, or read (`None` when it has none).
@@ -174,6 +182,14 @@ pub struct Dock {
     growth: Vec<Magnification>,
     hovered: Option<usize>,
     status_hovered: bool,
+    /// The small icons at the end, and the one under the pointer.
+    strip: Vec<Cell>,
+    strip_hovered: Option<usize>,
+    /// The battery, the network and the volume, as last read.
+    system: Option<super::system_status::Status>,
+    /// The tray icons' images, by icon key: the image they came from and
+    /// the bitmap.
+    tray_images: HashMap<String, (String, Option<ID2D1Bitmap>)>,
     /// The item held down by the left button.
     pressed: Option<usize>,
     press: Option<Press>,
@@ -264,6 +280,10 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
         growth: Vec::new(),
         hovered: None,
         status_hovered: false,
+        strip: Vec::new(),
+        strip_hovered: None,
+        system: Some(super::system_status::read()),
+        tray_images: HashMap::new(),
         pressed: None,
         press: None,
         drag_x: 0.0,
@@ -281,6 +301,7 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
     with_dock(|dock| {
         dock.rebuild();
         dock.arm_clock();
+        unsafe { SetTimer(Some(dock.hwnd), STATUS_TIMER, STATUS_EVERY, None) };
     });
     Ok(())
 }
@@ -318,6 +339,8 @@ fn run_queue() {
 
 fn read_data(app: &AppHandle) -> Data {
     let settings = crate::commands::settings::current(app);
+    #[cfg(windows)]
+    let tray = crate::commands::tray::icons();
     let (widgets, apps, order) = match app.try_state::<Mutex<Storage>>() {
         Some(state) => {
             let storage = state.lock().unwrap_or_else(PoisonError::into_inner);
@@ -335,6 +358,7 @@ fn read_data(app: &AppHandle) -> Data {
         apps,
         open: super::open_apps::snapshot(),
         order,
+        tray,
     }
 }
 
@@ -357,7 +381,6 @@ fn names() -> Names {
     let dock = &crate::i18n::messages().dock;
     Names {
         settings: dock.settings,
-        tray: dock.tray,
         clock: dock.clock,
         time_progress: dock.time_progress,
         note: dock.note,
@@ -373,7 +396,6 @@ fn panel_of(item: &Item) -> PanelId {
         Item::Widget(widget) => PanelId::Widget(widget.id.clone()),
         Item::Other(other) => PanelId::Open(other.key.clone()),
         Item::System(SystemItem::Settings) => PanelId::Settings,
-        Item::System(SystemItem::Tray) => PanelId::Tray,
     }
 }
 
@@ -398,6 +420,7 @@ impl Dock {
             groups: self.groups.clone(),
             hover: Hover::of(dock.hover, dock.hover_scale),
             status: dock.taskbar != TaskbarMode::Visible,
+            tray: self.strip.len(),
         }
     }
 
@@ -434,9 +457,21 @@ impl Dock {
             apps: self.data.apps.as_ref(),
             open: &self.data.open,
             show_open: settings.dock.show_open_apps,
-            tray: settings.dock.taskbar == TaskbarMode::Hidden,
             order: &self.data.order,
         });
+        self.strip = strip::cells(
+            settings.dock.taskbar,
+            self.system.as_ref(),
+            &self.data.tray,
+            &settings.dock.tray_in_dock,
+        );
+        if self
+            .strip_hovered
+            .is_some_and(|index| index >= self.strip.len())
+        {
+            self.strip_hovered = None;
+        }
+        self.decode_tray_images();
         // The growth of each item follows it by key across changes.
         let before: HashMap<String, Magnification> = self
             .items
@@ -482,6 +517,98 @@ impl Dock {
         self.place();
         self.animate();
         self.paint();
+    }
+
+    /// The images of the tray icons kept in the dock, read again when one
+    /// changed.
+    fn decode_tray_images(&mut self) {
+        use base64::Engine as _;
+        for cell in &self.strip {
+            let Cell::Tray(icon) = cell else {
+                continue;
+            };
+            let Some(image) = &icon.image else {
+                self.tray_images.remove(&icon.key);
+                continue;
+            };
+            if self
+                .tray_images
+                .get(&icon.key)
+                .is_some_and(|(from, _)| from == image)
+            {
+                continue;
+            }
+            let bitmap = image
+                .strip_prefix("data:image/png;base64,")
+                .and_then(|data| base64::engine::general_purpose::STANDARD.decode(data).ok())
+                .and_then(|png| self.painter.bitmap(&png));
+            self.tray_images
+                .insert(icon.key.clone(), (image.clone(), bitmap));
+        }
+    }
+
+    /// The battery, the network and the volume, read again; laid out again
+    /// when they changed (an icon may come or go).
+    fn read_system(&mut self) {
+        let now = Some(super::system_status::read());
+        if now != self.system {
+            self.system = now;
+            self.rebuild();
+        }
+    }
+
+    /// The cells of the strip, where they are drawn now.
+    fn strip_cells(&self) -> Vec<Area> {
+        let icon = self.shape().size.geometry().icon;
+        self.placement_now()
+            .tray
+            .map(|area| dock_layout::tray_cells(area, self.strip.len(), icon))
+            .unwrap_or_default()
+    }
+
+    /// The cell of the strip under the point.
+    fn strip_hit(&self, x: f64, y: f64) -> Option<usize> {
+        self.strip_cells()
+            .iter()
+            .position(|cell| cell.contains(x, y))
+    }
+
+    /// A click on a cell of the strip: the arrow opens the tray panel, the
+    /// battery, the network and the volume the quick settings of Windows, a
+    /// tray icon its program's own action.
+    fn strip_click(&mut self, index: usize, right: bool) {
+        let Some(cell) = self.strip.get(index).cloned() else {
+            return;
+        };
+        match cell {
+            Cell::Arrow if !right => {
+                let Some(area) = self.strip_cells().get(index).copied() else {
+                    return;
+                };
+                self.strip_hovered = None;
+                self.toggle(PanelId::Tray, area);
+            }
+            Cell::Tray(icon) => {
+                let button = if right {
+                    super::tray_host::Button::Right
+                } else {
+                    super::tray_host::Button::Left
+                };
+                self.effects.push(Box::new(move |_| {
+                    if let Err(error) = super::tray_host::click(&icon.key, button) {
+                        log::warn!("dock: a tray icon refused the click: {error}");
+                    }
+                }));
+            }
+            Cell::Network(_) | Cell::Volume(_) | Cell::Battery(_) if !right => {
+                self.effects.push(Box::new(|_| {
+                    if let Err(error) = super::flyout::open(super::flyout::Flyout::QuickSettings) {
+                        log::warn!("dock: the quick settings could not be opened: {error}");
+                    }
+                }));
+            }
+            _ => self.dock_menu(),
+        }
     }
 
     /// Asks for the icons and badges not read yet, off the main thread.
@@ -593,6 +720,24 @@ impl Dock {
                         ),
                     }
                 })
+                .chain(
+                    self.strip
+                        .iter()
+                        .zip(self.strip_cells())
+                        .map(|(cell, area)| {
+                            let on_screen = to_screen(area);
+                            access::Entry {
+                                key: cell.key(),
+                                name: cell.tip(),
+                                rect: (
+                                    f64::from(on_screen.x),
+                                    f64::from(on_screen.y),
+                                    f64::from(on_screen.width),
+                                    f64::from(on_screen.height),
+                                ),
+                            }
+                        }),
+                )
                 .collect(),
         );
     }
@@ -601,6 +746,9 @@ impl Dock {
     fn press(&mut self, key: &str) {
         if let Some(index) = self.items.iter().position(|item| item.key() == key) {
             self.click(index);
+            self.paint();
+        } else if let Some(index) = self.strip.iter().position(|cell| cell.key() == key) {
+            self.strip_click(index, false);
             self.paint();
         }
     }
@@ -842,6 +990,33 @@ impl Dock {
                     text: self.names.get(index)?.clone(),
                 })
             });
+        let cells = self.strip_cells();
+        let strip: Vec<StripCell> = self
+            .strip
+            .iter()
+            .zip(&cells)
+            .enumerate()
+            .map(|(index, (cell, area))| StripCell {
+                area: *area,
+                glyph: cell.glyph(edge),
+                image: match cell {
+                    Cell::Tray(icon) => self
+                        .tray_images
+                        .get(&icon.key)
+                        .and_then(|(_, bitmap)| bitmap.clone()),
+                    _ => None,
+                },
+                hovered: self.strip_hovered == Some(index),
+            })
+            .collect();
+        // Over a cell of the strip, its label.
+        let tip = tip.or_else(|| {
+            let index = self.strip_hovered.filter(|_| self.open.is_none())?;
+            Some(Tip {
+                anchor: dock_layout::tip_anchor(*cells.get(index)?, edge),
+                text: self.strip.get(index)?.tip(),
+            })
+        });
         let status = now_placement.status.map(|area| Status {
             area,
             time: format!("{:02}:{:02}", clock.wHour, clock.wMinute),
@@ -864,6 +1039,7 @@ impl Dock {
             separators: now_placement.separators.clone(),
             tiles,
             status,
+            strip,
             tip,
             indicator: settings.indicator,
             indicator_color,
@@ -908,10 +1084,6 @@ impl Dock {
             Item::System(SystemItem::Settings) => Face::Glyph {
                 glaze: theme::Glaze::SETTINGS,
                 paths: paint::SETTINGS_GLYPH,
-            },
-            Item::System(SystemItem::Tray) => Face::Glyph {
-                glaze: theme::Glaze::TRAY,
-                paths: paint::TRAY_GLYPH,
             },
         }
     }
@@ -959,10 +1131,16 @@ impl Dock {
             .placement_now()
             .status
             .is_some_and(|area| area.contains(x, y));
-        let hovered = if status { None } else { self.hit(x, y) };
-        if hovered != self.hovered || status != self.status_hovered {
+        let cell = self.strip_hit(x, y);
+        let hovered = if status || cell.is_some() {
+            None
+        } else {
+            self.hit(x, y)
+        };
+        if hovered != self.hovered || status != self.status_hovered || cell != self.strip_hovered {
             self.hovered = hovered;
             self.status_hovered = status;
+            self.strip_hovered = cell;
             let _ = unsafe { KillTimer(Some(self.hwnd), WARM_TIMER) };
             if self.warmable() {
                 unsafe { SetTimer(Some(self.hwnd), WARM_TIMER, WARM_DELAY, None) };
@@ -975,6 +1153,14 @@ impl Dock {
     /// Whether the item under the pointer opens a panel that warming helps:
     /// not a program (a click opens it) nor Configurações (an app of its own).
     fn warmable(&self) -> bool {
+        // The tray's arrow opens the tray panel.
+        if self
+            .strip_hovered
+            .and_then(|index| self.strip.get(index))
+            .is_some_and(|cell| *cell == Cell::Arrow)
+        {
+            return true;
+        }
         self.hovered
             .and_then(|index| self.items.get(index))
             .is_some_and(|item| {
@@ -989,6 +1175,7 @@ impl Dock {
         }
         self.hovered = None;
         self.status_hovered = false;
+        self.strip_hovered = None;
         self.pressed = None;
         let _ = unsafe { KillTimer(Some(self.hwnd), WARM_TIMER) };
         self.animate();
@@ -1036,6 +1223,8 @@ impl Dock {
                     log::warn!("dock: the calendar could not be opened: {error}");
                 }
             }));
+        } else if let Some(cell) = self.strip_hit(x, y) {
+            self.strip_click(cell, false);
         } else if let Some(index) = self.hit(x, y).filter(|&index| Some(index) == pressed) {
             self.click(index);
         }
@@ -1400,6 +1589,10 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
         WM_RBUTTONUP => with_dock(|dock| {
             shared().clicked = Some(Instant::now());
             let (x, y) = dock.point(lparam);
+            if let Some(cell) = dock.strip_hit(x, y) {
+                dock.strip_click(cell, true);
+                return;
+            }
             match dock.hit(x, y) {
                 Some(index) if dock.items.get(index).is_some_and(Item::is_program) => {
                     dock.right_click(index);
@@ -1422,6 +1615,7 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
                 dock.paint();
                 dock.arm_clock();
             }),
+            STATUS_TIMER => with_dock(Dock::read_system),
             WARM_TIMER => with_dock(|dock| {
                 let _ = unsafe { KillTimer(Some(dock.hwnd), WARM_TIMER) };
                 if dock.warmable() && dock.open.is_none() {

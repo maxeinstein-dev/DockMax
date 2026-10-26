@@ -18,7 +18,6 @@ pub struct Messages {
 #[derive(Debug)]
 pub struct DockMessages {
     pub settings: &'static str,
-    pub tray: &'static str,
     /// The names of the widget kinds, for an instance without a label.
     pub clock: &'static str,
     pub time_progress: &'static str,
@@ -30,6 +29,16 @@ pub struct DockMessages {
     /// An item's name while it carries the attention badge; `{name}` is
     /// replaced.
     pub with_notice: &'static str,
+    /// The labels of the small icons at the end; `{n}` is a percentage.
+    pub show_hidden_icons: &'static str,
+    pub tray_icon: &'static str,
+    pub wifi: &'static str,
+    pub wired: &'static str,
+    pub offline: &'static str,
+    pub volume: &'static str,
+    pub muted: &'static str,
+    pub battery: &'static str,
+    pub battery_charging: &'static str,
 }
 
 /// The Configurações app (spec 0011 H1).
@@ -61,7 +70,6 @@ const PT_BR: Messages = Messages {
     },
     dock: DockMessages {
         settings: "Configurações",
-        tray: "Bandeja do sistema",
         clock: "Relógio",
         time_progress: "Progresso do tempo",
         note: "Nota",
@@ -69,6 +77,15 @@ const PT_BR: Messages = Messages {
         files: "Arquivos",
         no_value: "–",
         with_notice: "{name} (com aviso)",
+        show_hidden_icons: "Mostrar ícones ocultos",
+        tray_icon: "Ícone da bandeja",
+        wifi: "Wi-Fi",
+        wired: "Rede com fio",
+        offline: "Sem conexão",
+        volume: "Volume: {n}%",
+        muted: "Sem som",
+        battery: "Bateria: {n}%",
+        battery_charging: "Bateria: {n}% (carregando)",
     },
 };
 

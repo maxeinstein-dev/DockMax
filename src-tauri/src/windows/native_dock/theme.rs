@@ -151,12 +151,6 @@ impl Glaze {
         s: 14.0,
         l: 34.0,
     };
-    /// Teal.
-    pub const TRAY: Glaze = Glaze {
-        h: 176.0,
-        s: 22.0,
-        l: 36.0,
-    };
     /// The pale plate under a program's icon.
     pub const APP: Glaze = Glaze {
         h: 220.0,

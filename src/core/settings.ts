@@ -107,6 +107,10 @@ export type OpenAnimation = "bounce" | "pulse" | "shake";
  * `TaskbarMode` in `src-tauri/src/domain/settings.rs`. */
 export type TaskbarMode = "visible" | "autohide" | "hidden";
 
+/** Most tray icons the dock shows itself, beside the battery, the network
+ * and the volume; `MAX_TRAY_IN_DOCK` in `src-tauri/src/domain/settings.rs`. */
+export const MAX_TRAY_IN_DOCK = 6;
+
 /** Distance between the dock and the screen edge, in logical pixels. */
 export const MAX_BOTTOM_SPACE = 64;
 export const DEFAULT_BOTTOM_SPACE = 2;
@@ -169,6 +173,10 @@ export interface DockSettings {
   showOpenApps: boolean;
   /** What the middle button does on a program of the dock. */
   middleClick: MiddleClick;
+  /** The tray icons the dock shows itself, by their lasting `id`
+   * (`TrayIcon.id`); the others are behind the arrow. Rust leaves the field
+   * out while it is empty. */
+  trayInDock?: string[];
   taskbar: TaskbarMode;
   /** Distance between the dock and the screen edge, in logical pixels,
    * 0–`MAX_BOTTOM_SPACE`. */

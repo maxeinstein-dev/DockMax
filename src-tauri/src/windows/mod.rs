@@ -29,6 +29,8 @@ pub mod profiles;
 pub mod recovery;
 pub mod settings_window;
 #[cfg(windows)]
+pub mod system_status;
+#[cfg(windows)]
 pub mod taskbar;
 #[cfg(windows)]
 pub mod tray_host;

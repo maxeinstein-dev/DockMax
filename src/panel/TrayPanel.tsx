@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { clickIcon, useTray, visibleIcons, type TrayIcon } from "../core/tray";
+import { clickIcon, panelIcons, useTray, type TrayIcon } from "../core/tray";
 import { useT } from "../i18n";
 import PanelFooter from "./PanelFooter";
 import "./TrayPanel.css";
@@ -16,10 +16,15 @@ function hidePanel() {
  * click opens the program's menu. The icons come from Rust, which hosts the
  * area while the Windows taskbar is hidden.
  */
-function TrayPanel() {
+function TrayPanel({
+  inDock = [],
+}: {
+  /** The icons the dock shows itself (their ids): not repeated here. */
+  inDock?: readonly string[];
+}) {
   const t = useT();
   const icons = useTray();
-  const shown = icons === null ? [] : visibleIcons(icons);
+  const shown = icons === null ? [] : panelIcons(icons, inDock);
 
   // A left click opens a window of the program, which would sit under the
   // panel: it closes. A right click opens the program's own menu and the

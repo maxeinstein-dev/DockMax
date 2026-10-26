@@ -10,7 +10,8 @@
 //! Configurações and Sobre left the dock (author's decision, 2026-10-26):
 //! the app opens from the dock's menu (right button) and has Sobre inside.
 //! Configurações comes back only while it carries the attention badge, so
-//! the notice is not lost.
+//! the notice is not lost. The tray's arrow is not an item either: it is in
+//! the strip of small icons at the end (`dock_layout::Shape::tray`).
 
 use super::apps::{AppsSnapshot, PinnedApp};
 use super::open_apps::{OpenOther, OpenSnapshot};
@@ -21,9 +22,6 @@ use super::widgets::{StorageStatus, WidgetInstance, WidgetKind, WidgetsSnapshot}
 pub enum SystemItem {
     /// Only while the storage needs attention (`needs_attention`).
     Settings,
-    /// The notification area: only while the Windows taskbar is hidden
-    /// altogether (ADR 0009).
-    Tray,
 }
 
 /// What an item of the dock stands for.
@@ -47,7 +45,6 @@ impl Item {
             Item::Widget(widget) => format!("widget:{}", widget.id.as_str()),
             Item::Other(other) => format!("open:{}", other.key),
             Item::System(SystemItem::Settings) => "settings".into(),
-            Item::System(SystemItem::Tray) => "tray".into(),
         }
     }
 
@@ -61,7 +58,6 @@ impl Item {
 #[derive(Debug, Clone, Copy)]
 pub struct Names {
     pub settings: &'static str,
-    pub tray: &'static str,
     pub clock: &'static str,
     pub time_progress: &'static str,
     pub note: &'static str,
@@ -86,7 +82,6 @@ impl Names {
                 .to_string()
             }),
             Item::System(SystemItem::Settings) => self.settings.into(),
-            Item::System(SystemItem::Tray) => self.tray.into(),
         }
     }
 }
@@ -99,8 +94,6 @@ pub struct Sources<'a> {
     pub open: &'a OpenSnapshot,
     /// Whether the open programs that are not pinned show (a setting).
     pub show_open: bool,
-    /// Whether the tray is the dock's (the taskbar hidden altogether).
-    pub tray: bool,
     /// How the programs and the widgets mix: keys in dock order.
     pub order: &'a [String],
 }
@@ -157,9 +150,6 @@ pub fn items(sources: Sources<'_>) -> Items {
     let mut systems = Vec::new();
     if sources.attention() {
         systems.push(Item::System(SystemItem::Settings));
-    }
-    if sources.tray {
-        systems.push(Item::System(SystemItem::Tray));
     }
     let mixed = interleave(sources.order, apps, widgets);
     let groups = [mixed.len(), others.len(), systems.len()]
@@ -241,7 +231,6 @@ mod tests {
 
     const NAMES: Names = Names {
         settings: "Configurações",
-        tray: "Bandeja do sistema",
         clock: "Relógio",
         time_progress: "Progresso do tempo",
         note: "Nota",
@@ -290,7 +279,6 @@ mod tests {
             apps,
             open,
             show_open: true,
-            tray: false,
             order: &[],
         }
     }
@@ -431,19 +419,17 @@ mod tests {
     }
 
     #[test]
-    fn the_open_programs_hide_with_the_setting_and_the_tray_shows_with_the_taskbar_hidden() {
+    fn the_open_programs_hide_with_the_setting() {
         let open = OpenSnapshot {
             apps: vec![],
             others: vec![other("00000000000000aa", true)],
         };
         let found = items(Sources {
             show_open: false,
-            tray: true,
             ..sources(None, None, &open)
         });
 
-        assert_eq!(found.groups, vec![1]);
-        assert_eq!(found.items, vec![Item::System(SystemItem::Tray)]);
+        assert!(found.items.is_empty());
     }
 
     #[test]
@@ -473,10 +459,6 @@ mod tests {
             "Lisboa"
         );
         assert_eq!(NAMES.of(&Item::App(app(1, "Paint"))), "Paint");
-        assert_eq!(
-            NAMES.of(&Item::System(SystemItem::Tray)),
-            "Bandeja do sistema"
-        );
     }
 
     #[test]
@@ -496,7 +478,7 @@ mod tests {
             running(&open, &Item::Other(other("00000000000000aa", false))),
             Some(false)
         );
-        assert_eq!(running(&open, &Item::System(SystemItem::Tray)), None);
+        assert_eq!(running(&open, &Item::System(SystemItem::Settings)), None);
         assert!(!needs_attention(None));
     }
 }

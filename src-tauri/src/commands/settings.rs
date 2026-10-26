@@ -56,6 +56,9 @@ struct DockSettingsInput {
     icon_pack: Option<String>,
     open_animation: OpenAnimation,
     show_open_apps: bool,
+    /// Left out of the settings while empty, so the interface may leave it out.
+    #[serde(default)]
+    tray_in_dock: Vec<String>,
     middle_click: MiddleClick,
     taskbar: TaskbarMode,
     bottom_space: u8,
@@ -88,6 +91,7 @@ impl From<SettingsInput> for Settings {
                 icon_pack: dock.icon_pack,
                 open_animation: dock.open_animation,
                 show_open_apps: dock.show_open_apps,
+                tray_in_dock: dock.tray_in_dock,
                 middle_click: dock.middle_click,
                 taskbar: dock.taskbar,
                 bottom_space: dock.bottom_space,
@@ -399,6 +403,7 @@ mod tests {
                     icon_pack: Some("pixel-system".into()),
                     open_animation: OpenAnimation::Pulse,
                     show_open_apps: false,
+                    tray_in_dock: Vec::new(),
                     middle_click: MiddleClick::None,
                     taskbar: TaskbarMode::Hidden,
                     bottom_space: 2,

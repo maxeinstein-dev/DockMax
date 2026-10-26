@@ -101,6 +101,34 @@ pub const TIP_HEIGHT: f64 = 24.0;
 /// Width of the clock and date at the end of the bar.
 pub const STATUS_WIDTH: f64 = 76.0;
 
+/// The side of a small icon's cell in the tray strip (two rows in the
+/// height of an item), at most `MAX_TRAY_CELL`.
+pub fn tray_cell(icon: f64) -> f64 {
+    (icon / 2.0).floor().min(MAX_TRAY_CELL)
+}
+
+const MAX_TRAY_CELL: f64 = 28.0;
+
+/// Width of a tray strip of `count` small icons, two to a column.
+pub fn tray_width(icon: f64, count: usize) -> f64 {
+    count.div_ceil(2) as f64 * tray_cell(icon)
+}
+
+/// The cells of a tray strip in `area` (as tall as an item): column by
+/// column, the top one first.
+pub fn tray_cells(area: Area, count: usize, icon: f64) -> Vec<Area> {
+    let cell = tray_cell(icon);
+    let top = area.y + (area.height - 2.0 * cell) / 2.0;
+    (0..count)
+        .map(|index| Area {
+            x: area.x + (index / 2) as f64 * cell,
+            y: top + (index % 2) as f64 * cell,
+            width: cell,
+            height: cell,
+        })
+        .collect()
+}
+
 /// Transparent room the window keeps beyond the label and on both sides of
 /// the widest bar, for the pill's shadow and the bar's.
 pub const ROOM: f64 = 8.0;
@@ -190,6 +218,9 @@ pub struct Shape {
     pub groups: Vec<usize>,
     pub hover: Hover,
     pub status: bool,
+    /// The small icons at the end (the tray's arrow, the battery, the
+    /// network, the volume, the tray icons kept in the dock): 0 for none.
+    pub tray: usize,
 }
 
 /// One item along the bar: its left edge from the bar's outer left edge,
@@ -209,6 +240,7 @@ struct Row {
     width: f64,
     items: Vec<RowItem>,
     separators: Vec<f64>,
+    tray: Option<f64>,
     status: Option<f64>,
 }
 
@@ -234,16 +266,24 @@ fn row(shape: &Shape, growth: &dyn Fn(usize) -> Magnification) -> Row {
         }
     }
     let mut status = None;
-    if shape.status {
-        // [item][gap][separator][gap][status][gap]: the way two groups meet.
+    let mut tray = None;
+    if shape.status || shape.tray > 0 {
+        // [item][gap][separator][gap][tray][gap][status][gap]: the way two
+        // groups meet.
         if !items.is_empty() {
             separators.push(x + gap * 0.4);
             x += separator_width(gap) + gap;
         }
-        status = Some(x);
-        x += STATUS_WIDTH + gap;
+        if shape.tray > 0 {
+            tray = Some(x);
+            x += tray_width(icon, shape.tray) + gap;
+        }
+        if shape.status {
+            status = Some(x);
+            x += STATUS_WIDTH + gap;
+        }
     }
-    let width = if items.is_empty() && !shape.status {
+    let width = if items.is_empty() && !shape.status && shape.tray == 0 {
         2.0 * pad
     } else {
         x - gap + pad
@@ -252,6 +292,7 @@ fn row(shape: &Shape, growth: &dyn Fn(usize) -> Magnification) -> Row {
         width,
         items,
         separators,
+        tray,
         status,
     }
 }
@@ -306,6 +347,8 @@ pub struct Placement {
     pub scales: Vec<f64>,
     /// The x of each separator's line.
     pub separators: Vec<f64>,
+    /// The strip of small icons, when there is one.
+    pub tray: Option<Area>,
     /// The clock's box, when it ends the bar.
     pub status: Option<Area>,
 }
@@ -362,6 +405,12 @@ pub fn place_with(
             .map(|item| item.magnification.scale)
             .collect(),
         separators: row.separators.iter().map(|x| bar.x + x).collect(),
+        tray: row.tray.map(|x| Area {
+            x: bar.x + x,
+            y: top,
+            width: tray_width(icon, shape.tray),
+            height: icon,
+        }),
         status: row.status.map(|x| Area {
             x: bar.x + x,
             y: top,
@@ -452,6 +501,7 @@ mod tests {
                 scale: 1.4,
             },
             status: false,
+            tray: 0,
         }
     }
 
@@ -641,6 +691,31 @@ mod tests {
         }
         let status = with.status.expect("the clock is placed");
         assert!((status.x + STATUS_WIDTH + 7.0 - (with.bar.x + with.bar.width)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn the_tray_strip_comes_before_the_clock_two_icons_a_column() {
+        let shape = Shape {
+            status: true,
+            tray: 5,
+            ..shape(DockSize::Medium)
+        };
+        let placement = place(&shape, DockEdge::Bottom, (600.0, 123.0), None);
+        let tray = placement.tray.expect("the strip is placed");
+        let status = placement.status.expect("the clock is placed");
+
+        // Three columns of 24 px for five icons on the medium size.
+        assert_eq!(tray_cell(48.0), 24.0);
+        assert!((tray.width - 72.0).abs() < 1e-9);
+        assert!((status.x - (tray.x + tray.width + 7.0)).abs() < 1e-9);
+        let cells = tray_cells(tray, 5, 48.0);
+        assert_eq!(cells.len(), 5);
+        assert!((cells[1].x - cells[0].x).abs() < 1e-9);
+        assert!((cells[1].y - cells[0].y - 24.0).abs() < 1e-9);
+        assert!((cells[4].x - cells[0].x - 48.0).abs() < 1e-9);
+        // The two rows fill the item's height, centered.
+        assert!((cells[0].y - tray.y).abs() < 1e-9);
+        assert_eq!(tray_cell(96.0), 28.0);
     }
 
     #[test]

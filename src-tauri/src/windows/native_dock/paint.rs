@@ -65,8 +65,6 @@ pub const SETTINGS_GLYPH: &[&str] = &[
     "M13.5 7.5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
     "M7.5 16.5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
 ];
-/// The tray: the arrow up of the Windows taskbar's "show hidden icons".
-pub const TRAY_GLYPH: &[&str] = &["M6 14.5l6-6 6 6"];
 pub const NOTE_GLYPH: &[&str] = &[
     "M7.5 3.5h9a2.5 2.5 0 0 1 2.5 2.5v12a2.5 2.5 0 0 1-2.5 2.5h-9a2.5 2.5 0 0 1-2.5-2.5v-12a2.5 2.5 0 0 1 2.5-2.5z",
     "M8.5 8.5h7M8.5 12h7M8.5 15.5h4",
@@ -130,6 +128,15 @@ pub struct Status {
     pub hovered: bool,
 }
 
+/// A small icon of the strip at the end: a glyph of Windows' icon font
+/// (with how strongly it is drawn) or a tray icon's own image.
+pub struct StripCell {
+    pub area: Area,
+    pub glyph: Option<(char, f32)>,
+    pub image: Option<ID2D1Bitmap>,
+    pub hovered: bool,
+}
+
 /// The label pill: anchored at the middle of its edge nearest the tile.
 pub struct Tip {
     pub anchor: (f64, f64),
@@ -147,6 +154,7 @@ pub struct Scene {
     pub separators: Vec<f64>,
     pub tiles: Vec<Tile>,
     pub status: Option<Status>,
+    pub strip: Vec<StripCell>,
     pub tip: Option<Tip>,
     pub indicator: Indicator,
     pub indicator_color: Color,
@@ -297,6 +305,8 @@ pub struct Painter {
     squircle: ID2D1PathGeometry,
     geometries: HashMap<&'static str, ID2D1PathGeometry>,
     formats: HashMap<TextKey, IDWriteTextFormat>,
+    /// Windows' icon font, by size (hundredths of a pixel).
+    icon_formats: HashMap<u32, IDWriteTextFormat>,
     glazes: HashMap<(u32, u32, u32, bool), ID2D1LinearGradientBrush>,
     sheen: ID2D1RadialGradientBrush,
     rim: ID2D1LinearGradientBrush,
@@ -419,6 +429,7 @@ impl Painter {
             squircle,
             geometries: HashMap::new(),
             formats: HashMap::new(),
+            icon_formats: HashMap::new(),
             glazes: HashMap::new(),
             sheen,
             rim,
@@ -691,6 +702,9 @@ impl Painter {
         }
         for tile in &scene.tiles {
             self.marks(scene, tile);
+        }
+        for cell in &scene.strip {
+            self.strip_cell(scene, cell);
         }
         if let Some(status) = &scene.status {
             self.status(scene, status);
@@ -1538,6 +1552,107 @@ impl Painter {
                 false,
                 ink.with_alpha(ink.a * 0.85),
             );
+        }
+    }
+
+    /// A glyph of Windows' icon font, centered in `area`.
+    fn icon_glyph(&mut self, glyph: char, area: Area, size: f64, ink: Color) {
+        let key = (size * 100.0).round() as u32;
+        let format = match self.icon_formats.get(&key) {
+            Some(format) => format.clone(),
+            None => {
+                let family = windows::core::HSTRING::from(super::strip::ICON_FONT);
+                let Ok(format) = (unsafe {
+                    self.write.CreateTextFormat(
+                        &family,
+                        None,
+                        DWRITE_FONT_WEIGHT(400),
+                        DWRITE_FONT_STYLE_NORMAL,
+                        DWRITE_FONT_STRETCH_NORMAL,
+                        size as f32,
+                        w!("pt-BR"),
+                    )
+                }) else {
+                    return;
+                };
+                unsafe {
+                    let _ = format.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                    let _ = format.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+                    let _ = format.SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+                }
+                self.icon_formats.insert(key, format.clone());
+                format
+            }
+        };
+        let mut buffer = [0u16; 2];
+        let text = glyph.encode_utf16(&mut buffer);
+        let brush = self.solid(ink).clone();
+        unsafe {
+            self.target.DrawText(
+                text,
+                &format,
+                &rect(area),
+                &brush,
+                D2D1_DRAW_TEXT_OPTIONS_NONE,
+                DWRITE_MEASURING_MODE_NATURAL,
+            )
+        };
+    }
+
+    fn strip_cell(&mut self, scene: &Scene, cell: &StripCell) {
+        let ink = scene.look.ink.unwrap_or(scene.palette.ink);
+        let area = cell.area;
+        if cell.hovered {
+            let hover = self.solid(ink.with_alpha(0.12)).clone();
+            unsafe {
+                self.target.FillRoundedRectangle(
+                    &D2D1_ROUNDED_RECT {
+                        rect: rect(Area {
+                            x: area.x + 1.0,
+                            y: area.y + 1.0,
+                            width: area.width - 2.0,
+                            height: area.height - 2.0,
+                        }),
+                        radiusX: 4.0,
+                        radiusY: 4.0,
+                    },
+                    &hover,
+                )
+            };
+        }
+        if let Some((glyph, alpha)) = cell.glyph {
+            if scene.look.flat {
+                // Without a bar behind it, a shadow keeps it legible.
+                let shadow = Area {
+                    y: area.y + 1.0,
+                    ..area
+                };
+                self.icon_glyph(
+                    glyph,
+                    shadow,
+                    area.width * 0.6,
+                    Color::BLACK.with_alpha(0.6),
+                );
+            }
+            self.icon_glyph(glyph, area, area.width * 0.6, ink.with_alpha(ink.a * alpha));
+        }
+        if let Some(image) = &cell.image {
+            let side = (area.width * 0.66).round();
+            let at = Area {
+                x: area.x + (area.width - side) / 2.0,
+                y: area.y + (area.height - side) / 2.0,
+                width: side,
+                height: side,
+            };
+            unsafe {
+                self.target.DrawBitmap(
+                    image,
+                    Some(&rect(at)),
+                    1.0,
+                    D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                    None,
+                )
+            };
         }
     }
 

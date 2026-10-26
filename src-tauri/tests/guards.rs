@@ -93,6 +93,8 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-list-icon-packs",
             "allow-reload-icon-packs",
             "allow-open-icon-packs-folder",
+            // Which tray icons the dock shows itself: the list to choose from.
+            "allow-list-tray",
             "log:allow-log",
         ],
     ),
