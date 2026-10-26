@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LOOK, type Settings } from "../core/settings";
 import { dockSize } from "../core/appearance";
 import { forgetIcons, type AppsSnapshot } from "../core/apps";
+import { forgetBadges } from "../core/openApps";
 import type { WidgetInstance, WidgetsSnapshot } from "../core/widgets";
 import { WIDGET_FIXTURES } from "../core/widgets.fixtures";
 import { ptBR } from "../i18n/pt-BR";
@@ -202,6 +203,7 @@ interface OtherForTest {
   name: string;
   count: number;
   active: boolean;
+  badge: boolean;
 }
 
 const CALCULATOR = {
@@ -237,6 +239,7 @@ describe("Dock", () => {
     activates = true;
     icon = ICON;
     forgetIcons();
+    forgetBadges();
     invoke.mockReset();
     invoke.mockImplementation((command: string) =>
       Promise.resolve(
@@ -1291,6 +1294,7 @@ describe("Dock", () => {
           name: "code",
           count: 1,
           active: false,
+          badge: false,
         };
         const MAIL: OtherForTest = {
           key: "00000000000000bb",
@@ -1298,6 +1302,7 @@ describe("Dock", () => {
           name: "Correio",
           count: 2,
           active: true,
+          badge: false,
         };
         const names = () =>
           within(bar())
@@ -1320,6 +1325,34 @@ describe("Dock", () => {
           expect(program("code")).toHaveAttribute("data-running");
           expect(program("code")).not.toHaveAttribute("data-active");
           expect(program("Correio")).toHaveAttribute("data-active");
+        });
+
+        it("badges the icon with the photo of a Chrome profile, asked by the key", async () => {
+          openOthers = [
+            { ...CODE, badge: true },
+            { ...MAIL, badge: false },
+          ];
+          const base = invoke.getMockImplementation() as (
+            command: string,
+          ) => Promise<unknown>;
+          invoke.mockImplementation((command: string) =>
+            command === "open_badge"
+              ? Promise.resolve("data:image/png;base64,UFJPRklMRQ==")
+              : base(command),
+          );
+          await renderDock();
+          await act(async () => {});
+
+          expect(
+            program("code").querySelector("img.dock-profile"),
+          ).toHaveAttribute("src", "data:image/png;base64,UFJPRklMRQ==");
+          expect(
+            program("Correio").querySelector("img.dock-profile"),
+          ).toBeNull();
+          expect(invoke).toHaveBeenCalledWith("open_badge", { key: CODE.key });
+          expect(invoke).not.toHaveBeenCalledWith("open_badge", {
+            key: MAIL.key,
+          });
         });
 
         it("draws their icon from the id Rust gave", async () => {
@@ -1407,6 +1440,7 @@ describe("Dock", () => {
           name: "code",
           count: 1,
           active: false,
+          badge: false,
         };
         const middle = (name: string) =>
           fireEvent(
@@ -1515,6 +1549,7 @@ describe("Dock", () => {
             name: "code",
             count: 1,
             active: false,
+            badge: false,
           },
         ];
         await renderDock();

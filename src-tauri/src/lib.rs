@@ -176,6 +176,7 @@ pub fn run() {
             commands::apps::activate_app,
             commands::apps::activate_open,
             commands::apps::launch_open,
+            commands::apps::open_badge,
             commands::apps::close_app,
             commands::apps::close_open,
             commands::apps::pin_open,

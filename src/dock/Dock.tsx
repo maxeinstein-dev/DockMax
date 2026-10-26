@@ -38,6 +38,7 @@ import {
   activateOpen,
   launchOpen,
   useOpenApps,
+  useOpenBadge,
   type OpenOther,
 } from "../core/openApps";
 import { errorKind, log } from "../core/log";
@@ -219,6 +220,15 @@ function AppFace({
   );
 }
 
+/** The photo of the profile on the corner of an open program's icon (a
+ * Chrome profile), as the Windows taskbar badges it. */
+function ProfileBadge({ other }: { other: OpenOther }) {
+  const url = useOpenBadge(other.key, other.badge);
+  return url === null ? null : (
+    <img className="dock-profile" src={url} alt="" draggable={false} />
+  );
+}
+
 /** The face inside an item's glaze: a program's icon, a widget's live face,
  * or a system item's glyph. */
 function TileFace({
@@ -241,11 +251,14 @@ function TileFace({
   }
   if (entry.other !== null) {
     return (
-      <AppFace
-        appId={entry.other.appId}
-        name={entry.other.name}
-        variant={iconVariant}
-      />
+      <>
+        <AppFace
+          appId={entry.other.appId}
+          name={entry.other.name}
+          variant={iconVariant}
+        />
+        <ProfileBadge other={entry.other} />
+      </>
     );
   }
   if (entry.instance === null) {

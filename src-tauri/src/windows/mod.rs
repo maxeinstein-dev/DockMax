@@ -20,6 +20,8 @@ pub mod panel;
 #[cfg(windows)]
 pub mod popup_menu;
 #[cfg(windows)]
+pub mod profiles;
+#[cfg(windows)]
 pub mod taskbar;
 #[cfg(windows)]
 pub mod tray_host;

@@ -425,6 +425,33 @@ pub async fn launch_open(key: String) -> Result<(), AppCommandError> {
     }
 }
 
+/// The badge of an open program that is not pinned (spec 0009): the photo of
+/// the Chrome profile its windows belong to, as a small PNG `data:` URL, drawn
+/// on the corner of its icon the way the Windows taskbar does. `null` for a
+/// program with none. The program is named by the `key` the dock was given.
+#[tauri::command]
+pub async fn open_badge(key: String) -> Result<Option<String>, AppCommandError> {
+    if !is_open_key_text(&key) {
+        return Err(AppError::NotFound.into());
+    }
+    #[cfg(windows)]
+    {
+        let Some(aumid) = crate::windows::open_apps::aumid_of_other(&key) else {
+            return Ok(None);
+        };
+        let made = tauri::async_runtime::spawn_blocking(move || {
+            crate::windows::profiles::badge_png(&aumid)
+        })
+        .await
+        .map_err(|_| AppCommandError::from(AppError::Unavailable))?;
+        Ok(made.map(|png| format!("data:image/png;base64,{}", STANDARD.encode(png))))
+    }
+    #[cfg(not(windows))]
+    {
+        Ok(None)
+    }
+}
+
 /// Asks the windows of the open pinned program `id` to close, as the close
 /// button of each does (spec 0009 D3). How many it asked; 0 when it has none.
 #[tauri::command]

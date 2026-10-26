@@ -28,6 +28,9 @@ export interface OpenOther {
   name: string;
   count: number;
   active: boolean;
+  /** It has a badge for its icon (the photo of a Chrome profile):
+   * `useOpenBadge` reads it. */
+  badge: boolean;
 }
 
 /** Who is open: the pinned programs, and the others. */
@@ -44,6 +47,7 @@ export const OPEN_APPS_COMMANDS = {
   closeApp: "close_app",
   closeOpen: "close_open",
   pinOpen: "pin_open",
+  badge: "open_badge",
 } as const;
 
 /** Event every window receives with the `OpenSnapshot` after a change. */
@@ -151,6 +155,50 @@ export function pinOpen(key: string): Promise<void> {
       throw error;
     },
   );
+}
+
+const badges = new Map<string, Promise<string | null>>();
+
+/** The badge of the open program `key` as an image URL, or null; asked once
+ * per program and page. */
+export function openBadge(key: string): Promise<string | null> {
+  let badge = badges.get(key);
+  if (badge === undefined) {
+    badge = invoke<string | null>(OPEN_APPS_COMMANDS.badge, { key }).then(
+      (url) => (typeof url === "string" ? url : null),
+      (error: unknown) => {
+        log.warn(`apps: badge failed: ${errorKind(error)}`);
+        return null;
+      },
+    );
+    badges.set(key, badge);
+  }
+  return badge;
+}
+
+/** Forgets the badges read (for the tests). */
+export function forgetBadges(): void {
+  badges.clear();
+}
+
+/** The badge of the open program `key`, as it arrives; null while it is read,
+ * and for a program with none (`has` false: nothing is asked). */
+export function useOpenBadge(key: string, has: boolean): string | null {
+  const [badge, setBadge] = useState<{
+    key: string;
+    url: string | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!has) return;
+    let active = true;
+    void openBadge(key).then((url) => {
+      if (active) setBadge({ key, url });
+    });
+    return () => {
+      active = false;
+    };
+  }, [key, has]);
+  return has && badge !== null && badge.key === key ? badge.url : null;
 }
 
 /** The open programs, kept current by `open-windows-changed`; none while

@@ -420,7 +420,7 @@ pub fn icon_png(_id: &str, _size: u32) -> Option<Vec<u8>> {
     None
 }
 
-fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
+pub(super) fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
     let mut out = Vec::new();
     {
         let mut encoder = png::Encoder::new(&mut out, width, height);
