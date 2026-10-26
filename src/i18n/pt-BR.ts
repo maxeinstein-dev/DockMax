@@ -72,6 +72,18 @@ const messages = {
       newInstance: "Nova instância",
       none: "Nada",
     } satisfies Record<MiddleClick, string>,
+    /** The Configurações app (spec 0011 H1): its sections, in the side
+     * bar. */
+    app: {
+      nav: "Seções das configurações",
+      sections: {
+        general: "Geral",
+        look: "Aparência do dock",
+        apps: "Apps do dock",
+        items: "Itens do dock",
+        about: "Sobre",
+      },
+    },
     /** The switch that opens the DockMax when the user signs in. */
     showOpenApps: "Mostrar apps abertos",
     showOpenAppsHint: "Os que não estão fixados, depois dos widgets",

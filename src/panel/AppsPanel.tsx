@@ -31,7 +31,9 @@ export interface AppsPanelProps {
   snapshot: AppsSnapshot | null;
   /** Voltar: back to Configurações, where the "Apps do dock" row takes the
    * focus. */
-  onBack: () => void;
+  /** Back to the main view of the panel; none in the Configurações app,
+   * where the views are sections. */
+  onBack?: () => void;
 }
 
 /** How many programs of the catalog show at once: the search narrows the
@@ -168,7 +170,11 @@ function AppsPanel({ snapshot, onBack }: AppsPanelProps) {
 
   return (
     <>
-      <PanelHeader title={t.apps.title} onBack={onBack} focusAction />
+      {onBack ? (
+        <PanelHeader title={t.apps.title} onBack={onBack} focusAction />
+      ) : (
+        <PanelHeader title={t.apps.title} />
+      )}
       {storage === "unavailable" || snapshot === null ? (
         <InlineNotice
           title={t.apps.unavailableNotice.title}

@@ -6,7 +6,6 @@ use tauri::tray::TrayIconBuilder;
 
 use crate::i18n;
 use crate::windows::dock;
-use crate::windows::panel::{self, PanelId};
 
 /// The product name: the same in every locale.
 const TOOLTIP: &str = "DockMax";
@@ -58,41 +57,17 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     }
 }
 
-/// Whether the dock must be asked to open the Settings panel, given the
-/// panel open now: not when it is already open (asking would toggle it
-/// closed).
-fn must_request_settings(open: Option<PanelId>) -> bool {
-    open != Some(PanelId::Settings)
-}
-
-/// Shows the dock if it is hidden (without taking the foreground) and asks
-/// it to open the Settings panel, anchored to its own item. Opening the
-/// tray menu may have blurred an open panel; this is an explicit request,
-/// so the reopen guard of that blur does not apply.
+/// Opens the Configurações app (spec 0011 H1), showing the dock too if it
+/// is hidden, without taking the foreground for it.
 fn open_settings(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     dock::reveal(app)?;
-    let request = {
-        let mut state = panel::lock(app);
-        state.forget_blur();
-        must_request_settings(state.open())
-    };
-    if request {
-        dock::request_panel(app, PanelId::Settings)?;
-    }
-    Ok(())
+    crate::windows::settings_window::open(app)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::windows::panel::PanelPayload;
-
-    #[test]
-    fn settings_are_requested_unless_already_open() {
-        assert!(must_request_settings(None));
-        assert!(must_request_settings(Some(PanelId::About)));
-        assert!(!must_request_settings(Some(PanelId::Settings)));
-    }
+    use crate::windows::panel::{PanelId, PanelPayload};
 
     #[test]
     fn request_event_names_the_settings_panel() {

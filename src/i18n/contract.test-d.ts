@@ -27,6 +27,16 @@ export const otherText: Messages = {
     middleClick: { newInstance: "New instance", none: "Nothing" },
     showOpenApps: "Show open apps",
     showOpenAppsHint: "The ones that are not pinned, after the widgets",
+    app: {
+      nav: "Settings sections",
+      sections: {
+        general: "General",
+        look: "Dock look",
+        apps: "Dock apps",
+        items: "Dock items",
+        about: "About",
+      },
+    },
     launchAtLogin: "Start with Windows",
     launchAtLoginHint: "Opens the DockMax when you sign in to Windows",
     theme: { system: "System", light: "Light", dark: "Dark" },

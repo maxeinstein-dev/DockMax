@@ -100,6 +100,36 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "log:allow-log",
         ],
     ),
+    (
+        "settings.json",
+        "settings",
+        &["settings"],
+        &[
+            "core:event:allow-listen",
+            "core:event:allow-unlisten",
+            // Esc closes the window, as it closes a panel.
+            "core:window:allow-close",
+            // The Configurações app (spec 0011 H1): the settings, the dock's
+            // items and apps, the icon packs. No panel, menu or tray command.
+            "allow-get-settings",
+            "allow-update-settings",
+            "allow-list-widgets",
+            "allow-add-widget",
+            "allow-remove-widget",
+            "allow-move-widget",
+            "allow-dismiss-storage-notice",
+            "allow-list-apps",
+            "allow-list-catalog",
+            "allow-app-icon",
+            "allow-pin-app",
+            "allow-unpin-app",
+            "allow-move-app",
+            "allow-list-icon-packs",
+            "allow-reload-icon-packs",
+            "allow-open-icon-packs-folder",
+            "log:allow-log",
+        ],
+    ),
 ];
 
 /// Top-level keys a capability file may have. Anything else (`remote`,

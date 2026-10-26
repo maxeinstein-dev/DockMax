@@ -1,0 +1,13 @@
+[package]
+name = "webview-startup-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Spike (ADR 0011): how long a WebView2 window takes to show a page, cold and warm"
+
+[dependencies]
+wry = "=0.57.0"
+tao = "=0.37.1"
+
+[profile.release]
+opt-level = 3

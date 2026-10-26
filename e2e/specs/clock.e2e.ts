@@ -1,6 +1,6 @@
 import { $, browser, expect } from "@wdio/globals";
 import { ptBR as t } from "../../src/i18n/pt-BR.ts";
-import { openPanelFrom, restartApp } from "../app.ts";
+import { openPanelFrom, openSettings, restartApp } from "../app.ts";
 
 /* The clock's Ajustes (spec 0003 §2.2): the zone, the seconds and the icon
  * style chosen in the panel reach the panel, the dock and Itens do dock, and
@@ -111,12 +111,9 @@ describe("Clock", () => {
     await browser.switchToWindow("dock");
     await expect(clockItem().$(".clock-tile-dial")).toBeExisting();
 
-    // Itens do dock names the zone.
-    await $(
-      `nav[aria-label="${t.dock.label}"] button[aria-label="${t.dock.items.settings}"]`,
-    ).click();
-    await browser.switchToWindow("panel");
-    await $(`button*=${t.widgets.items.title}`).click();
+    // Itens do dock, in the Configurações app, names the zone.
+    await openSettings();
+    await $(`button*=${t.settings.app.sections.items}`).click();
     await expect(
       $(`ul[aria-label="${t.widgets.items.listLabel}"] li`),
     ).toHaveText(expect.stringContaining("Tokyo"));

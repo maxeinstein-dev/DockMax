@@ -142,7 +142,9 @@ type LookPanelProps = {
   /** The settings in use, or null while they can't be read. */
   settings: Settings | null;
   /** Voltar to the settings. */
-  onBack: () => void;
+  /** Back to the main view of the panel; none in the Configurações app,
+   * where the views are sections. */
+  onBack?: () => void;
 };
 
 /**
@@ -182,7 +184,11 @@ function LookPanel({ settings, onBack }: LookPanelProps) {
 
   return (
     <>
-      <PanelHeader title={text.title} onBack={onBack} focusAction />
+      {onBack ? (
+        <PanelHeader title={text.title} onBack={onBack} focusAction />
+      ) : (
+        <PanelHeader title={text.title} />
+      )}
       <SelectField
         label={text.style}
         value={dock?.style ?? "native"}

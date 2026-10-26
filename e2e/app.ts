@@ -5,7 +5,8 @@ import { join, resolve } from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
-import { browser } from "@wdio/globals";
+import { $, browser } from "@wdio/globals";
+import { ptBR as t } from "../src/i18n/pt-BR.ts";
 import type { ChainablePromiseElement } from "webdriverio";
 
 /** The test build's identifier (`src-tauri/tauri.e2e.conf.json`). */
@@ -141,6 +142,33 @@ export async function openPanelFrom(
   );
 }
 
+/**
+ * Opens the Configurações app from the dock's item and switches to its
+ * window, made on demand (spec 0011 H1): the click is repeated until the
+ * window is there, as right after a restart a click may open nothing.
+ */
+export async function openSettings() {
+  await browser.waitUntil(
+    async () => {
+      await browser.switchToWindow("dock");
+      await $(
+        `nav[aria-label="${t.dock.label}"] button[aria-label="${t.dock.items.settings}"]`,
+      ).click();
+      try {
+        await browser.switchToWindow("settings");
+      } catch {
+        return false;
+      }
+      return $(".settings-app").isDisplayed();
+    },
+    {
+      timeout: 30_000,
+      interval: 750,
+      timeoutMsg: "the Configurações app never opened from the dock",
+    },
+  );
+}
+
 /** The test build this worker started, still to be stopped. */
 let started: ChildProcess | null = null;
 
@@ -155,8 +183,14 @@ let started: ChildProcess | null = null;
  * service gave the first one.
  */
 export async function restartApp() {
-  for (const label of ["panel", "dock"]) {
-    await browser.switchToWindow(label);
+  // The Configurações app, if it is open, is a window too: it goes first.
+  const open = ["settings", "panel", "dock"];
+  for (const label of open) {
+    const there = await browser
+      .switchToWindow(label)
+      .then(() => true)
+      .catch(() => false);
+    if (!there) continue;
     // The last window takes the server down with the app: its answer may
     // never come.
     await browser.closeWindow().catch(() => undefined);

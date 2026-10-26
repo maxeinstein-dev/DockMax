@@ -9,6 +9,14 @@
 #[derive(Debug)]
 pub struct Messages {
     pub tray: TrayMessages,
+    pub settings: SettingsMessages,
+}
+
+/// The Configurações app (spec 0011 H1).
+#[derive(Debug)]
+pub struct SettingsMessages {
+    /// The window's title, in its title bar and in Alt+Tab.
+    pub window_title: &'static str,
 }
 
 /// Items of the tray icon menu.
@@ -16,7 +24,7 @@ pub struct Messages {
 pub struct TrayMessages {
     /// Shows the dock when hidden, hides it otherwise.
     pub toggle_dock: &'static str,
-    /// Opens the Settings panel, showing the dock first if it is hidden.
+    /// Opens the Configurações app.
     pub open_settings: &'static str,
     /// Ends the app.
     pub quit: &'static str,
@@ -27,6 +35,9 @@ const PT_BR: Messages = Messages {
         toggle_dock: "Mostrar/ocultar dock",
         open_settings: "Configurações",
         quit: "Sair",
+    },
+    settings: SettingsMessages {
+        window_title: "Configurações do DockMax",
     },
 };
 

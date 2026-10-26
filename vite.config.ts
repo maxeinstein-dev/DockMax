@@ -38,6 +38,7 @@ export default defineConfig(() => ({
       input: {
         dock: fileURLToPath(new URL("index.html", import.meta.url)),
         panel: fileURLToPath(new URL("panel.html", import.meta.url)),
+        settings: fileURLToPath(new URL("settings.html", import.meta.url)),
       },
     },
   },
