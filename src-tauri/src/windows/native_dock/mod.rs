@@ -118,12 +118,26 @@ thread_local! {
 /// state is no longer borrowed (it may call back into the dock).
 type Effect = Box<dyn FnOnce(&AppHandle)>;
 
-/// A press on a pinned program that may become a drag.
+/// A press on an item that may become a drag.
 #[derive(Debug, Clone, Copy)]
 struct Press {
     index: usize,
+    /// The item's group, where it can go: its first index and its size.
+    group: (usize, usize),
     start_x: f64,
     dragging: bool,
+}
+
+impl Press {
+    /// The item's place in its group.
+    fn local(&self) -> usize {
+        self.index - self.group.0
+    }
+
+    /// The indices of its group.
+    fn range(&self) -> std::ops::Range<usize> {
+        self.group.0..self.group.0 + self.group.1
+    }
 }
 
 /// What the dock reads from the rest of the app.
@@ -742,15 +756,14 @@ impl Dock {
         let attention = dock_items::needs_attention(self.data.widgets.as_ref());
         let clock = local_now();
         let drag = self.press.filter(|press| press.dragging);
-        let programs = self
-            .items
-            .iter()
-            .take_while(|item| matches!(item, Item::App(_)))
-            .count();
         let drop = drag.and_then(|press| {
-            let centers: Vec<f64> = rest.items[..programs].iter().map(Area::center_x).collect();
-            let target = drop_index(&centers, press.index, self.drag_x);
-            drop_mark(programs, press.index, target)
+            let centers: Vec<f64> = rest.items[press.range()]
+                .iter()
+                .map(Area::center_x)
+                .collect();
+            let target = drop_index(&centers, press.local(), self.drag_x);
+            drop_mark(press.group.1, press.local(), target)
+                .map(|(at, side)| (press.group.0 + at, side))
         });
         let mut tiles = Vec::with_capacity(self.items.len());
         for (index, item) in self.items.iter().enumerate() {
@@ -758,8 +771,9 @@ impl Dock {
             let box_area = now_placement.items[index];
             let dragging = drag.is_some_and(|press| press.index == index);
             if let Some(press) = drag.filter(|_| dragging) {
-                let first = rest.items[0];
-                let last = rest.items[programs.saturating_sub(1)];
+                // Within its own group.
+                let first = rest.items[press.group.0];
+                let last = rest.items[press.group.0 + press.group.1 - 1];
                 let rest_item = rest.items[index];
                 area.x += drag_offset(
                     self.drag_x,
@@ -986,12 +1000,12 @@ impl Dock {
         shared().clicked = Some(Instant::now());
         let index = self.hit(x, y);
         self.pressed = index;
-        if let Some(index) = index
-            && matches!(self.items.get(index), Some(Item::App(_)))
+        if let Some((index, group)) = index.and_then(|index| Some((index, self.group_of(index)?)))
             && self.open.is_none()
         {
             self.press = Some(Press {
                 index,
+                group,
                 start_x: x,
                 dragging: false,
             });
@@ -1029,28 +1043,52 @@ impl Dock {
         self.paint();
     }
 
-    /// A drag let go: the program goes where it was let go.
+    /// The group an item can be dragged in, as its first index and its size:
+    /// the pinned programs, the widgets or the open programs. The system
+    /// items stay where they are.
+    fn group_of(&self, index: usize) -> Option<(usize, usize)> {
+        if matches!(self.items.get(index)?, Item::System(_)) {
+            return None;
+        }
+        let mut start = 0;
+        for &size in &self.groups {
+            if index < start + size {
+                // A group of one has nowhere to go.
+                return (size > 1).then_some((start, size));
+            }
+            start += size;
+        }
+        None
+    }
+
+    /// A drag let go: the item goes where it was let go, in its group.
     fn drop_at(&mut self, press: Press, x: f64) {
         let rest = self.rest();
-        let programs = self
-            .items
+        let centers: Vec<f64> = rest.items[press.range()]
             .iter()
-            .take_while(|item| matches!(item, Item::App(_)))
-            .count();
-        let centers: Vec<f64> = rest.items[..programs].iter().map(Area::center_x).collect();
-        let target = drop_index(&centers, press.index, x);
-        let Some(Item::App(app)) = self.items.get(press.index) else {
-            return;
-        };
-        if target == press.index {
+            .map(Area::center_x)
+            .collect();
+        let target = drop_index(&centers, press.local(), x);
+        if target == press.local() {
             return;
         }
-        let id = app.id.as_str().to_string();
-        self.effects.push(Box::new(move |app| {
-            let state = app.state::<Mutex<Storage>>();
-            if let Err(error) = crate::commands::apps::place_app(app.clone(), state, id, target) {
-                log::warn!("dock: placing a program failed: {error:?}");
+        let Some(item) = self.items.get(press.index).cloned() else {
+            return;
+        };
+        self.effects.push(Box::new(move |app| match item {
+            Item::App(pinned) => {
+                let state = app.state::<Mutex<Storage>>();
+                let id = pinned.id.as_str().to_string();
+                if let Err(error) = crate::commands::apps::place_app(app.clone(), state, id, target)
+                {
+                    log::warn!("dock: placing a program failed: {error:?}");
+                }
             }
+            Item::Widget(widget) => {
+                crate::commands::widgets::place_widget(app, widget.id.as_str(), target);
+            }
+            Item::Other(other) => super::open_apps::place_other(app, &other.key, target),
+            Item::System(_) => {}
         }));
     }
 
