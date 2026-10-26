@@ -1007,10 +1007,49 @@ impl Painter {
                 self.glaze(area, *glaze, tile.pressed);
                 self.ring(area, *fraction);
                 if let Some(text) = text {
-                    self.text(text, area, area.width * 0.23, 600, true, Color::WHITE);
+                    self.percent(text, area);
                 }
             }
         }
+    }
+
+    /// The progress in the ring: the number, and a smaller, fainter `%`.
+    fn percent(&mut self, text: &str, area: Area) {
+        let size = area.width * 0.23;
+        let Some(number) = text.strip_suffix('%') else {
+            self.text(text, area, size, 600, true, Color::WHITE);
+            return;
+        };
+        let small = size * 0.7;
+        let number_width = self.text_width(number, size, 600, true);
+        let sign_width = self.text_width("%", small, 600, true);
+        let left = area.x + (area.width - number_width - sign_width) / 2.0;
+        self.text(
+            number,
+            Area {
+                x: left,
+                width: number_width,
+                ..area
+            },
+            size,
+            600,
+            true,
+            Color::WHITE,
+        );
+        // On the number's baseline, about: a little lower than centered.
+        self.text(
+            "%",
+            Area {
+                x: left + number_width,
+                y: area.y + (size - small) * 0.35,
+                width: sign_width,
+                ..area
+            },
+            small,
+            600,
+            true,
+            Color::WHITE.with_alpha(0.85),
+        );
     }
 
     /// The photo of a profile on the corner of an open program's icon, in a

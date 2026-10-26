@@ -7,6 +7,7 @@ pub mod dock_items;
 pub mod dock_layout;
 pub mod fullscreen;
 pub mod icon_pack;
+pub mod live_faces;
 pub mod open_apps;
 pub mod settings;
 pub mod thumbnail;

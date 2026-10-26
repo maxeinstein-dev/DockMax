@@ -683,10 +683,8 @@ fn the_app_builder_registers_its_state_through_with_state() {
         "src/lib.rs: `run` must not `.manage(...)` by itself; add it to `with_state`"
     );
     let with_state = block_after(&source, "fn with_state", "src/lib.rs");
-    for state in ["PanelState"] {
-        assert!(
-            with_state.contains(state),
-            "src/lib.rs: `with_state` must manage the {state} state"
-        );
-    }
+    assert!(
+        with_state.contains("PanelState"),
+        "src/lib.rs: `with_state` must manage the PanelState state"
+    );
 }
