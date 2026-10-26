@@ -459,23 +459,53 @@ pub fn drop_index(centers: &[f64], from: usize, x: f64) -> usize {
         .count()
 }
 
-/// Which side of which program the mark of the drop stands on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DropSide {
-    Before,
-    After,
+/// How far the dragged item rises off the bar, in logical pixels.
+pub const DRAG_LIFT: f64 = 6.0;
+/// How much it grows while held.
+pub const DRAG_GROW: f64 = 1.08;
+
+/// How far the others step aside for the dragged item: its width and the
+/// gap after it, read from where the items of its group rest.
+pub fn drag_pitch(items: &[Area], from: usize) -> f64 {
+    let Some(item) = items.get(from) else {
+        return 0.0;
+    };
+    let gap = match (
+        items.get(from + 1),
+        from.checked_sub(1).and_then(|i| items.get(i)),
+    ) {
+        (Some(next), _) => next.x - (item.x + item.width),
+        (None, Some(before)) => item.x - (before.x + before.width),
+        (None, None) => 0.0,
+    };
+    item.width + gap
 }
 
-/// Where the mark of the drop stands, or nowhere when the program would stay
-/// where it is.
-pub fn drop_mark(count: usize, from: usize, target: usize) -> Option<(usize, DropSide)> {
-    if target == from {
-        return None;
-    }
-    let others: Vec<usize> = (0..count).filter(|&index| index != from).collect();
-    match others.get(target) {
-        Some(&next) => Some((next, DropSide::Before)),
-        None => others.last().map(|&last| (last, DropSide::After)),
+/// How far each item of a group moves aside while the one at `from` is
+/// dragged to `target`: those in between make room for it, by `pitch`. The
+/// dragged one is 0 here: it follows the pointer.
+pub fn make_room(count: usize, from: usize, target: usize, pitch: f64) -> Vec<f64> {
+    (0..count)
+        .map(|index| {
+            if from < index && index <= target {
+                -pitch
+            } else if target <= index && index < from {
+                pitch
+            } else {
+                0.0
+            }
+        })
+        .collect()
+}
+
+/// One frame of an item sliding from `now` toward `target`: a part of the
+/// way, and there once it is close.
+pub fn slide_step(now: f64, target: f64) -> f64 {
+    let next = now + (target - now) * 0.3;
+    if (target - next).abs() < 0.25 {
+        target
+    } else {
+        next
     }
 }
 
@@ -816,12 +846,49 @@ mod tests {
     }
 
     #[test]
-    fn the_drop_mark_stands_before_the_next_program_or_after_the_last() {
-        assert_eq!(drop_mark(4, 1, 1), None);
-        assert_eq!(drop_mark(4, 0, 2), Some((3, DropSide::Before)));
-        assert_eq!(drop_mark(4, 3, 0), Some((0, DropSide::Before)));
-        assert_eq!(drop_mark(4, 0, 3), Some((3, DropSide::After)));
-        assert_eq!(drop_mark(1, 0, 1), None);
+    fn the_others_make_room_where_the_dragged_item_would_land() {
+        // Dragged right, from the first to the third place: the second and
+        // the third step left.
+        assert_eq!(make_room(4, 0, 2, 50.0), [0.0, -50.0, -50.0, 0.0]);
+        // Dragged left, from the last to the second place.
+        assert_eq!(make_room(4, 3, 1, 50.0), [0.0, 50.0, 50.0, 0.0]);
+        // Still over its own place: nobody moves.
+        assert_eq!(make_room(4, 2, 2, 50.0), [0.0; 4]);
+    }
+
+    #[test]
+    fn the_room_is_the_dragged_item_and_the_gap_after_it() {
+        let area = |x: f64, width: f64| Area {
+            x,
+            y: 0.0,
+            width,
+            height: 48.0,
+        };
+        // 48 px items, 8 px apart; a wide widget in the middle.
+        let items = [area(0.0, 48.0), area(56.0, 112.0), area(176.0, 48.0)];
+
+        assert_eq!(drag_pitch(&items, 0), 56.0);
+        assert_eq!(drag_pitch(&items, 1), 120.0);
+        // The last: the gap before it.
+        assert_eq!(drag_pitch(&items, 2), 56.0);
+        assert_eq!(drag_pitch(&items[..1], 0), 48.0);
+        assert_eq!(drag_pitch(&[], 0), 0.0);
+    }
+
+    #[test]
+    fn a_slide_eases_in_and_arrives() {
+        let mut now = 0.0;
+        let mut frames = 0;
+        while now != -56.0 {
+            let next = slide_step(now, -56.0);
+            // Always toward the target, never past it.
+            assert!(next < now && next >= -56.0);
+            now = next;
+            frames += 1;
+        }
+        // About a quarter of a second at 60 frames a second.
+        assert!((8..=20).contains(&frames), "{frames} frames");
+        assert_eq!(slide_step(-56.0, -56.0), -56.0);
     }
 
     #[test]

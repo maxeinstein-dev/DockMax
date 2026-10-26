@@ -54,8 +54,8 @@ use super::panel::{LogicalRect, PanelId};
 use crate::domain::apps::AppsSnapshot;
 use crate::domain::dock_items::{self, Item, Names, SystemItem};
 use crate::domain::dock_layout::{
-    self, Area, DRAG_THRESHOLD, DockSize, Hover, Magnification, Shape, drag_offset, drop_index,
-    drop_mark,
+    self, Area, DRAG_GROW, DRAG_LIFT, DRAG_THRESHOLD, DockSize, Hover, Magnification, Shape,
+    drag_offset, drag_pitch, drop_index, make_room, slide_step,
 };
 use crate::domain::open_apps::OpenSnapshot;
 use crate::domain::settings::{DockEdge, MiddleClick, OpenAnimation, Settings, TaskbarMode, Theme};
@@ -162,6 +162,20 @@ struct Press {
     dragging: bool,
 }
 
+/// A drag let go that moved its item: the item stays where it was let go,
+/// and the others keep the room they made, until the dock reads the new
+/// order (or for `LANDING`, when it never comes).
+#[derive(Debug, Clone, Copy)]
+struct Landing {
+    press: Press,
+    /// The pointer's x when it was let go.
+    x: f64,
+    since: Instant,
+}
+
+/// The longest a drag let go waits for the new order.
+const LANDING: Duration = Duration::from_secs(1);
+
 impl Press {
     /// The item's place in its group.
     fn local(&self) -> usize {
@@ -225,6 +239,10 @@ pub struct Dock {
     press: Option<Press>,
     /// While dragging: the pointer's x.
     drag_x: f64,
+    landing: Option<Landing>,
+    /// How far each item is drawn from its place at rest, sideways: the
+    /// room made for a dragged item, or the way to a new place, eased.
+    slide: Vec<f64>,
     /// The panel open, anchored to one of the items.
     open: Option<PanelId>,
     /// The programs whose icon is animating after a click, by item key.
@@ -383,6 +401,8 @@ fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
         pressed: None,
         press: None,
         drag_x: 0.0,
+        landing: None,
+        slide: Vec::new(),
         open: None,
         opening: HashMap::new(),
         icons: HashMap::new(),
@@ -606,6 +626,49 @@ impl Dock {
     /// Lays the dock out for the data it has: the items, their names, the
     /// window, and paints.
     fn rebuild(&mut self) {
+        // Where each item is drawn now, on the screen, by key: from there it
+        // slides to its new place.
+        let drawn: HashMap<String, f64> = self.drawn_x().collect();
+        self.rebuild_layout();
+        let rest = self.rest();
+        let left = f64::from(self.window.x) / self.scale;
+        let (width, _) = self.viewport();
+        self.slide = self
+            .items
+            .iter()
+            .zip(&rest.items)
+            .map(|(item, area)| {
+                let Some(before) = drawn.get(&item.key()) else {
+                    return 0.0;
+                };
+                let offset = before - (left + area.x);
+                // Another monitor, or no motion: straight there.
+                if !self.motion || offset.abs() > width {
+                    0.0
+                } else {
+                    offset
+                }
+            })
+            .collect();
+        self.landing = None;
+        self.animate();
+        self.paint();
+    }
+
+    /// Each item's x as drawn now, on the screen in logical pixels, by key.
+    fn drawn_x(&self) -> impl Iterator<Item = (String, f64)> + '_ {
+        let rest = self.rest();
+        let left = f64::from(self.window.x) / self.scale;
+        let shown = self.shown_offsets(&rest);
+        self.items
+            .iter()
+            .zip(rest.items)
+            .zip(shown)
+            .map(move |((item, area), offset)| (item.key(), left + area.x + offset))
+    }
+
+    /// The items, their names and the window for the data the dock has.
+    fn rebuild_layout(&mut self) {
         let settings = &self.data.settings;
         let found = dock_items::items(dock_items::Sources {
             widgets: self.data.widgets.as_ref(),
@@ -670,8 +733,6 @@ impl Dock {
             .collect();
         self.request_pictures();
         self.place();
-        self.animate();
-        self.paint();
     }
 
     /// The images of the tray icons kept in the dock, read again when one
@@ -1032,6 +1093,72 @@ impl Dock {
         dock_layout::place(&self.shape(), self.edge(), self.viewport(), None)
     }
 
+    /// The drag drawn: the one going on, or the one let go while its item
+    /// waits for its new place; with the pointer's x.
+    fn shown_drag(&self) -> Option<(Press, f64)> {
+        self.press
+            .filter(|press| press.dragging)
+            .map(|press| (press, self.drag_x))
+            .or(self.landing.map(|landing| (landing.press, landing.x)))
+    }
+
+    /// How far the dragged item is from its place at rest: with the pointer,
+    /// inside its group.
+    fn drag_shift(press: Press, x: f64, rest: &dock_layout::Placement) -> f64 {
+        let first = rest.items[press.group.0];
+        let last = rest.items[press.group.0 + press.group.1 - 1];
+        let item = rest.items[press.index];
+        drag_offset(
+            x,
+            press.start_x,
+            item.x,
+            item.width,
+            first.x,
+            last.x + last.width,
+        )
+    }
+
+    /// Where each item is headed, from its place at rest: the dragged item
+    /// with the pointer, the others making room where it would land.
+    fn slide_targets(&self, rest: &dock_layout::Placement) -> Vec<f64> {
+        let mut targets = vec![0.0; self.items.len()];
+        let Some((press, x)) = self
+            .shown_drag()
+            .filter(|(press, _)| press.range().end <= rest.items.len())
+        else {
+            return targets;
+        };
+        let group = &rest.items[press.range()];
+        let centers: Vec<f64> = group.iter().map(Area::center_x).collect();
+        let target = drop_index(&centers, press.local(), x);
+        let room = make_room(
+            press.group.1,
+            press.local(),
+            target,
+            drag_pitch(group, press.local()),
+        );
+        for (local, offset) in room.into_iter().enumerate() {
+            targets[press.group.0 + local] = offset;
+        }
+        targets[press.index] = Self::drag_shift(press, x, rest);
+        targets
+    }
+
+    /// How far each item is drawn from its place at rest now: the dragged
+    /// one right with the pointer, the others where their slide got to.
+    fn shown_offsets(&self, rest: &dock_layout::Placement) -> Vec<f64> {
+        let mut offsets: Vec<f64> = (0..self.items.len())
+            .map(|index| self.slide.get(index).copied().unwrap_or(0.0))
+            .collect();
+        if let Some((press, x)) = self
+            .shown_drag()
+            .filter(|(press, _)| press.range().end <= rest.items.len())
+        {
+            offsets[press.index] = Self::drag_shift(press, x, rest);
+        }
+        offsets
+    }
+
     /// Starts the frames, if anything moves.
     fn animate(&mut self) {
         if !self.animating {
@@ -1069,10 +1196,32 @@ impl Dock {
                 moving = true;
             }
         }
+        if self
+            .landing
+            .is_some_and(|landing| landing.since.elapsed() >= LANDING)
+        {
+            // The new order never came: back to where it was.
+            self.landing = None;
+        }
+        let rest = self.rest();
+        let targets = self.slide_targets(&rest);
+        let held = self.shown_drag().map(|(press, _)| press.index);
+        self.slide.resize(self.items.len(), 0.0);
+        for (index, (now, target)) in self.slide.iter_mut().zip(targets).enumerate() {
+            // The dragged item is with the pointer, not behind it.
+            *now = if !self.motion || held == Some(index) {
+                target
+            } else {
+                slide_step(*now, target)
+            };
+            if *now != target {
+                moving = true;
+            }
+        }
         let now = Instant::now();
         self.opening
             .retain(|_, started| now.saturating_duration_since(*started) < OPENING);
-        let dragging = self.press.is_some_and(|press| press.dragging);
+        let dragging = self.press.is_some_and(|press| press.dragging) || self.landing.is_some();
         if !moving && self.opening.is_empty() && !dragging {
             self.animating = false;
             let _ = unsafe { KillTimer(Some(self.hwnd), ANIMATION_TIMER) };
@@ -1129,33 +1278,28 @@ impl Dock {
         let attention = dock_items::needs_attention(self.data.widgets.as_ref());
         let clock = local_now();
         let drag = self.press.filter(|press| press.dragging);
-        let drop = drag.and_then(|press| {
-            let centers: Vec<f64> = rest.items[press.range()]
-                .iter()
-                .map(Area::center_x)
-                .collect();
-            let target = drop_index(&centers, press.local(), self.drag_x);
-            drop_mark(press.group.1, press.local(), target)
-                .map(|(at, side)| (press.group.0 + at, side))
-        });
+        let held = self.shown_drag().map(|(press, _)| press.index);
+        let offsets = self.shown_offsets(&rest);
         let mut tiles = Vec::with_capacity(self.items.len());
         for (index, item) in self.items.iter().enumerate() {
             let mut area = now_placement.tiles[index];
-            let box_area = now_placement.items[index];
-            let dragging = drag.is_some_and(|press| press.index == index);
-            if let Some(press) = drag.filter(|_| dragging) {
-                // Within its own group.
-                let first = rest.items[press.group.0];
-                let last = rest.items[press.group.0 + press.group.1 - 1];
-                let rest_item = rest.items[index];
-                area.x += drag_offset(
-                    self.drag_x,
-                    press.start_x,
-                    rest_item.x,
-                    rest_item.width,
-                    first.x,
-                    last.x + last.width,
-                );
+            let mut box_area = now_placement.items[index];
+            area.x += offsets[index];
+            box_area.x += offsets[index];
+            let dragging = held == Some(index);
+            if dragging {
+                // Picked up: off the bar, a little bigger.
+                let lift = match edge {
+                    DockEdge::Bottom => -DRAG_LIFT,
+                    DockEdge::Top => DRAG_LIFT,
+                };
+                let (width, height) = (area.width * DRAG_GROW, area.height * DRAG_GROW);
+                area = Area {
+                    x: area.x - (width - area.width) / 2.0,
+                    y: area.y + lift - (height - area.height) / 2.0,
+                    width,
+                    height,
+                };
             }
             if let Some(started) = self.opening.get(&item.key()) {
                 let (dx, dy, grow) = opening_offset(
@@ -1187,12 +1331,6 @@ impl Dock {
                 attention: attention && matches!(item, Item::System(SystemItem::Settings)),
                 dragging,
                 dot: Some((box_area.center_x(), dot)),
-                drop: drop.and_then(|(at, side)| {
-                    (at == index).then_some(match side {
-                        dock_layout::DropSide::Before => box_area.x - 4.0 + 1.0,
-                        dock_layout::DropSide::After => box_area.x + box_area.width + 4.0 - 1.0,
-                    })
-                }),
                 item: box_area,
             });
         }
@@ -1430,7 +1568,13 @@ impl Dock {
             let _ = unsafe { ReleaseCapture() };
         }
         if let Some(press) = press.filter(|press| press.dragging) {
-            self.drop_at(press, x);
+            if self.drop_at(press, x) {
+                self.landing = Some(Landing {
+                    press,
+                    x,
+                    since: Instant::now(),
+                });
+            }
             self.animate();
             self.paint();
             return;
@@ -1472,7 +1616,8 @@ impl Dock {
     }
 
     /// A drag let go: the item goes where it was let go, in its group.
-    fn drop_at(&mut self, press: Press, x: f64) {
+    /// Returns whether it moves (the dock then reads the new order).
+    fn drop_at(&mut self, press: Press, x: f64) -> bool {
         let rest = self.rest();
         let centers: Vec<f64> = rest.items[press.range()]
             .iter()
@@ -1480,22 +1625,22 @@ impl Dock {
             .collect();
         let target = drop_index(&centers, press.local(), x);
         if target == press.local() {
-            return;
+            return false;
         }
         let Some(item) = self.items.get(press.index).cloned() else {
-            return;
+            return false;
         };
         if let Item::Other(other) = item {
             self.effects.push(Box::new(move |app| {
                 super::open_apps::place_other(app, &other.key, target);
             }));
-            return;
+            return true;
         }
         // A program or a widget, among both: the dock's order, then the
         // place among its own kind.
         let group = &self.items[press.range()];
         let Some((order, among)) = dock_items::moved(group, press.local(), target) else {
-            return;
+            return false;
         };
         self.effects.push(Box::new(move |app| {
             {
@@ -1523,6 +1668,7 @@ impl Dock {
             // Only the mix may have changed: the dock reads it again.
             super::dock::refresh();
         }));
+        true
     }
 
     fn click(&mut self, index: usize) {
