@@ -146,6 +146,8 @@ struct Data {
     widgets: Option<WidgetsSnapshot>,
     apps: Option<AppsSnapshot>,
     open: OpenSnapshot,
+    /// How the programs and the widgets mix (`Storage::dock_order`).
+    order: Vec<String>,
 }
 
 /// A program's icon: being read, or read (`None` when it has none).
@@ -316,21 +318,23 @@ fn run_queue() {
 
 fn read_data(app: &AppHandle) -> Data {
     let settings = crate::commands::settings::current(app);
-    let (widgets, apps) = match app.try_state::<Mutex<Storage>>() {
+    let (widgets, apps, order) = match app.try_state::<Mutex<Storage>>() {
         Some(state) => {
             let storage = state.lock().unwrap_or_else(PoisonError::into_inner);
             (
                 crate::commands::widgets::snapshot(&storage).ok(),
                 crate::commands::apps::snapshot(&storage).ok(),
+                storage.dock_order(),
             )
         }
-        None => (None, None),
+        None => (None, None, Vec::new()),
     };
     Data {
         settings,
         widgets,
         apps,
         open: super::open_apps::snapshot(),
+        order,
     }
 }
 
@@ -431,6 +435,7 @@ impl Dock {
             open: &self.data.open,
             show_open: settings.dock.show_open_apps,
             tray: settings.dock.taskbar == TaskbarMode::Hidden,
+            order: &self.data.order,
         });
         // The growth of each item follows it by key across changes.
         let before: HashMap<String, Magnification> = self
@@ -1038,8 +1043,8 @@ impl Dock {
     }
 
     /// The group an item can be dragged in, as its first index and its size:
-    /// the pinned programs, the widgets or the open programs. The system
-    /// items stay where they are.
+    /// the pinned programs and the widgets, mixed, or the open programs. The
+    /// system items stay where they are.
     fn group_of(&self, index: usize) -> Option<(usize, usize)> {
         if matches!(self.items.get(index)?, Item::System(_)) {
             return None;
@@ -1069,20 +1074,43 @@ impl Dock {
         let Some(item) = self.items.get(press.index).cloned() else {
             return;
         };
-        self.effects.push(Box::new(move |app| match item {
-            Item::App(pinned) => {
+        if let Item::Other(other) = item {
+            self.effects.push(Box::new(move |app| {
+                super::open_apps::place_other(app, &other.key, target);
+            }));
+            return;
+        }
+        // A program or a widget, among both: the dock's order, then the
+        // place among its own kind.
+        let group = &self.items[press.range()];
+        let Some((order, among)) = dock_items::moved(group, press.local(), target) else {
+            return;
+        };
+        self.effects.push(Box::new(move |app| {
+            {
                 let state = app.state::<Mutex<Storage>>();
-                let id = pinned.id.as_str().to_string();
-                if let Err(error) = crate::commands::apps::place_app(app.clone(), state, id, target)
-                {
-                    log::warn!("dock: placing a program failed: {error:?}");
+                let mut storage = state.lock().unwrap_or_else(PoisonError::into_inner);
+                if let Err(error) = storage.set_dock_order(&order) {
+                    log::warn!("dock: the order could not be kept: {error}");
                 }
             }
-            Item::Widget(widget) => {
-                crate::commands::widgets::place_widget(app, widget.id.as_str(), target);
+            match item {
+                Item::App(pinned) => {
+                    let state = app.state::<Mutex<Storage>>();
+                    let id = pinned.id.as_str().to_string();
+                    if let Err(error) =
+                        crate::commands::apps::place_app(app.clone(), state, id, among)
+                    {
+                        log::warn!("dock: placing a program failed: {error:?}");
+                    }
+                }
+                Item::Widget(widget) => {
+                    crate::commands::widgets::place_widget(app, widget.id.as_str(), among);
+                }
+                _ => {}
             }
-            Item::Other(other) => super::open_apps::place_other(app, &other.key, target),
-            Item::System(_) => {}
+            // Only the mix may have changed: the dock reads it again.
+            super::dock::refresh();
         }));
     }
 

@@ -1,7 +1,11 @@
 //! What the dock shows, in order (spec 0011 H3; the page's `dockEntries`):
-//! the pinned programs, the widgets in the order chosen, the open programs
-//! that are not pinned, then the system items. A separator stands between
-//! the groups that have items.
+//! the pinned programs and the widgets, mixed as the user dragged them, the
+//! open programs that are not pinned, then the system items. A separator
+//! stands between the groups that have items.
+//!
+//! Each kind keeps its own order (its table, what Configurações reorders);
+//! the dock's order (`Storage::dock_order`) only says where each kind goes,
+//! so moving a program up in Configurações moves it on the dock too.
 //!
 //! Configurações and Sobre left the dock (author's decision, 2026-10-26):
 //! the app opens from the dock's menu (right button) and has Sobre inside.
@@ -97,6 +101,8 @@ pub struct Sources<'a> {
     pub show_open: bool,
     /// Whether the tray is the dock's (the taskbar hidden altogether).
     pub tray: bool,
+    /// How the programs and the widgets mix: keys in dock order.
+    pub order: &'a [String],
 }
 
 impl Sources<'_> {
@@ -155,15 +161,55 @@ pub fn items(sources: Sources<'_>) -> Items {
     if sources.tray {
         systems.push(Item::System(SystemItem::Tray));
     }
-    let groups = [apps.len(), widgets.len(), others.len(), systems.len()]
+    let mixed = interleave(sources.order, apps, widgets);
+    let groups = [mixed.len(), others.len(), systems.len()]
         .into_iter()
         .filter(|&size| size > 0)
         .collect();
-    let items = [apps, widgets, others, systems]
-        .into_iter()
-        .flatten()
-        .collect();
+    let items = [mixed, others, systems].into_iter().flatten().collect();
     Items { items, groups }
+}
+
+/// The programs and the widgets mixed: `order` says, by its keys of each
+/// kind, where the next program and where the next widget go; each kind
+/// comes in its own order. Those `order` doesn't know (new) go at the end,
+/// the programs first.
+pub fn interleave(order: &[String], apps: Vec<Item>, widgets: Vec<Item>) -> Vec<Item> {
+    let app_keys: std::collections::HashSet<String> = apps.iter().map(Item::key).collect();
+    let widget_keys: std::collections::HashSet<String> = widgets.iter().map(Item::key).collect();
+    let mut apps = apps.into_iter();
+    let mut widgets = widgets.into_iter();
+    let mut mixed = Vec::new();
+    for key in order {
+        let next = if app_keys.contains(key) {
+            apps.next()
+        } else if widget_keys.contains(key) {
+            widgets.next()
+        } else {
+            None
+        };
+        mixed.extend(next);
+    }
+    mixed.extend(apps);
+    mixed.extend(widgets);
+    mixed
+}
+
+/// The dock's order after the item `from` (an index of `items`) is let go at
+/// `to` among them: the keys, and where the item now is among those of its
+/// kind (what its own table keeps).
+pub fn moved(items: &[Item], from: usize, to: usize) -> Option<(Vec<String>, usize)> {
+    let mut keys: Vec<String> = items.iter().map(Item::key).collect();
+    if from >= keys.len() {
+        return None;
+    }
+    let key = keys.remove(from);
+    let to = to.min(keys.len());
+    keys.insert(to, key);
+    let kind = |key: &str| key.split(':').next().unwrap_or_default().to_string();
+    let own = kind(&keys[to]);
+    let among = keys[..to].iter().filter(|key| kind(key) == own).count();
+    Some((keys, among))
 }
 
 /// Whether Configurações wears the attention badge: while the database was
@@ -245,6 +291,7 @@ mod tests {
             open,
             show_open: true,
             tray: false,
+            order: &[],
         }
     }
 
@@ -275,7 +322,64 @@ mod tests {
                 "open:00000000000000aa".to_string(),
             ]
         );
-        assert_eq!(groups, vec![2, 1, 1]);
+        // The programs and the widgets are one group.
+        assert_eq!(groups, vec![3, 1]);
+    }
+
+    #[test]
+    fn programs_and_widgets_mix_as_the_order_says_each_kind_in_its_own_order() {
+        let keys = |items: &[Item]| -> Vec<String> { items.iter().map(Item::key).collect() };
+        let apps = vec![Item::App(app(1, "A")), Item::App(app(2, "B"))];
+        let widgets = vec![
+            Item::Widget(widget(10, WidgetKind::Clock, None)),
+            Item::Widget(widget(11, WidgetKind::Note, None)),
+        ];
+        let (a1, a2) = (apps[0].key(), apps[1].key());
+        let (w1, w2) = (widgets[0].key(), widgets[1].key());
+
+        // Widget, program, widget, program.
+        let order = vec![w1.clone(), a1.clone(), w2.clone(), a2.clone()];
+        let mixed = interleave(&order, apps.clone(), widgets.clone());
+        assert_eq!(
+            keys(&mixed),
+            [w1.clone(), a1.clone(), w2.clone(), a2.clone()]
+        );
+
+        // Configurações swapped the programs: their places stay, they swap.
+        let swapped = vec![apps[1].clone(), apps[0].clone()];
+        let mixed = interleave(&order, swapped, widgets.clone());
+        assert_eq!(
+            keys(&mixed),
+            [w1.clone(), a2.clone(), w2.clone(), a1.clone()]
+        );
+
+        // Unknown keys are skipped; the new go at the end, programs first.
+        let order = vec!["app:gone".to_string(), w2.clone()];
+        let mixed = interleave(&order, apps.clone(), widgets.clone());
+        assert_eq!(
+            keys(&mixed),
+            [w1.clone(), a1.clone(), a2.clone(), w2.clone()]
+        );
+        assert_eq!(keys(&interleave(&[], apps, widgets)), [a1, a2, w1, w2]);
+    }
+
+    #[test]
+    fn a_drag_gives_the_new_order_and_the_place_among_its_kind() {
+        let items = vec![
+            Item::App(app(1, "A")),
+            Item::App(app(2, "B")),
+            Item::Widget(widget(10, WidgetKind::Clock, None)),
+            Item::Widget(widget(11, WidgetKind::Note, None)),
+        ];
+        // The first widget to the front: first of the widgets still.
+        let (order, among) = moved(&items, 2, 0).unwrap();
+        assert_eq!(order[0], items[2].key());
+        assert_eq!(among, 0);
+        // The first program after the widgets: last of the programs.
+        let (order, among) = moved(&items, 0, 3).unwrap();
+        assert_eq!(order[3], items[0].key());
+        assert_eq!(among, 1);
+        assert_eq!(moved(&items, 9, 0), None);
     }
 
     #[test]
