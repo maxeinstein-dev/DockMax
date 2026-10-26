@@ -205,6 +205,30 @@ const IDENTITY: Matrix3x2 = Matrix3x2 {
     M32: 0.0,
 };
 
+/// `a`, then `b` (Direct2D maps row vectors: `p × a × b`).
+fn then(a: &Matrix3x2, b: &Matrix3x2) -> Matrix3x2 {
+    Matrix3x2 {
+        M11: a.M11 * b.M11 + a.M12 * b.M21,
+        M12: a.M11 * b.M12 + a.M12 * b.M22,
+        M21: a.M21 * b.M11 + a.M22 * b.M21,
+        M22: a.M21 * b.M12 + a.M22 * b.M22,
+        M31: a.M31 * b.M11 + a.M32 * b.M21 + b.M31,
+        M32: a.M31 * b.M12 + a.M32 * b.M22 + b.M32,
+    }
+}
+
+/// The mirror about the horizontal line at `y`.
+fn mirror(y: f64) -> Matrix3x2 {
+    Matrix3x2 {
+        M11: 1.0,
+        M12: 0.0,
+        M21: 0.0,
+        M22: -1.0,
+        M31: 0.0,
+        M32: (2.0 * y) as f32,
+    }
+}
+
 /// A text style: its size in logical pixels, its weight and whether it is
 /// the display face (the tiles) or the text face.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -285,6 +309,9 @@ pub struct Painter {
     rim: ID2D1LinearGradientBrush,
     /// The DPI the target draws at: 96 × the monitor's scale.
     dpi: f32,
+    /// Applied after every transform: the mirror while a reflection is
+    /// drawn, nothing otherwise.
+    base: Matrix3x2,
 }
 
 impl Painter {
@@ -403,6 +430,7 @@ impl Painter {
             sheen,
             rim,
             dpi: 96.0,
+            base: IDENTITY,
         })
     }
 
@@ -560,6 +588,11 @@ impl Painter {
         Some(brush)
     }
 
+    /// Sets `matrix`, then the base.
+    fn transform(&self, matrix: &Matrix3x2) {
+        unsafe { self.target.SetTransform(&then(matrix, &self.base)) };
+    }
+
     fn solid(&self, c: Color) -> &ID2D1SolidColorBrush {
         unsafe { self.brush.SetColor(&color(c)) };
         &self.brush
@@ -601,7 +634,7 @@ impl Painter {
             self.target.BindDC(dc, &bounds)?;
             self.target.BeginDraw();
             self.target.Clear(Some(&color(Color::CLEAR)));
-            self.target.SetTransform(&IDENTITY);
+            self.transform(&IDENTITY);
         }
         self.draw(scene);
         unsafe { self.target.EndDraw(None, None) }?;
@@ -648,6 +681,11 @@ impl Painter {
                     &brush,
                 )
             };
+        }
+        if scene.look.reflections {
+            for tile in scene.tiles.iter().filter(|tile| !tile.dragging) {
+                self.reflection(scene, tile);
+            }
         }
         // The dragged tile last, above the others.
         let order = scene
@@ -861,8 +899,7 @@ impl Painter {
             let shadow = self.solid(Color::BLACK.with_alpha(alpha)).clone();
             let side = area.width + 2.0 * grow;
             unsafe {
-                self.target
-                    .SetTransform(&place(side / 100.0, area.x - grow, area.y - grow + dy));
+                self.transform(&place(side / 100.0, area.x - grow, area.y - grow + dy));
                 self.target
                     .FillGeometry(&self.squircle, &shadow, None::<&ID2D1Brush>);
             }
@@ -871,7 +908,7 @@ impl Painter {
             return;
         };
         unsafe {
-            self.target.SetTransform(&place(s, area.x, area.y));
+            self.transform(&place(s, area.x, area.y));
             self.target
                 .FillGeometry(&self.squircle, &fill, None::<&ID2D1Brush>);
             self.target
@@ -882,7 +919,7 @@ impl Painter {
                 (1.0 / s) as f32,
                 None::<&ID2D1StrokeStyle>,
             );
-            self.target.SetTransform(&IDENTITY);
+            self.transform(&IDENTITY);
         }
     }
 
@@ -906,12 +943,12 @@ impl Painter {
                 continue;
             };
             unsafe {
-                self.target.SetTransform(&place(k, x, y));
+                self.transform(&place(k, x, y));
                 self.target
                     .DrawGeometry(&geometry, &brush, width as f32, &self.round);
             }
         }
-        unsafe { self.target.SetTransform(&IDENTITY) };
+        self.transform(&IDENTITY);
     }
 
     fn text(&mut self, text: &str, area: Area, size: f64, weight: i32, display: bool, ink: Color) {
@@ -932,8 +969,128 @@ impl Painter {
         };
     }
 
+    /// The tile mirrored beyond its screen-side edge, fading out within the
+    /// bar's padding (`-webkit-box-reflect` with a mask of 60 % to nothing
+    /// over 15 % of the tile).
+    fn reflection(&mut self, scene: &Scene, tile: &Tile) {
+        let area = tile.area;
+        let reach = area.height * 0.15;
+        let (edge, start, end, clip) = match scene.edge {
+            DockEdge::Bottom => {
+                let edge = area.y + area.height;
+                (
+                    edge,
+                    v(0.0, edge),
+                    v(0.0, edge + reach),
+                    Area {
+                        y: edge,
+                        height: reach,
+                        ..area
+                    },
+                )
+            }
+            DockEdge::Top => (
+                area.y,
+                v(0.0, area.y),
+                v(0.0, area.y - reach),
+                Area {
+                    y: area.y - reach,
+                    height: reach,
+                    ..area
+                },
+            ),
+        };
+        let Some(fade) = self.gradient(
+            &[
+                (0.0, Color::WHITE.with_alpha(0.6)),
+                (1.0, Color::WHITE.with_alpha(0.0)),
+            ],
+            start,
+            end,
+        ) else {
+            return;
+        };
+        let Ok(brush) = fade.cast::<ID2D1Brush>() else {
+            return;
+        };
+        self.transform(&IDENTITY);
+        unsafe {
+            let parameters = D2D1_LAYER_PARAMETERS {
+                contentBounds: rect(clip),
+                geometricMask: std::mem::ManuallyDrop::new(None),
+                maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                maskTransform: IDENTITY,
+                opacity: 1.0,
+                opacityBrush: std::mem::ManuallyDrop::new(Some(brush)),
+                layerOptions: D2D1_LAYER_OPTIONS_NONE,
+            };
+            self.target.PushLayer(
+                &parameters,
+                None::<&windows::Win32::Graphics::Direct2D::ID2D1Layer>,
+            );
+            let mut parameters = parameters;
+            std::mem::ManuallyDrop::drop(&mut parameters.opacityBrush);
+        }
+        self.base = mirror(edge);
+        let plain = Tile {
+            area,
+            face: match &tile.face {
+                Face::App {
+                    icon,
+                    letter,
+                    shape,
+                    ..
+                } => Face::App {
+                    icon: icon.clone(),
+                    letter: letter.clone(),
+                    shape: *shape,
+                    badge: None,
+                },
+                Face::Glyph { glaze, paths } => Face::Glyph {
+                    glaze: *glaze,
+                    paths,
+                },
+                Face::Time { glaze, text } => Face::Time {
+                    glaze: *glaze,
+                    text: text.clone(),
+                },
+                Face::Dial {
+                    glaze,
+                    hours,
+                    minutes,
+                } => Face::Dial {
+                    glaze: *glaze,
+                    hours: *hours,
+                    minutes: *minutes,
+                },
+                Face::Ring {
+                    glaze,
+                    fraction,
+                    text,
+                } => Face::Ring {
+                    glaze: *glaze,
+                    fraction: *fraction,
+                    text: text.clone(),
+                },
+            },
+            pressed: false,
+            attention: false,
+            dragging: false,
+            dot: None,
+            drop: None,
+            item: tile.item,
+        };
+        self.tile(scene, &plain);
+        self.base = IDENTITY;
+        self.transform(&IDENTITY);
+        unsafe { self.target.PopLayer() };
+    }
+
     fn tile(&mut self, scene: &Scene, tile: &Tile) {
         let area = tile.area;
+        // Whatever the tile draws without a transform of its own goes through
+        // the base too.
+        self.transform(&IDENTITY);
         match &tile.face {
             Face::Glyph { glaze, paths } => {
                 self.glaze(area, *glaze, tile.pressed);

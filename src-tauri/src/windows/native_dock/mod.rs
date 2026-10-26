@@ -8,6 +8,7 @@
 //! threads need to read (whether it is on screen, where it is) is kept in
 //! `SHARED`.
 
+mod access;
 mod faces;
 mod look;
 mod paint;
@@ -32,7 +33,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     PostMessageW, RegisterClassW, SPI_GETCLIENTAREAANIMATION, SW_HIDE, SW_SHOWNOACTIVATE,
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SetTimer,
     SetWindowPos, ShowWindow, SystemParametersInfoW, WM_APP, WM_CAPTURECHANGED, WM_CLOSE,
-    WM_DISPLAYCHANGE, WM_DPICHANGED, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP,
+    WM_DISPLAYCHANGE, WM_DPICHANGED, WM_GETOBJECT, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP,
     WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_RBUTTONUP, WM_SETTINGCHANGE, WM_TIMER,
     WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
@@ -543,6 +544,43 @@ impl Dock {
             .map(|(item, area)| (panel_of(item), logical(*area)))
             .collect();
         shared.visible = self.visible;
+        drop(shared);
+        // For assistive technology: each item's name (with the notice on
+        // Configurações) and its box on the screen.
+        let attention = dock_items::needs_attention(self.data.widgets.as_ref());
+        let notice = crate::i18n::messages().dock.with_notice;
+        access::publish(
+            self.items
+                .iter()
+                .zip(&self.names)
+                .zip(&rest.items)
+                .map(|((item, name), area)| {
+                    let on_screen = to_screen(*area);
+                    access::Entry {
+                        key: item.key(),
+                        name: if attention && matches!(item, Item::System(SystemItem::Settings)) {
+                            notice.replace("{name}", name)
+                        } else {
+                            name.clone()
+                        },
+                        rect: (
+                            f64::from(on_screen.x),
+                            f64::from(on_screen.y),
+                            f64::from(on_screen.width),
+                            f64::from(on_screen.height),
+                        ),
+                    }
+                })
+                .collect(),
+        );
+    }
+
+    /// Presses the item `key` (assistive technology), as a click would.
+    fn press(&mut self, key: &str) {
+        if let Some(index) = self.items.iter().position(|item| item.key() == key) {
+            self.click(index);
+            self.paint();
+        }
     }
 
     fn show(&mut self) {
@@ -1270,6 +1308,10 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
         }),
         // Alt+F4 hides the dock instead of closing it.
         WM_CLOSE => with_dock(Dock::hide),
+        WM_GETOBJECT => match access::get_object(hwnd, wparam, lparam) {
+            Some(result) => return result,
+            None => handled = false,
+        },
         _ => handled = false,
     }
     if handled {

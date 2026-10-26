@@ -28,6 +28,9 @@ pub struct DockMessages {
     pub files: &'static str,
     /// The progress tile without a period running.
     pub no_value: &'static str,
+    /// An item's name while it carries the attention badge; `{name}` is
+    /// replaced.
+    pub with_notice: &'static str,
 }
 
 /// The Configurações app (spec 0011 H1).
@@ -67,6 +70,7 @@ const PT_BR: Messages = Messages {
         shortcut: "Atalho",
         files: "Arquivos",
         no_value: "–",
+        with_notice: "{name} (com aviso)",
     },
 };
 
