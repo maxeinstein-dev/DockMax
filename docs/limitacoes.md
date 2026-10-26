@@ -35,4 +35,5 @@ O que o DockMax **não** faz hoje, e o que pode surpreender. Vale para o MVP (ve
 
 ## Desempenho
 
+- Se o processo do WebView2 cair (por exemplo, uma falha do driver de vídeo), o DockMax se reinicia sozinho uma vez; se cair de novo em menos de 2 minutos, ele fecha e a barra do Windows volta ([ADR 0010](adr/0010-gpu-no-processo-do-navegador.md)).
 - Cada janela do dock é um WebView2. A memória privada em repouso (processo e WebView2) tem como meta cerca de 220 MB; a medição mais recente está na seção "Medição de recursos" do [roadmap](roadmap.md).

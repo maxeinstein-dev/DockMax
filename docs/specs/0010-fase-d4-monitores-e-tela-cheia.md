@@ -31,7 +31,9 @@ Continuação da [spec 0009](0009-fase-d-janelas.md). Requisitos do autor (2026-
 | DockMax, um dock, 5 programas abertos mostrados (spec 0009) | ~200 MB |
 | DockMax, spike com um **segundo** dock (página do dock numa segunda janela, no outro monitor) | 220–230 MB |
 
-O segundo dock custa uns 15–25 MB, e não um processo a mais: com `--process-per-site` as páginas dividem o renderizador. Mesmo assim o DockMax já pesa mais que o PrimoDock fazendo menos. Antes do D4b vem a medição por processo (o processo de GPU do WebView2 sozinho já foi visto com 70–95 MB, spec 0003) e as alternativas: GPU dentro do processo do navegador, painel criado só quando abre, uma janela só para todos os docks, alvo de memória baixo nos docks em repouso.
+O segundo dock custa uns 15–25 MB, e não um processo a mais: com `--process-per-site` as páginas dividem o renderizador. Mesmo assim o DockMax já pesa mais que o PrimoDock fazendo menos.
+
+**Decidido** ([ADR 0010](../adr/0010-gpu-no-processo-do-navegador.md), com a medição por processo e as alternativas): a GPU do WebView2 passa para o processo do navegador, com reinício automático se ele cair. Um dock fica em ~165 MB e dois em ~196 MB. O próximo corte é o **app de Configurações**, aberto só quando usado, antes do D4b.
 
 ## 4. Verificado (D4a)
 

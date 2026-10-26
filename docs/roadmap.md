@@ -26,7 +26,7 @@ DockMax será um dock personalizável para Windows, inspirado em aplicações de
 - Separar widgets visuais de serviços nativos e integrações externas.
 - Implementar widgets por prioridade e dependência técnica.
 - Tratar recursos que dependem de hardware ou APIs externas como capacidades opcionais.
-- Medir memória e CPU em repouso em todo PR que mude a interface e comparar com a linha de base. Orçamento até o MVP: memória privada em repouso (processo + WebView2) no máximo 20% acima da linha de base da Fase 1 (182 MB), ou seja, cerca de 220 MB.
+- Medir memória e CPU em repouso em todo PR que mude a interface e comparar com a linha de base. Orçamento até o MVP: memória privada em repouso (processo + WebView2) no máximo 20% acima da linha de base da Fase 1 (182 MB), ou seja, cerca de 220 MB. **Revisto em 2026-10-26 ([ADR 0010](adr/0010-gpu-no-processo-do-navegador.md)):** cerca de 180 MB com um dock e cerca de 15 MB por monitor a mais.
 - Comercialização, suporte a macOS e sincronização em nuvem estão fora do escopo inicial.
 
 ## Fases

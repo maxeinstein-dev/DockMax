@@ -24,6 +24,8 @@ pub mod popup_menu;
 #[cfg(windows)]
 pub mod profiles;
 #[cfg(windows)]
+pub mod recovery;
+#[cfg(windows)]
 pub mod taskbar;
 #[cfg(windows)]
 pub mod tray_host;

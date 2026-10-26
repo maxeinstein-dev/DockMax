@@ -20,3 +20,4 @@ ADRs registram decisões técnicas importantes, seu contexto e suas consequênci
 - [0007 — Configurações, logs e i18n](0007-configuracoes-logs-e-i18n.md)
 - [0008 — Persistência em SQLite, contrato de widgets e E2E](0008-persistencia-sqlite-e-widgets.md)
 - [0009 — O dock substitui a barra de tarefas e a licença passa a ser de uso pessoal](0009-dock-substitui-a-barra-de-tarefas.md)
+- [0010 — GPU do WebView2 no processo do navegador, com reinício automático](0010-gpu-no-processo-do-navegador.md)

@@ -135,6 +135,12 @@ pub fn run() {
                 {
                     windows::drop_target::install(&window);
                 }
+                #[cfg(windows)]
+                if webview.label() == windows::dock::LABEL
+                    && let Some(window) = webview.app_handle().get_webview_window(webview.label())
+                {
+                    windows::recovery::watch(&window);
+                }
             }
         })
         .setup(|app| {
