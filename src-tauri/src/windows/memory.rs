@@ -169,5 +169,11 @@ mod tests {
             args.split(' ').any(|arg| arg == "--process-per-site"),
             "{args}"
         );
+        // The GPU work in the browser process (ADR 0010), with the restart
+        // of `windows/recovery.rs` for when it fails.
+        assert!(
+            args.split(' ').any(|arg| arg == "--in-process-gpu"),
+            "{args}"
+        );
     }
 }
