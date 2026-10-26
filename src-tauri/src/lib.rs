@@ -237,6 +237,19 @@ pub fn run() {
         .build(context)
         .expect("error while building tauri application")
         .run(|app, event| {
+            // The dock is not a Tauri window (spec 0011 H3): when the panel or
+            // the Configurações app, made on demand, closes and no Tauri window
+            // is left, Tauri asks to exit, with no code. The app stays; Sair
+            // in the tray asks with a code and is let through. The test build
+            // keeps Tauri's way: the suite quits it by closing its windows.
+            #[cfg(not(feature = "e2e"))]
+            if let RunEvent::ExitRequested {
+                code: None, api, ..
+            } = &event
+            {
+                api.prevent_exit();
+                return;
+            }
             if let RunEvent::Exit = event {
                 // The edge and the taskbar go back before anything else.
                 #[cfg(windows)]

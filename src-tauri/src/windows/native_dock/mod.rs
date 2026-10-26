@@ -190,6 +190,11 @@ pub fn post(work: impl FnOnce(&mut Dock) + Send + 'static) {
 
 /// Makes the dock's window, hidden. On the main thread, once.
 pub fn start(app: &AppHandle) -> windows::core::Result<()> {
+    // COM and OLE on the main thread, for the images (WIC) and the drop
+    // target: WebView2 used to do it, and none runs at startup any more.
+    if let Err(error) = unsafe { windows::Win32::System::Ole::OleInitialize(None) } {
+        log::warn!("dock: OLE could not be initialized: {error}");
+    }
     let instance = unsafe { GetModuleHandleW(None) }?;
     let class = w!("DockMaxDock");
     let class_data = WNDCLASSW {
