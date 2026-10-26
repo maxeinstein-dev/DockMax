@@ -548,6 +548,7 @@ describe("Panel routing", () => {
       name: "code",
       count: 1,
       active: false,
+      badge: false,
     };
 
     it("shows the menu of the program under its own title", async () => {

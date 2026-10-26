@@ -43,6 +43,7 @@ fn main() {
             "activate_app",
             "activate_open",
             "launch_open",
+            "open_badge",
             "close_app",
             "close_open",
             "pin_open",

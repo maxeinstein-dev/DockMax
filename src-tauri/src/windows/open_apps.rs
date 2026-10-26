@@ -39,6 +39,10 @@ struct Other {
     name: String,
     hwnds: Vec<isize>,
     active: bool,
+    /// The AppID the windows declare, when they do: what a badge is found by.
+    aumid: Option<String>,
+    /// The program has a badge to draw on its icon.
+    badge: bool,
 }
 
 /// What the windows were at the last look.
@@ -122,6 +126,7 @@ fn snapshot_of(state: &State) -> OpenSnapshot {
                 name: other.name.clone(),
                 count: other.hwnds.len(),
                 active: other.active,
+                badge: other.badge,
             })
             .collect(),
     }
@@ -223,9 +228,24 @@ fn described_others(
                 .iter()
                 .find(|window| group.hwnds.contains(&window.hwnd))?;
             let (app_id, name) = describe(&group.key, sample)?;
+            // A Chrome window carries its profile: the name tells the
+            // profiles apart, and the photo badges the icon.
+            let profile = sample
+                .aumid
+                .as_deref()
+                .and_then(super::profiles::profile_of);
+            let name = match &profile {
+                Some(profile) => format!("{name} ({})", profile.name),
+                None => name,
+            };
             Some(Other {
                 id: short_id(&group.key),
                 active: foreground.is_some_and(|front| group.hwnds.contains(&front)),
+                badge: sample
+                    .aumid
+                    .as_deref()
+                    .is_some_and(super::profiles::has_badge),
+                aumid: sample.aumid.clone(),
                 key: group.key,
                 app_id,
                 name,
@@ -381,6 +401,16 @@ pub fn pin_target_of_other(key: &str) -> Option<(String, String)> {
         .iter()
         .find(|other| other.id == key)
         .map(|other| (other.app_id.clone(), other.name.clone()))
+}
+
+/// The AppID the windows of the open program `key` that is not pinned
+/// declare, for its badge.
+pub fn aumid_of_other(key: &str) -> Option<String> {
+    state()
+        .others
+        .iter()
+        .find(|other| other.id == key)
+        .and_then(|other| other.aumid.clone())
 }
 
 /// What `app_icon` and `launch` take for the open program that is not pinned

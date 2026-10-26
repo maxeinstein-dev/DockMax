@@ -19,6 +19,7 @@ const OTHER: OpenOther = {
   name: "code",
   count: 1,
   active: false,
+  badge: false,
 };
 
 const flush = () => act(() => Promise.resolve());

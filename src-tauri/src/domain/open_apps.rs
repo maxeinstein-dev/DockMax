@@ -42,13 +42,23 @@ pub struct WindowFacts {
 }
 
 /// Whether the window belongs to the program: it declares one of the
-/// program's AppIDs, or it runs the program's file (so every window of one
-/// executable, the profiles of a browser, belongs to the one program).
+/// program's AppIDs, or it runs the program's file.
 pub fn matches(window: &WindowFacts, identity: &Identity) -> bool {
     if let Some(aumid) = window.aumid.as_deref() {
         let aumid = aumid.to_lowercase();
         if identity.ids.contains(&aumid) {
             return true;
+        }
+        // An AppID that extends one of the program's (`Chrome.UserData.
+        // Profile1` of `Chrome`) is another instance of it that the shell keeps
+        // apart, as Windows keeps the profiles of a browser apart: it is not
+        // the program's by the file alone.
+        if identity.ids.iter().any(|id| {
+            aumid
+                .strip_prefix(id.as_str())
+                .is_some_and(|rest| rest.starts_with('.'))
+        }) {
+            return false;
         }
     }
     match (&window.exe, &identity.target) {
@@ -177,6 +187,9 @@ pub struct OpenOther {
     pub name: String,
     pub count: usize,
     pub active: bool,
+    /// The program has a badge to draw on its icon (the photo of a Chrome
+    /// profile): `open_badge` gives it.
+    pub badge: bool,
 }
 
 /// What the dock gets: the pinned programs that are open and the others.
@@ -278,7 +291,7 @@ mod tests {
         assert!(matches(
             &window(
                 1,
-                Some("Chrome.UserData.Profile1"),
+                Some("Some.Other.AppId"),
                 Some(&CHROME_EXE.to_uppercase())
             ),
             &chrome
@@ -288,6 +301,29 @@ mod tests {
             &window(3, None, Some(r"C:\Windows\notepad.exe")),
             &chrome
         ));
+    }
+
+    #[test]
+    fn a_window_whose_appid_extends_the_programs_is_another_instance_of_it() {
+        // The pinned Chrome is the default profile's; the other profiles are
+        // each their own item, as in the Windows taskbar.
+        let chrome = Identity::new(["Chrome"], Some(CHROME_EXE));
+
+        assert!(matches(
+            &window(1, Some("Chrome"), Some(CHROME_EXE)),
+            &chrome
+        ));
+        assert!(!matches(
+            &window(2, Some("Chrome.UserData.Profile1"), Some(CHROME_EXE)),
+            &chrome
+        ));
+        // A name that only begins the same way is not an extension of it.
+        assert!(matches(
+            &window(3, Some("Chromatic"), Some(CHROME_EXE)),
+            &chrome
+        ));
+        // And a window that declares nothing still goes by the file.
+        assert!(matches(&window(4, None, Some(CHROME_EXE)), &chrome));
     }
 
     #[test]
