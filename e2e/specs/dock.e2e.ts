@@ -1,9 +1,9 @@
 import { closeSync, existsSync, openSync, readSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { $, browser, expect } from "@wdio/globals";
+import { browser, expect } from "@wdio/globals";
 import { ptBR as t } from "../../src/i18n/pt-BR.ts";
-import { DATA_DIR_VAR } from "../app.ts";
+import { DATA_DIR_VAR, dockView } from "../app.ts";
 
 /* E2E 1 (spec 0003 §2.8): the dock opens, and the widget database is made in
  * the run's data folder.
@@ -38,17 +38,24 @@ function header(path: string): string | null {
   }
 }
 
-/** A fixed item of the dock, found by its accessible name. */
-function dockItem(name: string) {
-  return $(`nav[aria-label="${t.dock.label}"] button[aria-label="${name}"]`);
-}
-
 describe("Dock", () => {
   it("opens with Settings and About", async () => {
-    await browser.switchToWindow("dock");
-
-    await expect(dockItem(t.dock.items.settings)).toBeDisplayed();
-    await expect(dockItem(t.dock.items.about)).toBeDisplayed();
+    // The dock reads its items once started: waited for, not assumed.
+    await browser.waitUntil(
+      async () => {
+        const names = (await dockView()).items.map((item) => item.name);
+        return (
+          names.includes(t.dock.items.settings) &&
+          names.includes(t.dock.items.about)
+        );
+      },
+      { timeoutMsg: "the dock never showed Configurações and Sobre" },
+    );
+    const names = (await dockView()).items.map((item) => item.name);
+    expect(names.slice(-2)).toEqual([
+      t.dock.items.settings,
+      t.dock.items.about,
+    ]);
   });
 
   it("makes the widget database in the run's data folder", async () => {

@@ -96,6 +96,14 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "log:allow-log",
         ],
     ),
+    (
+        "e2e.json",
+        "e2e",
+        // The hidden window of the test build only (`tauri.e2e.conf.json`);
+        // the released app never makes a window with this label.
+        &["e2e"],
+        &["allow-e2e-dock-view", "allow-e2e-press-dock"],
+    ),
 ];
 
 /// Top-level keys a capability file may have. Anything else (`remote`,
@@ -541,8 +549,14 @@ fn bracket_items<'a>(code: &'a str, open: &str, file: &str) -> Vec<&'a str> {
         found, 1,
         "{file}: expected exactly one `{open}`, found {found}"
     );
+    nth_bracket_items(code, open, 1, file)
+}
+
+/// The comma-separated items between the `nth` `open` of `code` (from 1) and
+/// the next `]`.
+fn nth_bracket_items<'a>(code: &'a str, open: &str, nth: usize, file: &str) -> Vec<&'a str> {
     code.split(open)
-        .nth(1)
+        .nth(nth)
         .and_then(|rest| rest.split(']').next())
         .unwrap_or_else(|| panic!("{file}: `{open}` is not closed by `]`"))
         .split(',')
@@ -569,11 +583,34 @@ fn every_declared_command_is_registered_and_vice_versa() {
                 })
         })
         .collect();
+    // `lib.rs` has two lists: the app's, and the test build's, which adds the
+    // E2E suite's commands (`src/e2e.rs`) and nothing else.
     let lib = rust_code("src/lib.rs");
-    let registered: Vec<&str> = bracket_items(&lib, "generate_handler![", "src/lib.rs")
-        .into_iter()
-        .map(|path| path.rsplit("::").next().unwrap_or(path).trim())
+    let found = lib.matches("generate_handler![").count();
+    assert_eq!(
+        found, 2,
+        "src/lib.rs: expected the app's and the test build's `generate_handler!`, found {found}"
+    );
+    let names = |nth: usize| -> Vec<&str> {
+        nth_bracket_items(&lib, "generate_handler![", nth, "src/lib.rs")
+            .into_iter()
+            .map(|path| path.rsplit("::").next().unwrap_or(path).trim())
+            .collect()
+    };
+    let (app_only, registered) = (names(1), names(2));
+    let added: Vec<_> = as_set(&registered)
+        .difference(&as_set(&app_only))
+        .cloned()
         .collect();
+    assert_eq!(
+        added,
+        vec!["e2e_dock_view".to_string(), "e2e_press_dock".to_string()],
+        "src/lib.rs: the test build's commands must be the app's plus the E2E suite's"
+    );
+    assert!(
+        as_set(&app_only).is_subset(&as_set(&registered)),
+        "src/lib.rs: the test build must answer every command of the app"
+    );
 
     let declared_set = as_set(&declared);
     let registered_set = as_set(&registered);
@@ -631,9 +668,10 @@ fn tauri_config_files_are_exactly_the_expected_ones() {
 #[test]
 fn e2e_config_only_renames_the_app() {
     // `pnpm test:e2e:build` merges this file over tauri.conf.json. It may
-    // only give the test build its own identifier and binary name: a CSP, a
-    // capability or a window here would make the tested app differ from the
-    // released one without tripping any other guard.
+    // only give the test build its own identifier and binary name, and the
+    // hidden window the suite drives the native dock through (spec 0011 H3):
+    // a CSP, a capability or another window here would make the tested app
+    // differ from the released one without tripping any other guard.
     let file = "tauri.e2e.conf.json";
     let json = read_json(&manifest_dir().join(file));
     let object = json
@@ -642,8 +680,21 @@ fn e2e_config_only_renames_the_app() {
     let keys: BTreeSet<String> = object.keys().cloned().collect();
     assert_eq!(
         keys,
-        as_set(&["$schema", "identifier", "mainBinaryName"]),
-        "{file}: must set exactly `$schema`, `identifier` and `mainBinaryName`"
+        as_set(&["$schema", "identifier", "mainBinaryName", "app"]),
+        "{file}: must set exactly `$schema`, `identifier`, `mainBinaryName` and `app`"
+    );
+    assert_eq!(
+        json["app"],
+        serde_json::json!({
+            "windows": [{
+                "label": "e2e",
+                "url": "e2e.html",
+                "visible": false,
+                "skipTaskbar": true,
+                "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --process-per-site --in-process-gpu"
+            }]
+        }),
+        "{file}: `app` may only add the hidden `e2e` window"
     );
 
     let base = read_json(&manifest_dir().join("tauri.conf.json"));

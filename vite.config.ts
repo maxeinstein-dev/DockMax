@@ -39,6 +39,8 @@ export default defineConfig(() => ({
       input: {
         panel: fileURLToPath(new URL("panel.html", import.meta.url)),
         settings: fileURLToPath(new URL("settings.html", import.meta.url)),
+        // The test build's hidden window, which drives the native dock.
+        e2e: fileURLToPath(new URL("e2e.html", import.meta.url)),
       },
     },
   },

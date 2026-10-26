@@ -3,7 +3,7 @@ import { join } from "node:path";
 import process from "node:process";
 import { $, browser, expect } from "@wdio/globals";
 import { ptBR as t } from "../../src/i18n/pt-BR.ts";
-import { DATA_DIR_VAR, openSettings, restartApp } from "../app.ts";
+import { DATA_DIR_VAR, dockView, openSettings, restartApp } from "../app.ts";
 
 /** The `data-mode` of the current window's `<html>`, set from the theme. */
 function pageMode(): Promise<string | null> {
@@ -46,8 +46,11 @@ describe("Theme", () => {
     );
     expect(saved).toMatchObject({ theme: "dark" });
 
+    // The dock is painted dark, before and after a restart.
+    expect((await dockView()).dark).toBe(true);
     await restartApp();
-    await browser.switchToWindow("dock");
-    await waitForMode("dark");
+    await browser.waitUntil(async () => (await dockView()).dark, {
+      timeoutMsg: "the dock was not dark after the restart",
+    });
   });
 });

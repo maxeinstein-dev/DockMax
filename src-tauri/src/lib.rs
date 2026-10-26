@@ -86,6 +86,100 @@ pub fn run_special_mode() -> bool {
     false
 }
 
+/// The app's commands, and the ones the E2E suite drives the dock with in
+/// the test build (`e2e.rs`): the dock is native, with no page to look into.
+#[cfg(not(feature = "e2e"))]
+macro_rules! handler {
+    () => {
+        tauri::generate_handler![
+            commands::panel::hide_panel,
+            commands::panel::panel_ready,
+            commands::panel::panel_mounted,
+            commands::settings::get_settings,
+            commands::settings::update_settings,
+            commands::widgets::list_widgets,
+            commands::widgets::add_widget,
+            commands::widgets::remove_widget,
+            commands::widgets::move_widget,
+            commands::widgets::update_widget,
+            commands::widgets::get_note,
+            commands::widgets::save_note,
+            commands::widgets::dismiss_storage_notice,
+            commands::tray::list_tray,
+            commands::tray::tray_click,
+            commands::apps::list_apps,
+            commands::apps::list_catalog,
+            commands::apps::app_icon,
+            commands::apps::pin_app,
+            commands::apps::unpin_app,
+            commands::apps::move_app,
+            commands::apps::place_app,
+            commands::apps::launch_app,
+            commands::apps::list_open_apps,
+            commands::apps::activate_app,
+            commands::apps::activate_open,
+            commands::apps::launch_open,
+            commands::apps::open_badge,
+            commands::apps::close_app,
+            commands::apps::close_open,
+            commands::apps::pin_open,
+            commands::apps::app_menu,
+            commands::apps::run_app_entry,
+            commands::apps::reveal_app,
+            commands::icons::list_icon_packs,
+            commands::icons::reload_icon_packs,
+            commands::icons::open_icon_packs_folder
+        ]
+    };
+}
+
+#[cfg(feature = "e2e")]
+macro_rules! handler {
+    () => {
+        tauri::generate_handler![
+            commands::panel::hide_panel,
+            commands::panel::panel_ready,
+            commands::panel::panel_mounted,
+            commands::settings::get_settings,
+            commands::settings::update_settings,
+            commands::widgets::list_widgets,
+            commands::widgets::add_widget,
+            commands::widgets::remove_widget,
+            commands::widgets::move_widget,
+            commands::widgets::update_widget,
+            commands::widgets::get_note,
+            commands::widgets::save_note,
+            commands::widgets::dismiss_storage_notice,
+            commands::tray::list_tray,
+            commands::tray::tray_click,
+            commands::apps::list_apps,
+            commands::apps::list_catalog,
+            commands::apps::app_icon,
+            commands::apps::pin_app,
+            commands::apps::unpin_app,
+            commands::apps::move_app,
+            commands::apps::place_app,
+            commands::apps::launch_app,
+            commands::apps::list_open_apps,
+            commands::apps::activate_app,
+            commands::apps::activate_open,
+            commands::apps::launch_open,
+            commands::apps::open_badge,
+            commands::apps::close_app,
+            commands::apps::close_open,
+            commands::apps::pin_open,
+            commands::apps::app_menu,
+            commands::apps::run_app_entry,
+            commands::apps::reveal_app,
+            commands::icons::list_icon_packs,
+            commands::icons::reload_icon_packs,
+            commands::icons::open_icon_packs_folder,
+            e2e::e2e_dock_view,
+            e2e::e2e_press_dock
+        ]
+    };
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // A panic gives the taskbar back before the process aborts (release
@@ -134,45 +228,7 @@ pub fn run() {
             tray::setup(app.handle())?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::panel::hide_panel,
-            commands::panel::panel_ready,
-            commands::panel::panel_mounted,
-            commands::settings::get_settings,
-            commands::settings::update_settings,
-            commands::widgets::list_widgets,
-            commands::widgets::add_widget,
-            commands::widgets::remove_widget,
-            commands::widgets::move_widget,
-            commands::widgets::update_widget,
-            commands::widgets::get_note,
-            commands::widgets::save_note,
-            commands::widgets::dismiss_storage_notice,
-            commands::tray::list_tray,
-            commands::tray::tray_click,
-            commands::apps::list_apps,
-            commands::apps::list_catalog,
-            commands::apps::app_icon,
-            commands::apps::pin_app,
-            commands::apps::unpin_app,
-            commands::apps::move_app,
-            commands::apps::place_app,
-            commands::apps::launch_app,
-            commands::apps::list_open_apps,
-            commands::apps::activate_app,
-            commands::apps::activate_open,
-            commands::apps::launch_open,
-            commands::apps::open_badge,
-            commands::apps::close_app,
-            commands::apps::close_open,
-            commands::apps::pin_open,
-            commands::apps::app_menu,
-            commands::apps::run_app_entry,
-            commands::apps::reveal_app,
-            commands::icons::list_icon_packs,
-            commands::icons::reload_icon_packs,
-            commands::icons::open_icon_packs_folder
-        ]);
+        .invoke_handler(handler!());
     // Test build only: the WebDriver server the E2E suite drives the windows
     // through, on the port in `TAURI_WEBDRIVER_PORT` (4445 by default).
     #[cfg(feature = "e2e")]

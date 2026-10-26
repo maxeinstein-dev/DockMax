@@ -1341,6 +1341,72 @@ pub fn show() {
     post(Dock::show);
 }
 
+/// What the E2E suite reads of the dock (test build only): each item's name
+/// and what its face draws, and whether it is painted dark.
+#[cfg(feature = "e2e")]
+pub struct View {
+    pub items: Vec<(String, &'static str)>,
+    pub dark: bool,
+}
+
+/// Asks the dock for its `View`, from a thread other than the main one.
+#[cfg(feature = "e2e")]
+pub fn view() -> Option<View> {
+    let (sent, received) = std::sync::mpsc::channel();
+    post(move |dock| {
+        let items = dock
+            .items
+            .iter()
+            .zip(&dock.names)
+            .map(|(item, name)| {
+                let face = match item {
+                    Item::App(_) | Item::Other(_) => "app",
+                    Item::System(_) => "glyph",
+                    Item::Widget(widget) => match &widget.config {
+                        crate::domain::widgets::WidgetConfig::Clock(clock) => {
+                            match clock.icon_style {
+                                crate::domain::widgets::clock::ClockIconStyle::Analog => "dial",
+                                crate::domain::widgets::clock::ClockIconStyle::Digital => "time",
+                            }
+                        }
+                        crate::domain::widgets::WidgetConfig::TimeProgress(_) => "ring",
+                        _ => "glyph",
+                    },
+                };
+                (name.clone(), face)
+            })
+            .collect();
+        let _ = sent.send(View {
+            items,
+            dark: dock.palette().dark,
+        });
+    });
+    received.recv_timeout(Duration::from_secs(5)).ok()
+}
+
+/// Presses the item named `name`, as a click would (test build only, from a
+/// thread other than the main one). `false` when the dock has no such item.
+#[cfg(feature = "e2e")]
+pub fn press_named(name: String) -> bool {
+    let (sent, received) = std::sync::mpsc::channel();
+    post(move |dock| {
+        let key = dock
+            .names
+            .iter()
+            .position(|shown| *shown == name)
+            .and_then(|index| dock.items.get(index))
+            .map(Item::key);
+        if let Some(key) = &key {
+            shared().clicked = Some(Instant::now());
+            dock.press(key);
+        }
+        let _ = sent.send(key.is_some());
+    });
+    received
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap_or(false)
+}
+
 /// The monitors or the band changed under the dock: places it again.
 pub fn reposition() {
     post(|dock| {

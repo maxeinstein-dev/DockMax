@@ -51,6 +51,9 @@ fn main() {
             "list_icon_packs",
             "reload_icon_packs",
             "open_icon_packs_folder",
+            // The E2E suite's, registered only in the test build (`e2e.rs`).
+            "e2e_dock_view",
+            "e2e_press_dock",
         ]),
     ))
     .expect("failed to run tauri-build");
