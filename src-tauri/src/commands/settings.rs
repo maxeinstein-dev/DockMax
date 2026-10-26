@@ -12,7 +12,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use std::collections::BTreeMap;
 
 use crate::domain::settings::{
-    DockEdge, DockOpacity, DockSettings, DockStyle, HoverEffect, IconShape, Indicator,
+    DockEdge, DockOpacity, DockSettings, DockStyle, HoverEffect, IconShape, Indicator, MiddleClick,
     OpenAnimation, Settings, SettingsError, SettingsErrorCode, StyleTweaks, TaskbarMode, Theme,
 };
 use crate::persistence::settings_file::{self, FILE_NAME};
@@ -55,6 +55,8 @@ struct DockSettingsInput {
     /// Like `indicator_color`: always sent, `null` for the Windows icons.
     icon_pack: Option<String>,
     open_animation: OpenAnimation,
+    show_open_apps: bool,
+    middle_click: MiddleClick,
     taskbar: TaskbarMode,
     bottom_space: u8,
 }
@@ -85,6 +87,8 @@ impl From<SettingsInput> for Settings {
                 icon_shape: dock.icon_shape,
                 icon_pack: dock.icon_pack,
                 open_animation: dock.open_animation,
+                show_open_apps: dock.show_open_apps,
+                middle_click: dock.middle_click,
                 taskbar: dock.taskbar,
                 bottom_space: dock.bottom_space,
             },
@@ -357,7 +361,7 @@ mod tests {
     }
 
     /// The look fields of a full update payload.
-    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","taskbar":"hidden","bottomSpace":2"##;
+    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","showOpenApps":false,"middleClick":"none","taskbar":"hidden","bottomSpace":2"##;
 
     fn full() -> String {
         format!(
@@ -394,6 +398,8 @@ mod tests {
                     icon_shape: IconShape::Uniform,
                     icon_pack: Some("pixel-system".into()),
                     open_animation: OpenAnimation::Pulse,
+                    show_open_apps: false,
+                    middle_click: MiddleClick::None,
                     taskbar: TaskbarMode::Hidden,
                     bottom_space: 2,
                 },

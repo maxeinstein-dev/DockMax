@@ -93,6 +93,99 @@ pub fn summarize(
         .collect()
 }
 
+/// The windows that belong to no pinned program, grouped by program.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Group {
+    /// What the program is known by, lowercased: the window's AppID, else the
+    /// program's file.
+    pub key: String,
+    /// Its windows, the topmost first.
+    pub hwnds: Vec<isize>,
+}
+
+/// What a window is grouped by: the AppID it declares, else the file it runs;
+/// `None` when it tells neither (nothing to show it as).
+pub fn group_key(window: &WindowFacts) -> Option<String> {
+    window
+        .aumid
+        .as_deref()
+        .filter(|aumid| !aumid.is_empty())
+        .or(window.exe.as_deref().filter(|exe| !exe.is_empty()))
+        .map(str::to_lowercase)
+}
+
+/// The open programs that are not pinned: the windows no program of `found`
+/// claims, grouped by `group_key`, in the order the groups first appeared in
+/// `windows` (the topmost first). `order` is the order the dock showed them
+/// last: groups it names keep their place and the new ones go at the end, so
+/// the items do not shuffle each time the stacking changes.
+pub fn others(windows: &[WindowFacts], found: &[Found], order: &[String]) -> Vec<Group> {
+    let claimed: Vec<isize> = found
+        .iter()
+        .flat_map(|found| found.hwnds.iter().copied())
+        .collect();
+    let mut groups: Vec<Group> = Vec::new();
+    for window in windows.iter().filter(|w| !claimed.contains(&w.hwnd)) {
+        let Some(key) = group_key(window) else {
+            continue;
+        };
+        match groups.iter_mut().find(|group| group.key == key) {
+            Some(group) => group.hwnds.push(window.hwnd),
+            None => groups.push(Group {
+                key,
+                hwnds: vec![window.hwnd],
+            }),
+        }
+    }
+    keep_order(&mut groups, |group| &group.key, order);
+    groups
+}
+
+/// Puts `items` in the order they were shown in (`order` names them by key):
+/// the ones it names keep their place and the others follow, in the order
+/// they were given.
+pub fn keep_order<T>(items: &mut [T], key: impl Fn(&T) -> &str, order: &[String]) {
+    items.sort_by_key(|item| {
+        order
+            .iter()
+            .position(|known| known == key(item))
+            .unwrap_or(usize::MAX)
+    });
+}
+
+/// An opaque name for a group the dock can send back, so the page never holds
+/// a path: 16 hexadecimal digits of the FNV-1a hash of the key.
+pub fn short_id(key: &str) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in key.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0100_0000_01b3);
+    }
+    format!("{hash:016x}")
+}
+
+/// An open program that is not pinned, as the dock sees it: `{"key": "...",
+/// "appId": "...", "name": "...", "count": 1, "active": false}`. `app_id` is
+/// what `app_icon` takes (the Apps folder's id, or the program's file for one
+/// the folder does not list); `key` is what `activate_open` takes. Carries no
+/// window handle.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenOther {
+    pub key: String,
+    pub app_id: String,
+    pub name: String,
+    pub count: usize,
+    pub active: bool,
+}
+
+/// What the dock gets: the pinned programs that are open and the others.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct OpenSnapshot {
+    pub apps: Vec<OpenApp>,
+    pub others: Vec<OpenOther>,
+}
+
 /// An open program as the dock sees it: `{"id": "...", "count": 2,
 /// "active": true}`. Carries no window handle.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -256,6 +349,81 @@ mod tests {
                 .all(|f| !f.active)
         );
         assert!(summarize(&programs, &[], None).is_empty());
+    }
+
+    #[test]
+    fn windows_no_pinned_program_claims_are_grouped_by_program() {
+        let windows = vec![
+            window(1, None, Some(r"C:\Apps\code.exe")),
+            window(2, Some("Pinned!App"), None),
+            window(
+                3,
+                Some("Store.App!App"),
+                Some(r"C:\Windows\ApplicationFrameHost.exe"),
+            ),
+            window(4, None, Some(r"C:\APPS\Code.exe")),
+            window(5, None, None),
+        ];
+        let found = vec![Found {
+            id: "pinned".into(),
+            hwnds: vec![2],
+            active: false,
+        }];
+
+        let groups = others(&windows, &found, &[]);
+
+        assert_eq!(
+            groups,
+            vec![
+                Group {
+                    key: r"c:\apps\code.exe".into(),
+                    hwnds: vec![1, 4]
+                },
+                Group {
+                    key: "store.app!app".into(),
+                    hwnds: vec![3]
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn the_groups_keep_the_order_they_were_shown_in() {
+        let windows = vec![
+            window(1, Some("A!App"), None),
+            window(2, Some("B!App"), None),
+            window(3, Some("C!App"), None),
+        ];
+        let order = vec!["c!app".to_owned(), "a!app".to_owned()];
+
+        let keys: Vec<String> = others(&windows, &[], &order)
+            .into_iter()
+            .map(|group| group.key)
+            .collect();
+
+        // C and A where they were, B (new) at the end.
+        assert_eq!(keys, ["c!app", "a!app", "b!app"]);
+    }
+
+    #[test]
+    fn keeping_the_order_puts_the_known_first_and_the_new_at_the_end_as_given() {
+        let mut items = vec!["new1", "b", "new2", "a"];
+        let order = vec!["a".to_owned(), "b".to_owned()];
+
+        keep_order(&mut items, |item| item, &order);
+
+        assert_eq!(items, ["a", "b", "new1", "new2"]);
+    }
+
+    #[test]
+    fn a_group_has_an_opaque_name_that_is_the_same_each_time() {
+        let id = short_id(r"c:\apps\code.exe");
+
+        assert_eq!(id, short_id(r"c:\apps\code.exe"));
+        assert_ne!(id, short_id(r"c:\apps\other.exe"));
+        assert_eq!(id.len(), 16);
+        assert!(id.bytes().all(|byte| byte.is_ascii_hexdigit()));
+        assert!(!id.contains("code"));
     }
 
     #[test]

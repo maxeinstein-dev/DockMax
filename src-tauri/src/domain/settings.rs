@@ -155,6 +155,12 @@ pub struct DockSettings {
     pub icon_pack: Option<String>,
     /// What a program's icon does while it opens (spec 0006 B2).
     pub open_animation: OpenAnimation,
+    /// Whether the open programs that are not pinned show on the dock, after
+    /// the widgets (spec 0009 D2).
+    pub show_open_apps: bool,
+    /// What a click with the middle button (the wheel) does on a program of the
+    /// dock (spec 0009).
+    pub middle_click: MiddleClick,
     /// What the dock does with the Windows taskbar (ADR 0009).
     pub taskbar: TaskbarMode,
     /// Distance between the dock and the screen edge, in logical pixels,
@@ -177,10 +183,23 @@ impl Default for DockSettings {
             icon_shape: IconShape::default(),
             icon_pack: None,
             open_animation: OpenAnimation::default(),
+            show_open_apps: true,
+            middle_click: MiddleClick::default(),
             taskbar: TaskbarMode::default(),
             bottom_space: DEFAULT_BOTTOM_SPACE,
         }
     }
+}
+
+/// What the middle button does on a program of the dock.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MiddleClick {
+    /// Opens a new instance of the program, as the Windows taskbar does.
+    #[default]
+    NewInstance,
+    /// Does nothing.
+    None,
 }
 
 /// What the dock does with the Windows taskbar (ADR 0009).
@@ -495,6 +514,7 @@ mod tests {
                 "style": "native", "tweaks": {}, "hover": "scale", "hoverScale": 110,
                 "indicator": "dot", "indicatorColor": null,
                 "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
+                "showOpenApps": true, "middleClick": "newInstance",
                 "taskbar": "hidden", "bottomSpace": 2
               },
               "launchAtLogin": false
@@ -671,6 +691,23 @@ mod tests {
                 "{color:?}"
             );
         }
+    }
+
+    #[test]
+    fn the_middle_button_opens_a_new_instance_unless_it_is_turned_off() {
+        assert_eq!(
+            Settings::default().dock.middle_click,
+            MiddleClick::NewInstance
+        );
+        for (name, expected) in [
+            ("newInstance", MiddleClick::NewInstance),
+            ("none", MiddleClick::None),
+        ] {
+            let json = format!(r#"{{"dock":{{"middleClick":"{name}"}}}}"#);
+            let settings: Settings = serde_json::from_str(&json).unwrap();
+            assert_eq!(settings.dock.middle_click, expected, "{name}");
+        }
+        assert!(serde_json::from_str::<Settings>(r#"{"dock":{"middleClick":"close"}}"#).is_err());
     }
 
     #[test]

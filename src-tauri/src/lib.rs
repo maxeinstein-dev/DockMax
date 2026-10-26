@@ -174,6 +174,8 @@ pub fn run() {
             commands::apps::launch_app,
             commands::apps::list_open_apps,
             commands::apps::activate_app,
+            commands::apps::activate_open,
+            commands::apps::launch_open,
             commands::apps::app_menu,
             commands::apps::run_app_entry,
             commands::apps::reveal_app,

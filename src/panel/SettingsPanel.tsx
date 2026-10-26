@@ -2,6 +2,7 @@ import {
   SIZE_PRESETS,
   type DockEdge,
   type DockOpacity,
+  type MiddleClick,
   type Settings,
   type SizePreset,
   type TaskbarMode,
@@ -21,6 +22,7 @@ const EDGES: readonly DockEdge[] = ["bottom", "top"];
 const SIZES: readonly SizePreset[] = ["small", "medium", "large"];
 const OPACITIES: readonly DockOpacity[] = ["translucent", "solid"];
 const TASKBARS: readonly TaskbarMode[] = ["visible", "autohide", "hidden"];
+const MIDDLE_CLICKS: readonly MiddleClick[] = ["newInstance", "none"];
 
 /** The preset whose icon size is `iconSize`, or null when none is (a size
  * set by hand in the file): then no size option shows as chosen. */
@@ -163,11 +165,28 @@ function SettingsPanel({
         }
       />
       <ToggleField
+        label={t.settings.showOpenApps}
+        hint={t.settings.showOpenAppsHint}
+        checked={shown?.dock.showOpenApps ?? true}
+        disabled={shown === null}
+        onChange={(showOpenApps) =>
+          change((s) => ({ ...s, dock: { ...s.dock, showOpenApps } }))
+        }
+      />
+      <ToggleField
         label={t.settings.launchAtLogin}
         hint={t.settings.launchAtLoginHint}
         checked={shown?.launchAtLogin ?? false}
         disabled={shown === null}
         onChange={(launchAtLogin) => change((s) => ({ ...s, launchAtLogin }))}
+      />
+      <OptionGroup
+        label={t.settings.groups.middleClick}
+        options={options(MIDDLE_CLICKS, t.settings.middleClick)}
+        selected={shown?.dock.middleClick ?? null}
+        onSelect={(value) =>
+          change((s) => ({ ...s, dock: { ...s.dock, middleClick: value } }))
+        }
       />
       {onOpenLook ? (
         <NavRow

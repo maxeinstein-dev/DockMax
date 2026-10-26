@@ -7,6 +7,7 @@ import type {
   HoverEffect,
   IconShape,
   Indicator,
+  MiddleClick,
   IndicatorColor,
   OpenAnimation,
   SettingsErrorCode,
@@ -64,8 +65,16 @@ const messages = {
       size: "Tamanho",
       opacity: "Opacidade do dock",
       taskbar: "Barra de tarefas do Windows",
+      middleClick: "Botão do meio",
     },
+    /** What the middle button does on a program of the dock. */
+    middleClick: {
+      newInstance: "Nova instância",
+      none: "Nada",
+    } satisfies Record<MiddleClick, string>,
     /** The switch that opens the DockMax when the user signs in. */
+    showOpenApps: "Mostrar apps abertos",
+    showOpenAppsHint: "Os que não estão fixados, depois dos widgets",
     launchAtLogin: "Iniciar com o Windows",
     launchAtLoginHint: "Abre o DockMax ao entrar no Windows",
     theme: {

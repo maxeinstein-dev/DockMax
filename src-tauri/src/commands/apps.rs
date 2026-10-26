@@ -21,7 +21,7 @@ use crate::domain::apps::{
     AppError, AppErrorCode, AppsSnapshot, PinnedApp, is_pinnable_path, is_valid_app_id,
     is_valid_app_name,
 };
-use crate::domain::open_apps::OpenApp;
+use crate::domain::open_apps::OpenSnapshot;
 use crate::domain::widgets::{MoveDirection, WidgetId};
 use crate::persistence::apps_repo;
 use crate::persistence::database::Storage;
@@ -350,14 +350,14 @@ pub async fn launch_app(
 /// first read; after that `open-windows-changed` carries the same list. No
 /// window handle leaves Rust.
 #[tauri::command]
-pub fn list_open_apps() -> Vec<OpenApp> {
+pub fn list_open_apps() -> OpenSnapshot {
     #[cfg(windows)]
     {
         crate::windows::open_apps::snapshot()
     }
     #[cfg(not(windows))]
     {
-        Vec::new()
+        OpenSnapshot::default()
     }
 }
 
@@ -376,6 +376,53 @@ pub fn activate_app(app: AppHandle, id: String) -> Result<bool, AppCommandError>
     {
         let _ = (app, id);
         Ok(false)
+    }
+}
+
+/// A click on an open program that is not pinned (spec 0009 D2), named by
+/// the `key` the dock was given for it (an opaque name, never a path or a
+/// window). `false` when it is no longer open.
+#[tauri::command]
+pub fn activate_open(app: AppHandle, key: String) -> Result<bool, AppCommandError> {
+    // What the dock was given: 16 hexadecimal digits.
+    if key.len() != 16 || !key.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(AppError::NotFound.into());
+    }
+    #[cfg(windows)]
+    {
+        Ok(crate::windows::open_apps::activate_other(&app, &key))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, key);
+        Ok(false)
+    }
+}
+
+/// A middle click on an open program that is not pinned (spec 0009 D2): opens
+/// a new instance of it, as the Windows taskbar does, by the `key` the dock
+/// was given for it. Fails with `notFound` when it is no longer open.
+#[tauri::command]
+pub async fn launch_open(key: String) -> Result<(), AppCommandError> {
+    if key.len() != 16 || !key.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(AppError::NotFound.into());
+    }
+    #[cfg(windows)]
+    {
+        let target = crate::windows::open_apps::app_id_of_other(&key).ok_or(AppError::NotFound)?;
+        let opened = tauri::async_runtime::spawn_blocking(move || apps::launch(&target)).await;
+        match opened {
+            Ok(Ok(())) => Ok(()),
+            _ => {
+                log::warn!("apps: a program could not be opened");
+                Err(AppError::LaunchFailed.into())
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = key;
+        Err(AppError::LaunchFailed.into())
     }
 }
 

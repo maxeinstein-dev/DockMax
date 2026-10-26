@@ -41,6 +41,8 @@ fn main() {
             "launch_app",
             "list_open_apps",
             "activate_app",
+            "activate_open",
+            "launch_open",
             "app_menu",
             "run_app_entry",
             "reveal_app",

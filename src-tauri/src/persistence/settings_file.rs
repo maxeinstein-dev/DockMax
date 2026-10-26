@@ -360,6 +360,7 @@ mod tests {
                     "style": "native", "tweaks": {}, "hover": "scale", "hoverScale": 110,
                     "indicator": "dot", "indicatorColor": null,
                     "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
+                    "showOpenApps": true, "middleClick": "newInstance",
                     "taskbar": "hidden", "bottomSpace": 2
                 },
                 "launchAtLogin": false

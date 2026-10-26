@@ -16,6 +16,8 @@
     "allow-launch-app",
     "allow-list-open-apps",
     "allow-activate-app",
+    "allow-activate-open",
+    "allow-launch-open",
     "allow-place-app",
     "log:allow-log"
   ]
