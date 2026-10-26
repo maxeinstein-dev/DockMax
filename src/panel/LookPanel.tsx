@@ -17,6 +17,7 @@ import {
 } from "../core/settings";
 import { dockLookOf } from "../dock/look";
 import { useT } from "../i18n";
+import IconPacksField from "./IconPacksField";
 import OptionGroup, { type Option } from "./OptionGroup";
 import PanelFooter from "./PanelFooter";
 import PanelHeader from "./parts/PanelHeader";
@@ -261,6 +262,11 @@ function LookPanel({ settings, onBack }: LookPanelProps) {
         options={options(ICON_SHAPES, text.iconShapeOptions)}
         selected={dock?.iconShape ?? null}
         onSelect={(iconShape) => update({ iconShape })}
+      />
+      <IconPacksField
+        selected={dock?.iconPack ?? null}
+        disabled={disabled}
+        onSelect={(iconPack) => update({ iconPack })}
       />
       <OptionGroup
         label={text.openAnimation}

@@ -42,6 +42,9 @@ fn main() {
             "app_menu",
             "run_app_entry",
             "reveal_app",
+            "list_icon_packs",
+            "reload_icon_packs",
+            "open_icon_packs_folder",
         ]),
     ))
     .expect("failed to run tauri-build");

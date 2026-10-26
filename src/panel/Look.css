@@ -57,3 +57,29 @@
   color: var(--ink);
   background: var(--track);
 }
+
+/* The icon packs (spec 0007): the list, what it says under it and the two
+   buttons. */
+.pack-field {
+  display: grid;
+  gap: 8px;
+}
+
+.look-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.pack-problems {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.pack-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

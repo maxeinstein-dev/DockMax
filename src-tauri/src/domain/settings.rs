@@ -10,6 +10,8 @@ use std::io;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use super::icon_pack::is_valid_pack_id;
+
 /// Format version written by this build. Files with any other version are
 /// rejected.
 pub const CURRENT_VERSION: u32 = 1;
@@ -92,6 +94,13 @@ impl DockSettings {
         {
             return Err(SettingsError::LookOutOfRange);
         }
+        if self
+            .icon_pack
+            .as_deref()
+            .is_some_and(|id| !is_valid_pack_id(id))
+        {
+            return Err(SettingsError::LookOutOfRange);
+        }
         Ok(())
     }
 }
@@ -137,6 +146,9 @@ pub struct DockSettings {
     pub indicator_color: Option<String>,
     /// How a pinned program's icon sits in its tile (spec 0006 B2).
     pub icon_shape: IconShape,
+    /// The icon pack every pinned program wears (spec 0007): the id of a
+    /// folder of `IconPacks`, or `None` for the icons Windows gives.
+    pub icon_pack: Option<String>,
     /// What a program's icon does while it opens (spec 0006 B2).
     pub open_animation: OpenAnimation,
     /// What the dock does with the Windows taskbar (ADR 0009).
@@ -159,6 +171,7 @@ impl Default for DockSettings {
             indicator: Indicator::default(),
             indicator_color: None,
             icon_shape: IconShape::default(),
+            icon_pack: None,
             open_animation: OpenAnimation::default(),
             taskbar: TaskbarMode::default(),
             bottom_space: DEFAULT_BOTTOM_SPACE,
@@ -468,7 +481,7 @@ mod tests {
     #[test]
     fn defaults_serialize_to_the_v1_example_of_the_spec() {
         // Spec 0002 §2.3 item 3 plus the look fields of spec 0005 §3.1, which
-        // are additive: the version stays 1.
+        // are additive (and spec 0007's `iconPack`): the version stays 1.
         let spec: serde_json::Value = serde_json::from_str(
             r#"{
               "version": 1,
@@ -477,7 +490,7 @@ mod tests {
                 "edge": "bottom", "iconSize": 48, "opacity": "translucent",
                 "style": "native", "tweaks": {}, "hover": "scale", "hoverScale": 110,
                 "indicator": "dot", "indicatorColor": null,
-                "iconShape": "plate", "openAnimation": "bounce",
+                "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
                 "taskbar": "hidden", "bottomSpace": 2
               }
             }"#,
@@ -506,6 +519,7 @@ mod tests {
         assert_eq!(settings.dock.indicator, Indicator::Dot);
         assert_eq!(settings.dock.indicator_color, None);
         assert_eq!(settings.dock.icon_shape, IconShape::Plate);
+        assert_eq!(settings.dock.icon_pack, None);
         assert_eq!(settings.dock.open_animation, OpenAnimation::Bounce);
         assert_eq!(settings.validate(), Ok(()));
     }
@@ -652,6 +666,27 @@ mod tests {
                 "{color:?}"
             );
         }
+    }
+
+    #[test]
+    fn the_icon_pack_is_the_id_of_a_pack_folder_or_none() {
+        for id in ["pixel-system", "a", "cores-2"] {
+            assert_eq!(
+                with_dock(|dock| dock.icon_pack = Some(id.into())).validate(),
+                Ok(()),
+                "{id}"
+            );
+        }
+        for id in ["", "Pixel", "a b", "..", "a/b", r"a\b", r"C:\x"] {
+            assert_eq!(
+                with_dock(|dock| dock.icon_pack = Some(id.into())).validate(),
+                Err(SettingsError::LookOutOfRange),
+                "{id:?}"
+            );
+        }
+        let settings: Settings =
+            serde_json::from_str(r#"{"dock":{"iconPack":"pixel-system"}}"#).unwrap();
+        assert_eq!(settings.dock.icon_pack.as_deref(), Some("pixel-system"));
     }
 
     #[test]

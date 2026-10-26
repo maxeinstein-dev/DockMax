@@ -42,6 +42,10 @@ function sentSettings(): Settings {
   return args.settings;
 }
 
+/** The saves sent: the view also asks for the icon packs when it opens. */
+const saves = () =>
+  invoke.mock.calls.filter(([command]) => command === "update_settings");
+
 const group = (name: string) => screen.getByRole("group", { name });
 
 function chosen(name: string): string[] {
@@ -81,6 +85,35 @@ describe("LookPanel", () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
+  it("chooses an icon pack and saves it with the other settings", async () => {
+    invoke.mockImplementation((command: string) =>
+      command === "list_icon_packs"
+        ? Promise.resolve([
+            {
+              id: "cores",
+              name: "Cores lisas",
+              author: "",
+              version: "",
+              description: "",
+              accent: null,
+              iconCount: 4,
+              covers: 0,
+              total: 0,
+              error: null,
+            },
+          ])
+        : new Promise(() => {}),
+    );
+    render(<LookPanel settings={SETTINGS} onBack={vi.fn()} />);
+    await flush();
+
+    fireEvent.change(screen.getByRole("combobox", { name: text.iconPack }), {
+      target: { value: "cores" },
+    });
+
+    expect(sentSettings().dock.iconPack).toBe("cores");
+  });
+
   it("lists the nine styles in order, with the one in use chosen", () => {
     render(
       <LookPanel settings={withDock({ style: "neon" })} onBack={vi.fn()} />,
@@ -112,7 +145,7 @@ describe("LookPanel", () => {
       target: { value: "aquaShelf" },
     });
 
-    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(saves()).toHaveLength(1);
     expect(sentSettings()).toEqual(withDock({ style: "aquaShelf" }));
   });
 
@@ -202,11 +235,11 @@ describe("LookPanel", () => {
     // The value follows the pointer on the screen, nothing is saved yet.
     expect(slider).toHaveValue("30");
     expect(screen.getByText("30%")).toBeInTheDocument();
-    expect(invoke).not.toHaveBeenCalled();
+    expect(saves()).toHaveLength(0);
 
     fireEvent.pointerUp(slider);
 
-    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(saves()).toHaveLength(1);
     expect(sentSettings().dock.tweaks).toEqual({ native: { corners: 30 } });
   });
 
@@ -227,7 +260,7 @@ describe("LookPanel", () => {
       key: "Tab",
     });
 
-    expect(invoke).not.toHaveBeenCalled();
+    expect(saves()).toHaveLength(0);
   });
 
   it("restores the style: drops its changes and no other", () => {
@@ -404,7 +437,7 @@ describe("LookPanel", () => {
     });
     expect(swatches[0]).toHaveFocus();
     // Choosing never happens by moving.
-    expect(invoke).not.toHaveBeenCalled();
+    expect(saves()).toHaveLength(0);
   });
 
   it("shows the translated reason when Rust refuses a value, and goes back", async () => {

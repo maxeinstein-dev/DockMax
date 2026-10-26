@@ -204,6 +204,31 @@ pub fn reveal(_path: &std::path::Path) -> Result<(), String> {
     Err("not Windows".to_owned())
 }
 
+/// Opens the folder `path` in File Explorer.
+#[cfg(windows)]
+pub fn open_folder(path: &std::path::Path) -> Result<(), String> {
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            &HSTRING::from("open"),
+            &HSTRING::from(path.as_os_str()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    if result.0 as usize > 32 {
+        Ok(())
+    } else {
+        Err(format!("ShellExecute answered {}", result.0 as usize))
+    }
+}
+
+#[cfg(not(windows))]
+pub fn open_folder(_path: &std::path::Path) -> Result<(), String> {
+    Err("not Windows".to_owned())
+}
+
 /// Opens the program, the way the Start menu does.
 #[cfg(windows)]
 pub fn launch(id: &str) -> Result<(), String> {

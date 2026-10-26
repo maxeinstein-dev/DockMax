@@ -349,7 +349,7 @@ mod tests {
                     "edge": "bottom", "iconSize": 48, "opacity": "translucent",
                     "style": "native", "tweaks": {}, "hover": "scale", "hoverScale": 110,
                     "indicator": "dot", "indicatorColor": null,
-                    "iconShape": "plate", "openAnimation": "bounce",
+                    "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
                     "taskbar": "hidden", "bottomSpace": 2
                 }
             })

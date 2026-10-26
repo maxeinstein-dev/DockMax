@@ -51,6 +51,8 @@ struct DockSettingsInput {
     /// always sends it, as `null` for the style's own color.
     indicator_color: Option<String>,
     icon_shape: IconShape,
+    /// Like `indicator_color`: always sent, `null` for the Windows icons.
+    icon_pack: Option<String>,
     open_animation: OpenAnimation,
     taskbar: TaskbarMode,
     bottom_space: u8,
@@ -78,6 +80,7 @@ impl From<SettingsInput> for Settings {
                 indicator: dock.indicator,
                 indicator_color: dock.indicator_color,
                 icon_shape: dock.icon_shape,
+                icon_pack: dock.icon_pack,
                 open_animation: dock.open_animation,
                 taskbar: dock.taskbar,
                 bottom_space: dock.bottom_space,
@@ -322,7 +325,7 @@ mod tests {
     }
 
     /// The look fields of a full update payload.
-    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","openAnimation":"pulse","taskbar":"hidden","bottomSpace":2"##;
+    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","taskbar":"hidden","bottomSpace":2"##;
 
     fn full() -> String {
         format!(
@@ -356,6 +359,7 @@ mod tests {
                     indicator: Indicator::Dash,
                     indicator_color: Some("#0A84FF".into()),
                     icon_shape: IconShape::Uniform,
+                    icon_pack: Some("pixel-system".into()),
                     open_animation: OpenAnimation::Pulse,
                     taskbar: TaskbarMode::Hidden,
                     bottom_space: 2,
