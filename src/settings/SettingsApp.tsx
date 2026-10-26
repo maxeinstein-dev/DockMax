@@ -73,6 +73,7 @@ function SettingsApp() {
                 settings={settings}
                 widgets={widgets}
                 apps={apps}
+                withTrayInDock
               />
             </>
           ) : null}

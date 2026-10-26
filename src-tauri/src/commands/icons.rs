@@ -176,6 +176,7 @@ async fn listing(
         if let Err(error) = app.emit(CHANGED_EVENT, ()) {
             log::warn!("icons: could not announce a change: {error}");
         }
+        crate::windows::dock::forget_icons();
     }
     Ok(found.iter().map(|found| info_of(found, &pinned)).collect())
 }

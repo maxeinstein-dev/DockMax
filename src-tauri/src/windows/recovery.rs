@@ -49,7 +49,6 @@ fn browser_gone(app: &AppHandle) {
     super::tray_host::stop();
     super::appbar::remove();
     super::taskbar::release();
-    super::hit_test::tracker(app).stop();
     if !may_restart(app) {
         log::error!("webview: it exited again soon after a restart; closing");
         app.exit(1);

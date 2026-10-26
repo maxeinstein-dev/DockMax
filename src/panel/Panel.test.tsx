@@ -313,6 +313,14 @@ describe("Panel", () => {
     expect(invoke).not.toHaveBeenCalledWith("hide_panel");
   });
 
+  it("tells Rust it mounted once it listens for panel-show (spec 0011 H2)", async () => {
+    render(<Panel />);
+    await act(() => Promise.resolve());
+
+    expect(invoke).toHaveBeenCalledWith("panel_mounted");
+    expect(handlers.has("panel-show")).toBe(true);
+  });
+
   it("stops listening to panel-show, settings-changed, widgets-changed, apps-changed and open-windows-changed when unmounted", async () => {
     const { unmount } = render(<Panel />);
     expect([...handlers.keys()].sort()).toEqual([

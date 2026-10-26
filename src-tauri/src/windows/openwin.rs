@@ -105,7 +105,7 @@ mod imp {
         String::from_utf16_lossy(&buffer[..read.max(0) as usize])
     }
 
-    fn exe_of(pid: u32) -> Option<PathBuf> {
+    pub(super) fn exe_of(pid: u32) -> Option<PathBuf> {
         let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.ok()?;
         let mut buffer = vec![0u16; MAX_PATH as usize * 4];
         let mut length = buffer.len() as u32;
@@ -347,6 +347,19 @@ pub fn fullscreen_candidates() -> Vec<crate::domain::fullscreen::Candidate> {
 #[cfg(windows)]
 pub fn primary_monitor() -> Option<(isize, crate::domain::fullscreen::Bounds)> {
     imp::primary_monitor()
+}
+
+/// The file of the program that owns the window `hwnd`.
+#[cfg(windows)]
+pub fn exe_of_window(hwnd: isize) -> Option<PathBuf> {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(HWND(hwnd as _), Some(&mut pid)) };
+    if pid == 0 {
+        return None;
+    }
+    imp::exe_of(pid)
 }
 
 /// Whether the window `hwnd` still exists.

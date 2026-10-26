@@ -15,6 +15,7 @@ import OptionGroup, { type Option } from "./OptionGroup";
 import PanelFooter from "./PanelFooter";
 import NavRow from "./parts/NavRow";
 import ToggleField from "./parts/ToggleField";
+import TrayInDockField from "./TrayInDockField";
 import { useSettingsEditor } from "./useSettingsEditor";
 
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
@@ -85,6 +86,9 @@ type SettingsPanelProps = {
   focusLookRow?: boolean;
   /** The same for the "Apps do dock" row. */
   focusAppsRow?: boolean;
+  /** Shows which tray icons the dock shows itself (`TrayInDockField`), with
+   * the taskbar hidden: the Configurações app's, which reads the tray. */
+  withTrayInDock?: boolean;
 };
 
 /**
@@ -103,6 +107,7 @@ function SettingsPanel({
   focusItemsRow = false,
   focusLookRow = false,
   focusAppsRow = false,
+  withTrayInDock = false,
 }: SettingsPanelProps) {
   const t = useT();
   const { shown, change, error } = useSettingsEditor(settings);
@@ -164,6 +169,15 @@ function SettingsPanel({
           }))
         }
       />
+      {/* The dock holds the tray only with the taskbar hidden altogether. */}
+      {withTrayInDock && shown !== null && taskbar === "hidden" ? (
+        <TrayInDockField
+          inDock={shown.dock.trayInDock ?? []}
+          onChange={(trayInDock) =>
+            change((s) => ({ ...s, dock: { ...s.dock, trayInDock } }))
+          }
+        />
+      ) : null}
       <ToggleField
         label={t.settings.showOpenApps}
         hint={t.settings.showOpenAppsHint}

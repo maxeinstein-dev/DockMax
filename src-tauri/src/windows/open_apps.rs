@@ -320,10 +320,11 @@ fn look(app: &AppHandle) {
     let after = snapshot_of(&after_state);
     let before = snapshot_of(&state());
     *state() = after_state;
-    if before != after
-        && let Err(error) = app.emit(CHANGED_EVENT, &after)
-    {
-        log::warn!("windows: could not announce the open programs: {error}");
+    if before != after {
+        if let Err(error) = app.emit(CHANGED_EVENT, &after) {
+            log::warn!("windows: could not announce the open programs: {error}");
+        }
+        super::dock::refresh();
     }
 }
 
@@ -364,6 +365,27 @@ pub fn activate_other(app: &AppHandle, key: &str) -> bool {
         .map(|other| other.hwnds.clone())
         .unwrap_or_default();
     click_on(app, &hwnds)
+}
+
+/// Puts the open program `key` that is not pinned at `index` among the others
+/// (the dock's drag). The order holds for the rest of the run: the next looks
+/// keep it. Nothing when it is no longer open.
+pub fn place_other(app: &AppHandle, key: &str, index: usize) {
+    let after = {
+        let mut state = state();
+        let Some(from) = state.others.iter().position(|other| other.id == key) else {
+            return;
+        };
+        let moved = state.others.remove(from);
+        let at = index.min(state.others.len());
+        state.others.insert(at, moved);
+        state.order = state.others.iter().map(|other| other.key.clone()).collect();
+        snapshot_of(&state)
+    };
+    if let Err(error) = app.emit(CHANGED_EVENT, &after) {
+        log::warn!("windows: could not announce the open programs: {error}");
+    }
+    super::dock::refresh();
 }
 
 /// Asks every window of the pinned program `id` to close; how many it asked.

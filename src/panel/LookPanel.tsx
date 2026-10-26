@@ -263,6 +263,17 @@ function LookPanel({ settings, onBack }: LookPanelProps) {
         selected={dock?.indicator ?? null}
         onSelect={(indicator) => update({ indicator })}
       />
+      {/* The color right after the mark it colors. */}
+      <SwatchGroup
+        label={text.indicatorColor}
+        defaultLabel={text.indicatorDefault}
+        colorName={(color) =>
+          text.colors[color as keyof typeof text.colors] ?? color
+        }
+        color={dock?.indicatorColor ?? null}
+        disabled={disabled}
+        onSelect={(indicatorColor) => update({ indicatorColor })}
+      />
       <OptionGroup
         label={text.iconShape}
         options={options(ICON_SHAPES, text.iconShapeOptions)}
@@ -279,16 +290,6 @@ function LookPanel({ settings, onBack }: LookPanelProps) {
         options={options(OPEN_ANIMATIONS, text.openAnimationOptions)}
         selected={dock?.openAnimation ?? null}
         onSelect={(openAnimation) => update({ openAnimation })}
-      />
-      <SwatchGroup
-        label={text.indicatorColor}
-        defaultLabel={text.indicatorDefault}
-        colorName={(color) =>
-          text.colors[color as keyof typeof text.colors] ?? color
-        }
-        color={dock?.indicatorColor ?? null}
-        disabled={disabled}
-        onSelect={(indicatorColor) => update({ indicatorColor })}
       />
       <PanelFooter alert={error && t.settings.errors[error]}>
         {t.settings.footer}

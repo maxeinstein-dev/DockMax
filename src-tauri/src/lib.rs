@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Mutex, PoisonError};
 
 use tauri::{
     Builder, Manager, RunEvent, Runtime, Wry, plugin::TauriPlugin, webview::PageLoadEvent,
@@ -43,22 +43,13 @@ fn startup() -> TauriPlugin<Wry> {
 /// with it.
 #[doc(hidden)]
 pub fn with_state<R: Runtime>(builder: Builder<R>) -> Builder<R> {
-    builder
-        .manage(Arc::new(windows::hit_test::Tracker::default()))
-        .manage(Mutex::new(windows::dock::Placement::default()))
-        .manage(Mutex::new(windows::panel::PanelState::default()))
+    builder.manage(Mutex::new(windows::panel::PanelState::default()))
 }
 
 /// The states `with_state` manages that `app` has, by type name.
 #[doc(hidden)]
 pub fn managed_state<R: Runtime>(app: &impl Manager<R>) -> Vec<&'static str> {
     let mut found = Vec::new();
-    if app.try_state::<Arc<windows::hit_test::Tracker>>().is_some() {
-        found.push("Arc<Tracker>");
-    }
-    if app.try_state::<Mutex<windows::dock::Placement>>().is_some() {
-        found.push("Mutex<Placement>");
-    }
     if app
         .try_state::<Mutex<windows::panel::PanelState>>()
         .is_some()
@@ -93,6 +84,102 @@ pub fn run_special_mode() -> bool {
         }
     }
     false
+}
+
+/// The app's commands, and the ones the E2E suite drives the dock with in
+/// the test build (`e2e.rs`): the dock is native, with no page to look into.
+#[cfg(not(feature = "e2e"))]
+macro_rules! handler {
+    () => {
+        tauri::generate_handler![
+            commands::panel::hide_panel,
+            commands::panel::panel_ready,
+            commands::panel::panel_mounted,
+            commands::settings::get_settings,
+            commands::settings::update_settings,
+            commands::widgets::list_widgets,
+            commands::widgets::add_widget,
+            commands::widgets::remove_widget,
+            commands::widgets::move_widget,
+            commands::widgets::update_widget,
+            commands::widgets::get_note,
+            commands::widgets::save_note,
+            commands::widgets::dismiss_storage_notice,
+            commands::tray::list_tray,
+            commands::tray::tray_click,
+            commands::tray::tray_to_dock,
+            commands::apps::list_apps,
+            commands::apps::list_catalog,
+            commands::apps::app_icon,
+            commands::apps::pin_app,
+            commands::apps::unpin_app,
+            commands::apps::move_app,
+            commands::apps::place_app,
+            commands::apps::launch_app,
+            commands::apps::list_open_apps,
+            commands::apps::activate_app,
+            commands::apps::activate_open,
+            commands::apps::launch_open,
+            commands::apps::open_badge,
+            commands::apps::close_app,
+            commands::apps::close_open,
+            commands::apps::pin_open,
+            commands::apps::app_menu,
+            commands::apps::run_app_entry,
+            commands::apps::reveal_app,
+            commands::icons::list_icon_packs,
+            commands::icons::reload_icon_packs,
+            commands::icons::open_icon_packs_folder
+        ]
+    };
+}
+
+#[cfg(feature = "e2e")]
+macro_rules! handler {
+    () => {
+        tauri::generate_handler![
+            commands::panel::hide_panel,
+            commands::panel::panel_ready,
+            commands::panel::panel_mounted,
+            commands::settings::get_settings,
+            commands::settings::update_settings,
+            commands::widgets::list_widgets,
+            commands::widgets::add_widget,
+            commands::widgets::remove_widget,
+            commands::widgets::move_widget,
+            commands::widgets::update_widget,
+            commands::widgets::get_note,
+            commands::widgets::save_note,
+            commands::widgets::dismiss_storage_notice,
+            commands::tray::list_tray,
+            commands::tray::tray_click,
+            commands::tray::tray_to_dock,
+            commands::apps::list_apps,
+            commands::apps::list_catalog,
+            commands::apps::app_icon,
+            commands::apps::pin_app,
+            commands::apps::unpin_app,
+            commands::apps::move_app,
+            commands::apps::place_app,
+            commands::apps::launch_app,
+            commands::apps::list_open_apps,
+            commands::apps::activate_app,
+            commands::apps::activate_open,
+            commands::apps::launch_open,
+            commands::apps::open_badge,
+            commands::apps::close_app,
+            commands::apps::close_open,
+            commands::apps::pin_open,
+            commands::apps::app_menu,
+            commands::apps::run_app_entry,
+            commands::apps::reveal_app,
+            commands::icons::list_icon_packs,
+            commands::icons::reload_icon_packs,
+            commands::icons::open_icon_packs_folder,
+            e2e::e2e_dock_view,
+            e2e::e2e_press_dock
+        ]
+    };
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -130,69 +217,20 @@ pub fn run() {
             if payload.event() == PageLoadEvent::Finished {
                 windows::memory::page_loaded(webview.app_handle(), webview.label());
                 #[cfg(windows)]
-                if webview.label() == windows::dock::LABEL
-                    && let Some(window) = webview.app_handle().get_webview_window(webview.label())
-                {
-                    windows::drop_target::install(&window);
-                }
-                #[cfg(windows)]
-                if webview.label() == windows::dock::LABEL
-                    && let Some(window) = webview.app_handle().get_webview_window(webview.label())
-                {
+                if let Some(window) = webview.app_handle().get_webview_window(webview.label()) {
                     windows::recovery::watch(&window);
                 }
             }
         })
         .setup(|app| {
             commands::settings::sync_launch_at_login(app.handle());
-            windows::panel::setup(app.handle())?;
             windows::dock::setup(app.handle())?;
             #[cfg(windows)]
             windows::open_apps::start(app.handle());
             tray::setup(app.handle())?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::panel::toggle_panel,
-            commands::panel::hide_panel,
-            commands::panel::panel_ready,
-            commands::dock::set_dock_layout,
-            commands::settings::get_settings,
-            commands::settings::update_settings,
-            commands::widgets::list_widgets,
-            commands::widgets::add_widget,
-            commands::widgets::remove_widget,
-            commands::widgets::move_widget,
-            commands::widgets::update_widget,
-            commands::widgets::get_note,
-            commands::widgets::save_note,
-            commands::widgets::dismiss_storage_notice,
-            commands::system::open_flyout,
-            commands::tray::list_tray,
-            commands::tray::tray_click,
-            commands::apps::list_apps,
-            commands::apps::list_catalog,
-            commands::apps::app_icon,
-            commands::apps::pin_app,
-            commands::apps::unpin_app,
-            commands::apps::move_app,
-            commands::apps::place_app,
-            commands::apps::launch_app,
-            commands::apps::list_open_apps,
-            commands::apps::activate_app,
-            commands::apps::activate_open,
-            commands::apps::launch_open,
-            commands::apps::open_badge,
-            commands::apps::close_app,
-            commands::apps::close_open,
-            commands::apps::pin_open,
-            commands::apps::app_menu,
-            commands::apps::run_app_entry,
-            commands::apps::reveal_app,
-            commands::icons::list_icon_packs,
-            commands::icons::reload_icon_packs,
-            commands::icons::open_icon_packs_folder
-        ]);
+        .invoke_handler(handler!());
     // Test build only: the WebDriver server the E2E suite drives the windows
     // through, on the port in `TAURI_WEBDRIVER_PORT` (4445 by default).
     #[cfg(feature = "e2e")]
@@ -201,6 +239,19 @@ pub fn run() {
         .build(context)
         .expect("error while building tauri application")
         .run(|app, event| {
+            // The dock is not a Tauri window (spec 0011 H3): when the panel or
+            // the Configurações app, made on demand, closes and no Tauri window
+            // is left, Tauri asks to exit, with no code. The app stays; Sair
+            // in the tray asks with a code and is let through. The test build
+            // keeps Tauri's way: the suite quits it by closing its windows.
+            #[cfg(not(feature = "e2e"))]
+            if let RunEvent::ExitRequested {
+                code: None, api, ..
+            } = &event
+            {
+                api.prevent_exit();
+                return;
+            }
             if let RunEvent::Exit = event {
                 // The edge and the taskbar go back before anything else.
                 #[cfg(windows)]
@@ -209,7 +260,6 @@ pub fn run() {
                     windows::appbar::remove();
                     windows::taskbar::release();
                 }
-                windows::hit_test::tracker(app).stop();
                 // The process ends without closing the widget database:
                 // leave the file complete on its own, `-wal` applied.
                 if let Some(storage) = app.try_state::<Mutex<persistence::database::Storage>>() {

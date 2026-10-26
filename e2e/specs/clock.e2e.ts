@@ -1,6 +1,6 @@
 import { $, browser, expect } from "@wdio/globals";
 import { ptBR as t } from "../../src/i18n/pt-BR.ts";
-import { openPanelFrom, openSettings, restartApp } from "../app.ts";
+import { dockView, openPanelFrom, openSettings, restartApp } from "../app.ts";
 
 /* The clock's Ajustes (spec 0003 §2.2): the zone, the seconds and the icon
  * style chosen in the panel reach the panel, the dock and Itens do dock, and
@@ -13,10 +13,11 @@ import { openPanelFrom, openSettings, restartApp } from "../app.ts";
 const ZONE = "Asia/Tokyo";
 
 /** The seeded clock's dock item: no label, so the kind's name. */
-function clockItem() {
-  return $(
-    `nav[aria-label="${t.dock.label}"] button[aria-label="${t.widgets.kinds.clock}"]`,
-  );
+const CLOCK = t.widgets.kinds.clock;
+
+/** What the clock's tile draws on the dock. */
+async function clockFace(): Promise<string | undefined> {
+  return (await dockView()).items.find((item) => item.name === CLOCK)?.face;
 }
 
 /** An option of the segmented group with the visible label `group`. */
@@ -29,7 +30,7 @@ function option(group: string, name: string) {
 
 /** Opens the clock's panel from the dock, on its main view. */
 async function openClock() {
-  await openPanelFrom(clockItem, () => $(".clock-time"));
+  await openPanelFrom(CLOCK, () => $(".clock-time"));
 }
 
 /** The zone list's option values, in order. */
@@ -108,8 +109,9 @@ describe("Clock", () => {
     expect(scheme).toBe(mode ?? (dark ? "dark" : "light"));
 
     // The dock icon turned analog.
-    await browser.switchToWindow("dock");
-    await expect(clockItem().$(".clock-tile-dial")).toBeExisting();
+    await browser.waitUntil(async () => (await clockFace()) === "dial", {
+      timeoutMsg: "the clock's tile never turned analog",
+    });
 
     // Itens do dock, in the Configurações app, names the zone.
     await openSettings();
@@ -125,7 +127,6 @@ describe("Clock", () => {
     await expect($(".panel-foot")).toHaveText(
       expect.stringContaining("Tokyo · UTC+9"),
     );
-    await browser.switchToWindow("dock");
-    await expect(clockItem().$(".clock-tile-dial")).toBeExisting();
+    expect(await clockFace()).toBe("dial");
   });
 });

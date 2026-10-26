@@ -114,7 +114,7 @@ const createRootMock = vi.hoisted(() =>
   vi.fn(() => ({ render: vi.fn(), unmount: vi.fn() })),
 );
 
-describe.each(["dock", "panel"])("%s window entry", (window) => {
+describe.each(["panel", "settings"])("%s window entry", (window) => {
   beforeEach(() => {
     vi.resetModules();
     vi.doMock("react-dom/client", () => ({

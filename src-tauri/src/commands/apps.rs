@@ -129,6 +129,7 @@ fn change<T>(
     {
         log::warn!("apps: {what} saved, but failed to notify the windows: {error}");
     }
+    crate::windows::dock::refresh();
     Ok(value)
 }
 
@@ -243,6 +244,66 @@ pub async fn app_icon(
     let icon = read.map(|png| format!("data:image/png;base64,{}", STANDARD.encode(png)));
     remember_icon(key, icon.clone());
     Ok(icon)
+}
+
+/// The icon the dock draws for a program (spec 0011 H3), as PNG: the icon
+/// pack in use answers first, then Windows. Reads the shell: off the main
+/// thread.
+pub fn dock_icon_png(app: &AppHandle, app_id: &str) -> Option<Vec<u8>> {
+    if !is_valid_app_id(app_id) {
+        return None;
+    }
+    let pack = super::settings::current(app).dock.icon_pack;
+    let from_pack = pack.and_then(|pack| {
+        let shown = apps::name_of(app_id).unwrap_or_default();
+        icons::pack_icon(app, &pack, &icons::names_of(app_id, &shown))
+    });
+    from_pack.or_else(|| apps::icon_png(app_id, ICON_SIZES[1]))
+}
+
+/// Opens the pinned program `id` (a click on the dock), off the main thread;
+/// `failed` runs when it could not be opened.
+pub fn launch_pinned(app: &AppHandle, id: &str, failed: impl FnOnce() + Send + 'static) {
+    let target = {
+        let state = app.state::<Mutex<Storage>>();
+        target_of(&mut lock(&state), id)
+    };
+    let Ok(target) = target.inspect_err(|error| log::warn!("apps: launch rejected: {error}"))
+    else {
+        failed();
+        return;
+    };
+    launch_off_thread(target, failed);
+}
+
+/// Opens a new instance of the open program `key` that is not pinned (the
+/// middle button on the dock); `failed` runs when it could not be opened.
+pub fn launch_other(key: &str, failed: impl FnOnce() + Send + 'static) {
+    #[cfg(windows)]
+    let target = crate::windows::open_apps::app_id_of_other(key);
+    #[cfg(not(windows))]
+    let target: Option<String> = {
+        let _ = key;
+        None
+    };
+    match target {
+        Some(target) => launch_off_thread(target, failed),
+        None => failed(),
+    }
+}
+
+fn launch_off_thread(target: String, failed: impl FnOnce() + Send + 'static) {
+    let spawned = std::thread::Builder::new()
+        .name("dock-launch".into())
+        .spawn(move || {
+            if apps::launch(&target).is_err() {
+                log::warn!("apps: a program could not be opened");
+                failed();
+            }
+        });
+    if let Err(error) = spawned {
+        log::warn!("apps: the program could not be opened: {error}");
+    }
 }
 
 /// Pins a program of the Apps folder at the end of the dock. The name is the

@@ -125,6 +125,33 @@ pub fn shift(storage: &mut Storage, id: &str, direction: MoveDirection) -> Resul
     widgets_repo::move_widget(conn, &parse_id(id)?, direction)
 }
 
+/// Puts an instance at `index` among the widgets (the dock's drag), one place
+/// at a time; an index past the end means the end.
+pub fn place(storage: &mut Storage, id: &str, index: usize) -> Result<(), WidgetError> {
+    let widgets = storage.snapshot()?.widgets;
+    let from = widgets
+        .iter()
+        .position(|widget| widget.id.as_str() == id)
+        .ok_or(WidgetError::NotFound)?;
+    let target = index.min(widgets.len().saturating_sub(1));
+    let direction = if target > from {
+        MoveDirection::Down
+    } else {
+        MoveDirection::Up
+    };
+    for _ in 0..target.abs_diff(from) {
+        shift(storage, id, direction)?;
+    }
+    Ok(())
+}
+
+/// The dock's drag of a widget: puts it at `index` and tells the windows.
+pub fn place_widget(app: &AppHandle, id: &str, index: usize) {
+    let state = app.state::<Mutex<Storage>>();
+    // A refusal is already in the log.
+    let _ = change(app, &state, "place", |storage| place(storage, id, index));
+}
+
 /// Replaces an instance's label and config, both given in full.
 pub fn update(
     storage: &mut Storage,
@@ -225,6 +252,7 @@ fn change<T>(
     {
         log::warn!("widgets: {what} saved, but failed to notify the windows: {error}");
     }
+    crate::windows::dock::refresh();
     Ok(changed.value)
 }
 
@@ -496,6 +524,42 @@ mod tests {
                 reason: UnavailableReason::OpenFailed
             }
         );
+    }
+
+    #[test]
+    fn placing_a_widget_puts_it_at_the_index_the_drag_left_it() {
+        let dir = tempdir().unwrap();
+        let (mut storage, _) = open(&dir);
+        let ids = |storage: &Storage| -> Vec<String> {
+            snapshot(storage)
+                .unwrap()
+                .widgets
+                .iter()
+                .map(|widget| widget.id.as_str().to_string())
+                .collect()
+        };
+        let seed = ids(&storage);
+        assert_eq!(seed.len(), 3);
+
+        place(&mut storage, &seed[0], 2).unwrap();
+        assert_eq!(
+            ids(&storage),
+            [seed[1].clone(), seed[2].clone(), seed[0].clone()]
+        );
+        place(&mut storage, &seed[0], 0).unwrap();
+        assert_eq!(ids(&storage), seed);
+        // Past the end means the end; where it is changes nothing.
+        place(&mut storage, &seed[1], 99).unwrap();
+        assert_eq!(
+            ids(&storage),
+            [seed[0].clone(), seed[2].clone(), seed[1].clone()]
+        );
+        place(&mut storage, &seed[2], 1).unwrap();
+        assert_eq!(
+            ids(&storage),
+            [seed[0].clone(), seed[2].clone(), seed[1].clone()]
+        );
+        assert_eq!(place(&mut storage, STRANGER, 0), Err(WidgetError::NotFound));
     }
 
     #[test]

@@ -9,6 +9,50 @@ import { $, browser } from "@wdio/globals";
 import { ptBR as t } from "../src/i18n/pt-BR.ts";
 import type { ChainablePromiseElement } from "webdriverio";
 
+/** One item of the native dock, as `e2e_dock_view` describes it. */
+export interface DockItem {
+  name: string;
+  /** What its face draws: `app`, `glyph`, `time`, `dial` or `ring`. */
+  face: string;
+}
+
+/** What the native dock shows (`e2e_dock_view`, test build only). */
+export interface DockView {
+  items: DockItem[];
+  dark: boolean;
+}
+
+/** Calls a command of the app from the hidden `e2e` window. */
+async function invoke<T>(
+  command: string,
+  args: Record<string, unknown> = {},
+): Promise<T> {
+  await browser.switchToWindow("e2e");
+  return browser.execute(
+    (name: string, payload: Record<string, unknown>) =>
+      (
+        window as unknown as {
+          __TAURI_INTERNALS__: {
+            invoke: (c: string, a: Record<string, unknown>) => Promise<unknown>;
+          };
+        }
+      ).__TAURI_INTERNALS__.invoke(name, payload),
+    command,
+    args,
+  ) as Promise<T>;
+}
+
+/** What the native dock shows now. The dock is drawn natively (spec 0011
+ * H3): there is no page of it to look into, so the test build tells. */
+export function dockView(): Promise<DockView> {
+  return invoke<DockView>("e2e_dock_view");
+}
+
+/** Presses the dock's item named `name`, as a click would. */
+export async function pressDockItem(name: string) {
+  await invoke("e2e_press_dock", { name });
+}
+
 /** The test build's identifier (`src-tauri/tauri.e2e.conf.json`). */
 export const E2E_IDENTIFIER = "dev.maxsueleinstein.dockmax.e2e";
 
@@ -118,20 +162,29 @@ async function launch(): Promise<ChildProcess | null> {
 }
 
 /**
- * Clicks a dock item until the panel it opens shows `ready`. Right after a
- * restart the dock is still measuring its labels and placing the window, and
- * a click that lands before that opens nothing: so the click is repeated, and
- * only a panel that never opens fails the test.
+ * Presses a dock item until the panel it opens shows `ready`. Right after a
+ * restart the dock may not have read its items yet, and the panel window is
+ * made on demand (spec 0011 H2): so the press is repeated while the panel is
+ * not there, and only a panel that never opens fails the test.
  */
 export async function openPanelFrom(
-  item: () => ChainablePromiseElement,
+  item: string,
   ready: () => ChainablePromiseElement,
 ) {
   await browser.waitUntil(
     async () => {
-      await browser.switchToWindow("dock");
-      await item().click();
-      await browser.switchToWindow("panel");
+      try {
+        await browser.switchToWindow("panel");
+        if (await ready().isDisplayed()) return true;
+      } catch {
+        // Not made yet.
+      }
+      await pressDockItem(item).catch(() => undefined);
+      try {
+        await browser.switchToWindow("panel");
+      } catch {
+        return false;
+      }
       return ready().isDisplayed();
     },
     {
@@ -150,10 +203,7 @@ export async function openPanelFrom(
 export async function openSettings() {
   await browser.waitUntil(
     async () => {
-      await browser.switchToWindow("dock");
-      await $(
-        `nav[aria-label="${t.dock.label}"] button[aria-label="${t.dock.items.settings}"]`,
-      ).click();
+      await pressDockItem(t.dock.items.settings).catch(() => undefined);
       try {
         await browser.switchToWindow("settings");
       } catch {
@@ -183,8 +233,9 @@ let started: ChildProcess | null = null;
  * service gave the first one.
  */
 export async function restartApp() {
-  // The Configurações app, if it is open, is a window too: it goes first.
-  const open = ["settings", "panel", "dock"];
+  // The Configurações app and the panel, if they are open, are windows too:
+  // they go first. The app exits with its last window, the hidden `e2e` one.
+  const open = ["settings", "panel", "e2e"];
   for (const label of open) {
     const there = await browser
       .switchToWindow(label)

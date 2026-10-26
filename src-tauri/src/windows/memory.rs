@@ -5,11 +5,7 @@
 //!
 //! - the panel is at rest while hidden: normal before its page renders a
 //!   panel, low once it is hidden (`panel::apply`);
-//! - the dock is at rest while the cursor is off it: normal while it
-//!   captures the mouse (cursor on the bar or a magnified icon), low once it
-//!   lets the mouse through, and applied again after each layout its page
-//!   reports, the first at startup included (`hit_test`). Its tiles still
-//!   change once a minute at rest.
+//! - the dock has no WebView2 (spec 0011 H3, `native_dock`).
 //!
 //! Once every WebView2 of the app is low, the shared browser, GPU and
 //! utility processes may be trimmed too. Measured (spec 0003 §2.12): the
@@ -18,16 +14,17 @@
 //! does not change, and the first interaction after a rest costs about
 //! 10 ms more while the pages come back.
 //!
-//! The two windows also share one renderer process (`--process-per-site`
-//! in `tauri.conf.json`, pinned by the test below): both pages come from
-//! the same origin, and the second renderer cost 20 to 30 MB.
+//! The panel and the Configurações app also share one renderer process
+//! (`--process-per-site` in `BROWSER_ARGS`, pinned by the test below): both
+//! pages come from the same origin, and the second renderer cost 20 to 30
+//! MB.
 
 use std::thread;
 use std::time::Duration;
 
 use tauri::{AppHandle, Manager, WebviewWindow};
 
-use super::{dock, hit_test, panel};
+use super::panel;
 
 /// How long after a page loads its window is taken to be at rest, with its
 /// first render done, and the target is applied again (`page_loaded`).
@@ -38,13 +35,6 @@ const SETTLE_DELAY: Duration = Duration::from_secs(3);
 pub enum MemoryTarget {
     Normal,
     Low,
-}
-
-impl MemoryTarget {
-    /// Normal while the window is in use, low at rest.
-    pub fn in_use(in_use: bool) -> Self {
-        if in_use { Self::Normal } else { Self::Low }
-    }
 }
 
 /// Asks the window's WebView2 for `target`, on the main thread. Best
@@ -73,23 +63,18 @@ pub fn set(window: &WebviewWindow, target: MemoryTarget) {
 
 /// A window's page finished loading: once its first render has settled,
 /// applies the target, so a window nobody touches after startup is at rest
-/// too. The dock's is applied by its cursor thread, which knows whether it
-/// holds the mouse; the panel is at rest unless a panel is open.
+/// too: the panel is at rest unless a panel is open.
 pub fn page_loaded(app: &AppHandle, label: &str) {
     let app = app.clone();
     let label = label.to_owned();
     let name = format!("{label}-memory-settle");
     let spawned = thread::Builder::new().name(name).spawn(move || {
         thread::sleep(SETTLE_DELAY);
-        match label.as_str() {
-            dock::LABEL => hit_test::tracker(&app).settle(),
-            panel::LABEL => {
-                let at_rest = panel::lock(&app).open().is_none();
-                if let (true, Some(window)) = (at_rest, app.get_webview_window(&label)) {
-                    set(&window, MemoryTarget::Low);
-                }
+        if label == panel::LABEL {
+            let at_rest = panel::lock(&app).open().is_none();
+            if let (true, Some(window)) = (at_rest, app.get_webview_window(&label)) {
+                set(&window, MemoryTarget::Low);
             }
-            _ => {}
         }
     });
     if let Err(error) = spawned {
@@ -125,40 +110,17 @@ fn apply(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
-    fn a_window_in_use_is_normal_and_one_at_rest_is_low() {
-        assert_eq!(MemoryTarget::in_use(true), MemoryTarget::Normal);
-        assert_eq!(MemoryTarget::in_use(false), MemoryTarget::Low);
-    }
-
-    /// The browser arguments of each window in `tauri.conf.json`.
-    fn browser_args() -> Vec<(String, Option<String>)> {
+    fn every_window_shares_one_renderer_with_wrys_default_arguments() {
+        // No window in `tauri.conf.json`: the dock is native, the panel and
+        // the Configurações app are made on demand with `BROWSER_ARGS`
+        // (spec 0011). One WebView2 environment for all: arguments that
+        // differ would need another data folder, and another browser process.
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tauri.conf.json");
         let text = std::fs::read_to_string(path).expect("tauri.conf.json must exist");
         let config: serde_json::Value = serde_json::from_str(&text).expect("valid JSON");
-        config["app"]["windows"]
-            .as_array()
-            .expect("windows")
-            .iter()
-            .map(|window| {
-                (
-                    window["label"].as_str().unwrap_or_default().to_owned(),
-                    window["additionalBrowserArgs"].as_str().map(str::to_owned),
-                )
-            })
-            .collect()
-    }
-
-    #[test]
-    fn both_windows_share_one_renderer_with_wrys_default_arguments() {
-        let windows = browser_args();
-        assert_eq!(windows.len(), 2, "{windows:?}");
-        // One WebView2 environment for both: arguments that differ would
-        // need another data folder, and another browser process.
-        assert_eq!(windows[0].1, windows[1].1, "{windows:?}");
-        let args = windows[0].1.as_deref().expect("additionalBrowserArgs");
+        assert_eq!(config["app"]["windows"], serde_json::json!([]));
+        let args = super::super::BROWSER_ARGS;
         // Setting them replaces wry's defaults, which must stay.
         assert!(
             args.contains("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection"),

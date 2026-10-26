@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
+  PANEL_MOUNTED_COMMAND,
   PANEL_READY_COMMAND,
   PANEL_SHOW_EVENT,
   isAppPanel,
@@ -121,6 +122,13 @@ function Panel() {
         seq: (previous?.seq ?? 0) + 1,
       }));
     });
+    // Listening now: a show that waited for this window to be made goes out
+    // (spec 0011 H2).
+    void unlisten.then(() =>
+      invoke(PANEL_MOUNTED_COMMAND).catch((error: unknown) => {
+        log.error(`panel: mounted signal failed: ${errorKind(error)}`);
+      }),
+    );
     return () => {
       void unlisten.then((stop) => stop());
     };

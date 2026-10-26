@@ -14,10 +14,9 @@ fn main() {
     // permission (`allow-<command>`) in a capability.
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
-            "toggle_panel",
             "hide_panel",
             "panel_ready",
-            "set_dock_layout",
+            "panel_mounted",
             "get_settings",
             "update_settings",
             "list_widgets",
@@ -28,9 +27,9 @@ fn main() {
             "get_note",
             "save_note",
             "dismiss_storage_notice",
-            "open_flyout",
             "list_tray",
             "tray_click",
+            "tray_to_dock",
             "list_apps",
             "list_catalog",
             "app_icon",
@@ -53,6 +52,9 @@ fn main() {
             "list_icon_packs",
             "reload_icon_packs",
             "open_icon_packs_folder",
+            // The E2E suite's, registered only in the test build (`e2e.rs`).
+            "e2e_dock_view",
+            "e2e_press_dock",
         ]),
     ))
     .expect("failed to run tauri-build");

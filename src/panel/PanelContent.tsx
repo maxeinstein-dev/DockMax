@@ -204,7 +204,7 @@ function PanelContent({
     case "about":
       return <AboutPanel />;
     case "tray":
-      return <TrayPanel />;
+      return <TrayPanel inDock={settings?.dock.trayInDock ?? []} />;
   }
 }
 

@@ -2,7 +2,7 @@
 
 ## 1. Contexto e objetivos
 
-DockMax é uma aplicação desktop local para Windows, com interface em React/TypeScript e integração nativa via Tauri 2/Rust.
+DockMax é uma aplicação desktop local para Windows, com interface em React/TypeScript e integração nativa via Tauri 2/Rust. Desde a [spec 0011](specs/0011-arquitetura-hibrida.md) a arquitetura é **híbrida**: o dock é desenhado em Rust nativo (Direct2D), sem WebView2, e os painéis e o app de Configurações são páginas React em janelas WebView2 criadas quando abrem.
 
 Objetivos arquiteturais:
 
@@ -23,8 +23,7 @@ Não objetivos iniciais:
 ## 2. Visão de alto nível
 
 ```text
-React UI
-  ├── Dock
+React UI (WebView2, sob demanda)
   ├── Widget Panels
   ├── Settings / Themes
   └── Widget Components
@@ -38,6 +37,7 @@ Frontend Application Services
           │ Tauri IPC
           ▼
 Rust Application Layer
+  ├── Dock nativo (Direct2D, UI Automation)
   ├── Commands (thin adapters)
   ├── Domain / Use Cases
   ├── Ports (traits)
@@ -259,7 +259,7 @@ Não criar abstrações para toda função simples. Criar uma port quando ela is
 - Não executar chamadas nativas em cada renderização.
 - Cancelar listeners e timers quando o recurso deixa de ser usado.
 - Medir consumo real antes de criar otimizações complexas.
-- Medir a memória em repouso em todo PR de interface (processo + WebView2, build de release isolado, método da spec 0003 §2.12) e comparar com a linha de base e o orçamento do roadmap.
+- Medir a memória em repouso em todo PR de interface (processo + WebView2, build de release isolado, método da spec 0003 §2.12) e comparar com a linha de base e o orçamento do roadmap. Em repouso, com o dock nativo, não há WebView2 (spec 0011).
 
 ## 10. Dock e gerenciamento de janelas
 
@@ -272,6 +272,8 @@ O MVP convive com a barra de tarefas nativa. Evolução posterior:
 6. Investigar bandeja do sistema e outros comportamentos avançados.
 
 Comportamento em tela cheia, foco, janela sempre no topo e ocultação automática precisam ser testados no Windows real. Não presumir que uma janela Tauri comum substitua as capacidades do shell do Windows.
+
+**O dock nativo** (`src-tauri/src/windows/native_dock/`, spec 0011 H3) é uma janela Win32 em camadas, nunca ativada pelo clique, pintada com Direct2D e entregue por `UpdateLayeredWindow`: o clique atravessa onde ela é transparente. Vive na thread principal (a do laço de eventos do Tauri, que despacha as mensagens dela); as outras threads falam com ela por `post`, que enfileira o trabalho e acorda a janela. As regras são módulos puros com testes: a geometria (`domain/dock_layout.rs`), a lista de itens (`domain/dock_items.rs`) e o que os ladrilhos vivos mostram (`domain/live_faces.rs`). O que o dock pede ao resto do app (abrir um painel, um programa) roda depois de soltar o estado dele, porque pode voltar a ele. Para a acessibilidade, a janela responde à UI Automation como uma barra de ferramentas de botões.
 
 ## 11. Widget de uso do Claude
 
@@ -294,6 +296,7 @@ Exibir origem, horário de atualização e distinção entre dado oficial, estim
   - WebdriverIO com `@wdio/tauri-service`, provedor embutido: o servidor WebDriver roda dentro do app (`tauri-plugin-wdio-webdriver`) e encontra cada janela pela label.
   - Build de teste separado: feature cargo `e2e`, `identifier` `dev.maxsueleinstein.dockmax.e2e` (`src-tauri/tauri.e2e.conf.json`) e uma pasta de dados temporária por execução (`DOCKMAX_E2E_DATA_DIR`). O runner recusa um executável sem a `identifier` de teste ou sem a feature `e2e`.
   - O build normal não contém o plugin: um passo do job `checks` do CI falha se `cargo tree -e normal` listar `wdio` ou `webdriver`. Testes-guarda fixam o conteúdo do `tauri.e2e.conf.json` e aceitam só os dois arquivos de config do Tauri.
+  - O dock nativo não tem página para o WebDriver: o build de teste tem uma janela oculta, `e2e`, de onde a suíte chama `e2e_dock_view` (o que o dock mostra) e `e2e_press_dock` (aperta um item), comandos que só esse build registra.
   - `pnpm test:e2e:build` e `pnpm test:e2e`. Roda num job próprio do CI (`e2e`) e, localmente, só com autorização do usuário, porque abre um segundo dock na tela.
   - Detalhes, reinício e alternativas no [ADR 0008](adr/0008-persistencia-sqlite-e-widgets.md).
 - Manual: monitores, escala, tela cheia, permissões, instalação e inicialização automática.

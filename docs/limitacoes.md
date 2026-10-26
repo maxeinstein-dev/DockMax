@@ -9,7 +9,8 @@ O que o DockMax **não** faz hoje, e o que pode surpreender. Vale para o MVP (ve
 - **Só o monitor principal recebe o dock.** Com a barra do Windows oculta, a do segundo monitor também some e esse monitor fica sem barra nenhuma ([ADR 0009](adr/0009-dock-substitui-a-barra-de-tarefas.md)). Um dock por monitor é da fase D.
 - **O instalador não é assinado.** O SmartScreen do Windows avisa na instalação e é preciso escolher "Mais informações › Executar assim mesmo". Para compilar do código-fonte, o Controle Inteligente de Aplicativos precisa estar desativado (README).
 - **Só inicia com o Windows se você ligar "Iniciar com o Windows" em Configurações** (desligado por padrão).
-- **Leitor de tela nunca foi testado.** Os controles têm nomes e papéis acessíveis e há testes de acessibilidade por código, mas ninguém usou o aplicativo com um leitor de tela.
+- **Leitor de tela nunca foi testado.** Os controles têm nomes e papéis acessíveis e há testes de acessibilidade por código, mas ninguém usou o aplicativo com um leitor de tela. O dock, desenhado sem navegador ([spec 0011](specs/0011-arquitetura-hibrida.md)), se apresenta à UI Automation como uma barra de ferramentas com um botão por item, que o leitor de tela pode acionar.
+- **O dock não recebe o teclado.** Ele nunca é ativado (o programa em uso continua na frente); os painéis e o app de Configurações recebem.
 
 ## A barra de tarefas
 
@@ -35,5 +36,5 @@ O que o DockMax **não** faz hoje, e o que pode surpreender. Vale para o MVP (ve
 
 ## Desempenho
 
-- Se o processo do WebView2 cair (por exemplo, uma falha do driver de vídeo), o DockMax se reinicia sozinho uma vez; se cair de novo em menos de 2 minutos, ele fecha e a barra do Windows volta ([ADR 0010](adr/0010-gpu-no-processo-do-navegador.md)).
-- Cada janela do dock é um WebView2. A memória privada em repouso (processo e WebView2) tem como meta cerca de 220 MB; a medição mais recente está na seção "Medição de recursos" do [roadmap](roadmap.md).
+- O dock é desenhado em Rust nativo, **sem WebView2** ([spec 0011](specs/0011-arquitetura-hibrida.md)): em repouso é um processo só, com cerca de 65 MB de memória privada. Os painéis e o app de Configurações são WebView2, criados quando abrem: o **primeiro painel** depois de um tempo parado leva cerca de 0,4 s para aparecer (passar o mouse sobre o item antes do clique adianta a criação). A janela do painel é liberada 45 s depois de fechado, e o WebView2 sai com ela.
+- Se o processo do WebView2 cair com um painel aberto (por exemplo, uma falha do driver de vídeo), o DockMax se reinicia sozinho uma vez; se cair de novo em menos de 2 minutos, ele fecha e a barra do Windows volta ([ADR 0010](adr/0010-gpu-no-processo-do-navegador.md)).

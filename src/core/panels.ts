@@ -96,22 +96,17 @@ export interface PanelShowPayload {
   wait: number;
 }
 
-/** Event the dock receives when the open panel changes; drives the open
- * panel indicator. Must match `CHANGED_EVENT` in
- * `src-tauri/src/windows/panel.rs`. */
-export const PANEL_CHANGED_EVENT = "panel-changed";
-
-export interface PanelChanged {
-  /** The panel now open, or null when none is. */
-  panelId: PanelId | null;
-}
-
 /** Command the panel calls once the content `panel-show` asked for has
  * rendered and been laid out: once per `panel-show`, switching panels
  * included. Rust sizes the panel window to `size`, places it so the visible
  * card (the window minus `inset` on every side) sits 8 px from the dock bar,
  * and only then shows it (or after a time limit, if this never comes). */
 export const PANEL_READY_COMMAND = "panel_ready";
+
+/** Sent by the panel's page once it listens for `panel-show` (spec 0011 H2):
+ * the window is made on demand, and a show asked for while it was being made
+ * waits for this. */
+export const PANEL_MOUNTED_COMMAND = "panel_mounted";
 
 /** Width and height in logical (CSS) pixels. */
 export interface LogicalSize {

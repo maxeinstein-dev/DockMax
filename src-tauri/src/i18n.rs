@@ -10,6 +10,35 @@
 pub struct Messages {
     pub tray: TrayMessages,
     pub settings: SettingsMessages,
+    pub dock: DockMessages,
+}
+
+/// The dock's own texts (spec 0011 H3): the names of its items, in their
+/// labels, and what a live tile shows without a value.
+#[derive(Debug)]
+pub struct DockMessages {
+    pub settings: &'static str,
+    /// The names of the widget kinds, for an instance without a label.
+    pub clock: &'static str,
+    pub time_progress: &'static str,
+    pub note: &'static str,
+    pub shortcut: &'static str,
+    pub files: &'static str,
+    /// The progress tile without a period running.
+    pub no_value: &'static str,
+    /// An item's name while it carries the attention badge; `{name}` is
+    /// replaced.
+    pub with_notice: &'static str,
+    /// The labels of the small icons at the end; `{n}` is a percentage.
+    pub show_hidden_icons: &'static str,
+    pub tray_icon: &'static str,
+    pub wifi: &'static str,
+    pub wired: &'static str,
+    pub offline: &'static str,
+    pub volume: &'static str,
+    pub muted: &'static str,
+    pub battery: &'static str,
+    pub battery_charging: &'static str,
 }
 
 /// The Configurações app (spec 0011 H1).
@@ -38,6 +67,25 @@ const PT_BR: Messages = Messages {
     },
     settings: SettingsMessages {
         window_title: "Configurações do DockMax",
+    },
+    dock: DockMessages {
+        settings: "Configurações",
+        clock: "Relógio",
+        time_progress: "Progresso do tempo",
+        note: "Nota",
+        shortcut: "Atalho",
+        files: "Arquivos",
+        no_value: "–",
+        with_notice: "{name} (com aviso)",
+        show_hidden_icons: "Mostrar ícones ocultos",
+        tray_icon: "Ícone da bandeja",
+        wifi: "Wi-Fi",
+        wired: "Rede com fio",
+        offline: "Sem conexão",
+        volume: "Volume: {n}%",
+        muted: "Sem som",
+        battery: "Bateria: {n}%",
+        battery_charging: "Bateria: {n}% (carregando)",
     },
 };
 

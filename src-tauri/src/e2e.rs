@@ -52,6 +52,46 @@ fn data_root(identifier: &str, data_dir: Option<OsString>) -> Result<PathBuf, St
     Ok(root)
 }
 
+/// One item of the dock as the suite sees it.
+#[derive(Debug, serde::Serialize)]
+pub struct DockItemView {
+    pub name: String,
+    /// What its face draws: `app`, `glyph`, `time`, `dial` or `ring`.
+    pub face: &'static str,
+}
+
+/// The native dock as the suite sees it (spec 0011 H3): it has no page to
+/// look into, so the hidden `e2e` window asks for this.
+#[derive(Debug, serde::Serialize)]
+pub struct DockView {
+    pub items: Vec<DockItemView>,
+    pub dark: bool,
+}
+
+/// What the dock shows now.
+#[tauri::command]
+pub async fn e2e_dock_view() -> Result<DockView, String> {
+    let view = crate::windows::native_dock::view().ok_or("the dock did not answer")?;
+    Ok(DockView {
+        items: view
+            .items
+            .into_iter()
+            .map(|(name, face)| DockItemView { name, face })
+            .collect(),
+        dark: view.dark,
+    })
+}
+
+/// Presses the dock's item named `name`, as a click would.
+#[tauri::command]
+pub async fn e2e_press_dock(name: String) -> Result<(), String> {
+    if crate::windows::native_dock::press_named(name) {
+        Ok(())
+    } else {
+        Err("no such item on the dock".into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

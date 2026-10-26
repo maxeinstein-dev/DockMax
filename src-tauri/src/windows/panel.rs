@@ -11,23 +11,14 @@ use tauri::{
 };
 
 use super::dock::{self, Edge, Rect};
-use super::hit_test;
 use super::memory::{self, MemoryTarget};
 use crate::domain::widgets::{WidgetId, WidgetKind};
 
 pub const LABEL: &str = "panel";
 
-/// The panel never ignores the mouse, so tao never makes it layered.
-#[cfg(windows)]
-pub const LAYERING: super::native::Layering = super::native::Layering::AsTaoSets;
-
 /// Event sent to the panel window, while hidden, with the panel to render.
 /// The page answers with `panel_ready` once it has.
 const SHOW_EVENT: &str = "panel-show";
-
-/// Event sent to the dock when the open panel changes, with
-/// `{ "panelId": <id> | null }` (`PanelChanged` in `src/core/panels.ts`).
-pub const CHANGED_EVENT: &str = "panel-changed";
 
 /// Gap between the panel's visible card and the dock bar, and between the
 /// card and the work area edges, in logical pixels.
@@ -681,13 +672,6 @@ impl PanelState {
     }
 }
 
-/// `{ "panelId": <id> }`: the payload of the dock's `dock-request-panel`.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PanelPayload {
-    pub panel_id: PanelId,
-}
-
 /// `{ "panelId": <id>, "wait": <n> }`: the payload of `panel-show`. The
 /// page sends `wait` back in `panel_ready`, so a late answer to an earlier
 /// show is told apart.
@@ -698,23 +682,14 @@ struct ShowPayload {
     wait: u64,
 }
 
-/// `{ "panelId": <id> | null }`: the payload of `panel-changed`.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ChangedPayload {
-    panel_id: Option<PanelId>,
-}
-
-/// Hides the panel when it loses focus or is closed (Alt+F4). The panel
-/// state itself is managed by the builder: a page can send a command
-/// (`set_dock_layout`, `toggle_panel`) while this still runs, and the
-/// command needs the state (seen as a panic at startup, spec 0003 §2.12).
-pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
-    let window = app
-        .get_webview_window(LABEL)
-        .ok_or("panel window is missing from tauri.conf.json")?;
+/// Sets up a panel window just made (`panel_window`, spec 0011 H2): it hides
+/// the panel when it loses focus or is closed (Alt+F4). The panel state
+/// itself is managed by the builder: a page can send a command
+/// (`set_dock_layout`, `toggle_panel`) any time, and the command needs the
+/// state (seen as a panic at startup, spec 0003 §2.12).
+pub fn install(app: &AppHandle, window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
     #[cfg(windows)]
-    super::native::install(&window, None, LAYERING)?;
+    super::native::install(window)?;
     let app = app.clone();
     window.on_window_event(move |event| {
         let action = match event {
@@ -785,9 +760,27 @@ pub fn close_for_move(app: &AppHandle) {
 /// open panel changed. Must be called without holding the state lock:
 /// hiding the window synchronously triggers the blur handler.
 pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
-    let window = app
-        .get_webview_window(LABEL)
-        .ok_or("panel window is missing")?;
+    // Made on demand (spec 0011 H2): a show for a window not made yet, or
+    // whose page has not mounted, waits for the page; closing a panel whose
+    // window is gone only tells the dock.
+    let Some(window) = super::panel_window::ready(app) else {
+        match action {
+            Action::Prepare(id, wait) => {
+                notify_dock(app, Some(id.clone()));
+                super::panel_window::defer(
+                    app,
+                    super::panel_window::Pending { panel_id: id, wait },
+                );
+            }
+            Action::Hide => {
+                notify_dock(app, None);
+                super::panel_window::touch(app);
+            }
+            Action::Reveal { .. } => return Err("panel window is not ready".into()),
+            Action::Nothing => {}
+        }
+        return Ok(());
+    };
     if let Some(target) = memory_target(&action) {
         memory::set(&window, target);
     }
@@ -797,8 +790,7 @@ pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
             // Hidden while the page renders: no previous content, no flash
             // at the previous size.
             window.hide()?;
-            window.emit_to(LABEL, SHOW_EVENT, ShowPayload { panel_id: id, wait })?;
-            schedule_time_out(app, wait)?;
+            show(app, id, wait)?;
         }
         Action::Reveal { anchor, geometry } => {
             place(app, &window, anchor, geometry)?;
@@ -812,10 +804,38 @@ pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
         Action::Hide => {
             notify_dock(app, None);
             window.hide()?;
+            // Kept for a while, then released.
+            super::panel_window::touch(app);
         }
         Action::Nothing => {}
     }
     Ok(())
+}
+
+/// Asks the page to render the panel `id` for the show `wait`, and reveals it
+/// after `READY_TIMEOUT` if the page has not confirmed by then.
+fn show(app: &AppHandle, id: PanelId, wait: u64) -> Result<(), Box<dyn Error>> {
+    app.emit_to(LABEL, SHOW_EVENT, ShowPayload { panel_id: id, wait })?;
+    schedule_time_out(app, wait)
+}
+
+/// The panel's page has mounted and listens for `panel-show` (spec 0011 H2):
+/// it gets the show that waited for it, if the state still wants it.
+pub fn page_mounted(app: &AppHandle) {
+    let Some(pending) = super::panel_window::mounted() else {
+        return;
+    };
+    let still_open = lock(app).open().as_ref() == Some(&pending.panel_id);
+    if !still_open {
+        return;
+    }
+    if let Some(window) = app.get_webview_window(LABEL) {
+        memory::set(&window, MemoryTarget::Normal);
+    }
+    if let Err(error) = show(app, pending.panel_id, pending.wait) {
+        log::warn!("panel: failed to show after the page mounted: {error}");
+        close(app);
+    }
 }
 
 /// The memory target an action moves the panel to: normal before its page
@@ -833,10 +853,8 @@ pub fn reveal_or_close(app: &AppHandle, action: Action) -> Result<(), Box<dyn Er
     apply(app, action).inspect_err(|_| close(app))
 }
 
-fn notify_dock(app: &AppHandle, panel_id: Option<PanelId>) {
-    if let Err(error) = app.emit_to(dock::LABEL, CHANGED_EVENT, ChangedPayload { panel_id }) {
-        log::warn!("panel: failed to tell the dock: {error}");
-    }
+fn notify_dock(_app: &AppHandle, panel_id: Option<PanelId>) {
+    dock::set_open_panel(panel_id);
 }
 
 /// Reveals the panel after `READY_TIMEOUT` if its page has not confirmed by
@@ -872,17 +890,10 @@ fn place(
     anchor: LogicalRect,
     geometry: PanelGeometry,
 ) -> Result<(), Box<dyn Error>> {
-    let dock_window = app
-        .get_webview_window(dock::LABEL)
-        .ok_or("dock window is missing")?;
-    let scale_factor = dock_window.scale_factor()?;
-    let origin = dock_window.inner_position()?;
     // The gap is measured from the visible bar, not from the taller window.
-    let bar = hit_test::tracker(app)
-        .bar_on_screen()
-        .ok_or("the dock bar has not been measured yet")?;
-    let anchor = to_screen(anchor, (origin.x, origin.y), scale_factor).ok_or("invalid anchor")?;
-    let (work_area, _) = dock::primary_work_area(&dock_window)?;
+    let (origin, scale_factor, bar) = dock::geometry().ok_or("the dock is not placed yet")?;
+    let anchor = to_screen(anchor, origin, scale_factor).ok_or("invalid anchor")?;
+    let (work_area, _) = dock::work_area().ok_or("no primary monitor found")?;
     let rect = panel_rect(
         anchor,
         bar,
@@ -897,12 +908,13 @@ fn place(
     Ok(())
 }
 
-/// Focuses the panel only when DockMax already owns the foreground (the
-/// user just clicked the dock). Otherwise tao's `set_focus` would fake an
+/// Focuses the panel only when the user just clicked the dock (the click is
+/// the last input, so Windows lets DockMax take the foreground) or DockMax
+/// owns the foreground already. Otherwise tao's `set_focus` would fake an
 /// Alt key press to steal the foreground from the app in use.
 fn focus(window: &WebviewWindow) -> tauri::Result<()> {
     #[cfg(windows)]
-    if !super::native::owns_foreground() {
+    if !super::native::owns_foreground() && !super::native_dock::clicked_recently() {
         return Ok(());
     }
     window.set_focus()
@@ -987,13 +999,6 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<PanelId>(&json).unwrap(),
             widget_id(WIDGET)
-        );
-        assert_eq!(
-            serde_json::to_value(ChangedPayload {
-                panel_id: Some(widget_id(WIDGET))
-            })
-            .unwrap(),
-            serde_json::json!({ "panelId": { "widget": WIDGET } })
         );
     }
 
@@ -2034,13 +2039,6 @@ mod tests {
     #[test]
     fn payloads_use_the_names_the_pages_expect() {
         assert_eq!(
-            serde_json::to_value(PanelPayload {
-                panel_id: PanelId::Settings
-            })
-            .unwrap(),
-            serde_json::json!({ "panelId": "settings" })
-        );
-        assert_eq!(
             serde_json::to_value(ShowPayload {
                 panel_id: PanelId::About,
                 wait: 7
@@ -2049,18 +2047,6 @@ mod tests {
             serde_json::json!({ "panelId": "about", "wait": 7 })
         );
         assert_eq!(SHOW_EVENT, "panel-show");
-        assert_eq!(
-            serde_json::to_value(ChangedPayload { panel_id: None }).unwrap(),
-            serde_json::json!({ "panelId": null })
-        );
-        assert_eq!(
-            serde_json::to_value(ChangedPayload {
-                panel_id: Some(PanelId::About)
-            })
-            .unwrap(),
-            serde_json::json!({ "panelId": "about" })
-        );
-        assert_eq!(CHANGED_EVENT, "panel-changed");
     }
 
     fn at(base: Instant, ms: u64) -> Instant {

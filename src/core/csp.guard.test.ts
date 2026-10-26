@@ -94,7 +94,7 @@ function violations(source: string): string[] {
 describe("strict CSP guard", () => {
   it("reads the sources, and not the tests", () => {
     const paths = Object.keys(sources);
-    expect(paths).toContain("/src/dock/Dock.tsx");
+    expect(paths).toContain("/src/panel/Panel.tsx");
     expect(paths).toContain("/src/panel/parts/TextField.tsx");
     expect(paths.filter((path) => /\.test\.tsx?$/.test(path))).toEqual([]);
   });

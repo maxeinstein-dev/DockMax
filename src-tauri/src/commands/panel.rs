@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 use std::time::Instant;
 
-use tauri::{AppHandle, State, WebviewWindow};
+use tauri::{AppHandle, Manager, WebviewWindow};
 
 use crate::commands::widgets;
 use crate::domain::widgets::WidgetError;
@@ -58,21 +58,17 @@ fn is_open_key(key: &str) -> bool {
     }
 }
 
-/// Called by the dock when an item is clicked. `anchor` is the item's
-/// rectangle relative to the dock's client area, in logical pixels. Opening
-/// asks the panel page to render first (`panel-show`); the window shows on
-/// `panel_ready` or after `panel::READY_TIMEOUT`.
+/// The dock's item was clicked (spec 0011 H3: the dock is native, so this is
+/// a call, not a command). `anchor` is the item's rectangle relative to the
+/// dock's window, in logical pixels. Opening asks the panel page to render
+/// first (`panel-show`); the window shows on `panel_ready` or after
+/// `panel::READY_TIMEOUT`.
 ///
 /// A widget instance the storage doesn't have (removed, or the widgets
 /// unavailable in this run) is refused with an error, and nothing changes:
 /// the open panel, if any, stays open.
-#[tauri::command]
-pub fn toggle_panel(
-    app: AppHandle,
-    storage: State<'_, Mutex<Storage>>,
-    panel_id: PanelId,
-    anchor: LogicalRect,
-) -> Result<(), String> {
+pub fn toggle(app: &AppHandle, panel_id: PanelId, anchor: LogicalRect) -> Result<(), String> {
+    let app = app.clone();
     // Configurações is an app of its own now (spec 0011 H1): the dock's item
     // opens it, and the open panel, if any, closes.
     if panel_id == PanelId::Settings {
@@ -85,9 +81,8 @@ pub fn toggle_panel(
             "the settings could not be opened".to_string()
         });
     }
-    // `anchor` was checked when deserialized: an invalid one never gets
-    // here, so a rejected click changes nothing. The storage lock is
-    // released before the panel's.
+    // The storage lock is released before the panel's.
+    let storage = app.state::<Mutex<Storage>>();
     let resolved = resolve(&widgets::lock(&storage), panel_id);
     let panel = resolved.map_err(|error| {
         log::warn!("panel: refused to open a widget panel: {error}");
@@ -95,7 +90,7 @@ pub fn toggle_panel(
     })?;
     let action = panel::lock(&app).toggle(panel, anchor, Instant::now());
     let show = matches!(action, Action::Prepare(..));
-    if show && !dock::is_visible(&app) {
+    if show && !dock::is_visible() {
         // A click queued before the dock was hidden from the tray: a panel
         // anchored to a hidden dock stays closed.
         panel::close(&app);
@@ -149,6 +144,17 @@ pub fn panel_ready(
         log::warn!("panel: failed to show: {error}");
         "could not open the panel".to_string()
     })
+}
+
+/// Called by the panel's page once it listens for `panel-show` (spec 0011
+/// H2): the show that waited for the window to be made goes out now.
+#[tauri::command]
+pub fn panel_mounted(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
+    if window.label() != panel::LABEL {
+        return Err("only the panel mounts".into());
+    }
+    panel::page_mounted(&app);
+    Ok(())
 }
 
 #[cfg(test)]

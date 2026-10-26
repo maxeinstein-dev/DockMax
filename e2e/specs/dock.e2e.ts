@@ -1,9 +1,9 @@
 import { closeSync, existsSync, openSync, readSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { $, browser, expect } from "@wdio/globals";
+import { browser, expect } from "@wdio/globals";
 import { ptBR as t } from "../../src/i18n/pt-BR.ts";
-import { DATA_DIR_VAR } from "../app.ts";
+import { DATA_DIR_VAR, dockView } from "../app.ts";
 
 /* E2E 1 (spec 0003 §2.8): the dock opens, and the widget database is made in
  * the run's data folder.
@@ -38,17 +38,27 @@ function header(path: string): string | null {
   }
 }
 
-/** A fixed item of the dock, found by its accessible name. */
-function dockItem(name: string) {
-  return $(`nav[aria-label="${t.dock.label}"] button[aria-label="${name}"]`);
-}
-
 describe("Dock", () => {
-  it("opens with Settings and About", async () => {
-    await browser.switchToWindow("dock");
-
-    await expect(dockItem(t.dock.items.settings)).toBeDisplayed();
-    await expect(dockItem(t.dock.items.about)).toBeDisplayed();
+  it("opens with the seeded widgets, and Configurações in its menu", async () => {
+    // The run's database is new: the seed (Relógio, Progresso do tempo,
+    // Nota). The dock reads its items once started: waited for, not assumed.
+    const seed = [
+      t.widgets.kinds.clock,
+      t.widgets.kinds["time-progress"],
+      t.widgets.kinds.note,
+    ];
+    await browser.waitUntil(
+      async () => {
+        const names = (await dockView()).items.map((item) => item.name);
+        return seed.every((name) => names.includes(name));
+      },
+      { timeoutMsg: "the dock never showed the seeded widgets" },
+    );
+    // Configurações and Sobre left the dock: the app opens from the dock's
+    // menu, with Sobre inside (2026-10-26).
+    const names = (await dockView()).items.map((item) => item.name);
+    expect(names).not.toContain(t.dock.items.settings);
+    expect(names).not.toContain(t.dock.items.about);
   });
 
   it("makes the widget database in the run's data folder", async () => {

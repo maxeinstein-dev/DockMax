@@ -23,8 +23,9 @@ const capabilities: TauriCapabilities[] = [
       // keep in step with WebView2 (spec 0003 §2.8).
       driverProvider: "embedded",
       embeddedPort: WEBDRIVER_PORT,
-      // Sessions start in the dock; the panel exists hidden until opened.
-      windowLabel: "dock",
+      // Sessions start in the test build's hidden window, which drives the
+      // native dock (spec 0011 H3); the panel is made when opened.
+      windowLabel: "e2e",
       captureBackendLogs: true,
     },
   },

@@ -45,6 +45,15 @@ use crate::domain::widgets::{
 /// Name of the widget database inside the app data folder.
 pub const FILE_NAME: &str = "dockmax.db";
 
+/// Key in `meta` of how the pinned programs and the widgets mix on the dock
+/// (`Storage::dock_order`).
+const DOCK_ORDER_KEY: &str = "dock_order";
+
+/// Most keys `dock_order` keeps, and the longest: far beyond the 40 programs
+/// and the widgets a dock can have, and an id of 36 characters with its kind.
+const MAX_DOCK_ORDER: usize = 200;
+const MAX_DOCK_KEY: usize = 64;
+
 /// How long a statement waits for a lock held by another connection. Short
 /// on purpose: the commands run synchronously on the main thread, so every
 /// moment waiting freezes the dock. With the single-instance plugin the app
@@ -139,6 +148,48 @@ impl Storage {
             storage: self.status,
             apps,
         })
+    }
+
+    /// How the pinned programs and the widgets mix on the dock (spec 0011:
+    /// the dock's drag): their keys (`app:<id>`, `widget:<id>`) in dock
+    /// order, as the last drag left them. Each kind keeps its own order in
+    /// its table; this says only where each kind goes. Empty when nothing was
+    /// ever dragged, or when it can't be read.
+    pub fn dock_order(&self) -> Vec<String> {
+        let Some(conn) = &self.conn else {
+            return Vec::new();
+        };
+        let text: Option<String> = conn
+            .query_row(
+                "SELECT value FROM meta WHERE key = ?1",
+                params![DOCK_ORDER_KEY],
+                |row| row.get(0),
+            )
+            .optional()
+            .ok()
+            .flatten();
+        text.and_then(|text| serde_json::from_str::<Vec<String>>(&text).ok())
+            .map(|keys| {
+                keys.into_iter()
+                    .filter(|key| key.len() <= MAX_DOCK_KEY)
+                    .take(MAX_DOCK_ORDER)
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Keeps the dock's order (`dock_order`).
+    pub fn set_dock_order(&mut self, keys: &[String]) -> Result<(), WidgetError> {
+        let conn = self.connection()?;
+        let keys: Vec<&String> = keys.iter().take(MAX_DOCK_ORDER).collect();
+        let text = serde_json::to_string(&keys).map_err(|_| WidgetError::WriteFailed)?;
+        conn.execute(
+            "INSERT INTO meta (key, value) VALUES (?1, ?2) \
+             ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            params![DOCK_ORDER_KEY, text],
+        )
+        .map_err(write_failed)?;
+        Ok(())
     }
 
     /// Copies the `-wal` into the file and empties it
@@ -890,6 +941,20 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
 
     fn modified(path: &Path) -> SystemTime {
         fs::metadata(path).unwrap().modified().unwrap()
+    }
+
+    #[test]
+    fn the_dock_order_is_kept_and_read_back_and_starts_empty() {
+        let dir = tempdir().unwrap();
+        let mut storage = Storage::open(dir.path());
+        assert!(storage.dock_order().is_empty());
+
+        let keys = vec!["widget:a".to_string(), "app:b".to_string()];
+        storage.set_dock_order(&keys).unwrap();
+        storage.set_dock_order(&keys).unwrap();
+        drop(storage);
+
+        assert_eq!(Storage::open(dir.path()).dock_order(), keys);
     }
 
     /// Opens with the real migrations, adds a widget and closes, leaving a

@@ -12,16 +12,12 @@ import { openPanelFrom, restartApp } from "../app.ts";
 const TEXT = "Comprar pão, café e maçã";
 
 /** The seeded note's dock item: no label, so the kind's name. */
-function noteItem() {
-  return $(
-    `nav[aria-label="${t.dock.label}"] button[aria-label="${t.widgets.kinds.note}"]`,
-  );
-}
+const NOTE = t.widgets.kinds.note;
 
 /** Opens the note's panel from the dock and returns its editor. */
 async function openNote() {
   const editor = () => $("textarea.note-editor");
-  await openPanelFrom(noteItem, editor);
+  await openPanelFrom(NOTE, editor);
   return editor();
 }
 

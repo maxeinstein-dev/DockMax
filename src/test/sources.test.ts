@@ -18,7 +18,7 @@ describe("the source reader", () => {
 
   it("lists the sources with paths from the root, sorted", () => {
     const files = listFiles("src");
-    expect(files).toContain("/src/dock/Dock.tsx");
+    expect(files).toContain("/src/panel/Panel.tsx");
     expect(files).toContain("/src/panel/parts/parts.css");
     expect(files).toEqual([...files].sort());
     expect(files.some((path) => path.includes("node_modules"))).toBe(false);
@@ -32,7 +32,7 @@ describe("the source reader", () => {
 
   it("leaves the tests out unless asked", () => {
     const sources = readSources("src", /\.tsx?$/);
-    expect(Object.keys(sources)).toContain("/src/dock/Dock.tsx");
+    expect(Object.keys(sources)).toContain("/src/panel/Panel.tsx");
     expect(Object.keys(sources).filter((p) => /\.test\.tsx?$/.test(p))).toEqual(
       [],
     );
