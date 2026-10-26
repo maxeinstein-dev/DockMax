@@ -3,7 +3,7 @@
 **Produto:** DockMax  
 **Plataforma inicial:** Windows 11  
 **Objetivo:** ferramenta de uso pessoal que também demonstre competências de desenvolvimento desktop e arquitetura.  
-**Status:** proposta inicial; estimativas são indicativas. **Atualização de 2026-10-26:** o produto passou a ser um dock que substitui a barra de tarefas (ADR 0009) e o plano das fases 3 e 4 abaixo foi superado pelas fases A a G da [spec 0004](specs/0004-paridade-primodock.md). O que define o MVP está em "Escopo do MVP".
+**Status:** proposta inicial; estimativas são indicativas. **Atualização de 2026-10-26:** o produto passou a ser um dock que substitui a barra de tarefas (ADR 0009) e o plano das fases 3 e 4 abaixo foi superado pelas fases A a G da [spec 0004](specs/0004-paridade-primodock.md). O que define o MVP está em "Escopo do MVP"; o andamento das fases A a G, em "Andamento das fases da spec 0004".
 
 ## Escopo do MVP (decisão do autor, 2026-10-26)
 
@@ -15,6 +15,22 @@ O MVP é o que já existe, com os **ícones que os programas já têm**:
 - relógio com data, bandeja do sistema hospedada pelo DockMax e os widgets Relógio, Progresso do tempo e Nota.
 
 Ficam **para o futuro**, fora do MVP: a personalização de ícones (ícone por app, imagem própria, chaves semânticas e um pacote embutido, recortes B4b e B4c da [spec 0007](specs/0007-fase-b4-icones.md); a leitura de pacotes de ícones, B4a, já está pronta e fica como recurso avançado), os apps abertos e as prévias de janela (fase D e E), os espaços de trabalho (fase C), os demais widgets (fase F) e os extras (fase G). A fase 5 abaixo é o que falta para fechar o MVP.
+
+## Andamento das fases da spec 0004
+
+Ordem decidida pelo autor em 2026-10-26, depois da fase D: **C → E → F → G**, cada uma com spec própria antes do código.
+
+| Fase | Situação |
+|---|---|
+| **A. Visual** | Concluída: nove estilos, efeito ao passar o mouse, indicador, posições ([spec 0005](specs/0005-fase-a-visual.md)). |
+| **B. Itens e ícones** | Concluída no escopo do MVP ([spec 0006](specs/0006-fase-b-apps.md), [spec 0007](specs/0007-fase-b4-icones.md)); a personalização de ícones (B4b, B4c) fica para o futuro. |
+| **D. Windows** | **Concluída em 2026-10-26**: barra de aplicativos e barra do Windows oculta (ADR 0009), apps abertos, ativar e minimizar, menus ([spec 0009](specs/0009-fase-d-janelas.md)), tela cheia e um dock por monitor ([spec 0010](specs/0010-fase-d4-monitores-e-tela-cheia.md)), dock nativo ([spec 0011](specs/0011-arquitetura-hibrida.md)) e ocultar automaticamente. Falta a [rodada de verificações](roteiro-de-verificacao.md). |
+| **C. Espaços de trabalho** | **Próxima.** |
+| **E. Prévias e bandeja** | A bandeja já está pronta (painel da seta, ícones no dock, menus no lugar); faltam as prévias das janelas. |
+| **F. Widgets** | Depois da E. |
+| **G. Extras** | Depois da F. |
+
+Fora das fases: o **lançador** no estilo do Ulauncher (spec 0012, em revisão no [PR #30](https://github.com/maxeinstein-dev/DockMax/pull/30)).
 
 ## Visão do produto
 
@@ -154,18 +170,18 @@ Revisão de 2026-10-19 (fim da Fase 2): a direção foi mantida e o roadmap ganh
 
 ### Verificações pendentes (decisão do autor, 2026-10-26: fazer todas depois da fase D)
 
-Tudo o que as specs e os PRs marcaram como **não verificado**, para uma rodada só:
+A fase D acabou: a rodada única está no **[roteiro de verificação](roteiro-de-verificacao.md)**, passo a passo e em blocos. O que o autor já confirmou nos PRs da fase D (arrastar, dois monitores, ocultar automaticamente) está marcado lá. Resumo do que falta:
 
 - [ ] Instalar e desinstalar numa máquina limpa ou virtual; Windows 10; atualizar por cima de uma versão anterior com o programa aberto.
-- [ ] Os cliques com o **mouse físico** no dock: esquerdo (ativar, minimizar, próxima janela), meio (nova instância) e direito (menus), nos programas fixados e nos abertos. Nos testes, o evento foi enviado à página.
+- [ ] Os cliques com o **mouse físico** no dock: esquerdo (ativar, minimizar, próxima janela), meio (nova instância) e direito (menus), nos programas fixados e nos abertos; os menus do dock e da bandeja.
 - [ ] Soltar um arquivo no dock vindo do Explorador de Arquivos (o teste usou um arraste simulado).
-- [ ] A seção "Ícones dos apps" e as chaves novas de Configurações vistas no painel de verdade.
+- [ ] A seção "Ícones dos apps" e as chaves novas de Configurações vistas no app de Configurações de verdade.
 - [ ] Um programa que pergunta se quer salvar ao fechar pelo menu.
 - [ ] Áreas de trabalho virtuais do Windows.
 - [ ] Uso longo (horas): memória e CPU em repouso.
 - [ ] Leitor de tela.
-- [ ] O dock nativo (spec 0011 H3) com o **mouse de verdade**: a ampliação nos três efeitos, arrastar para reordenar, soltar arquivos, os botões do meio e direito; os nove estilos e os reflexos na tela; a borda de cima; escala de 150 %.
-- [ ] Um dock por monitor (spec 0010 D4b): o mouse no segundo dock, ligar e desligar um monitor com o DockMax aberto, mudar "Dock em todos os monitores" com ele aberto, tela cheia de verdade no segundo monitor.
+- [ ] O dock nativo (spec 0011 H3) com o **mouse de verdade**: os três efeitos ao passar o mouse; os nove estilos e os reflexos na tela; a borda de cima; escala de 150 %. (Arrastar para reordenar: confirmado pelo autor em 2026-10-26.)
+- [ ] Um dock por monitor (spec 0010 D4b): o mouse no segundo dock, ligar e desligar um monitor com o DockMax aberto, mudar "Dock em todos os monitores" com ele aberto, tela cheia de verdade no segundo monitor. (Um dock em cada monitor: confirmado pelo autor em 2026-10-26.)
 
 ### Medição de recursos (build de release 0.3.0, 2026-10-26)
 
