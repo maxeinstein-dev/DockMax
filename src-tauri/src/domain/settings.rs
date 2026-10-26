@@ -155,6 +155,9 @@ pub struct DockSettings {
     pub icon_pack: Option<String>,
     /// What a program's icon does while it opens (spec 0006 B2).
     pub open_animation: OpenAnimation,
+    /// Whether the open programs that are not pinned show on the dock, after
+    /// the widgets (spec 0009 D2).
+    pub show_open_apps: bool,
     /// What the dock does with the Windows taskbar (ADR 0009).
     pub taskbar: TaskbarMode,
     /// Distance between the dock and the screen edge, in logical pixels,
@@ -177,6 +180,7 @@ impl Default for DockSettings {
             icon_shape: IconShape::default(),
             icon_pack: None,
             open_animation: OpenAnimation::default(),
+            show_open_apps: true,
             taskbar: TaskbarMode::default(),
             bottom_space: DEFAULT_BOTTOM_SPACE,
         }
@@ -495,6 +499,7 @@ mod tests {
                 "style": "native", "tweaks": {}, "hover": "scale", "hoverScale": 110,
                 "indicator": "dot", "indicatorColor": null,
                 "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
+                "showOpenApps": true,
                 "taskbar": "hidden", "bottomSpace": 2
               },
               "launchAtLogin": false

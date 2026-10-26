@@ -19,12 +19,30 @@ export interface OpenApp {
   active: boolean;
 }
 
+/** An open program that is not pinned (spec 0009 D2). */
+export interface OpenOther {
+  /** What `activateOpen` takes: opaque, never a path. */
+  key: string;
+  /** What `app_icon` takes for its icon. */
+  appId: string;
+  name: string;
+  count: number;
+  active: boolean;
+}
+
+/** Who is open: the pinned programs, and the others. */
+export interface OpenSnapshot {
+  apps: OpenApp[];
+  others: OpenOther[];
+}
+
 export const OPEN_APPS_COMMANDS = {
   list: "list_open_apps",
   activate: "activate_app",
+  activateOpen: "activate_open",
 } as const;
 
-/** Event every window receives with the `OpenApp[]` after a change. */
+/** Event every window receives with the `OpenSnapshot` after a change. */
 export const OPEN_APPS_CHANGED_EVENT = "open-windows-changed";
 
 /** Brings the pinned program `id` to the front, minimizes it if the user is
@@ -40,17 +58,51 @@ export function activateApp(id: WidgetId): Promise<boolean> {
   );
 }
 
-function byId(open: readonly OpenApp[]): ReadonlyMap<string, OpenApp> {
-  return new Map(open.map((app) => [app.id, app]));
+/** What the dock keeps of who is open: the pinned programs by the id of
+ * their item, and the others in the order they are shown. */
+export interface OpenNow {
+  apps: ReadonlyMap<string, OpenApp>;
+  others: readonly OpenOther[];
 }
 
-const NONE: ReadonlyMap<string, OpenApp> = new Map();
+const NONE: OpenNow = { apps: new Map(), others: [] };
 
-/** The open programs by the id of their pinned item, kept current by
- * `open-windows-changed`; empty while loading and if they can't be read (the
- * dock then shows no program as open). */
-export function useOpenApps(): ReadonlyMap<string, OpenApp> {
-  const [open, setOpen] = useState<ReadonlyMap<string, OpenApp>>(NONE);
+function validSnapshot(value: unknown): value is OpenSnapshot {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "apps" in value &&
+    Array.isArray(value.apps) &&
+    "others" in value &&
+    Array.isArray(value.others)
+  );
+}
+
+function nowOf(snapshot: OpenSnapshot): OpenNow {
+  return {
+    apps: new Map(snapshot.apps.map((app) => [app.id, app])),
+    others: snapshot.others,
+  };
+}
+
+/** Brings the open program that is not pinned, named by `key`, to the front,
+ * minimizes it, or passes to its next window. Resolves `false` when it is
+ * not open any more (or the call failed). */
+export function activateOpen(key: string): Promise<boolean> {
+  return invoke<boolean>(OPEN_APPS_COMMANDS.activateOpen, { key }).then(
+    (done) => done === true,
+    (error: unknown) => {
+      log.warn(`apps: activate open failed: ${errorKind(error)}`);
+      return false;
+    },
+  );
+}
+
+/** The open programs, kept current by `open-windows-changed`; none while
+ * loading and if they can't be read (the dock then shows no program as
+ * open). */
+export function useOpenApps(): OpenNow {
+  const [open, setOpen] = useState<OpenNow>(NONE);
 
   useEffect(() => {
     let active = true;
@@ -58,16 +110,16 @@ export function useOpenApps(): ReadonlyMap<string, OpenApp> {
     // then, so it is dropped.
     let changed = false;
 
-    const unlisten = listen<OpenApp[]>(OPEN_APPS_CHANGED_EVENT, (event) => {
-      if (!active || !Array.isArray(event.payload)) return;
+    const unlisten = listen<OpenSnapshot>(OPEN_APPS_CHANGED_EVENT, (event) => {
+      if (!active || !validSnapshot(event.payload)) return;
       changed = true;
-      setOpen(byId(event.payload));
+      setOpen(nowOf(event.payload));
     });
 
-    invoke<OpenApp[]>(OPEN_APPS_COMMANDS.list).then(
+    invoke<OpenSnapshot>(OPEN_APPS_COMMANDS.list).then(
       (current) => {
-        if (active && !changed && Array.isArray(current)) {
-          setOpen(byId(current));
+        if (active && !changed && validSnapshot(current)) {
+          setOpen(nowOf(current));
         }
       },
       (error: unknown) => {

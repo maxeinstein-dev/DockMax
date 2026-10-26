@@ -66,6 +66,8 @@ const messages = {
       taskbar: "Barra de tarefas do Windows",
     },
     /** The switch that opens the DockMax when the user signs in. */
+    showOpenApps: "Mostrar apps abertos",
+    showOpenAppsHint: "Os que não estão fixados, depois dos widgets",
     launchAtLogin: "Iniciar com o Windows",
     launchAtLoginHint: "Abre o DockMax ao entrar no Windows",
     theme: {

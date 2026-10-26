@@ -23,6 +23,8 @@ export const otherText: Messages = {
       opacity: "Dock opacity",
       taskbar: "Windows taskbar",
     },
+    showOpenApps: "Show open apps",
+    showOpenAppsHint: "The ones that are not pinned, after the widgets",
     launchAtLogin: "Start with Windows",
     launchAtLoginHint: "Opens the DockMax when you sign in to Windows",
     theme: { system: "System", light: "Light", dark: "Dark" },

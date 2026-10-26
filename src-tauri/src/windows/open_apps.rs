@@ -1,4 +1,4 @@
-//! Which pinned programs are open, and what a click on one does (spec 0009).
+//! Which programs are open, and what a click on one does (spec 0009).
 //!
 //! No polling: a `SetWinEventHook` tells this thread when a window is made,
 //! destroyed, shown, hidden, cloaked, minimized or brought to the front, and
@@ -13,21 +13,71 @@ use std::time::Instant;
 
 use tauri::{AppHandle, Emitter, Listener, Manager};
 
+use super::openwin::OpenWindow;
 use crate::commands::apps::CHANGED_EVENT as APPS_CHANGED_EVENT;
+use crate::commands::settings::CHANGED_EVENT as SETTINGS_CHANGED_EVENT;
 use crate::commands::widgets::lock;
-use crate::domain::open_apps::{Click, Found, Identity, OpenApp, WindowFacts, click, summarize};
+use crate::domain::apps::is_pinnable_path;
+use crate::domain::open_apps::{
+    Click, Found, Identity, OpenApp, OpenOther, OpenSnapshot, WindowFacts, click, keep_order,
+    others, short_id, summarize,
+};
 use crate::persistence::database::Storage;
 
-/// Event sent to every window with the `[OpenApp]` list after a change.
+/// Event sent to every window with the `OpenSnapshot` after a change.
 pub const CHANGED_EVENT: &str = "open-windows-changed";
 
-/// What the windows of the pinned programs were at the last look.
-static FOUND: Mutex<Vec<Found>> = Mutex::new(Vec::new());
+/// An open program that is not pinned, as it was at the last look.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Other {
+    /// What it is grouped by (`domain::open_apps::group_key`).
+    key: String,
+    /// The opaque name the dock uses for it (`short_id` of the key).
+    id: String,
+    /// What `app_icon` takes for it.
+    app_id: String,
+    name: String,
+    hwnds: Vec<isize>,
+    active: bool,
+}
+
+/// What the windows were at the last look.
+#[derive(Debug, Default)]
+struct State {
+    found: Vec<Found>,
+    others: Vec<Other>,
+    /// The keys of the open programs that are not pinned, in the order the
+    /// dock showed them: kept while they are hidden (the setting off), so
+    /// they come back where they were.
+    order: Vec<String>,
+}
+
+static STATE: Mutex<State> = Mutex::new(State {
+    found: Vec::new(),
+    others: Vec::new(),
+    order: Vec::new(),
+});
+
+fn state() -> std::sync::MutexGuard<'static, State> {
+    STATE.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 /// What the shell calls each pinned program, by the program's id in the Apps
 /// folder: read once, as it costs the shell's time and does not change while
 /// the program stays pinned.
 static IDENTITIES: Mutex<Option<HashMap<String, Identity>>> = Mutex::new(None);
+
+/// What an open program is shown as: the id for its icon and its name.
+type Description = Option<(String, String)>;
+
+/// What an open program that is not pinned is shown as, by its group key: its
+/// id for the icon and its name, or `None` for one with no way to show it.
+static DESCRIPTIONS: Mutex<Option<HashMap<String, Description>>> = Mutex::new(None);
+
+/// The programs of the Apps folder by the file they run (lowercased): the id
+/// and the name. Read once, when the first open program that needs it shows
+/// up: it takes the shell about a second.
+static CATALOG_BY_FILE: Mutex<Option<Vec<(String, String, String)>>> = Mutex::new(None);
 
 /// A look at the windows is wanted (an event came, or the pinned programs
 /// changed).
@@ -51,19 +101,35 @@ const HEARTBEAT_MS: u32 = 5_000;
 
 /// Whether a window of the programs found last no longer exists.
 fn a_window_is_gone() -> bool {
-    lock_found()
+    let state = state();
+    state
+        .found
         .iter()
         .flat_map(|found| found.hwnds.iter())
+        .chain(state.others.iter().flat_map(|other| other.hwnds.iter()))
         .any(|hwnd| !super::openwin::exists(*hwnd))
 }
 
-fn lock_found() -> std::sync::MutexGuard<'static, Vec<Found>> {
-    FOUND.lock().unwrap_or_else(PoisonError::into_inner)
+fn snapshot_of(state: &State) -> OpenSnapshot {
+    OpenSnapshot {
+        apps: state.found.iter().map(OpenApp::from).collect(),
+        others: state
+            .others
+            .iter()
+            .map(|other| OpenOther {
+                key: other.id.clone(),
+                app_id: other.app_id.clone(),
+                name: other.name.clone(),
+                count: other.hwnds.len(),
+                active: other.active,
+            })
+            .collect(),
+    }
 }
 
-/// The pinned programs that have windows now, as the dock sees them.
-pub fn snapshot() -> Vec<OpenApp> {
-    lock_found().iter().map(OpenApp::from).collect()
+/// The programs that have windows now, as the dock sees them.
+pub fn snapshot() -> OpenSnapshot {
+    snapshot_of(&state())
 }
 
 fn identity_of(app_id: &str) -> Identity {
@@ -82,12 +148,111 @@ fn identity_of(app_id: &str) -> Identity {
     identity
 }
 
+/// The Apps-folder program that runs `exe` (lowercased), if there is one.
+fn catalog_entry_for(exe: &str) -> Option<(String, String)> {
+    let mut index = CATALOG_BY_FILE
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    let index = index.get_or_insert_with(|| {
+        super::apps::catalog()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|entry| {
+                let target = super::apps::target_of(&entry.id)?;
+                Some((
+                    target.to_string_lossy().to_lowercase(),
+                    entry.id,
+                    entry.name,
+                ))
+            })
+            .collect()
+    });
+    index
+        .iter()
+        .find(|(target, _, _)| target == exe)
+        .map(|(_, id, name)| (id.clone(), name.clone()))
+}
+
+/// What to show an open program that is not pinned as: the id `app_icon`
+/// takes for it and its name. The Apps folder's own item if there is one (its
+/// AppID, or a program that runs the same file); otherwise the program's file
+/// and its name.
+fn describe(key: &str, window: &OpenWindow) -> Option<(String, String)> {
+    if let Some(known) = DESCRIPTIONS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .as_ref()
+        .and_then(|known| known.get(key))
+    {
+        return known.clone();
+    }
+    let exe = window.exe.as_deref().and_then(std::path::Path::to_str);
+    let described = window
+        .aumid
+        .as_deref()
+        .and_then(|aumid| super::apps::name_of(aumid).map(|name| (aumid.to_owned(), name)))
+        .or_else(|| exe.and_then(|exe| catalog_entry_for(&exe.to_lowercase())))
+        .or_else(|| {
+            let exe = exe.filter(|exe| is_pinnable_path(exe))?;
+            let stem = std::path::Path::new(exe).file_stem()?.to_str()?;
+            Some((exe.to_owned(), stem.to_owned()))
+        });
+    DESCRIPTIONS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .get_or_insert_with(HashMap::new)
+        .insert(key.to_owned(), described.clone());
+    described
+}
+
+/// The open programs that are not pinned, one for each program as the shell
+/// names it: the windows are grouped by what they declare, and groups that
+/// turn out to be one program (the profiles of a browser each have an AppID of
+/// their own) are one item. In the order shown last, the new ones at the end.
+fn merged_others(
+    windows: &[WindowFacts],
+    open_windows: &[OpenWindow],
+    found: &[Found],
+    foreground: Option<isize>,
+    order: &[String],
+) -> Vec<Other> {
+    let mut merged: Vec<Other> = Vec::new();
+    for group in others(windows, found, &[]) {
+        let Some(sample) = open_windows
+            .iter()
+            .find(|window| group.hwnds.contains(&window.hwnd))
+        else {
+            continue;
+        };
+        let Some((app_id, name)) = describe(&group.key, sample) else {
+            continue;
+        };
+        let key = app_id.to_lowercase();
+        match merged.iter_mut().find(|other| other.key == key) {
+            Some(other) => other.hwnds.extend(group.hwnds),
+            None => merged.push(Other {
+                id: short_id(&key),
+                key,
+                app_id,
+                name,
+                hwnds: group.hwnds,
+                active: false,
+            }),
+        }
+    }
+    for other in &mut merged {
+        other.active = foreground.is_some_and(|front| other.hwnds.contains(&front));
+    }
+    keep_order(&mut merged, |other| &other.key, order);
+    merged
+}
+
 /// Looks at the windows and, if what the dock shows changed, tells it.
 fn look(app: &AppHandle) {
     super::apps::init_com();
     let pinned = {
-        let state = app.state::<std::sync::Mutex<Storage>>();
-        match lock(&state).apps_snapshot() {
+        let storage = app.state::<std::sync::Mutex<Storage>>();
+        match lock(&storage).apps_snapshot() {
             Ok(snapshot) => snapshot.apps,
             Err(_) => Vec::new(),
         }
@@ -104,18 +269,42 @@ fn look(app: &AppHandle) {
     {
         cache.retain(|id, _| pinned.iter().any(|app| app.app_id == *id));
     }
-    let windows: Vec<WindowFacts> = super::openwin::enumerate()
-        .into_iter()
+    let open_windows = super::openwin::enumerate();
+    let windows: Vec<WindowFacts> = open_windows
+        .iter()
         .map(|window| WindowFacts {
             hwnd: window.hwnd,
-            aumid: window.aumid,
-            exe: window.exe.and_then(|path| path.to_str().map(str::to_owned)),
+            aumid: window.aumid.clone(),
+            exe: window
+                .exe
+                .as_deref()
+                .and_then(|path| path.to_str().map(str::to_owned)),
         })
         .collect();
-    let found = summarize(&programs, &windows, super::openwin::foreground());
-    let before = snapshot_of(&lock_found());
-    let after = snapshot_of(&found);
-    *lock_found() = found;
+    let foreground = super::openwin::foreground();
+    let found = summarize(&programs, &windows, foreground);
+
+    let show_others = crate::commands::settings::current(app).dock.show_open_apps;
+    let previous_order = state().order.clone();
+    let others_now: Vec<Other> = if show_others {
+        merged_others(&windows, &open_windows, &found, foreground, &previous_order)
+    } else {
+        Vec::new()
+    };
+    let order = if show_others {
+        others_now.iter().map(|other| other.key.clone()).collect()
+    } else {
+        previous_order
+    };
+
+    let after_state = State {
+        found,
+        others: others_now,
+        order,
+    };
+    let after = snapshot_of(&after_state);
+    let before = snapshot_of(&state());
+    *state() = after_state;
     if before != after
         && let Err(error) = app.emit(CHANGED_EVENT, &after)
     {
@@ -123,20 +312,8 @@ fn look(app: &AppHandle) {
     }
 }
 
-fn snapshot_of(found: &[Found]) -> Vec<OpenApp> {
-    found.iter().map(OpenApp::from).collect()
-}
-
-/// Brings the program `id` (the dock's own id of a pinned program) to the
-/// front, minimizes it, or passes to its next window (`domain::open_apps`).
-/// `false` when it has no window: the caller opens it.
-pub fn activate(app: &AppHandle, id: &str) -> bool {
-    let hwnds = lock_found()
-        .iter()
-        .find(|found| found.id == id)
-        .map(|found| found.hwnds.clone())
-        .unwrap_or_default();
-    let Some(action) = click(&hwnds, super::openwin::foreground()) else {
+fn click_on(app: &AppHandle, hwnds: &[isize]) -> bool {
+    let Some(action) = click(hwnds, super::openwin::foreground()) else {
         return false;
     };
     match action {
@@ -147,6 +324,31 @@ pub fn activate(app: &AppHandle, id: &str) -> bool {
     // window that was already where it should be.
     wake(app);
     true
+}
+
+/// Brings the program `id` (the dock's own id of a pinned program) to the
+/// front, minimizes it, or passes to its next window (`domain::open_apps`).
+/// `false` when it has no window: the caller opens it.
+pub fn activate(app: &AppHandle, id: &str) -> bool {
+    let hwnds = state()
+        .found
+        .iter()
+        .find(|found| found.id == id)
+        .map(|found| found.hwnds.clone())
+        .unwrap_or_default();
+    click_on(app, &hwnds)
+}
+
+/// The same for an open program that is not pinned, named by the `key` the
+/// dock was given for it. `false` when it is no longer open.
+pub fn activate_other(app: &AppHandle, key: &str) -> bool {
+    let hwnds = state()
+        .others
+        .iter()
+        .find(|other| other.id == key)
+        .map(|other| other.hwnds.clone())
+        .unwrap_or_default();
+    click_on(app, &hwnds)
 }
 
 /// Asks the listening thread to look at the windows again.
@@ -175,6 +377,9 @@ pub fn start(app: &AppHandle) {
     // The pinned programs changed: who is open may be another set.
     let woken = app.clone();
     app.listen(APPS_CHANGED_EVENT, move |_| wake(&woken));
+    // "Show open programs" turned on or off.
+    let woken = app.clone();
+    app.listen(SETTINGS_CHANGED_EVENT, move |_| wake(&woken));
 }
 
 mod imp {

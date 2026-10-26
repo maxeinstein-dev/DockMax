@@ -114,7 +114,7 @@ O DockMax abre um dock que **ocupa o lugar da barra de tarefas do Windows**: res
 
 - ícones com ampliação, rótulo e ponto indicador; o clique atravessa a área transparente em volta do dock;
 - **apps fixados** ([spec 0006](docs/specs/0006-fase-b-apps.md)): escolha na lista de programas instalados (a mesma do menu Iniciar) ou **solte um programa ou atalho no dock** para fixá-lo, com o ícone real; o clique abre o programa e o botão direito mostra o mesmo menu da barra do Windows (tarefas, recentes, Abrir, Remover); **arraste um app no dock** para mudar a ordem (ou use Configurações › Apps do dock);
-- **programas abertos** ([spec 0009](docs/specs/0009-fase-d-janelas.md)): os apps fixados que estão abertos ganham o indicador, e o clique traz a janela para a frente, minimiza ou passa para a próxima janela do programa;
+- **programas abertos** ([spec 0009](docs/specs/0009-fase-d-janelas.md)): os apps fixados que estão abertos ganham o indicador, e o clique traz a janela para a frente, minimiza ou passa para a próxima janela do programa; os abertos que não estão fixados aparecem depois dos widgets (dá para esconder em Configurações);
 - nove **estilos de barra** (Nativo, Liquid Glass, Meia-noite, Rocket, Prateleira Aqua, Neon, Canarinho, Papel e Flutuante), efeito ao passar o mouse e indicador, em Configurações › Aparência do dock;
 - **relógio com data** no fim do dock e **bandeja do sistema** hospedada pelo DockMax: o botão direito num ícone abre o menu do próprio programa;
 - **widgets**, cada um um item do dock que abre o próprio painel:

@@ -163,6 +163,15 @@ function SettingsPanel({
         }
       />
       <ToggleField
+        label={t.settings.showOpenApps}
+        hint={t.settings.showOpenAppsHint}
+        checked={shown?.dock.showOpenApps ?? true}
+        disabled={shown === null}
+        onChange={(showOpenApps) =>
+          change((s) => ({ ...s, dock: { ...s.dock, showOpenApps } }))
+        }
+      />
+      <ToggleField
         label={t.settings.launchAtLogin}
         hint={t.settings.launchAtLoginHint}
         checked={shown?.launchAtLogin ?? false}

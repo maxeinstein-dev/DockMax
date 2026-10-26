@@ -33,11 +33,17 @@ import {
   type SetDockLayoutArgs,
 } from "../core/dock";
 import { ICONS_CHANGED_EVENT } from "../core/iconPacks";
-import { activateApp, useOpenApps } from "../core/openApps";
+import {
+  activateApp,
+  activateOpen,
+  useOpenApps,
+  type OpenOther,
+} from "../core/openApps";
 import { errorKind, log } from "../core/log";
 import {
   PANEL_CHANGED_EVENT,
   appPanel,
+  otherPanel,
   type LogicalRect,
   panelKey,
   samePanel,
@@ -98,8 +104,12 @@ interface DockEntry {
   name: string;
   /** The widget it shows, for its live face; null for a system item. */
   instance: WidgetInstance<CreatableKind> | null;
-  /** The program it opens; null for a widget or a system item. */
+  /** The program it opens; null for a widget, a system item or an open
+   * program that is not pinned. */
   app: PinnedApp | null;
+  /** The open program that is not pinned that it stands for (spec 0009 D2);
+   * null for the others. */
+  other: OpenOther | null;
 }
 
 /** The pinned programs the dock shows: none while they are loading, or with
@@ -119,6 +129,7 @@ function dockEntries(
   snapshot: WidgetsSnapshot | null,
   apps: readonly PinnedApp[],
   systems: readonly SystemPanelId[],
+  others: readonly OpenOther[],
 ): DockEntry[] {
   const widgets =
     snapshot === null || snapshot.storage.state === "unavailable"
@@ -131,6 +142,7 @@ function dockEntries(
       name: app.name,
       instance: null,
       app,
+      other: null,
     })),
     ...widgets.map((instance) => {
       const panelId = widgetPanel(instance.id);
@@ -140,6 +152,18 @@ function dockEntries(
         name: widgetName(t, instance),
         instance,
         app: null,
+        other: null,
+      };
+    }),
+    ...others.map((other) => {
+      const panelId = otherPanel(other.key);
+      return {
+        panelId,
+        key: panelKey(panelId),
+        name: other.name,
+        instance: null,
+        app: null,
+        other,
       };
     }),
     ...systems.map((panelId) => ({
@@ -148,19 +172,22 @@ function dockEntries(
       name: t.dock.items[panelId],
       instance: null,
       app: null,
+      other: null,
     })),
   ];
 }
 
 /** The size of each group of items: a separator stands between the groups
- * that have items (the programs, the widgets, the system items). */
+ * that have items (the programs, the widgets, the open programs that are not
+ * pinned, the system items). */
 function groupSizes(
   entries: readonly DockEntry[],
   apps: number,
+  others: number,
   systems: number,
 ): number[] {
-  const widgets = entries.length - apps - systems;
-  return [apps, widgets, systems].filter((size) => size > 0);
+  const widgets = entries.length - apps - others - systems;
+  return [apps, widgets, others, systems].filter((size) => size > 0);
 }
 
 /** Whether the Configurações icon carries the attention badge: while the
@@ -172,11 +199,19 @@ function needsAttention(storage: StorageStatus | undefined): boolean {
 
 /** A program's icon on its plate, or the first letter of its name while the
  * icon is not read yet and when Windows has none. */
-function AppFace({ app, variant }: { app: PinnedApp; variant: string }) {
-  const icon = useAppIcon(app.appId, ICON_SIZES.dock, variant);
+function AppFace({
+  appId,
+  name,
+  variant,
+}: {
+  appId: string;
+  name: string;
+  variant: string;
+}) {
+  const icon = useAppIcon(appId, ICON_SIZES.dock, variant);
   return icon === null ? (
     <span className="dock-app-letter" aria-hidden="true">
-      {Array.from(app.name.trim())[0]?.toUpperCase() ?? "?"}
+      {Array.from(name.trim())[0]?.toUpperCase() ?? "?"}
     </span>
   ) : (
     <img className="dock-app-icon" src={icon} alt="" draggable={false} />
@@ -195,7 +230,22 @@ function TileFace({
   iconVariant: string;
 }) {
   if (entry.app !== null) {
-    return <AppFace app={entry.app} variant={iconVariant} />;
+    return (
+      <AppFace
+        appId={entry.app.appId}
+        name={entry.app.name}
+        variant={iconVariant}
+      />
+    );
+  }
+  if (entry.other !== null) {
+    return (
+      <AppFace
+        appId={entry.other.appId}
+        name={entry.other.name}
+        variant={iconVariant}
+      />
+    );
   }
   if (entry.instance === null) {
     return <Glyph id={entry.panelId as SystemPanelId} />;
@@ -205,7 +255,7 @@ function TileFace({
 }
 
 function glazeOf(entry: DockEntry): string {
-  if (entry.app !== null) return "t-app";
+  if (entry.app !== null || entry.other !== null) return "t-app";
   return entry.instance === null
     ? GLAZE[entry.panelId as SystemPanelId]
     : definitionOf(entry.instance).glaze;
@@ -336,7 +386,8 @@ function Dock() {
   const snapshot = useWidgets();
   const appsSnapshot = useApps();
   // Which pinned programs have windows open (spec 0009).
-  const openApps = useOpenApps();
+  const openNow = useOpenApps();
+  const openApps = openNow.apps;
   // The icons depend on the pack in use and on what the pack folder holds
   // (spec 0007): either changing asks for them again.
   const [iconsEpoch, setIconsEpoch] = useState(0);
@@ -352,8 +403,14 @@ function Dock() {
   const taskbar = settings?.dock.taskbar ?? DEFAULT_LOOK.taskbar;
   const systems = systemItems(taskbar === "hidden");
   const apps = pinnedApps(appsSnapshot);
-  const entries = dockEntries(t, snapshot, apps, systems);
-  const groups = groupSizes(entries, apps.length, systems.length);
+  const others = settings?.dock.showOpenApps === false ? [] : openNow.others;
+  const entries = dockEntries(t, snapshot, apps, systems, others);
+  const groups = groupSizes(
+    entries,
+    apps.length,
+    others.length,
+    systems.length,
+  );
   const badge = needsAttention(snapshot?.storage);
   // Changes whenever an item or a name changes: the pills are measured
   // again then.
@@ -564,6 +621,10 @@ function Dock() {
       } else {
         launch(entry.key, app);
       }
+    } else if (entry?.other) {
+      // An open program that is not pinned: to the front, away, or to its
+      // next window. It has no menu until the D3 recorte.
+      void activateOpen(entry.other.key);
     } else if (entry && anchor) {
       openPanel(entry.panelId, anchor);
     }
@@ -735,9 +796,15 @@ function Dock() {
         tabIndex={index === currentIndex ? 0 : -1}
         data-magnify={magnifyRole(index, magnified, hover.effect) ?? undefined}
         data-opening={opening.has(entry.key) ? "" : undefined}
-        data-running={entry.app && openApps.has(entry.app.id) ? "" : undefined}
+        data-running={
+          entry.other || (entry.app && openApps.has(entry.app.id))
+            ? ""
+            : undefined
+        }
         data-active={
-          entry.app && openApps.get(entry.app.id)?.active ? "" : undefined
+          (entry.other ?? (entry.app && openApps.get(entry.app.id)))?.active
+            ? ""
+            : undefined
         }
         data-dragging={drag?.key === entry.key ? "" : undefined}
         data-drop={dropSide(index)}

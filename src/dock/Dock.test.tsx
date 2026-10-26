@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LOOK, type Settings } from "../core/settings";
 import { dockSize } from "../core/appearance";
@@ -195,6 +195,15 @@ const withWidgets = (
 /** No programs pinned. */
 const NO_APPS: AppsSnapshot = { storage: { state: "ok" }, apps: [] };
 
+/** An open program that is not pinned, as Rust sends it. */
+interface OtherForTest {
+  key: string;
+  appId: string;
+  name: string;
+  count: number;
+  active: boolean;
+}
+
 const CALCULATOR = {
   id: "0199a4c0-0000-7000-8000-000000000001",
   appId: "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
@@ -212,6 +221,7 @@ describe("Dock", () => {
   let snapshot: WidgetsSnapshot;
   let pinned: AppsSnapshot;
   let openNow: { id: string; count: number; active: boolean }[];
+  let openOthers: OtherForTest[];
   let activates: boolean;
   let icon: string | null;
 
@@ -223,6 +233,7 @@ describe("Dock", () => {
     snapshot = NO_WIDGETS;
     pinned = NO_APPS;
     openNow = [];
+    openOthers = [];
     activates = true;
     icon = ICON;
     forgetIcons();
@@ -236,8 +247,8 @@ describe("Dock", () => {
             : command === "list_apps"
               ? pinned
               : command === "list_open_apps"
-                ? openNow
-                : command === "activate_app"
+                ? { apps: openNow, others: openOthers }
+                : command === "activate_app" || command === "activate_open"
                   ? activates
                   : command === "app_icon"
                     ? icon
@@ -1224,18 +1235,20 @@ describe("Dock", () => {
         await renderDock();
         expect(marked("Bloco de notas")).toBe(false);
 
-        emit("open-windows-changed", [
-          { id: NOTEPAD.id, count: 2, active: false },
-        ]);
+        emit("open-windows-changed", {
+          apps: [{ id: NOTEPAD.id, count: 2, active: false }],
+          others: [],
+        });
         expect(marked("Bloco de notas")).toBe(true);
         expect(program("Bloco de notas")).not.toHaveAttribute("data-active");
 
-        emit("open-windows-changed", [
-          { id: NOTEPAD.id, count: 2, active: true },
-        ]);
+        emit("open-windows-changed", {
+          apps: [{ id: NOTEPAD.id, count: 2, active: true }],
+          others: [],
+        });
         expect(program("Bloco de notas")).toHaveAttribute("data-active");
 
-        emit("open-windows-changed", []);
+        emit("open-windows-changed", { apps: [], others: [] });
         expect(marked("Bloco de notas")).toBe(false);
       });
 
@@ -1268,6 +1281,122 @@ describe("Dock", () => {
 
         expect(invoke).toHaveBeenCalledWith("launch_app", {
           id: CALCULATOR.id,
+        });
+      });
+
+      describe("the open programs that are not pinned (D2)", () => {
+        const CODE: OtherForTest = {
+          key: "00000000000000aa",
+          appId: "C:\\Apps\\code.exe",
+          name: "code",
+          count: 1,
+          active: false,
+        };
+        const MAIL: OtherForTest = {
+          key: "00000000000000bb",
+          appId: "Mail.App!App",
+          name: "Correio",
+          count: 2,
+          active: true,
+        };
+        const names = () =>
+          within(bar())
+            .getAllByRole("button")
+            .map((button) => button.getAttribute("aria-label"));
+
+        it("shows them after the widgets and before the system items, marked as open", async () => {
+          pinned = withApps(CALCULATOR);
+          openOthers = [CODE, MAIL];
+          await renderDock();
+
+          const all = names();
+          expect(all.indexOf("code")).toBeGreaterThan(
+            all.indexOf("Calculadora"),
+          );
+          expect(all.indexOf("Correio")).toBe(all.indexOf("code") + 1);
+          expect(all.indexOf(text.items.settings)).toBeGreaterThan(
+            all.indexOf("Correio"),
+          );
+          expect(program("code")).toHaveAttribute("data-running");
+          expect(program("code")).not.toHaveAttribute("data-active");
+          expect(program("Correio")).toHaveAttribute("data-active");
+        });
+
+        it("draws their icon from the id Rust gave", async () => {
+          openOthers = [CODE];
+          await renderDock();
+
+          expect(invoke).toHaveBeenCalledWith("app_icon", {
+            appId: CODE.appId,
+            size: 96,
+          });
+        });
+
+        it("separates them from the other items with a separator", async () => {
+          pinned = withApps(CALCULATOR);
+          openOthers = [CODE];
+          await renderDock();
+
+          const kinds = Array.from(bar().children).map((child) =>
+            child.classList.contains("dock-separator") ? "|" : "item",
+          );
+          expect(kinds.join(" ")).toBe("item | item | item item");
+        });
+
+        it("brings one to the front by its key on a click, and opens no panel", async () => {
+          openOthers = [CODE];
+          await renderDock();
+
+          fireEvent.click(program("code"));
+          await act(async () => {});
+
+          expect(invoke).toHaveBeenCalledWith("activate_open", {
+            key: CODE.key,
+          });
+          expect(panelCalls()).toHaveLength(0);
+          expect(invoke).not.toHaveBeenCalledWith(
+            "launch_app",
+            expect.anything(),
+          );
+        });
+
+        it("follows them as they open and close", async () => {
+          await renderDock();
+          expect(screen.queryByRole("button", { name: "code" })).toBeNull();
+
+          emit("open-windows-changed", { apps: [], others: [CODE] });
+          expect(program("code")).toBeInTheDocument();
+
+          emit("open-windows-changed", { apps: [], others: [] });
+          expect(screen.queryByRole("button", { name: "code" })).toBeNull();
+        });
+
+        it("shows none while Mostrar apps abertos is off", async () => {
+          current = withDock({ showOpenApps: false });
+          openOthers = [CODE];
+          await renderDock();
+
+          expect(screen.queryByRole("button", { name: "code" })).toBeNull();
+        });
+
+        it("is not draggable: only the pinned programs reorder", async () => {
+          pinned = withApps(CALCULATOR);
+          openOthers = [CODE];
+          await renderDock();
+
+          fireEvent.pointerDown(program("code"), {
+            pointerId: 1,
+            button: 0,
+            clientX: 300,
+          });
+          fireEvent.pointerMove(program("code"), { pointerId: 1, clientX: 10 });
+          fireEvent.pointerUp(program("code"), { pointerId: 1, clientX: 10 });
+
+          expect(program("code")).not.toHaveAttribute("data-dragging");
+          expect(invoke).not.toHaveBeenCalledWith(
+            "place_app",
+            expect.anything(),
+          );
         });
       });
 

@@ -119,6 +119,7 @@ export const DEFAULT_LOOK = {
   iconShape: "plate",
   iconPack: null,
   openAnimation: "bounce",
+  showOpenApps: true,
   taskbar: "hidden",
   bottomSpace: DEFAULT_BOTTOM_SPACE,
 } as const satisfies Pick<
@@ -132,6 +133,7 @@ export const DEFAULT_LOOK = {
   | "iconShape"
   | "iconPack"
   | "openAnimation"
+  | "showOpenApps"
   | "taskbar"
   | "bottomSpace"
 >;
@@ -156,6 +158,9 @@ export interface DockSettings {
    * the packs folder, or null for the icons Windows gives. */
   iconPack: string | null;
   openAnimation: OpenAnimation;
+  /** Whether the open programs that are not pinned show on the dock, after
+   * the widgets (spec 0009 D2). */
+  showOpenApps: boolean;
   taskbar: TaskbarMode;
   /** Distance between the dock and the screen edge, in logical pixels,
    * 0–`MAX_BOTTOM_SPACE`. */

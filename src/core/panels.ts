@@ -14,13 +14,31 @@ export interface AppPanelId {
   app: WidgetId;
 }
 
+/** An open program that is not pinned (spec 0009 D2): `open` is the opaque
+ * key Rust gave it. It names the item of the dock only; the dock never asks
+ * Rust to open a panel for it (its menu is the D3 recorte). */
+export interface OpenPanelId {
+  open: string;
+}
+
 /** Panels the dock can open; must match `PanelId` in
- * `src-tauri/src/windows/panel.rs`. In JSON: `"settings"`, `"about"`,
- * `"tray"`, `{ "widget": "<id>" }` or `{ "app": "<id>" }`. Rust refuses
+ * `src-tauri/src/windows/panel.rs`, but for `OpenPanelId`, which names an
+ * item and is never sent. In JSON: `"settings"`, `"about"`, `"tray"`,
+ * `{ "widget": "<id>" }` or `{ "app": "<id>" }`. Rust refuses
  * (`toggle_panel` fails, nothing opens) an ID that isn't an instance, or a
  * pinned program, the dock has. An object, so compare two with
  * `samePanel`, never with `===`. */
-export type PanelId = SystemPanelId | WidgetPanelId | AppPanelId;
+export type PanelId = SystemPanelId | WidgetPanelId | AppPanelId | OpenPanelId;
+
+/** The item of the open program `key`. */
+export function otherPanel(key: string): OpenPanelId {
+  return { open: key };
+}
+
+/** Whether `id` names an open program that is not pinned. */
+export function isOpenPanel(id: PanelId): id is OpenPanelId {
+  return typeof id === "object" && "open" in id;
+}
 
 /** The panel of the instance `id`. */
 export function widgetPanel(id: WidgetId): WidgetPanelId {
@@ -47,6 +65,7 @@ export function samePanel(a: PanelId | null, b: PanelId | null): boolean {
   if (a === null || b === null) return a === b;
   if (isWidgetPanel(a)) return isWidgetPanel(b) && a.widget === b.widget;
   if (isAppPanel(a)) return isAppPanel(b) && a.app === b.app;
+  if (isOpenPanel(a)) return isOpenPanel(b) && a.open === b.open;
   return a === b;
 }
 
@@ -56,6 +75,7 @@ export function samePanel(a: PanelId | null, b: PanelId | null): boolean {
 export function panelKey(id: PanelId): string {
   if (isWidgetPanel(id)) return `widget:${id.widget}`;
   if (isAppPanel(id)) return `app:${id.app}`;
+  if (isOpenPanel(id)) return `open:${id.open}`;
   return id;
 }
 

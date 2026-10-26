@@ -150,6 +150,22 @@ describe("SettingsPanel", () => {
     expect(invoke).toHaveBeenCalledWith("update_settings", { settings: sent });
   });
 
+  it("turns showing the open apps on and off, in the dock settings", () => {
+    invoke.mockReturnValue(new Promise(() => {}));
+    render(<SettingsPanel settings={SETTINGS} />);
+    const toggle = screen.getByRole("switch", { name: text.showOpenApps });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(toggle);
+
+    expect(invoke).toHaveBeenLastCalledWith("update_settings", {
+      settings: {
+        ...SETTINGS,
+        dock: { ...SETTINGS.dock, showOpenApps: false },
+      },
+    });
+  });
+
   it("turns starting with Windows on and off, saving the full settings", () => {
     invoke.mockReturnValue(new Promise(() => {}));
     const { rerender } = render(<SettingsPanel settings={SETTINGS} />);
