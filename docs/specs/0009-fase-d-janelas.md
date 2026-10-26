@@ -52,6 +52,13 @@ Perguntas: dá para saber, com pouco custo, quais janelas o Windows daria um bot
 - **Fixar:** `pin_open(chave)`. O id e o nome que se fixam são os que o Rust já tinha descrito ao mostrar o programa (a página só nomeia a chave opaca); depois de fixado, o item passa para os fixados.
 - **Capacidades:** os cinco comandos novos (`launch_open`, `close_app`, `close_open`, `pin_open` e a leitura `list_open_apps`) ficam na janela do painel, pinados no guarda; o dock só ganhou o que já tinha.
 
+## 3.3 Os perfis do Chrome
+
+- **Separados, como no Windows:** cada perfil do Chrome tem um AppID próprio (`Chrome` para o padrão, `Chrome.UserData.<pasta sem espaços>` para os outros) e é um item. Um programa fixado não reivindica, só pelo executável, uma janela cujo AppID **estende** o dele (`Chrome.UserData.Profile1` de `Chrome`): o Chrome fixado é o do perfil padrão, e os outros perfis aparecem como abertos não fixados.
+- **Nome:** o rótulo leva o nome do perfil ("Google Chrome (Trabalho)").
+- **Foto:** como o selo que o Chrome põe no botão da barra do Windows (que nenhum outro programa consegue ler), o dock desenha a **foto da conta** do perfil no canto do ícone. Ela vem do próprio Chrome, só leitura: a lista de perfis em `%LOCALAPPDATA%\Google\Chrome\User Data\Local State` (`profile.info_cache`: nome e arquivo da foto) e o arquivo da foto na pasta do perfil. O Rust confere nome de arquivo, tamanho e cabeçalho PNG, reduz a foto a 64 px e a entrega por `open_badge(chave)` como `data:image/png`; a página sabe só que há selo (`badge`). Nomes e fotos não vão para o log. Um perfil sem foto da conta fica sem selo.
+- **Só o Chrome estável** por enquanto (Edge, Beta e Canary usam outras pastas e AppIDs).
+
 ## 4. Testes
 
 - Rust: a regra de casamento (AppID sem diferenciar maiúsculas; executável contra alvo; programa sem alvo; dois programas com o mesmo executável); o resumo por programa (contagem, ativo); a escolha de a quem passar o foco (minimizar, próxima, mais acima).
@@ -92,3 +99,7 @@ No app real (build de debug, sem mouse: os comandos pela janela do dock e do pai
 - o menu da Calculadora fixada traz "Fechar janela" junto da Jump List, e escolhê-lo a fecha.
 
 **Não verificado:** o clique do botão direito do mouse de verdade (o painel foi aberto pelo comando), o rótulo do menu com vários monitores e o comportamento de um programa que pergunta se quer salvar ao fechar.
+
+## 8. Verificado (perfis do Chrome)
+
+No app real, com dois perfis do Chrome abertos e nada fixado: dois itens, "Google Chrome (Max Pessoal)" e "Google Chrome (Max Alfama)", cada um com a foto do perfil (64 px) no canto do ícone; os outros programas sem selo.
