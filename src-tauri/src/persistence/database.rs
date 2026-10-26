@@ -819,23 +819,33 @@ mod tests {
     use crate::domain::widgets::{WidgetConfig, WidgetInstance};
     use crate::persistence::notes_repo;
 
-    /// A third migration, for a database "from a newer version" and for
-    /// migrating an existing one.
-    const MIGRATION_3: &str = "ALTER TABLE meta ADD COLUMN extra TEXT;";
+    /// The schema version the app ships with: the number of migrations.
+    const CURRENT: i64 = MIGRATIONS.len() as i64;
 
-    fn up_to_v3() -> Vec<&'static str> {
-        vec![MIGRATION_1, MIGRATION_2, MIGRATION_3]
+    /// One migration more than the app ships, for a database "from a newer
+    /// version" and for migrating an existing one.
+    const NEXT_MIGRATION: &str = "ALTER TABLE meta ADD COLUMN extra TEXT;";
+
+    fn newer() -> Vec<&'static str> {
+        let mut migrations = MIGRATIONS.to_vec();
+        migrations.push(NEXT_MIGRATION);
+        migrations
     }
 
-    /// Migration 3 creates a table and then fails: the whole migration must
+    /// The backup made before migrating from `version`.
+    fn backup_of(version: i64) -> String {
+        format!("dockmax.db.bak-v{version}")
+    }
+
+    /// The next migration creates a table and then fails: the whole migration must
     /// be rolled back.
-    fn failing_v3() -> Vec<&'static str> {
-        vec![
-            MIGRATION_1,
-            MIGRATION_2,
+    fn failing_next() -> Vec<&'static str> {
+        let mut migrations = MIGRATIONS.to_vec();
+        migrations.push(
             "CREATE TABLE half_done (x INTEGER) STRICT; \
              INSERT INTO no_such_table VALUES (1);",
-        ]
+        );
+        migrations
     }
 
     /// Migration 1 and a trigger that refuses every widget: the seed fails
@@ -883,8 +893,8 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
     }
 
     /// Opens with the real migrations, adds a widget and closes, leaving a
-    /// version 2 database with four widgets.
-    fn v2_database(dir: &TempDir) -> Vec<WidgetInstance> {
+    /// current database with four widgets.
+    fn current_database(dir: &TempDir) -> Vec<WidgetInstance> {
         let mut storage = Storage::open(dir.path());
         widgets_repo::add(storage.connection().unwrap(), WidgetKind::Clock).unwrap();
         widgets(&storage)
@@ -911,14 +921,14 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
         assert_eq!(storage.apps_snapshot().unwrap().apps, []);
         apps_repo::pin(storage.connection().unwrap(), "app", "App").unwrap();
         drop(storage);
-        assert_eq!(user_version(&db_path(&dir)), 2);
+        assert_eq!(user_version(&db_path(&dir)), CURRENT);
         assert_eq!(user_version(&dir.path().join("dockmax.db.bak-v1")), 1);
     }
 
     #[test]
     fn real_migrations_validate() {
         assert_eq!(Migrations::new(with_seed(MIGRATIONS)).validate(), Ok(()));
-        assert_eq!(Migrations::new(with_seed(&up_to_v3())).validate(), Ok(()));
+        assert_eq!(Migrations::new(with_seed(&newer())).validate(), Ok(()));
     }
 
     #[test]
@@ -962,7 +972,7 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
             .unwrap();
         assert_eq!(meta, 0);
         drop(storage);
-        assert_eq!(user_version(&db_path(&dir)), 2);
+        assert_eq!(user_version(&db_path(&dir)), CURRENT);
     }
 
     #[test]
@@ -1071,19 +1081,19 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
     #[test]
     fn older_database_is_backed_up_and_then_migrated() {
         let dir = tempdir().unwrap();
-        let before = v2_database(&dir);
+        let before = current_database(&dir);
         let path = db_path(&dir);
         let original = fs::read(&path).unwrap();
-        let migrations = up_to_v3();
+        let migrations = newer();
 
         let storage = open_with(dir.path(), &migrations);
 
         assert_eq!(storage.status(), StorageStatus::Ok);
         assert_eq!(widgets(&storage), before, "same widgets, not seeded again");
         drop(storage);
-        assert_eq!(user_version(&path), 3);
-        let backup = dir.path().join("dockmax.db.bak-v2");
-        assert_eq!(user_version(&backup), 2);
+        assert_eq!(user_version(&path), CURRENT + 1);
+        let backup = dir.path().join(backup_of(CURRENT));
+        assert_eq!(user_version(&backup), CURRENT);
         let backed_up: i64 = inspect(&backup)
             .query_row("SELECT count(*) FROM widget_instances", [], |row| {
                 row.get(0)
@@ -1104,8 +1114,8 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
     #[test]
     fn migration_failing_on_every_start_backs_up_only_once() {
         let dir = tempdir().unwrap();
-        v2_database(&dir);
-        let migrations = failing_v3();
+        current_database(&dir);
+        let migrations = failing_next();
 
         for _ in 0..3 {
             let storage = open_with(dir.path(), &migrations);
@@ -1115,16 +1125,16 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
             );
         }
 
-        assert_eq!(backups(dir.path()), ["dockmax.db.bak-v2"]);
+        assert_eq!(backups(dir.path()), [backup_of(CURRENT)]);
     }
 
     #[test]
     fn backup_is_made_again_when_the_data_changed_since_the_last_one() {
         let dir = tempdir().unwrap();
-        v2_database(&dir);
-        let migrations = failing_v3();
+        current_database(&dir);
+        let migrations = failing_next();
         drop(open_with(dir.path(), &migrations));
-        // Back to a build that opens version 2, and a change there.
+        // Back to a build that opens the current version, and a change there.
         let mut storage = Storage::open(dir.path());
         widgets_repo::add(storage.connection().unwrap(), WidgetKind::Note).unwrap();
         drop(storage);
@@ -1133,7 +1143,7 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
 
         assert_eq!(
             backups(dir.path()),
-            ["dockmax.db.bak-v2", "dockmax.db.bak-v2-2"]
+            [backup_of(CURRENT), format!("{}-2", backup_of(CURRENT))]
         );
         let widgets_in = |name: &str| -> i64 {
             inspect(&dir.path().join(name))
@@ -1142,32 +1152,35 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
                 })
                 .unwrap()
         };
-        assert_eq!(widgets_in("dockmax.db.bak-v2"), 4);
-        assert_eq!(widgets_in("dockmax.db.bak-v2-2"), 5);
+        assert_eq!(widgets_in(&backup_of(CURRENT)), 4);
+        assert_eq!(widgets_in(&format!("{}-2", backup_of(CURRENT))), 5);
     }
 
     #[test]
     fn backup_never_replaces_an_earlier_one() {
         let dir = tempdir().unwrap();
-        v2_database(&dir);
-        let earlier = dir.path().join("dockmax.db.bak-v2");
+        current_database(&dir);
+        let earlier = dir.path().join(backup_of(CURRENT));
         fs::write(&earlier, "an earlier backup").unwrap();
-        let migrations = up_to_v3();
+        let migrations = newer();
 
         let storage = open_with(dir.path(), &migrations);
 
         assert_eq!(storage.status(), StorageStatus::Ok);
         assert_eq!(fs::read_to_string(&earlier).unwrap(), "an earlier backup");
-        assert_eq!(user_version(&dir.path().join("dockmax.db.bak-v2-2")), 2);
+        assert_eq!(
+            user_version(&dir.path().join(format!("{}-2", backup_of(CURRENT)))),
+            CURRENT
+        );
     }
 
     #[test]
     fn failed_migration_leaves_the_file_as_it_was() {
         let dir = tempdir().unwrap();
-        v2_database(&dir);
+        current_database(&dir);
         let path = db_path(&dir);
         let original = fs::read(&path).unwrap();
-        let migrations = failing_v3();
+        let migrations = failing_next();
 
         let mut storage = open_with(dir.path(), &migrations);
 
@@ -1183,7 +1196,7 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
         );
         drop(storage);
         assert_eq!(fs::read(&path).unwrap(), original);
-        assert_eq!(user_version(&path), 2);
+        assert_eq!(user_version(&path), CURRENT);
         let half_done: i64 = inspect(&path)
             .query_row(
                 "SELECT count(*) FROM sqlite_schema WHERE name = 'half_done'",
@@ -1197,7 +1210,7 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
     #[test]
     fn newer_database_is_left_untouched_and_unavailable() {
         let dir = tempdir().unwrap();
-        let migrations = up_to_v3();
+        let migrations = newer();
         drop(open_with(dir.path(), &migrations));
         let path = db_path(&dir);
         let bytes = fs::read(&path).unwrap();
@@ -1215,7 +1228,7 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
         assert_eq!(fs::read(&path).unwrap(), bytes);
         assert_eq!(modified(&path), mtime);
         assert_eq!(file_names(dir.path()), names);
-        assert_eq!(user_version(&path), 3);
+        assert_eq!(user_version(&path), CURRENT + 1);
     }
 
     #[test]
@@ -1223,7 +1236,7 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
         // A copy taken while the database is open: the newer changes are
         // still in the `-wal`, not in the file.
         let live = tempdir().unwrap();
-        let migrations = up_to_v3();
+        let migrations = newer();
         let storage = open_with(live.path(), &migrations);
         let dir = tempdir().unwrap();
         for name in [FILE_NAME, "dockmax.db-wal", "dockmax.db-shm"] {
@@ -1315,7 +1328,7 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
             fs::read_to_string(dir.path().join(format!("{aside}-journal"))).unwrap(),
             "old journal"
         );
-        assert_eq!(user_version(&path), 2);
+        assert_eq!(user_version(&path), CURRENT);
     }
 
     /// The `-wal` and `-shm` of a live database with a saved note, copied
@@ -1494,7 +1507,7 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
     #[test]
     fn corrupt_pages_are_detected_and_set_aside() {
         let dir = tempdir().unwrap();
-        v2_database(&dir);
+        current_database(&dir);
         let path = db_path(&dir);
         let mut bytes = fs::read(&path).unwrap();
         let page_size = usize::from(u16::from_be_bytes([bytes[16], bytes[17]]));
@@ -1601,7 +1614,7 @@ CREATE TRIGGER refuse_seed BEFORE INSERT ON widget_instances          BEGIN SELE
     #[test]
     fn read_only_file_is_open_failed_and_untouched() {
         let dir = tempdir().unwrap();
-        v2_database(&dir);
+        current_database(&dir);
         let path = db_path(&dir);
         let bytes = fs::read(&path).unwrap();
         let read_only = ReadOnly::set(&path);

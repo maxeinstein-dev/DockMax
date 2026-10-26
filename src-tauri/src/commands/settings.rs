@@ -12,8 +12,8 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use std::collections::BTreeMap;
 
 use crate::domain::settings::{
-    DockEdge, DockOpacity, DockSettings, DockStyle, HoverEffect, Indicator, Settings,
-    SettingsError, SettingsErrorCode, StyleTweaks, TaskbarMode, Theme,
+    DockEdge, DockOpacity, DockSettings, DockStyle, HoverEffect, IconShape, Indicator,
+    OpenAnimation, Settings, SettingsError, SettingsErrorCode, StyleTweaks, TaskbarMode, Theme,
 };
 use crate::persistence::settings_file::{self, FILE_NAME};
 use crate::windows::dock;
@@ -50,6 +50,8 @@ struct DockSettingsInput {
     /// An `Option` that serde fills with `None` when missing: the interface
     /// always sends it, as `null` for the style's own color.
     indicator_color: Option<String>,
+    icon_shape: IconShape,
+    open_animation: OpenAnimation,
     taskbar: TaskbarMode,
     bottom_space: u8,
 }
@@ -75,6 +77,8 @@ impl From<SettingsInput> for Settings {
                 hover_scale: dock.hover_scale,
                 indicator: dock.indicator,
                 indicator_color: dock.indicator_color,
+                icon_shape: dock.icon_shape,
+                open_animation: dock.open_animation,
                 taskbar: dock.taskbar,
                 bottom_space: dock.bottom_space,
             },
@@ -318,7 +322,7 @@ mod tests {
     }
 
     /// The look fields of a full update payload.
-    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","taskbar":"hidden","bottomSpace":2"##;
+    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","openAnimation":"pulse","taskbar":"hidden","bottomSpace":2"##;
 
     fn full() -> String {
         format!(
@@ -351,6 +355,8 @@ mod tests {
                     hover_scale: 120,
                     indicator: Indicator::Dash,
                     indicator_color: Some("#0A84FF".into()),
+                    icon_shape: IconShape::Uniform,
+                    open_animation: OpenAnimation::Pulse,
                     taskbar: TaskbarMode::Hidden,
                     bottom_space: 2,
                 },

@@ -135,6 +135,10 @@ pub struct DockSettings {
     pub indicator: Indicator,
     /// `#RRGGBB`, or `None` for the style's own color.
     pub indicator_color: Option<String>,
+    /// How a pinned program's icon sits in its tile (spec 0006 B2).
+    pub icon_shape: IconShape,
+    /// What a program's icon does while it opens (spec 0006 B2).
+    pub open_animation: OpenAnimation,
     /// What the dock does with the Windows taskbar (ADR 0009).
     pub taskbar: TaskbarMode,
     /// Distance between the dock and the screen edge, in logical pixels,
@@ -154,6 +158,8 @@ impl Default for DockSettings {
             hover_scale: DEFAULT_HOVER_SCALE,
             indicator: Indicator::default(),
             indicator_color: None,
+            icon_shape: IconShape::default(),
+            open_animation: OpenAnimation::default(),
             taskbar: TaskbarMode::default(),
             bottom_space: DEFAULT_BOTTOM_SPACE,
         }
@@ -230,6 +236,32 @@ pub enum Indicator {
     #[default]
     Dot,
     Dash,
+}
+
+/// How a pinned program's icon sits in its tile.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IconShape {
+    /// On a rounded plate, with room around it.
+    #[default]
+    Plate,
+    /// Without a plate, every icon filling the same square.
+    Uniform,
+    /// Without a plate, as the program drew it.
+    Original,
+}
+
+/// What a program's icon does while the program opens.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OpenAnimation {
+    /// It jumps, away from the screen edge.
+    #[default]
+    Bounce,
+    /// It swells and shrinks.
+    Pulse,
+    /// It shakes from side to side.
+    Shake,
 }
 
 impl DockSettings {
@@ -445,6 +477,7 @@ mod tests {
                 "edge": "bottom", "iconSize": 48, "opacity": "translucent",
                 "style": "native", "tweaks": {}, "hover": "scale", "hoverScale": 110,
                 "indicator": "dot", "indicatorColor": null,
+                "iconShape": "plate", "openAnimation": "bounce",
                 "taskbar": "hidden", "bottomSpace": 2
               }
             }"#,
@@ -472,7 +505,25 @@ mod tests {
         assert_eq!(settings.dock.hover_scale, 110);
         assert_eq!(settings.dock.indicator, Indicator::Dot);
         assert_eq!(settings.dock.indicator_color, None);
+        assert_eq!(settings.dock.icon_shape, IconShape::Plate);
+        assert_eq!(settings.dock.open_animation, OpenAnimation::Bounce);
         assert_eq!(settings.validate(), Ok(()));
+    }
+
+    #[test]
+    fn icon_shapes_and_open_animations_use_their_lowercase_names() {
+        let settings: Settings =
+            serde_json::from_str(r#"{"dock":{"iconShape":"original","openAnimation":"shake"}}"#)
+                .unwrap();
+
+        assert_eq!(settings.dock.icon_shape, IconShape::Original);
+        assert_eq!(settings.dock.open_animation, OpenAnimation::Shake);
+        for name in ["plate", "uniform", "original"] {
+            let json = format!(r#"{{"dock":{{"iconShape":"{name}"}}}}"#);
+            assert!(serde_json::from_str::<Settings>(&json).is_ok(), "{name}");
+        }
+        assert!(serde_json::from_str::<Settings>(r#"{"dock":{"iconShape":"Plate"}}"#).is_err());
+        assert!(serde_json::from_str::<Settings>(r#"{"dock":{"openAnimation":"spin"}}"#).is_err());
     }
 
     fn with_dock(change: impl FnOnce(&mut DockSettings)) -> Settings {

@@ -99,15 +99,27 @@ pub fn catalog() -> Result<Vec<CatalogApp>, String> {
     Ok(tidy(apps))
 }
 
-/// The item of one program, by the id the catalog gave.
+/// The item of a program of the Apps folder, by the id the catalog gave.
 #[cfg(windows)]
-fn item_of(id: &str) -> Result<IShellItem, String> {
+fn apps_folder_item(id: &str) -> Result<IShellItem, String> {
     if !is_valid_app_id(id) {
         return Err("the id is not one of the Apps folder".to_owned());
     }
     init_com();
     let name = HSTRING::from(format!("shell:AppsFolder\\{id}"));
     unsafe { SHCreateItemFromParsingName(&name, None) }.map_err(|error| error.to_string())
+}
+
+/// The item of a program: the one in the Apps folder or, for a program that
+/// was dropped on the dock and the Apps folder doesn't list, its file (the id
+/// is then the path, see `domain::apps::is_pinnable_path`).
+#[cfg(windows)]
+fn item_of(id: &str) -> Result<IShellItem, String> {
+    apps_folder_item(id).or_else(|error| {
+        let path = file_of(id).ok_or(error)?;
+        let name = HSTRING::from(path.as_os_str());
+        unsafe { SHCreateItemFromParsingName(&name, None) }.map_err(|error| error.to_string())
+    })
 }
 
 /// The name the shell shows for the program, or `None` when the id is not
@@ -138,11 +150,16 @@ pub fn app_user_model_id(id: &str) -> Option<String> {
     }
     init_com();
     let name = HSTRING::from(format!("shell:AppsFolder\\{id}"));
-    let store: IPropertyStore =
-        unsafe { SHGetPropertyStoreFromParsingName(&name, None, GPS_DEFAULT) }.ok()?;
-    let value = unsafe { store.GetValue(&PKEY_APP_USER_MODEL_ID) }.ok()?;
-    let text = value.to_string();
-    (!text.is_empty()).then_some(text)
+    let listed = unsafe {
+        SHGetPropertyStoreFromParsingName::<_, _, IPropertyStore>(&name, None, GPS_DEFAULT)
+    }
+    .ok()
+    .and_then(|store| unsafe { store.GetValue(&PKEY_APP_USER_MODEL_ID) }.ok())
+    .map(|value| value.to_string())
+    .filter(|text| !text.is_empty());
+    // A program the Apps folder doesn't list has the AppID the shell gives
+    // an executable that sets none: its path.
+    listed.or_else(|| file_of(id).map(|path| path.to_string_lossy().into_owned()))
 }
 
 #[cfg(not(windows))]
@@ -194,7 +211,12 @@ pub fn launch(id: &str) -> Result<(), String> {
         return Err("the id is not one of the Apps folder".to_owned());
     }
     init_com();
-    let target = HSTRING::from(format!("shell:AppsFolder\\{id}"));
+    // A program of the Apps folder opens as the Start menu opens it; a file
+    // the Apps folder doesn't list (dropped on the dock) opens as itself.
+    let target = match apps_folder_item(id) {
+        Ok(_) => HSTRING::from(format!("shell:AppsFolder\\{id}")),
+        Err(error) => HSTRING::from(file_of(id).ok_or(error)?.as_os_str()),
+    };
     let result = unsafe {
         ShellExecuteW(
             None,

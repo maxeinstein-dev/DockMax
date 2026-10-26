@@ -13,11 +13,12 @@ use std::sync::{Mutex, PoisonError};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use super::widgets::lock;
 use crate::domain::apps::{
-    AppError, AppErrorCode, AppsSnapshot, PinnedApp, is_valid_app_id, is_valid_app_name,
+    AppError, AppErrorCode, AppsSnapshot, PinnedApp, is_pinnable_path, is_valid_app_id,
+    is_valid_app_name,
 };
 use crate::domain::widgets::{MoveDirection, WidgetId};
 use crate::persistence::apps_repo;
@@ -69,6 +70,26 @@ pub fn unpin(storage: &mut Storage, id: &str) -> Result<(), AppError> {
 /// Moves the program `id` one place up or down.
 pub fn shift(storage: &mut Storage, id: &str, direction: MoveDirection) -> Result<(), AppError> {
     apps_repo::shift(storage.connection()?, &WidgetId::parse(id)?, direction)
+}
+
+/// Puts the program `id` at `index` among the pinned ones.
+pub fn place(storage: &mut Storage, id: &str, index: usize) -> Result<(), AppError> {
+    apps_repo::place(storage.connection()?, &WidgetId::parse(id)?, index)
+}
+
+/// The paths of what was dropped on the dock that can be pinned, with no
+/// repeats, in the order dropped: a program or a shortcut on a drive that
+/// exists (`is_pinnable_path`, then the disk).
+pub fn droppable(paths: &[std::path::PathBuf]) -> Vec<String> {
+    let mut found: Vec<String> = Vec::new();
+    for path in paths {
+        let Some(text) = path.to_str() else { continue };
+        let known = found.iter().any(|seen| seen.eq_ignore_ascii_case(text));
+        if is_pinnable_path(text) && path.is_file() && !known {
+            found.push(text.to_owned());
+        }
+    }
+    found
 }
 
 /// The parsing name of the pinned program `id`, to open it.
@@ -223,6 +244,46 @@ pub fn unpin_app(
     id: String,
 ) -> Result<(), AppCommandError> {
     change(&app, &state, "unpin", |storage| unpin(storage, &id))
+}
+
+/// Puts a program where the user dropped it among the others (the dock's
+/// drag). The dock may ask: it only orders what is already pinned.
+#[tauri::command]
+pub fn place_app(
+    app: AppHandle,
+    state: State<'_, Mutex<Storage>>,
+    id: String,
+    index: usize,
+) -> Result<(), AppCommandError> {
+    change(&app, &state, "place", |storage| place(storage, &id, index))
+}
+
+/// Pins what was dropped on the dock, at the end of the programs. Comes from
+/// the dock's own drop target (`windows::drop_target`), not from the page, so only
+/// what the user really dropped can be pinned. Reading the names takes the
+/// shell's time: off the event loop.
+pub fn pin_dropped(app: &AppHandle, paths: Vec<std::path::PathBuf>) {
+    let wanted = droppable(&paths);
+    if wanted.is_empty() {
+        return;
+    }
+    let app = app.clone();
+    let spawned = std::thread::Builder::new()
+        .name("dock-drop".into())
+        .spawn(move || {
+            let state = app.state::<Mutex<Storage>>();
+            for id in wanted {
+                let Some(name) = apps::name_of(&id).filter(|name| is_valid_app_name(name)) else {
+                    log::warn!("apps: a dropped file has no name the shell knows");
+                    continue;
+                };
+                // An error is already in the log; the rest still go in.
+                let _ = change(&app, &state, "drop", |storage| pin(storage, &id, &name));
+            }
+        });
+    if let Err(error) = spawned {
+        log::warn!("apps: the drop could not be handled: {error}");
+    }
 }
 
 #[tauri::command]
@@ -411,6 +472,50 @@ mod tests {
             target_of(&mut storage, pinned.id.as_str()),
             Ok("Some.App!App".to_owned())
         );
+    }
+
+    #[test]
+    fn a_program_is_placed_where_it_was_dropped() {
+        let (_dir, mut storage) = open();
+        let a = pin(&mut storage, "a!App", "A").unwrap();
+        pin(&mut storage, "b!App", "B").unwrap();
+        pin(&mut storage, "c!App", "C").unwrap();
+
+        place(&mut storage, a.id.as_str(), 2).unwrap();
+
+        let names: Vec<_> = snapshot(&storage)
+            .unwrap()
+            .apps
+            .into_iter()
+            .map(|app| app.name)
+            .collect();
+        assert_eq!(names, ["B", "C", "A"]);
+        assert_eq!(place(&mut storage, "1", 0), Err(AppError::NotFound));
+    }
+
+    #[test]
+    fn only_programs_and_shortcuts_that_exist_are_taken_from_a_drop() {
+        let dir = tempdir().unwrap();
+        let exe = dir.path().join("Tool.exe");
+        let lnk = dir.path().join("Other.LNK");
+        let text = dir.path().join("notes.txt");
+        for file in [&exe, &lnk, &text] {
+            std::fs::write(file, b"x").unwrap();
+        }
+        let missing = dir.path().join("Gone.exe");
+
+        let taken = droppable(&[
+            exe.clone(),
+            text,
+            missing,
+            lnk.clone(),
+            // The same file twice, in another case.
+            std::path::PathBuf::from(exe.to_string_lossy().to_uppercase()),
+            dir.path().to_path_buf(),
+        ]);
+
+        let as_text = |path: &std::path::Path| path.to_string_lossy().into_owned();
+        assert_eq!(taken, [as_text(&exe), as_text(&lnk)]);
     }
 
     #[test]

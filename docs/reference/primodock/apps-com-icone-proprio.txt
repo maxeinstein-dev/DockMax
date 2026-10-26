@@ -1,0 +1,371 @@
+1Password
+1Password 7
+7-Zip
+7-Zip File Manager
+7zFM
+Acrobat
+Acrobat Reader
+AcroRd32
+Activity Monitor
+Adobe Acrobat
+Adobe Acrobat DC
+Adobe Acrobat Reader
+Adobe Acrobat Reader DC
+Adobe After Effects
+Adobe After Effects 2024
+Adobe After Effects 2025
+Adobe After Effects 2026
+Adobe Creative Cloud
+Adobe Illustrator
+Adobe Illustrator 2024
+Adobe Illustrator 2025
+Adobe Illustrator 2026
+Adobe InDesign
+Adobe InDesign 2024
+Adobe InDesign 2025
+Adobe InDesign 2026
+Adobe Lightroom
+Adobe Lightroom Classic
+Adobe Photoshop
+Adobe Photoshop 2024
+Adobe Photoshop 2025
+Adobe Photoshop 2026
+Adobe Premiere Pro
+Adobe Premiere Pro 2024
+Adobe Premiere Pro 2025
+Adobe Premiere Pro 2026
+Adobe Premiere Pro.exe
+Affinity
+After Effects
+AfterFX
+Alfred
+Alfred 5
+AMD Software
+AMD Software: Adrenalin Edition
+Android Studio
+AnyDesk
+App Store
+Apps
+Arc
+Audacity
+audacity
+Automator
+Avast
+Avast Antivirus
+Avast Free Antivirus
+AvastUI
+Battle.net
+Battle.net Launcher
+Bear
+Bitwarden
+Blender
+Bloco de Notas
+Bluetooth File Exchange
+Books
+Brave
+brave
+Brave Browser
+calc
+Calculator
+Calendar
+Canva
+CapCut
+ChatGPT
+Chess
+Chrome
+chrome
+Chromium
+Claude
+ClickUp
+Clock
+cmd
+Code
+Command Prompt
+Configurações
+Console
+Contacts
+Corsair iCUE
+Creative Cloud
+Cursor
+DaVinci Resolve
+DaVinci Resolve Studio
+DBeaver
+DBeaver CE
+DBeaverEE
+Deezer
+devenv
+Dia
+Dictionary
+Discord
+Disk Utility
+Docker
+Docker Desktop
+Dropbox
+DuckDuckGo
+EA
+EA app
+EADesktop
+Edge
+Epic Games
+Epic Games Launcher
+EpicGamesLauncher
+Este Computador
+Evernote
+Excel
+EXCEL
+Explorador de Arquivos
+explorer
+FaceTime
+Fantastical
+Figma
+File Explorer
+FileZilla
+filezilla
+Final Cut Pro
+Find My
+Finder
+Firefox
+Freeform
+Games
+GamingApp
+GarageBand
+Gemini
+Gerenciador de Tarefas
+Ghostty
+GIMP
+GIMP 2
+gimp-2.10
+Git Bash
+Git GUI
+git-bash
+GitHub Desktop
+GitHubDesktop
+Google Chrome
+Google Drive
+GoogleDriveFS
+Home
+iCUE
+iCUE5
+idea64
+IINA
+Illustrator
+Image Capture
+Image Playground
+immersivecontrolpanel
+InDesign
+Inkscape
+inkscape
+Instruments
+IntelliJ IDEA
+IntelliJ IDEA CE
+IntelliJ IDEA Ultimate
+iPhone Mirroring
+iTerm
+iTerm2
+iTunes
+Journal
+Keynote
+Krita
+krita
+League of Legends
+LibreOffice
+lightroom
+Lightroom Classic
+Linear
+Logic Pro
+Magnifier
+Mail
+Malwarebytes
+Maps
+mbam
+Messages
+Messenger
+Microsoft Edge
+Microsoft Excel
+Microsoft OneNote
+Microsoft Outlook
+Microsoft PowerPoint
+Microsoft Store
+Microsoft Teams
+Microsoft Teams (work or school)
+Microsoft Teams classic
+Microsoft To Do
+Microsoft Word
+Microsoft.GamingApp
+Microsoft.Paint
+Microsoft.SecHealthUI
+Microsoft.Todos
+Microsoft.Windows.Explorer
+Microsoft.Windows.Photos
+Microsoft.WindowsCalculator
+Microsoft.WindowsNotepad
+Microsoft.WindowsStore
+Microsoft.WindowsTerminal
+Microsoft.YourPhone
+Migration Assistant
+MiniMax Code
+Mozilla Firefox
+Mozilla Thunderbird
+ms-teams
+msedge
+MSI Afterburner
+MSI Center
+MSI Dragon Center
+MSIAfterburner
+mspaint
+MSTeams
+Music
+News
+Notepad++
+Notes
+Notion
+Numbers
+NVIDIA App
+NVIDIA Control Panel
+NVIDIA GeForce Experience
+OBS
+OBS Studio
+obs64
+Obsidian
+olk
+OneDrive
+OneNote
+ONENOTE
+OneNote for Windows 10
+Opera
+Opera GX
+Opera GX Browser
+Orion
+Orion Browser
+Outlook
+OUTLOOK
+Outlook (new)
+Pages
+Paint
+Parallels
+Parallels Desktop
+Passwords
+Pearcleaner
+Perplexity
+Phone Link
+Photo Booth
+Photos
+Photoshop
+Pixelmator Pro
+Podcasts
+Postman
+POWERPNT
+PowerPoint
+powershell
+PowerShell
+PowerShell 7
+Premiere Pro
+Preview
+Prompt de Comando
+pwsh
+PyCharm
+PyCharm CE
+PyCharm Community Edition
+PyCharm Professional Edition
+pycharm64
+qBittorrent
+QuickTime Player
+RadeonSoftware
+Raycast
+Razer Synapse
+Razer Synapse 3
+RazerAppEngine
+Reminders
+Resolve
+Riot Client
+RiotClientServices
+Safari
+Screen Sharing
+Script Editor
+SecHealthUI
+Segurança do Windows
+Settings
+Shortcuts
+Signal
+Sketch
+Slack
+soffice
+Spotify
+Steam
+Stickies
+Stocks
+studio64
+Sublime Text
+sublime_text
+System Settings
+Task Manager
+Taskmgr
+Teams
+TeamViewer
+Telegram
+Telegram Desktop
+TelegramDesktop
+Terminal
+TextEdit
+Things
+Things 3
+Things3
+This PC
+Thunderbird
+TIDAL
+Tips
+To Do
+Todoist
+Todos
+Tor
+Tor Browser
+Trello
+TV
+Ubisoft Connect
+UbisoftConnect
+UE5
+Unity
+Unity Hub
+Unreal Engine
+UnrealEditor
+upc
+VALORANT
+Vincular ao Celular
+Visual Studio
+Visual Studio 2022
+Visual Studio Code
+Vivaldi
+VLC
+vlc
+VLC media player
+Voice Memos
+Warp
+WebStorm
+webstorm64
+WhatsApp
+WhatsApp Desktop
+WhatsAppDesktop
+Windows PowerShell
+Windows Security
+Windows Terminal
+windows.immersivecontrolpanel
+WindowsCalculator
+WindowsNotepad
+WindowsStore
+WindowsTerminal
+Windsurf
+WinStore.App
+WINWORD
+Word
+wt
+Xbox
+Xcode
+YourPhone
+YouTube Music
+Zed
+Zen
+zen
+Zen Browser
+Zoom Meetings
+Zoom Workplace
+zoom.us

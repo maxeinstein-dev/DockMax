@@ -37,6 +37,7 @@ fn main() {
             "pin_app",
             "unpin_app",
             "move_app",
+            "place_app",
             "launch_app",
             "app_menu",
             "run_app_entry",

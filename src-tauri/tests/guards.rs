@@ -37,6 +37,11 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-list-apps",
             "allow-app-icon",
             "allow-launch-app",
+            // Dragging a pinned program along the bar puts it in its new
+            // place (spec 0006 B2); the command only orders what is
+            // already pinned. Pinning what is dropped is not here: the
+            // window hears the drop itself.
+            "allow-place-app",
             "log:allow-log",
         ],
     ),

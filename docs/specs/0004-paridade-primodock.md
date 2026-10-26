@@ -10,6 +10,8 @@
 - **REA** (`rea-agents` 6.7.0, usado pelo CLI, sem registrar o MCP na configuração do Claude Code): o inspetor .NET recusa o executável porque o limite de memória dele é 128 MB. A extração de nomes por strings do binário só devolveu ruído e foi abandonada; o inventário abaixo vem da configuração e do log.
 - **Capturas de tela do autor** (11 imagens do painel de configurações): preencheram as listas fechadas (temas, formatos, efeitos, animações, posições, pets) que a configuração não mostra. Faltam ainda o seletor de indicador, o IconStudio, a Licença (fora de escopo), a bandeja e a lista completa de widgets (só "Mídia e tempo" apareceu).
 
+- **Referência detalhada** (2026-10-25): os dados observados (esquema das configurações, espaços de trabalho, os 31 tipos de widget, formato dos pacotes de ícones e catálogo da galeria, comportamentos lidos do registro de execução, processos e memória) ficam em [`docs/reference/primodock/`](../reference/primodock/README.md), sem código, ativos nem dados de licença.
+
 ## 2. Limites da réplica
 
 | Replicar | Não replicar |
@@ -150,6 +152,7 @@ Ordem sugerida: A → B → D → C → E → F → G. A fase D vem cedo porque 
 
 ## 7. Pendências para o autor
 
-- Capturas que ainda faltam: ver a lista pedida ao autor em 2026-10-22 (seletor de indicador, painel da bandeja, menu de um app, configurações dos widgets de relógio, clima, água e IA, e o Dock nos outros temas).
+- Capturas: feitas em 2026-10-25 e descritas em [`docs/reference/primodock/interface.md`](../reference/primodock/interface.md) (menus, bandeja, todas as abas de configuração, os temas e as quatro bordas no dock). Faltam só a animação de abertura num app de verdade, o mascote comendo e o tour.
+- **Prioridade (autor, 2026-10-25):** os temas sazonais e o tema Canarinho ficam de fora por enquanto. O Canarinho já existe no DockMax desde a fase A1 e continua lá, sem mais trabalho; os sazonais saem da fase G até segunda ordem.
 - Confirmar a ordem das fases e se o spike da barra de aplicativos vem primeiro.
 - Feito em 2026-10-22: `PRODUCT.md`, ADR 0009 (substitui a convivência do ADR 0004) e licença de uso pessoal. Falta atualizar o roadmap quando a ordem das fases for aprovada.

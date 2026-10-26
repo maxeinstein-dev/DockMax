@@ -85,6 +85,8 @@ function applyLook(root: HTMLElement, settings: Settings) {
   root.dataset.border = look.border ? "on" : "off";
   root.dataset.reflect = look.reflections ? "on" : "off";
   root.dataset.indicator = look.indicator;
+  root.dataset.iconShape = settings.dock.iconShape;
+  root.dataset.openAnimation = settings.dock.openAnimation;
   root.style.setProperty("--corners", String(look.corners / 100));
   if (look.indicatorColor === null) {
     root.style.removeProperty("--indicator-color");

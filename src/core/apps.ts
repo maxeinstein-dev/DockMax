@@ -109,6 +109,7 @@ export const APP_COMMANDS = {
   pin: "pin_app",
   unpin: "unpin_app",
   move: "move_app",
+  place: "place_app",
   launch: "launch_app",
   menu: "app_menu",
   runEntry: "run_app_entry",
@@ -168,6 +169,14 @@ export function unpinApp(id: WidgetId): Promise<void> {
 export function moveApp(id: WidgetId, direction: MoveDirection): Promise<void> {
   return run(APP_COMMANDS.move, { id, direction }, (error) =>
     log.warn(`apps: move failed: ${errorKind(error)}`),
+  );
+}
+
+/** Puts a pinned program at `index` among the pinned ones (the dock's drag):
+ * the others close up around it. */
+export function placeApp(id: WidgetId, index: number): Promise<void> {
+  return run(APP_COMMANDS.place, { id, index }, (error) =>
+    log.warn(`apps: place failed: ${errorKind(error)}`),
   );
 }
 

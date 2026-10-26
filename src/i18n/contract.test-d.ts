@@ -55,6 +55,18 @@ export const otherText: Messages = {
       hoverScale: "Hover scale",
       indicator: "Indicator",
       indicatorOptions: { dot: "Dot", dash: "Dash" },
+      iconShape: "Icon shape",
+      iconShapeOptions: {
+        plate: "Rounded plates",
+        uniform: "Same size",
+        original: "As they came",
+      },
+      openAnimation: "Opening animation",
+      openAnimationOptions: {
+        bounce: "Bounce",
+        pulse: "Pulse",
+        shake: "Shake",
+      },
       indicatorColor: "Indicator color",
       indicatorDefault: "Default",
       colors: {
