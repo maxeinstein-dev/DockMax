@@ -3,5 +3,6 @@
 
 pub mod apps;
 pub mod icon_pack;
+pub mod open_apps;
 pub mod settings;
 pub mod widgets;

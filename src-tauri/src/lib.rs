@@ -141,6 +141,8 @@ pub fn run() {
             commands::settings::sync_launch_at_login(app.handle());
             windows::panel::setup(app.handle())?;
             windows::dock::setup(app.handle())?;
+            #[cfg(windows)]
+            windows::open_apps::start(app.handle());
             tray::setup(app.handle())?;
             Ok(())
         })
@@ -170,6 +172,8 @@ pub fn run() {
             commands::apps::move_app,
             commands::apps::place_app,
             commands::apps::launch_app,
+            commands::apps::list_open_apps,
+            commands::apps::activate_app,
             commands::apps::app_menu,
             commands::apps::run_app_entry,
             commands::apps::reveal_app,

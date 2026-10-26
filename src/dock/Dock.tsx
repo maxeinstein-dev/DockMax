@@ -33,6 +33,7 @@ import {
   type SetDockLayoutArgs,
 } from "../core/dock";
 import { ICONS_CHANGED_EVENT } from "../core/iconPacks";
+import { activateApp, useOpenApps } from "../core/openApps";
 import { errorKind, log } from "../core/log";
 import {
   PANEL_CHANGED_EVENT,
@@ -334,6 +335,8 @@ function Dock() {
   const settings = useAppearance("dock");
   const snapshot = useWidgets();
   const appsSnapshot = useApps();
+  // Which pinned programs have windows open (spec 0009).
+  const openApps = useOpenApps();
   // The icons depend on the pack in use and on what the pack folder holds
   // (spec 0007): either changing asks for them again.
   const [iconsEpoch, setIconsEpoch] = useState(0);
@@ -551,7 +554,16 @@ function Dock() {
     const entry = entries[index];
     const anchor = restItems[index];
     if (entry?.app) {
-      launch(entry.key, entry.app);
+      const app = entry.app;
+      if (openApps.has(app.id)) {
+        // Open already: to the front (or away, or to its next window); a
+        // program whose windows closed meanwhile is opened.
+        void activateApp(app.id).then((done) => {
+          if (!done) launch(entry.key, app);
+        });
+      } else {
+        launch(entry.key, app);
+      }
     } else if (entry && anchor) {
       openPanel(entry.panelId, anchor);
     }
@@ -723,6 +735,10 @@ function Dock() {
         tabIndex={index === currentIndex ? 0 : -1}
         data-magnify={magnifyRole(index, magnified, hover.effect) ?? undefined}
         data-opening={opening.has(entry.key) ? "" : undefined}
+        data-running={entry.app && openApps.has(entry.app.id) ? "" : undefined}
+        data-active={
+          entry.app && openApps.get(entry.app.id)?.active ? "" : undefined
+        }
         data-dragging={drag?.key === entry.key ? "" : undefined}
         data-drop={dropSide(index)}
         style={

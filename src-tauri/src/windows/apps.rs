@@ -58,7 +58,7 @@ fn tidy(mut apps: Vec<CatalogApp>) -> Vec<CatalogApp> {
 }
 
 #[cfg(windows)]
-fn init_com() {
+pub(super) fn init_com() {
     // Already initialized in another mode (the main thread's): fine either
     // way, the call only has to have been made on this thread.
     let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
@@ -164,6 +164,51 @@ pub fn app_user_model_id(id: &str) -> Option<String> {
 
 #[cfg(not(windows))]
 pub fn app_user_model_id(_id: &str) -> Option<String> {
+    None
+}
+
+/// `System.Link.TargetParsingPath`: the file a shortcut of the Apps folder
+/// opens.
+#[cfg(windows)]
+const PKEY_LINK_TARGET_PARSING_PATH: PROPERTYKEY = PROPERTYKEY {
+    fmtid: ::windows::core::GUID::from_u128(0xb9b4b3fc_2b51_4a42_b5d8_324146afcf25),
+    pid: 2,
+};
+
+/// The program file the item `id` of the Apps folder runs, for a classic
+/// program (a Store app has none). A program dropped on the dock is its own
+/// file.
+#[cfg(windows)]
+pub fn target_of(id: &str) -> Option<std::path::PathBuf> {
+    if !is_valid_app_id(id) {
+        return None;
+    }
+    init_com();
+    let name = match file_of(id) {
+        // A program dropped on the dock is its own file; a shortcut dropped
+        // on it runs what it points to.
+        Some(file)
+            if !file
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("lnk")) =>
+        {
+            return Some(file);
+        }
+        Some(shortcut) => HSTRING::from(shortcut.as_os_str()),
+        None => HSTRING::from(format!("shell:AppsFolder\\{id}")),
+    };
+    let target = unsafe {
+        SHGetPropertyStoreFromParsingName::<_, _, IPropertyStore>(&name, None, GPS_DEFAULT)
+    }
+    .ok()
+    .and_then(|store| unsafe { store.GetValue(&PKEY_LINK_TARGET_PARSING_PATH) }.ok())
+    .map(|value| value.to_string())
+    .filter(|text| !text.is_empty())?;
+    Some(std::path::PathBuf::from(target))
+}
+
+#[cfg(not(windows))]
+pub fn target_of(_id: &str) -> Option<std::path::PathBuf> {
     None
 }
 

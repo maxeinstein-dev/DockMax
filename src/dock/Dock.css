@@ -273,6 +273,16 @@
   opacity: 1;
 }
 
+/* A pinned program with windows open (spec 0009) wears the same mark: fainter
+   while the user is elsewhere, full while the user is in it. */
+.dock-item[data-running] .dock-dot {
+  opacity: 0.55;
+}
+
+.dock-item[data-running][data-active] .dock-dot {
+  opacity: 1;
+}
+
 /* The styles of the bar (spec 0005 §3.2), chosen by data-style on <html>.
    Each sets the bar's own colors through --bar-bg, --bar-line, --bar-glow,
    --bar-sep and --ind-default; Nativo is the base look above and has no

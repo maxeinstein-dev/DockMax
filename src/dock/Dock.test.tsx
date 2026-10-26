@@ -211,6 +211,8 @@ describe("Dock", () => {
   let current: Settings;
   let snapshot: WidgetsSnapshot;
   let pinned: AppsSnapshot;
+  let openNow: { id: string; count: number; active: boolean }[];
+  let activates: boolean;
   let icon: string | null;
 
   beforeEach(() => {
@@ -220,6 +222,8 @@ describe("Dock", () => {
     current = MEDIUM;
     snapshot = NO_WIDGETS;
     pinned = NO_APPS;
+    openNow = [];
+    activates = true;
     icon = ICON;
     forgetIcons();
     invoke.mockReset();
@@ -231,9 +235,13 @@ describe("Dock", () => {
             ? snapshot
             : command === "list_apps"
               ? pinned
-              : command === "app_icon"
-                ? icon
-                : undefined,
+              : command === "list_open_apps"
+                ? openNow
+                : command === "activate_app"
+                  ? activates
+                  : command === "app_icon"
+                    ? icon
+                    : undefined,
       ),
     );
     vi.stubGlobal("innerWidth", MEDIUM_WINDOW.width);
@@ -1194,6 +1202,88 @@ describe("Dock", () => {
       await act(async () => {});
 
       expect(iconCalls()).toHaveLength(2);
+    });
+
+    describe("open programs (spec 0009)", () => {
+      const marked = (name: string) =>
+        program(name).hasAttribute("data-running");
+
+      it("marks the pinned programs that have windows open, and the one the user is in", async () => {
+        pinned = withApps(CALCULATOR, NOTEPAD);
+        openNow = [{ id: CALCULATOR.id, count: 1, active: true }];
+        await renderDock();
+
+        expect(marked("Calculadora")).toBe(true);
+        expect(program("Calculadora")).toHaveAttribute("data-active");
+        expect(marked("Bloco de notas")).toBe(false);
+        expect(program("Bloco de notas")).not.toHaveAttribute("data-active");
+      });
+
+      it("follows the windows as they open, change front and close", async () => {
+        pinned = withApps(CALCULATOR, NOTEPAD);
+        await renderDock();
+        expect(marked("Bloco de notas")).toBe(false);
+
+        emit("open-windows-changed", [
+          { id: NOTEPAD.id, count: 2, active: false },
+        ]);
+        expect(marked("Bloco de notas")).toBe(true);
+        expect(program("Bloco de notas")).not.toHaveAttribute("data-active");
+
+        emit("open-windows-changed", [
+          { id: NOTEPAD.id, count: 2, active: true },
+        ]);
+        expect(program("Bloco de notas")).toHaveAttribute("data-active");
+
+        emit("open-windows-changed", []);
+        expect(marked("Bloco de notas")).toBe(false);
+      });
+
+      it("brings an open program to the front instead of opening it again", async () => {
+        pinned = withApps(CALCULATOR);
+        openNow = [{ id: CALCULATOR.id, count: 1, active: false }];
+        await renderDock();
+
+        fireEvent.click(program("Calculadora"));
+        await act(async () => {});
+
+        expect(invoke).toHaveBeenCalledWith("activate_app", {
+          id: CALCULATOR.id,
+        });
+        expect(invoke).not.toHaveBeenCalledWith(
+          "launch_app",
+          expect.anything(),
+        );
+        expect(program("Calculadora")).not.toHaveAttribute("data-opening");
+      });
+
+      it("opens it after all when its windows closed meanwhile", async () => {
+        pinned = withApps(CALCULATOR);
+        openNow = [{ id: CALCULATOR.id, count: 1, active: false }];
+        activates = false;
+        await renderDock();
+
+        fireEvent.click(program("Calculadora"));
+        await act(async () => {});
+
+        expect(invoke).toHaveBeenCalledWith("launch_app", {
+          id: CALCULATOR.id,
+        });
+      });
+
+      it("opens a program that is not open, as before", async () => {
+        pinned = withApps(CALCULATOR, NOTEPAD);
+        openNow = [{ id: CALCULATOR.id, count: 1, active: false }];
+        await renderDock();
+
+        fireEvent.click(program("Bloco de notas"));
+
+        expect(invoke).toHaveBeenCalledWith("launch_app", { id: NOTEPAD.id });
+        expect(invoke).not.toHaveBeenCalledWith(
+          "activate_app",
+          expect.anything(),
+        );
+      });
     });
 
     it("shows the first letter of the name while the icon is not there, and when Windows has none", async () => {

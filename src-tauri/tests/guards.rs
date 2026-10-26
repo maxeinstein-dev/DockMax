@@ -37,6 +37,8 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-list-apps",
             "allow-app-icon",
             "allow-launch-app",
+            "allow-list-open-apps",
+            "allow-activate-app",
             // Dragging a pinned program along the bar puts it in its new
             // place (spec 0006 B2); the command only orders what is
             // already pinned. Pinning what is dropped is not here: the
