@@ -320,10 +320,11 @@ fn look(app: &AppHandle) {
     let after = snapshot_of(&after_state);
     let before = snapshot_of(&state());
     *state() = after_state;
-    if before != after
-        && let Err(error) = app.emit(CHANGED_EVENT, &after)
-    {
-        log::warn!("windows: could not announce the open programs: {error}");
+    if before != after {
+        if let Err(error) = app.emit(CHANGED_EVENT, &after) {
+            log::warn!("windows: could not announce the open programs: {error}");
+        }
+        super::dock::refresh();
     }
 }
 

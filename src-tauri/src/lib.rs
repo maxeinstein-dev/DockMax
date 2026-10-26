@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Mutex, PoisonError};
 
 use tauri::{
     Builder, Manager, RunEvent, Runtime, Wry, plugin::TauriPlugin, webview::PageLoadEvent,
@@ -43,22 +43,13 @@ fn startup() -> TauriPlugin<Wry> {
 /// with it.
 #[doc(hidden)]
 pub fn with_state<R: Runtime>(builder: Builder<R>) -> Builder<R> {
-    builder
-        .manage(Arc::new(windows::hit_test::Tracker::default()))
-        .manage(Mutex::new(windows::dock::Placement::default()))
-        .manage(Mutex::new(windows::panel::PanelState::default()))
+    builder.manage(Mutex::new(windows::panel::PanelState::default()))
 }
 
 /// The states `with_state` manages that `app` has, by type name.
 #[doc(hidden)]
 pub fn managed_state<R: Runtime>(app: &impl Manager<R>) -> Vec<&'static str> {
     let mut found = Vec::new();
-    if app.try_state::<Arc<windows::hit_test::Tracker>>().is_some() {
-        found.push("Arc<Tracker>");
-    }
-    if app.try_state::<Mutex<windows::dock::Placement>>().is_some() {
-        found.push("Mutex<Placement>");
-    }
     if app
         .try_state::<Mutex<windows::panel::PanelState>>()
         .is_some()
@@ -130,15 +121,7 @@ pub fn run() {
             if payload.event() == PageLoadEvent::Finished {
                 windows::memory::page_loaded(webview.app_handle(), webview.label());
                 #[cfg(windows)]
-                if webview.label() == windows::dock::LABEL
-                    && let Some(window) = webview.app_handle().get_webview_window(webview.label())
-                {
-                    windows::drop_target::install(&window);
-                }
-                #[cfg(windows)]
-                if webview.label() == windows::dock::LABEL
-                    && let Some(window) = webview.app_handle().get_webview_window(webview.label())
-                {
+                if let Some(window) = webview.app_handle().get_webview_window(webview.label()) {
                     windows::recovery::watch(&window);
                 }
             }
@@ -152,12 +135,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::panel::toggle_panel,
             commands::panel::hide_panel,
             commands::panel::panel_ready,
             commands::panel::panel_mounted,
-            commands::panel::warm_panel,
-            commands::dock::set_dock_layout,
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::widgets::list_widgets,
@@ -168,7 +148,6 @@ pub fn run() {
             commands::widgets::get_note,
             commands::widgets::save_note,
             commands::widgets::dismiss_storage_notice,
-            commands::system::open_flyout,
             commands::tray::list_tray,
             commands::tray::tray_click,
             commands::apps::list_apps,
@@ -210,7 +189,6 @@ pub fn run() {
                     windows::appbar::remove();
                     windows::taskbar::release();
                 }
-                windows::hit_test::tracker(app).stop();
                 // The process ends without closing the widget database:
                 // leave the file complete on its own, `-wal` applied.
                 if let Some(storage) = app.try_state::<Mutex<persistence::database::Storage>>() {

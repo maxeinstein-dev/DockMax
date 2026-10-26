@@ -225,6 +225,7 @@ fn change<T>(
     {
         log::warn!("widgets: {what} saved, but failed to notify the windows: {error}");
     }
+    crate::windows::dock::refresh();
     Ok(changed.value)
 }
 

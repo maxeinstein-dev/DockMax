@@ -10,6 +10,24 @@
 pub struct Messages {
     pub tray: TrayMessages,
     pub settings: SettingsMessages,
+    pub dock: DockMessages,
+}
+
+/// The dock's own texts (spec 0011 H3): the names of its items, in their
+/// labels, and what a live tile shows without a value.
+#[derive(Debug)]
+pub struct DockMessages {
+    pub settings: &'static str,
+    pub about: &'static str,
+    pub tray: &'static str,
+    /// The names of the widget kinds, for an instance without a label.
+    pub clock: &'static str,
+    pub time_progress: &'static str,
+    pub note: &'static str,
+    pub shortcut: &'static str,
+    pub files: &'static str,
+    /// The progress tile without a period running.
+    pub no_value: &'static str,
 }
 
 /// The Configurações app (spec 0011 H1).
@@ -38,6 +56,17 @@ const PT_BR: Messages = Messages {
     },
     settings: SettingsMessages {
         window_title: "Configurações do DockMax",
+    },
+    dock: DockMessages {
+        settings: "Configurações",
+        about: "Sobre",
+        tray: "Bandeja do sistema",
+        clock: "Relógio",
+        time_progress: "Progresso do tempo",
+        note: "Nota",
+        shortcut: "Atalho",
+        files: "Arquivos",
+        no_value: "–",
     },
 };
 

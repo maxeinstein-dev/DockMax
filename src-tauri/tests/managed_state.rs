@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use dockmax_lib::{managed_state, with_state};
 use tauri::test::{mock_builder, mock_context, noop_assets};
 
-const ALL: [&str; 3] = ["Arc<Tracker>", "Mutex<Placement>", "Mutex<PanelState>"];
+const ALL: [&str; 1] = ["Mutex<PanelState>"];
 
 #[test]
 fn the_state_is_managed_before_any_setup() {

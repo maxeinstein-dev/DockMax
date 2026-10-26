@@ -14,12 +14,9 @@ fn main() {
     // permission (`allow-<command>`) in a capability.
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
-            "toggle_panel",
             "hide_panel",
             "panel_ready",
             "panel_mounted",
-            "warm_panel",
-            "set_dock_layout",
             "get_settings",
             "update_settings",
             "list_widgets",
@@ -30,7 +27,6 @@ fn main() {
             "get_note",
             "save_note",
             "dismiss_storage_notice",
-            "open_flyout",
             "list_tray",
             "tray_click",
             "list_apps",

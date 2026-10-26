@@ -63,21 +63,3 @@ fn open_settings(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     dock::reveal(app)?;
     crate::windows::settings_window::open(app)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::windows::panel::{PanelId, PanelPayload};
-
-    #[test]
-    fn request_event_names_the_settings_panel() {
-        assert_eq!(dock::REQUEST_PANEL_EVENT, "dock-request-panel");
-        assert_eq!(
-            serde_json::to_value(PanelPayload {
-                panel_id: PanelId::Settings
-            })
-            .unwrap(),
-            serde_json::json!({ "panelId": "settings" })
-        );
-    }
-}

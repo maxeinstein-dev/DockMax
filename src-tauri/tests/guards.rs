@@ -16,42 +16,6 @@ use serde_json::Value;
 /// Changing a capability requires changing this table.
 const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
     (
-        "dock.json",
-        "dock",
-        &["dock"],
-        &[
-            "core:event:allow-listen",
-            "core:event:allow-unlisten",
-            "allow-toggle-panel",
-            "allow-warm-panel",
-            "allow-set-dock-layout",
-            "allow-get-settings",
-            // The dock only reads the widgets; every change goes through the
-            // panel (spec 0003 §2.7).
-            "allow-list-widgets",
-            // The clock opens the Windows calendar (ADR 0009); the command
-            // takes the name of a panel and nothing else.
-            "allow-open-flyout",
-            // The dock shows the pinned programs, with their icons, and
-            // opens one by the id of a pinned item (spec 0006); pinning and
-            // ordering go through the panel.
-            "allow-list-apps",
-            "allow-app-icon",
-            "allow-launch-app",
-            "allow-list-open-apps",
-            "allow-activate-app",
-            "allow-activate-open",
-            "allow-open-badge",
-            "allow-launch-open",
-            // Dragging a pinned program along the bar puts it in its new
-            // place (spec 0006 B2); the command only orders what is
-            // already pinned. Pinning what is dropped is not here: the
-            // window hears the drop itself.
-            "allow-place-app",
-            "log:allow-log",
-        ],
-    ),
-    (
         "panel.json",
         "panel",
         &["panel"],
@@ -719,7 +683,7 @@ fn the_app_builder_registers_its_state_through_with_state() {
         "src/lib.rs: `run` must not `.manage(...)` by itself; add it to `with_state`"
     );
     let with_state = block_after(&source, "fn with_state", "src/lib.rs");
-    for state in ["Tracker", "Placement", "PanelState"] {
+    for state in ["PanelState"] {
         assert!(
             with_state.contains(state),
             "src/lib.rs: `with_state` must manage the {state} state"

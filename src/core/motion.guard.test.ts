@@ -98,7 +98,10 @@ function unguarded(css: string): string[] {
 describe("reduced motion guard", () => {
   it("reads every stylesheet", () => {
     expect(Object.keys(sheets)).toEqual(
-      expect.arrayContaining(["/src/dock/Dock.css", "/src/panel/Panel.css"]),
+      expect.arrayContaining([
+        "/src/panel/Panel.css",
+        "/src/settings/SettingsApp.css",
+      ]),
     );
   });
 

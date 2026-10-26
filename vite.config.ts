@@ -32,11 +32,11 @@ export default defineConfig(() => ({
     },
   },
 
-  // One HTML entry per window, no router.
+  // One HTML entry per window, no router. The dock is native (spec 0011
+  // H3): it has no page.
   build: {
     rolldownOptions: {
       input: {
-        dock: fileURLToPath(new URL("index.html", import.meta.url)),
         panel: fileURLToPath(new URL("panel.html", import.meta.url)),
         settings: fileURLToPath(new URL("settings.html", import.meta.url)),
       },
@@ -46,8 +46,8 @@ export default defineConfig(() => ({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
-    // Lets tests read the CSS sources as text (`?raw`): Dock.css for the
-    // magnification guard, every file for the design-token guards.
+    // Lets tests read the CSS sources as text (`?raw`), for the
+    // design-token guards.
     css: { include: [/\.css/] },
   },
 }));

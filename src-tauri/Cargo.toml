@@ -62,16 +62,23 @@ tauri = { version = "2", features = ["test"] }
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", features = [
     "Win32_Foundation",
+    "Win32_Graphics_Direct2D",
+    "Win32_Graphics_Direct2D_Common",
+    "Win32_Graphics_DirectWrite",
     "Win32_Graphics_Dwm",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Imaging",
     "Win32_Graphics_Gdi",
     "Win32_System_Com",
     "Win32_System_DataExchange",
     "Win32_System_LibraryLoader",
     "Win32_System_Ole",
     "Win32_System_Registry",
+    "Win32_System_SystemInformation",
     "Win32_System_SystemServices",
     "Win32_System_Threading",
     "Win32_UI_Accessibility",
+    "Win32_UI_HiDpi",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_Shell",
     "Win32_UI_Shell_Common",
@@ -85,6 +92,9 @@ windows = { version = "0.62.2", features = [
 # `#[implement]` (the dock's drop target) names this crate in what it expands
 # to; the version `windows` uses.
 windows-core = "0.62"
+# The points and matrices Direct2D takes (the dock, spec 0011 H3): the version
+# `windows` uses.
+windows-numerics = "0.3"
 # The WebView2 interfaces Tauri builds on, for the memory target of the
 # hidden panel (spec 0003 §2.12). The version tauri-runtime-wry uses.
 webview2-com = "0.39"

@@ -1,0 +1,381 @@
+//! What the dock shows, in order (spec 0011 H3; the page's `dockEntries`):
+//! the pinned programs, the widgets in the order chosen, the open programs
+//! that are not pinned, then the system items. A separator stands between
+//! the groups that have items.
+
+use super::apps::{AppsSnapshot, PinnedApp};
+use super::open_apps::{OpenOther, OpenSnapshot};
+use super::widgets::{StorageStatus, WidgetInstance, WidgetKind, WidgetsSnapshot};
+
+/// The items DockMax itself puts at the end of the dock.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemItem {
+    Settings,
+    About,
+    /// The notification area: only while the Windows taskbar is hidden
+    /// altogether (ADR 0009).
+    Tray,
+}
+
+/// What an item of the dock stands for.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Item {
+    /// A pinned program: a click opens it, the right button its menu.
+    App(PinnedApp),
+    /// A widget: a click opens its panel.
+    Widget(WidgetInstance),
+    /// An open program that is not pinned.
+    Other(OpenOther),
+    System(SystemItem),
+}
+
+impl Item {
+    /// A stable name for the item across changes of the list: the key of its
+    /// panel (`app:<id>`, `widget:<id>`, `open:<key>`, or the system item's).
+    pub fn key(&self) -> String {
+        match self {
+            Item::App(app) => format!("app:{}", app.id.as_str()),
+            Item::Widget(widget) => format!("widget:{}", widget.id.as_str()),
+            Item::Other(other) => format!("open:{}", other.key),
+            Item::System(SystemItem::Settings) => "settings".into(),
+            Item::System(SystemItem::About) => "about".into(),
+            Item::System(SystemItem::Tray) => "tray".into(),
+        }
+    }
+
+    /// Whether the item stands for a program (pinned or open).
+    pub fn is_program(&self) -> bool {
+        matches!(self, Item::App(_) | Item::Other(_))
+    }
+}
+
+/// The texts the names come from.
+#[derive(Debug, Clone, Copy)]
+pub struct Names {
+    pub settings: &'static str,
+    pub about: &'static str,
+    pub tray: &'static str,
+    pub clock: &'static str,
+    pub time_progress: &'static str,
+    pub note: &'static str,
+    pub shortcut: &'static str,
+    pub files: &'static str,
+}
+
+impl Names {
+    /// The item's name: its label, never the time (spec 0003 §2.3 item 4).
+    pub fn of(&self, item: &Item) -> String {
+        match item {
+            Item::App(app) => app.name.clone(),
+            Item::Other(other) => other.name.clone(),
+            Item::Widget(widget) => widget.label.clone().unwrap_or_else(|| {
+                match widget.config.kind() {
+                    WidgetKind::Clock => self.clock,
+                    WidgetKind::TimeProgress => self.time_progress,
+                    WidgetKind::Note => self.note,
+                    WidgetKind::Shortcut => self.shortcut,
+                    WidgetKind::Files => self.files,
+                }
+                .to_string()
+            }),
+            Item::System(SystemItem::Settings) => self.settings.into(),
+            Item::System(SystemItem::About) => self.about.into(),
+            Item::System(SystemItem::Tray) => self.tray.into(),
+        }
+    }
+}
+
+/// What the items come from.
+#[derive(Debug, Clone, Copy)]
+pub struct Sources<'a> {
+    pub widgets: Option<&'a WidgetsSnapshot>,
+    pub apps: Option<&'a AppsSnapshot>,
+    pub open: &'a OpenSnapshot,
+    /// Whether the open programs that are not pinned show (a setting).
+    pub show_open: bool,
+    /// Whether the tray is the dock's (the taskbar hidden altogether).
+    pub tray: bool,
+}
+
+/// The items in order and the size of each group that has items.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Items {
+    pub items: Vec<Item>,
+    pub groups: Vec<usize>,
+}
+
+fn usable(storage: StorageStatus) -> bool {
+    !matches!(storage, StorageStatus::Unavailable { .. })
+}
+
+/// The dock's items: without a readable list, or with the storage
+/// unavailable, a group is empty.
+pub fn items(sources: Sources<'_>) -> Items {
+    let apps: Vec<Item> = sources
+        .apps
+        .filter(|snapshot| usable(snapshot.storage))
+        .map(|snapshot| snapshot.apps.iter().cloned().map(Item::App).collect())
+        .unwrap_or_default();
+    let widgets: Vec<Item> = sources
+        .widgets
+        .filter(|snapshot| usable(snapshot.storage))
+        .map(|snapshot| {
+            snapshot
+                .widgets
+                .iter()
+                .filter(|widget| widget.config.kind().creatable())
+                .cloned()
+                .map(Item::Widget)
+                .collect()
+        })
+        .unwrap_or_default();
+    let others: Vec<Item> = if sources.show_open {
+        sources
+            .open
+            .others
+            .iter()
+            .cloned()
+            .map(Item::Other)
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let mut systems = vec![
+        Item::System(SystemItem::Settings),
+        Item::System(SystemItem::About),
+    ];
+    if sources.tray {
+        systems.push(Item::System(SystemItem::Tray));
+    }
+    let groups = [apps.len(), widgets.len(), others.len(), systems.len()]
+        .into_iter()
+        .filter(|&size| size > 0)
+        .collect();
+    let items = [apps, widgets, others, systems]
+        .into_iter()
+        .flatten()
+        .collect();
+    Items { items, groups }
+}
+
+/// Whether Configurações wears the attention badge: while the database was
+/// recovered (until the notice is dismissed) or is unavailable (spec 0003
+/// §2.11).
+pub fn needs_attention(widgets: Option<&WidgetsSnapshot>) -> bool {
+    widgets.is_some_and(|snapshot| snapshot.storage != StorageStatus::Ok)
+}
+
+/// Whether the pinned program `app` has windows open, and whether the user is
+/// in one of them.
+pub fn running(open: &OpenSnapshot, item: &Item) -> Option<bool> {
+    match item {
+        Item::App(app) => open
+            .apps
+            .iter()
+            .find(|found| found.id == app.id.as_str())
+            .map(|found| found.active),
+        Item::Other(other) => Some(other.active),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::open_apps::OpenApp;
+    use crate::domain::widgets::{UnavailableReason, WidgetConfig, WidgetId};
+
+    const NAMES: Names = Names {
+        settings: "Configurações",
+        about: "Sobre",
+        tray: "Bandeja do sistema",
+        clock: "Relógio",
+        time_progress: "Progresso do tempo",
+        note: "Nota",
+        shortcut: "Atalho",
+        files: "Arquivos",
+    };
+
+    fn id(n: u8) -> WidgetId {
+        WidgetId::parse(&format!("0190a1b2-c3d4-7e5f-8a6b-{:012x}", n)).unwrap()
+    }
+
+    fn app(n: u8, name: &str) -> PinnedApp {
+        PinnedApp {
+            id: id(n),
+            app_id: format!("App{n}"),
+            name: name.into(),
+        }
+    }
+
+    fn widget(n: u8, kind: WidgetKind, label: Option<&str>) -> WidgetInstance {
+        WidgetInstance {
+            id: id(n),
+            label: label.map(String::from),
+            config: WidgetConfig::default_for(kind),
+        }
+    }
+
+    fn other(key: &str, active: bool) -> OpenOther {
+        OpenOther {
+            key: key.into(),
+            app_id: "Chrome".into(),
+            name: "Google Chrome".into(),
+            count: 1,
+            active,
+            badge: false,
+        }
+    }
+
+    fn sources<'a>(
+        widgets: Option<&'a WidgetsSnapshot>,
+        apps: Option<&'a AppsSnapshot>,
+        open: &'a OpenSnapshot,
+    ) -> Sources<'a> {
+        Sources {
+            widgets,
+            apps,
+            open,
+            show_open: true,
+            tray: false,
+        }
+    }
+
+    #[test]
+    fn programs_widgets_open_programs_then_the_system_items() {
+        let widgets = WidgetsSnapshot {
+            storage: StorageStatus::Ok,
+            widgets: vec![widget(10, WidgetKind::Clock, None)],
+        };
+        let apps = AppsSnapshot {
+            storage: StorageStatus::Ok,
+            apps: vec![app(1, "Bloco"), app(2, "Paint")],
+        };
+        let open = OpenSnapshot {
+            apps: vec![],
+            others: vec![other("00000000000000aa", false)],
+        };
+
+        let Items { items, groups } = items(sources(Some(&widgets), Some(&apps), &open));
+
+        let keys: Vec<String> = items.iter().map(Item::key).collect();
+        assert_eq!(
+            keys,
+            vec![
+                format!("app:{}", id(1).as_str()),
+                format!("app:{}", id(2).as_str()),
+                format!("widget:{}", id(10).as_str()),
+                "open:00000000000000aa".to_string(),
+                "settings".into(),
+                "about".into(),
+            ]
+        );
+        assert_eq!(groups, vec![2, 1, 1, 2]);
+    }
+
+    #[test]
+    fn without_lists_only_the_system_items_show() {
+        let open = OpenSnapshot::default();
+
+        let found = items(sources(None, None, &open));
+
+        assert_eq!(found.groups, vec![2]);
+        assert!(
+            found
+                .items
+                .iter()
+                .all(|item| matches!(item, Item::System(_)))
+        );
+    }
+
+    #[test]
+    fn an_unavailable_storage_hides_the_programs_and_the_widgets() {
+        let unavailable = StorageStatus::Unavailable {
+            reason: UnavailableReason::OpenFailed,
+        };
+        let widgets = WidgetsSnapshot {
+            storage: unavailable,
+            widgets: vec![widget(10, WidgetKind::Note, None)],
+        };
+        let apps = AppsSnapshot {
+            storage: unavailable,
+            apps: vec![app(1, "Bloco")],
+        };
+        let open = OpenSnapshot::default();
+
+        let found = items(sources(Some(&widgets), Some(&apps), &open));
+
+        assert_eq!(found.groups, vec![2]);
+        assert!(needs_attention(Some(&widgets)));
+    }
+
+    #[test]
+    fn the_open_programs_hide_with_the_setting_and_the_tray_shows_with_the_taskbar_hidden() {
+        let open = OpenSnapshot {
+            apps: vec![],
+            others: vec![other("00000000000000aa", true)],
+        };
+        let found = items(Sources {
+            show_open: false,
+            tray: true,
+            ..sources(None, None, &open)
+        });
+
+        assert_eq!(found.groups, vec![3]);
+        assert_eq!(found.items[2], Item::System(SystemItem::Tray));
+    }
+
+    #[test]
+    fn widgets_of_kinds_not_usable_yet_are_left_out() {
+        let widgets = WidgetsSnapshot {
+            storage: StorageStatus::Ok,
+            widgets: vec![
+                widget(10, WidgetKind::Files, None),
+                widget(11, WidgetKind::Note, None),
+            ],
+        };
+        let open = OpenSnapshot::default();
+
+        let found = items(sources(Some(&widgets), None, &open));
+
+        assert_eq!(found.groups, vec![1, 2]);
+    }
+
+    #[test]
+    fn names_are_the_label_or_the_kind_never_the_time() {
+        assert_eq!(
+            NAMES.of(&Item::Widget(widget(1, WidgetKind::Clock, None))),
+            "Relógio"
+        );
+        assert_eq!(
+            NAMES.of(&Item::Widget(widget(1, WidgetKind::Clock, Some("Lisboa")))),
+            "Lisboa"
+        );
+        assert_eq!(NAMES.of(&Item::App(app(1, "Paint"))), "Paint");
+        assert_eq!(
+            NAMES.of(&Item::System(SystemItem::Tray)),
+            "Bandeja do sistema"
+        );
+    }
+
+    #[test]
+    fn running_programs_are_told_with_whether_the_user_is_in_them() {
+        let open = OpenSnapshot {
+            apps: vec![OpenApp {
+                id: id(1).as_str().to_string(),
+                count: 2,
+                active: true,
+            }],
+            others: vec![],
+        };
+
+        assert_eq!(running(&open, &Item::App(app(1, "Bloco"))), Some(true));
+        assert_eq!(running(&open, &Item::App(app(2, "Paint"))), None);
+        assert_eq!(
+            running(&open, &Item::Other(other("00000000000000aa", false))),
+            Some(false)
+        );
+        assert_eq!(running(&open, &Item::System(SystemItem::About)), None);
+        assert!(!needs_attention(None));
+    }
+}

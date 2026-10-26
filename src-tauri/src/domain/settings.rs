@@ -332,10 +332,8 @@ pub enum DockOpacity {
 /// Named icon sizes offered by the settings panel, from `DESIGN.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SizePreset {
-    #[cfg_attr(not(test), expect(dead_code, reason = "used by the dock in PR 3"))]
     Small,
     Medium,
-    #[cfg_attr(not(test), expect(dead_code, reason = "used by the dock in PR 3"))]
     Large,
 }
 
