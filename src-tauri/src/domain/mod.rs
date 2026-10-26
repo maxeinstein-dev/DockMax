@@ -3,6 +3,7 @@
 
 pub mod apps;
 pub mod browser_profile;
+pub mod fullscreen;
 pub mod icon_pack;
 pub mod open_apps;
 pub mod settings;

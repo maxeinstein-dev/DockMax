@@ -5,6 +5,7 @@ O que o DockMax **não** faz hoje, e o que pode surpreender. Vale para o MVP (ve
 ## Sistema
 
 - **Só Windows 11**, testado em um monitor principal com escala de 100 % e de 125 %. Windows 10 não foi testado.
+- **O dock some quando o monitor dele está em tela cheia** (um vídeo, uma apresentação) e volta quando ela acaba, mesmo que você use o outro monitor nesse meio tempo ([spec 0010](specs/0010-fase-d4-monitores-e-tela-cheia.md)).
 - **Só o monitor principal recebe o dock.** Com a barra do Windows oculta, a do segundo monitor também some e esse monitor fica sem barra nenhuma ([ADR 0009](adr/0009-dock-substitui-a-barra-de-tarefas.md)). Um dock por monitor é da fase D.
 - **O instalador não é assinado.** O SmartScreen do Windows avisa na instalação e é preciso escolher "Mais informações › Executar assim mesmo". Para compilar do código-fonte, o Controle Inteligente de Aplicativos precisa estar desativado (README).
 - **Só inicia com o Windows se você ligar "Iniciar com o Windows" em Configurações** (desligado por padrão).

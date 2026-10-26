@@ -138,7 +138,7 @@ Revisão de 2026-10-19 (fim da Fase 2): a direção foi mantida e o roadmap ganh
 - [x] Documentar limitações conhecidas (inclusive: leitor de tela nunca testado): [limitações](limitacoes.md).
 - [x] README com "onde ficam seus dados" (`%APPDATA%\dev.maxsueleinstein.dockmax`). (feito na v0.2.0)
 - [ ] Criar README com imagens, arquitetura, funcionalidades e instruções.
-- [ ] Criar uma demonstração curta do aplicativo.
+- [ ] ~~Criar uma demonstração curta do aplicativo.~~ Fora por agora (decisão do autor, 2026-10-26).
 - [x] Verificar licença de dependências e atribuições necessárias: [licenças de terceiros](licencas-de-terceiros.md) (nenhuma exige abrir o código; os avisos para distribuir a outras pessoas ainda não foram gerados).
 
 **Critérios de aceitação do MVP**
@@ -151,6 +151,19 @@ Revisão de 2026-10-19 (fim da Fase 2): a direção foi mantida e o roadmap ganh
 - [x] Testes essenciais passam.
 - [x] Documentação explica como executar, testar e compilar.
 - [x] Limitações de gerenciamento de janelas estão explícitas.
+
+### Verificações pendentes (decisão do autor, 2026-10-26: fazer todas depois da fase D)
+
+Tudo o que as specs e os PRs marcaram como **não verificado**, para uma rodada só:
+
+- [ ] Instalar e desinstalar numa máquina limpa ou virtual; Windows 10; atualizar por cima de uma versão anterior com o programa aberto.
+- [ ] Os cliques com o **mouse físico** no dock: esquerdo (ativar, minimizar, próxima janela), meio (nova instância) e direito (menus), nos programas fixados e nos abertos. Nos testes, o evento foi enviado à página.
+- [ ] Soltar um arquivo no dock vindo do Explorador de Arquivos (o teste usou um arraste simulado).
+- [ ] A seção "Ícones dos apps" e as chaves novas de Configurações vistas no painel de verdade.
+- [ ] Um programa que pergunta se quer salvar ao fechar pelo menu.
+- [ ] Áreas de trabalho virtuais do Windows.
+- [ ] Uso longo (horas): memória e CPU em repouso.
+- [ ] Leitor de tela.
 
 ### Medição de recursos (build de release 0.3.0, 2026-10-26)
 

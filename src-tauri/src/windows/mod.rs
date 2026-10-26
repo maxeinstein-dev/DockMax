@@ -7,6 +7,8 @@ pub mod dock;
 pub mod drop_target;
 #[cfg(windows)]
 pub mod flyout;
+#[cfg(windows)]
+pub mod fullscreen;
 pub mod hit_test;
 pub mod jumplist;
 pub mod memory;
