@@ -152,13 +152,19 @@ mod tests {
     }
 
     #[test]
-    fn both_windows_share_one_renderer_with_wrys_default_arguments() {
+    fn every_window_shares_one_renderer_with_wrys_default_arguments() {
+        // The dock is the only window of `tauri.conf.json`; the panel and the
+        // Configurações app are made on demand with the same arguments
+        // (spec 0011). One WebView2 environment for all: arguments that
+        // differ would need another data folder, and another browser process.
         let windows = browser_args();
-        assert_eq!(windows.len(), 2, "{windows:?}");
-        // One WebView2 environment for both: arguments that differ would
-        // need another data folder, and another browser process.
-        assert_eq!(windows[0].1, windows[1].1, "{windows:?}");
-        let args = windows[0].1.as_deref().expect("additionalBrowserArgs");
+        assert_eq!(windows.len(), 1, "{windows:?}");
+        assert_eq!(
+            windows[0].1.as_deref(),
+            Some(super::super::BROWSER_ARGS),
+            "{windows:?}"
+        );
+        let args = super::super::BROWSER_ARGS;
         // Setting them replaces wry's defaults, which must stay.
         assert!(
             args.contains("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection"),

@@ -145,7 +145,6 @@ pub fn run() {
         })
         .setup(|app| {
             commands::settings::sync_launch_at_login(app.handle());
-            windows::panel::setup(app.handle())?;
             windows::dock::setup(app.handle())?;
             #[cfg(windows)]
             windows::open_apps::start(app.handle());
@@ -156,6 +155,8 @@ pub fn run() {
             commands::panel::toggle_panel,
             commands::panel::hide_panel,
             commands::panel::panel_ready,
+            commands::panel::panel_mounted,
+            commands::panel::warm_panel,
             commands::dock::set_dock_layout,
             commands::settings::get_settings,
             commands::settings::update_settings,

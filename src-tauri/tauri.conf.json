@@ -25,22 +25,6 @@
         "visible": false,
         "focus": false,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --process-per-site --in-process-gpu"
-      },
-      {
-        "label": "panel",
-        "title": "DockMax",
-        "url": "panel.html",
-        "width": 360,
-        "height": 480,
-        "decorations": false,
-        "transparent": true,
-        "alwaysOnTop": true,
-        "resizable": false,
-        "skipTaskbar": true,
-        "shadow": false,
-        "visible": false,
-        "focus": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --process-per-site --in-process-gpu"
       }
     ],
     "security": {

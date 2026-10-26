@@ -113,6 +113,19 @@ export interface PanelChanged {
  * and only then shows it (or after a time limit, if this never comes). */
 export const PANEL_READY_COMMAND = "panel_ready";
 
+/** Sent by the panel's page once it listens for `panel-show` (spec 0011 H2):
+ * the window is made on demand, and a show asked for while it was being made
+ * waits for this. */
+export const PANEL_MOUNTED_COMMAND = "panel_mounted";
+
+/** Sent by the dock when the pointer rests on an item that opens a panel
+ * (spec 0011 H2): the panel window is made now, so the click finds it warm. */
+export const WARM_PANEL_COMMAND = "warm_panel";
+
+/** How long the pointer rests on an item before the panel is warmed:
+ * passing over the bar on the way elsewhere warms nothing. */
+export const WARM_DELAY_MS = 150;
+
 /** Width and height in logical (CSS) pixels. */
 export interface LogicalSize {
   width: number;

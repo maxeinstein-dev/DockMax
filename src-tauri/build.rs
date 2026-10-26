@@ -17,6 +17,8 @@ fn main() {
             "toggle_panel",
             "hide_panel",
             "panel_ready",
+            "panel_mounted",
+            "warm_panel",
             "set_dock_layout",
             "get_settings",
             "update_settings",

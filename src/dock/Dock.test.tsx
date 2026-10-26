@@ -1218,6 +1218,60 @@ describe("Dock", () => {
       expect(iconCalls()).toHaveLength(2);
     });
 
+    describe("warming the panel (spec 0011 H2)", () => {
+      const warms = () =>
+        invoke.mock.calls.filter(([command]) => command === "warm_panel");
+
+      it("warms the panel when the pointer rests on an item that opens one", async () => {
+        await renderDock();
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+        fireEvent.pointerOver(about());
+        act(() => {
+          vi.advanceTimersByTime(149);
+        });
+        expect(warms()).toHaveLength(0);
+        act(() => {
+          vi.advanceTimersByTime(1);
+        });
+
+        expect(warms()).toHaveLength(1);
+      });
+
+      it("warms nothing when the pointer only passes over it", async () => {
+        await renderDock();
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+        fireEvent.pointerOver(about());
+        act(() => {
+          vi.advanceTimersByTime(80);
+        });
+        fireEvent.pointerLeave(bar());
+        act(() => {
+          vi.advanceTimersByTime(500);
+        });
+
+        expect(warms()).toHaveLength(0);
+      });
+
+      it("warms nothing over a program or Configurações", async () => {
+        pinned = withApps(CALCULATOR);
+        await renderDock();
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+        fireEvent.pointerOver(program("Calculadora"));
+        act(() => {
+          vi.advanceTimersByTime(500);
+        });
+        fireEvent.pointerOver(settings());
+        act(() => {
+          vi.advanceTimersByTime(500);
+        });
+
+        expect(warms()).toHaveLength(0);
+      });
+    });
+
     describe("open programs (spec 0009)", () => {
       const marked = (name: string) =>
         program(name).hasAttribute("data-running");

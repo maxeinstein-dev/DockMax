@@ -705,16 +705,14 @@ struct ChangedPayload {
     panel_id: Option<PanelId>,
 }
 
-/// Hides the panel when it loses focus or is closed (Alt+F4). The panel
-/// state itself is managed by the builder: a page can send a command
-/// (`set_dock_layout`, `toggle_panel`) while this still runs, and the
-/// command needs the state (seen as a panic at startup, spec 0003 §2.12).
-pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
-    let window = app
-        .get_webview_window(LABEL)
-        .ok_or("panel window is missing from tauri.conf.json")?;
+/// Sets up a panel window just made (`panel_window`, spec 0011 H2): it hides
+/// the panel when it loses focus or is closed (Alt+F4). The panel state
+/// itself is managed by the builder: a page can send a command
+/// (`set_dock_layout`, `toggle_panel`) any time, and the command needs the
+/// state (seen as a panic at startup, spec 0003 §2.12).
+pub fn install(app: &AppHandle, window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
     #[cfg(windows)]
-    super::native::install(&window, None, LAYERING)?;
+    super::native::install(window, None, LAYERING)?;
     let app = app.clone();
     window.on_window_event(move |event| {
         let action = match event {
@@ -785,9 +783,27 @@ pub fn close_for_move(app: &AppHandle) {
 /// open panel changed. Must be called without holding the state lock:
 /// hiding the window synchronously triggers the blur handler.
 pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
-    let window = app
-        .get_webview_window(LABEL)
-        .ok_or("panel window is missing")?;
+    // Made on demand (spec 0011 H2): a show for a window not made yet, or
+    // whose page has not mounted, waits for the page; closing a panel whose
+    // window is gone only tells the dock.
+    let Some(window) = super::panel_window::ready(app) else {
+        match action {
+            Action::Prepare(id, wait) => {
+                notify_dock(app, Some(id.clone()));
+                super::panel_window::defer(
+                    app,
+                    super::panel_window::Pending { panel_id: id, wait },
+                );
+            }
+            Action::Hide => {
+                notify_dock(app, None);
+                super::panel_window::touch(app);
+            }
+            Action::Reveal { .. } => return Err("panel window is not ready".into()),
+            Action::Nothing => {}
+        }
+        return Ok(());
+    };
     if let Some(target) = memory_target(&action) {
         memory::set(&window, target);
     }
@@ -797,8 +813,7 @@ pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
             // Hidden while the page renders: no previous content, no flash
             // at the previous size.
             window.hide()?;
-            window.emit_to(LABEL, SHOW_EVENT, ShowPayload { panel_id: id, wait })?;
-            schedule_time_out(app, wait)?;
+            show(app, id, wait)?;
         }
         Action::Reveal { anchor, geometry } => {
             place(app, &window, anchor, geometry)?;
@@ -812,10 +827,38 @@ pub fn apply(app: &AppHandle, action: Action) -> Result<(), Box<dyn Error>> {
         Action::Hide => {
             notify_dock(app, None);
             window.hide()?;
+            // Kept for a while, then released.
+            super::panel_window::touch(app);
         }
         Action::Nothing => {}
     }
     Ok(())
+}
+
+/// Asks the page to render the panel `id` for the show `wait`, and reveals it
+/// after `READY_TIMEOUT` if the page has not confirmed by then.
+fn show(app: &AppHandle, id: PanelId, wait: u64) -> Result<(), Box<dyn Error>> {
+    app.emit_to(LABEL, SHOW_EVENT, ShowPayload { panel_id: id, wait })?;
+    schedule_time_out(app, wait)
+}
+
+/// The panel's page has mounted and listens for `panel-show` (spec 0011 H2):
+/// it gets the show that waited for it, if the state still wants it.
+pub fn page_mounted(app: &AppHandle) {
+    let Some(pending) = super::panel_window::mounted() else {
+        return;
+    };
+    let still_open = lock(app).open().as_ref() == Some(&pending.panel_id);
+    if !still_open {
+        return;
+    }
+    if let Some(window) = app.get_webview_window(LABEL) {
+        memory::set(&window, MemoryTarget::Normal);
+    }
+    if let Err(error) = show(app, pending.panel_id, pending.wait) {
+        log::warn!("panel: failed to show after the page mounted: {error}");
+        close(app);
+    }
 }
 
 /// The memory target an action moves the panel to: normal before its page

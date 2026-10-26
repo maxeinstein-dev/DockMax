@@ -23,6 +23,7 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "core:event:allow-listen",
             "core:event:allow-unlisten",
             "allow-toggle-panel",
+            "allow-warm-panel",
             "allow-set-dock-layout",
             "allow-get-settings",
             // The dock only reads the widgets; every change goes through the
@@ -59,6 +60,7 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "core:event:allow-unlisten",
             "allow-hide-panel",
             "allow-panel-ready",
+            "allow-panel-mounted",
             "allow-get-settings",
             "allow-update-settings",
             "allow-list-widgets",

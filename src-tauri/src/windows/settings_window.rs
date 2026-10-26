@@ -11,11 +11,6 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 /// The window's label: the capability `settings` is granted to it.
 pub const LABEL: &str = "settings";
 
-/// The WebView2 arguments every window of the app shares (they must be the
-/// same in all of them, or the windows can't share the browser process):
-/// the ones in `tauri.conf.json` (ADR 0006, ADR 0010).
-pub const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --process-per-site --in-process-gpu";
-
 /// Opens the Configurações window, or brings it to the front if it is open.
 pub fn open(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     if let Some(window) = app.get_webview_window(LABEL) {
@@ -39,7 +34,7 @@ pub fn open(app: &AppHandle) -> Result<(), Box<dyn Error>> {
                     .min_inner_size(720.0, 480.0)
                     .center()
                     .resizable(true)
-                    .additional_browser_args(BROWSER_ARGS)
+                    .additional_browser_args(super::BROWSER_ARGS)
                     .build();
             if let Err(error) = built {
                 log::warn!("settings: the window could not be made: {error}");
@@ -50,8 +45,6 @@ pub fn open(app: &AppHandle) -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn the_settings_window_shares_the_browser_arguments_of_the_others() {
         let config: serde_json::Value =
@@ -59,7 +52,7 @@ mod tests {
         for window in config["app"]["windows"].as_array().unwrap() {
             assert_eq!(
                 window["additionalBrowserArgs"].as_str(),
-                Some(BROWSER_ARGS),
+                Some(crate::windows::BROWSER_ARGS),
                 "{}",
                 window["label"]
             );

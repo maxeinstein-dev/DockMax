@@ -44,6 +44,8 @@ import {
 import { errorKind, log } from "../core/log";
 import {
   PANEL_CHANGED_EVENT,
+  WARM_DELAY_MS,
+  WARM_PANEL_COMMAND,
   appPanel,
   otherPanel,
   type LogicalRect,
@@ -453,6 +455,25 @@ function Dock() {
   const inRange = (index: number | null) =>
     index !== null && index < entries.length ? index : null;
   const hovered = inRange(hoveredAt);
+
+  // The pointer resting on an item that opens a panel warms the panel window
+  // (spec 0011 H2). Not the programs (a click opens the program) nor
+  // Configurações (an app of its own).
+  const warmable =
+    hovered !== null &&
+    entries[hovered] !== undefined &&
+    entries[hovered].app === null &&
+    entries[hovered].other === null &&
+    entries[hovered].panelId !== "settings";
+  useEffect(() => {
+    if (!warmable) return;
+    const timer = window.setTimeout(() => {
+      invoke(WARM_PANEL_COMMAND).catch((error: unknown) => {
+        log.warn(`dock: warming the panel failed: ${errorKind(error)}`);
+      });
+    }, WARM_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [warmable, hovered]);
   const focused = inRange(focusedAt);
   // The single tab stop: the item last focused, or the first one.
   const currentIndex = Math.max(

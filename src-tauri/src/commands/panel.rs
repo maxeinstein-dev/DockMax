@@ -151,6 +151,29 @@ pub fn panel_ready(
     })
 }
 
+/// Called by the panel's page once it listens for `panel-show` (spec 0011
+/// H2): the show that waited for the window to be made goes out now.
+#[tauri::command]
+pub fn panel_mounted(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
+    if window.label() != panel::LABEL {
+        return Err("only the panel mounts".into());
+    }
+    panel::page_mounted(&app);
+    Ok(())
+}
+
+/// The pointer rests on an item of the dock that opens a panel (spec 0011
+/// H2): the panel window is made now, so the click finds it warm. Nothing
+/// when it is already there.
+#[tauri::command]
+pub fn warm_panel(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
+    if window.label() != crate::windows::dock::LABEL {
+        return Err("only the dock warms the panel".into());
+    }
+    crate::windows::panel_window::warm(&app);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use tempfile::tempdir;
