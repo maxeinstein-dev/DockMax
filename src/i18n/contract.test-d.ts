@@ -27,6 +27,12 @@ export const otherText: Messages = {
     middleClick: { newInstance: "New instance", none: "Nothing" },
     showOpenApps: "Show open apps",
     showOpenAppsHint: "The ones that are not pinned, after the widgets",
+    autoHide: "Hide automatically",
+    autoHideHint: "Goes down when the pointer leaves, up at the screen edge",
+    autoHideReveal: "Delay to show",
+    autoHideRevealHint: "How long on the edge before it comes up",
+    autoHideDelay: "Delay to hide",
+    autoHideDelayHint: "How long away before it goes down",
     everyMonitor: "Dock on every monitor",
     everyMonitorHint: "Each monitor with its own dock",
     app: {

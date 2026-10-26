@@ -43,6 +43,14 @@ pub const MAX_TRAY_IN_DOCK: usize = 6;
 /// The longest name of a tray icon kept (`path:<program>#<id>`).
 pub const MAX_TRAY_KEY: usize = 300;
 
+/// How long the pointer rests on the screen edge before a dock hiding on its
+/// own comes up, in milliseconds: the default and the most.
+pub const DEFAULT_AUTO_HIDE_REVEAL: u16 = 300;
+pub const MAX_AUTO_HIDE_REVEAL: u16 = 2000;
+/// How long the pointer is away before it goes down, in milliseconds.
+pub const DEFAULT_AUTO_HIDE_DELAY: u16 = 700;
+pub const MAX_AUTO_HIDE_DELAY: u16 = 5000;
+
 /// The distance between the dock and the edge unless the user changes it:
 /// the dock takes the place of the taskbar, so it sits close to the edge.
 pub const DEFAULT_BOTTOM_SPACE: u8 = 2;
@@ -95,7 +103,10 @@ impl DockSettings {
         {
             return Err(SettingsError::LookOutOfRange);
         }
-        if self.bottom_space > MAX_BOTTOM_SPACE {
+        if self.bottom_space > MAX_BOTTOM_SPACE
+            || self.auto_hide_reveal > MAX_AUTO_HIDE_REVEAL
+            || self.auto_hide_delay > MAX_AUTO_HIDE_DELAY
+        {
             return Err(SettingsError::LookOutOfRange);
         }
         if self
@@ -199,6 +210,15 @@ pub struct DockSettings {
     /// A dock on every monitor, each holding its own edge (spec 0010 D4b), or
     /// only on the primary one.
     pub every_monitor: bool,
+    /// The dock goes off the screen when the pointer leaves it and comes
+    /// back when the pointer reaches the screen edge, giving its band to the
+    /// programs (like the taskbar's own auto-hide).
+    pub auto_hide: bool,
+    /// Its times, in milliseconds: on the edge before it comes up, within
+    /// `0..=MAX_AUTO_HIDE_REVEAL`; away before it goes down, within
+    /// `0..=MAX_AUTO_HIDE_DELAY`.
+    pub auto_hide_reveal: u16,
+    pub auto_hide_delay: u16,
     /// Distance between the dock and the screen edge, in logical pixels,
     /// within `0..=MAX_BOTTOM_SPACE`.
     pub bottom_space: u8,
@@ -224,6 +244,9 @@ impl Default for DockSettings {
             middle_click: MiddleClick::default(),
             taskbar: TaskbarMode::default(),
             every_monitor: true,
+            auto_hide: false,
+            auto_hide_reveal: DEFAULT_AUTO_HIDE_REVEAL,
+            auto_hide_delay: DEFAULT_AUTO_HIDE_DELAY,
             bottom_space: DEFAULT_BOTTOM_SPACE,
         }
     }
@@ -551,7 +574,7 @@ mod tests {
                 "indicator": "dot", "indicatorColor": null,
                 "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
                 "showOpenApps": true, "middleClick": "newInstance",
-                "taskbar": "hidden", "everyMonitor": true, "bottomSpace": 2
+                "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2
               },
               "launchAtLogin": false
             }"#,

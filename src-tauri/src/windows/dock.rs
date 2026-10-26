@@ -145,6 +145,7 @@ pub fn moves_the_dock(before: &DockSettings, after: &DockSettings) -> bool {
         || before.taskbar != after.taskbar
         || before.bottom_space != after.bottom_space
         || before.every_monitor != after.every_monitor
+        || before.auto_hide != after.auto_hide
 }
 
 /// Makes the dock and shows it on the primary monitor. On the main thread.
@@ -207,30 +208,12 @@ pub fn is_visible() -> bool {
     native_dock::is_visible()
 }
 
-/// Hides the docks (and the panel) when one is visible, shows them
-/// otherwise.
-pub fn toggle(app: &AppHandle) -> Result<(), Box<dyn Error>> {
-    if is_visible() {
-        hide(app);
-    } else {
-        native_dock::show();
-    }
-    Ok(())
-}
-
-/// Shows the dock if it is hidden (the app was launched again, or the tray
-/// asked for a panel). Like every show, it doesn't take the foreground.
+/// Shows the dock (the app was launched again, or the tray asked for a
+/// panel), bringing it up if it is hiding on its own. Like every show, it
+/// doesn't take the foreground.
 pub fn reveal(_app: &AppHandle) -> Result<(), Box<dyn Error>> {
-    if !is_visible() {
-        native_dock::show();
-    }
+    native_dock::show();
     Ok(())
-}
-
-/// Hides the dock and the open panel.
-fn hide(app: &AppHandle) {
-    panel::close(app);
-    native_dock::hide();
 }
 
 /// The dock window's origin on the screen and its scale, and the bar on the
@@ -314,8 +297,9 @@ fn apply_taskbar(app: &AppHandle, mode: crate::domain::settings::TaskbarMode) {
 }
 
 /// With the taskbar taken, reserves the band along the edge of `monitor`
-/// and returns it; `None` (and the band given back) when the taskbar stays
-/// or the band could not be had.
+/// and returns it; `None` (and the band given back) when the taskbar stays,
+/// the dock hides on its own (its room is the programs') or the band could
+/// not be had.
 #[cfg(windows)]
 fn reserve_edge(
     app: &AppHandle,
@@ -325,7 +309,7 @@ fn reserve_edge(
 ) -> Option<Rect> {
     use super::appbar;
     let _ = app;
-    if !settings.taskbar.reserves_the_edge() || !super::taskbar::is_held() {
+    if !settings.taskbar.reserves_the_edge() || !super::taskbar::is_held() || settings.auto_hide {
         appbar::set(&monitor.key, None);
         return None;
     }

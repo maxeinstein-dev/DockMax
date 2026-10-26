@@ -87,6 +87,15 @@ const messages = {
     /** The switch that opens the DockMax when the user signs in. */
     showOpenApps: "Mostrar apps abertos",
     showOpenAppsHint: "Os que não estão fixados, depois dos widgets",
+    autoHide: "Ocultar automaticamente",
+    autoHideHint:
+      "O dock desce quando o ponteiro sai e sobe ao encostar na borda da tela",
+    autoHideReveal: "Atraso para mostrar",
+    autoHideRevealHint:
+      "Quanto tempo o ponteiro fica na borda antes de o dock subir",
+    autoHideDelay: "Atraso para ocultar",
+    autoHideDelayHint:
+      "Quanto tempo o ponteiro fica fora antes de o dock descer",
     everyMonitor: "Dock em todos os monitores",
     everyMonitorHint:
       "Cada monitor com o seu dock, no lugar da barra de tarefas",
