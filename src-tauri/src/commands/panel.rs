@@ -73,6 +73,18 @@ pub fn toggle_panel(
     panel_id: PanelId,
     anchor: LogicalRect,
 ) -> Result<(), String> {
+    // Configurações is an app of its own now (spec 0011 H1): the dock's item
+    // opens it, and the open panel, if any, closes.
+    if panel_id == PanelId::Settings {
+        let action = panel::lock(&app).hide();
+        if let Err(error) = panel::apply(&app, action) {
+            log::warn!("panel: failed to close before the settings: {error}");
+        }
+        return crate::windows::settings_window::open(&app).map_err(|error| {
+            log::warn!("settings: the window could not be opened: {error}");
+            "the settings could not be opened".to_string()
+        });
+    }
     // `anchor` was checked when deserialized: an invalid one never gets
     // here, so a rejected click changes nothing. The storage lock is
     // released before the panel's.

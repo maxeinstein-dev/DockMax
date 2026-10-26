@@ -3,7 +3,7 @@ import { join } from "node:path";
 import process from "node:process";
 import { $, browser, expect } from "@wdio/globals";
 import { ptBR as t } from "../../src/i18n/pt-BR.ts";
-import { DATA_DIR_VAR, restartApp } from "../app.ts";
+import { DATA_DIR_VAR, openSettings, restartApp } from "../app.ts";
 
 /** The `data-mode` of the current window's `<html>`, set from the theme. */
 function pageMode(): Promise<string | null> {
@@ -26,12 +26,7 @@ function settingsOption(group: string, option: string) {
 
 describe("Theme", () => {
   it("applies the chosen theme and keeps it after a restart", async () => {
-    await browser.switchToWindow("dock");
-    await $(
-      `nav[aria-label="${t.dock.label}"] button[aria-label="${t.dock.items.settings}"]`,
-    ).click();
-
-    await browser.switchToWindow("panel");
+    await openSettings();
     const dark = settingsOption(t.settings.groups.theme, t.settings.theme.dark);
     await dark.click();
     await expect(dark).toHaveAttribute("aria-pressed", "true");

@@ -679,12 +679,6 @@ impl PanelState {
     pub fn open(&self) -> Option<PanelId> {
         self.open.as_ref().map(|open| open.panel.id())
     }
-
-    /// Drops the reopen guard: the next toggle is an explicit request (the
-    /// tray), not the click that closed the panel.
-    pub fn forget_blur(&mut self) {
-        self.blurred = None;
-    }
 }
 
 /// `{ "panelId": <id> }`: the payload of the dock's `dock-request-panel`.
@@ -2450,21 +2444,6 @@ mod tests {
         assert_eq!(
             prepared(state.toggle(Panel::About, ANCHOR, at(t, 1050))).0,
             PanelId::About
-        );
-    }
-
-    #[test]
-    fn forgetting_the_blur_lets_an_explicit_request_reopen_at_once() {
-        let mut state = PanelState::default();
-        let t = Instant::now();
-        show(&mut state, Panel::Settings, t);
-        state.blur(at(t, 1000));
-
-        state.forget_blur();
-
-        assert_eq!(
-            prepared(state.toggle(Panel::Settings, ANCHOR, at(t, 1010))).0,
-            PanelId::Settings
         );
     }
 

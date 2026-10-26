@@ -39,7 +39,9 @@ export interface DockItemsProps {
   /** Voltar: back to Configurações, where the "Itens do dock" row takes the
    * focus (`NavRow` `focusOnMount`). The view mounts with the focus on
    * Voltar. */
-  onBack: () => void;
+  /** Back to the main view of the panel; none in the Configurações app,
+   * where the views are sections. */
+  onBack?: () => void;
 }
 
 /** The glyph of each kind on its mini tile (DESIGN.md "Dock item": Mini;
@@ -391,7 +393,15 @@ function DockItems({ snapshot, onBack }: DockItemsProps) {
 
   return (
     <>
-      <PanelHeader title={t.widgets.items.title} onBack={onBack} focusAction />
+      {onBack ? (
+        <PanelHeader
+          title={t.widgets.items.title}
+          onBack={onBack}
+          focusAction
+        />
+      ) : (
+        <PanelHeader title={t.widgets.items.title} />
+      )}
       {storage === "recovered" ? (
         <InlineNotice
           title={t.widgets.items.recovered.title}
