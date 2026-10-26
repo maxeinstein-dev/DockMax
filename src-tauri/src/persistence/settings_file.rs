@@ -165,6 +165,7 @@ mod tests {
         Settings {
             version: 1,
             theme: Theme::Dark,
+            launch_at_login: false,
             dock: DockSettings {
                 edge: DockEdge::Top,
                 icon_size: 64,
@@ -201,6 +202,15 @@ mod tests {
                 issue: None,
             }
         );
+    }
+
+    #[test]
+    fn starting_with_windows_is_off_unless_the_file_says_so() {
+        assert!(!load_str(r#"{"version":1}"#).settings.launch_at_login);
+        let loaded = load_str(r#"{"version":1,"launchAtLogin":true}"#);
+
+        assert!(loaded.settings.launch_at_login);
+        assert_eq!(loaded.issue, None);
     }
 
     #[test]
@@ -351,7 +361,8 @@ mod tests {
                     "indicator": "dot", "indicatorColor": null,
                     "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
                     "taskbar": "hidden", "bottomSpace": 2
-                }
+                },
+                "launchAtLogin": false
             })
         );
     }

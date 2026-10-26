@@ -138,6 +138,7 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            commands::settings::sync_launch_at_login(app.handle());
             windows::panel::setup(app.handle())?;
             windows::dock::setup(app.handle())?;
             tray::setup(app.handle())?;

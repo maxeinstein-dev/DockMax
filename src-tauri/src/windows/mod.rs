@@ -1,6 +1,7 @@
 #[cfg(windows)]
 pub mod appbar;
 pub mod apps;
+pub mod autostart;
 pub mod dock;
 #[cfg(windows)]
 pub mod drop_target;

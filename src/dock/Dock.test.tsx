@@ -33,6 +33,7 @@ const text = ptBR.dock;
 const MEDIUM: Settings = {
   version: 1,
   theme: "system",
+  launchAtLogin: false,
   dock: {
     edge: "bottom",
     iconSize: 48,

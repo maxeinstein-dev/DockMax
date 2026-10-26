@@ -3,7 +3,18 @@
 **Produto:** DockMax  
 **Plataforma inicial:** Windows 11  
 **Objetivo:** ferramenta de uso pessoal que também demonstre competências de desenvolvimento desktop e arquitetura.  
-**Status:** proposta inicial; estimativas são indicativas.
+**Status:** proposta inicial; estimativas são indicativas. **Atualização de 2026-10-26:** o produto passou a ser um dock que substitui a barra de tarefas (ADR 0009) e o plano das fases 3 e 4 abaixo foi superado pelas fases A a G da [spec 0004](specs/0004-paridade-primodock.md). O que define o MVP está em "Escopo do MVP".
+
+## Escopo do MVP (decisão do autor, 2026-10-26)
+
+O MVP é o que já existe, com os **ícones que os programas já têm**:
+
+- o dock no lugar da barra de tarefas do Windows, com restauração garantida (ADR 0009);
+- a fase A (visual): nove estilos, efeito ao passar o mouse, indicador, posições;
+- a fase B (apps): programas fixados com o ícone real, fixar e desafixar, reordenar arrastando, soltar um programa ou atalho no dock, e o menu do programa (a Jump List do Windows);
+- relógio com data, bandeja do sistema hospedada pelo DockMax e os widgets Relógio, Progresso do tempo e Nota.
+
+Ficam **para o futuro**, fora do MVP: a personalização de ícones (ícone por app, imagem própria, chaves semânticas e um pacote embutido, recortes B4b e B4c da [spec 0007](specs/0007-fase-b4-icones.md); a leitura de pacotes de ícones, B4a, já está pronta e fica como recurso avançado), os apps abertos e as prévias de janela (fase D e E), os espaços de trabalho (fase C), os demais widgets (fase F) e os extras (fase G). A fase 5 abaixo é o que falta para fechar o MVP.
 
 ## Visão do produto
 
@@ -120,26 +131,47 @@ Revisão de 2026-10-19 (fim da Fase 2): a direção foi mantida e o roadmap ganh
 
 **Estimativa:** 1–2 semanas.
 
-- [ ] Gerar instalador Windows.
-- [ ] Testar instalação e desinstalação em ambiente limpo.
-- [ ] Verificar persistência de configurações e do banco após atualização manual, com uma migração real (v1 → v2) e o backup antes dela.
-- [ ] Política de retenção dos arquivos `bak-v*` e `.corrompido-*` na pasta de dados.
-- [ ] Documentar limitações conhecidas (inclusive: leitor de tela nunca testado).
+- [x] Gerar instalador Windows: NSIS, por usuário, em português, 2,6 MiB, não assinado ([spec 0008](specs/0008-fechamento-do-mvp.md)).
+- [x] Testar instalação e desinstalação: feito em silêncio na máquina do autor (ver "Verificação do instalador"); **não** foi feito numa máquina limpa nem numa máquina virtual.
+- [x] Verificar persistência de configurações e do banco após atualização manual, com uma migração real (v1 → v2) e o backup antes dela: coberto pelos testes do banco (migração com `dockmax.db.bak-v<n>`, falha de migração que deixa o arquivo como estava, banco danificado renomeado) e pela migração 1 → 2 (B1) já usada nos dados reais do autor.
+- [x] Política de retenção dos arquivos `bak-v*` e `.corrompido-*` na pasta de dados: **nenhum é apagado pelo programa** (o DockMax nunca apaga dados do usuário; cada `bak-v*` vem de uma migração e é pequeno, e um `.corrompido-*` só existe se o banco foi danificado). A pasta e o motivo estão no README e em [limitações](limitacoes.md); apagar é decisão de quem usa.
+- [x] Documentar limitações conhecidas (inclusive: leitor de tela nunca testado): [limitações](limitacoes.md).
 - [x] README com "onde ficam seus dados" (`%APPDATA%\dev.maxsueleinstein.dockmax`). (feito na v0.2.0)
 - [ ] Criar README com imagens, arquitetura, funcionalidades e instruções.
 - [ ] Criar uma demonstração curta do aplicativo.
 - [ ] Verificar licença de dependências e atribuições necessárias.
 
 **Critérios de aceitação do MVP**
-- [ ] Instala e inicia em uma máquina Windows compatível.
-- [ ] Dock e painéis funcionam sem falhas críticas conhecidas.
-- [ ] Atalhos e preferências persistem.
-- [ ] Notas são salvas e recuperadas.
-- [ ] Temas são aplicados de forma consistente.
-- [ ] Memória privada em repouso dentro do orçamento (cerca de 220 MB) e CPU em repouso abaixo de 1%.
-- [ ] Testes essenciais passam.
-- [ ] Documentação explica como executar, testar e compilar.
-- [ ] Limitações de gerenciamento de janelas estão explícitas.
+- [x] Instala e inicia em uma máquina Windows compatível (na do autor; ver as limitações).
+- [x] Dock e painéis funcionam sem falhas críticas conhecidas.
+- [x] Atalhos e preferências persistem.
+- [x] Notas são salvas e recuperadas.
+- [x] Temas são aplicados de forma consistente.
+- [x] Memória privada em repouso dentro do orçamento (cerca de 220 MB) e CPU em repouso abaixo de 1%: ver "Medição de recursos".
+- [x] Testes essenciais passam.
+- [x] Documentação explica como executar, testar e compilar.
+- [x] Limitações de gerenciamento de janelas estão explícitas.
+
+### Medição de recursos (build de release 0.3.0, 2026-10-26)
+
+Máquina do autor (Windows 11, 16 processadores lógicos, um monitor, escala de 125 %), dock com a barra do Windows oculta, sem programas fixados além dos do autor, painel fechado, medido 25 s depois de abrir.
+
+| Medida | Resultado | Meta |
+|---|---|---|
+| Memória privada em repouso (processo e os 6 processos do WebView2) | 174 MB aos 25 s; 187 MB 30 s depois | cerca de 220 MB |
+| CPU em repouso (30 s) | 0,02 % do total dos 16 processadores | abaixo de 1 % |
+
+A memória subiu 13 MB entre as duas medições; as duas ficam abaixo da meta. Não foi medido um uso longo (horas).
+
+### Verificação do instalador (2026-10-26)
+
+Instalador `DockMax_0.3.0_x64-setup.exe`, instalado e desinstalado em silêncio (`/S`) numa pasta do usuário, na máquina do autor:
+
+- instala sem administrador (`dockmax.exe` e `uninstall.exe`) e registra "DockMax 0.3.0" em Aplicativos instalados; **não** abre o programa sozinho;
+- com a entrada de inicialização presente, o desinstalador a remove, remove os atalhos do Menu Iniciar e da Área de Trabalho, a pasta de instalação e a cópia do vigia (`dockmax-guard.exe`); os dados do usuário ficam intactos;
+- o desinstalador deixou os atalhos quando a instalação foi feita num caminho em formato curto 8.3 (`C:\Users\MAXSUE~1\...`), que o Windows usa no `%TEMP%`; numa pasta de caminho normal não deixa nada. Quem instala na pasta padrão (`%LOCALAPPDATA%\DockMax`) não é afetado.
+
+Não verificado: máquina limpa ou virtual, Windows 10, atualização por cima de uma versão anterior com o programa aberto.
 
 ## Backlog pós-MVP
 
