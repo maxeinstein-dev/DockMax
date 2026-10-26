@@ -61,6 +61,7 @@ struct DockSettingsInput {
     tray_in_dock: Vec<String>,
     middle_click: MiddleClick,
     taskbar: TaskbarMode,
+    every_monitor: bool,
     bottom_space: u8,
 }
 
@@ -94,6 +95,7 @@ impl From<SettingsInput> for Settings {
                 tray_in_dock: dock.tray_in_dock,
                 middle_click: dock.middle_click,
                 taskbar: dock.taskbar,
+                every_monitor: dock.every_monitor,
                 bottom_space: dock.bottom_space,
             },
         }
@@ -385,7 +387,7 @@ mod tests {
     }
 
     /// The look fields of a full update payload.
-    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","showOpenApps":false,"middleClick":"none","taskbar":"hidden","bottomSpace":2"##;
+    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","showOpenApps":false,"middleClick":"none","taskbar":"hidden","everyMonitor":false,"bottomSpace":2"##;
 
     fn full() -> String {
         format!(
@@ -426,6 +428,7 @@ mod tests {
                     tray_in_dock: Vec::new(),
                     middle_click: MiddleClick::None,
                     taskbar: TaskbarMode::Hidden,
+                    every_monitor: false,
                     bottom_space: 2,
                 },
             }
@@ -473,6 +476,7 @@ mod tests {
             "hoverScale",
             "indicator",
             "taskbar",
+            "everyMonitor",
             "bottomSpace",
         ] {
             let mut value: serde_json::Value = serde_json::from_str(&full()).unwrap();

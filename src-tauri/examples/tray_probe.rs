@@ -5,6 +5,7 @@
 //!
 //! `cargo run --example tray_probe -- [seconds] [tooltip part] [left|right]`
 
+#[allow(dead_code, reason = "`aside` is for the app's own app bar bands")]
 #[path = "../src/windows/tray_host.rs"]
 mod tray_host;
 

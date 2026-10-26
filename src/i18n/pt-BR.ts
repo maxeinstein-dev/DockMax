@@ -87,6 +87,9 @@ const messages = {
     /** The switch that opens the DockMax when the user signs in. */
     showOpenApps: "Mostrar apps abertos",
     showOpenAppsHint: "Os que não estão fixados, depois dos widgets",
+    everyMonitor: "Dock em todos os monitores",
+    everyMonitorHint:
+      "Cada monitor com o seu dock, no lugar da barra de tarefas",
     launchAtLogin: "Iniciar com o Windows",
     launchAtLoginHint: "Abre o DockMax ao entrar no Windows",
     theme: {

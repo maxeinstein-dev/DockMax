@@ -40,3 +40,21 @@ O segundo dock custa uns 15–25 MB, e não um processo a mais: com `--process-p
 No app real (release), com dois monitores: uma janela de teste em tela cheia no monitor principal esconde o dock; trazer para a frente uma janela no **outro** monitor (o primeiro plano foi para lá) **mantém o dock escondido**; fechar a tela cheia traz o dock de volta.
 
 **Não verificado:** um vídeo de verdade (YouTube, player) em tela cheia, jogos em tela cheia exclusiva e o dock escondido pelo usuário durante a tela cheia.
+
+## 5. D4b em detalhe
+
+O dock já é nativo ([spec 0011](0011-arquitetura-hibrida.md), H3), então um dock a mais é uma janela a mais no mesmo processo, sem WebView2.
+
+- **Um dock por monitor** (`windows/monitors.rs`, `native_dock`): os monitores vêm do Windows, o principal primeiro, cada um identificado pelo nome do dispositivo (`\\.\DISPLAY1`). Ligar um monitor cria o dock dele; desligar destrói o dock e devolve a faixa; os outros docks se reposicionam. Todos mostram os mesmos itens e repetem a bandeja e o relógio.
+- **"Dock em todos os monitores"** (Configurações, ligado por padrão): desligado, só o monitor principal recebe o dock, como antes.
+- **Uma faixa por monitor** (`windows/appbar.rs`): cada dock reserva a borda do seu monitor, com a espessura da sua escala. Duas regras vieram do teste com dois monitores:
+  - cada `ABM_SETPOS` de uma faixa avisa as outras que a borda mudou; uma faixa só pede de novo quando o lugar oferecido mudou, senão as duas se respondem sem fim;
+  - com a barra do Windows oculta, a bandeja hospedada (um `Shell_TrayWnd` do DockMax na frente do Explorer) recebe as mensagens de barra de aplicativos. O Explorer concede a faixa pedida por ela, mas a deixa fora da área de trabalho, e as janelas maximizadas ficavam por baixo do dock (já acontecia com um dock só). O dock pede as suas faixas com a bandeja hospedada abaixada na ordem z, direto ao Explorer.
+- **Tela cheia por monitor:** a checagem do D4a roda para cada dock, com o monitor dele. Uma janela **maximizada com barra de título** nunca é tela cheia: logo depois de a barra do Windows sumir, antes de a faixa valer, ela ainda cobre o monitor inteiro, e o dock daquele monitor se escondia.
+- **Painéis:** abrem junto do dock em que se clicou, no monitor dele.
+
+## 6. Verificado (D4b)
+
+No app real (release), com dois monitores (2560 × 1080 a 100 % e 1920 × 1200 a 125 %), a barra do Windows oculta e um programa maximizado no segundo monitor: um dock em cada monitor, cada um no seu monitor e na sua escala, cada um com os seus itens para a UI Automation. As áreas de trabalho ficam acima de cada faixa (1026 e 1138 px de altura útil), e o programa maximizado termina acima do dock. Com o DockMax fechado, as áreas de trabalho e a barra do Windows voltam como estavam. Memória privada com os dois docks: cerca de 88 MB, num processo só.
+
+**Não verificado:** o mouse de verdade no segundo dock (painéis, menus, arrastar), ligar e desligar um monitor com o DockMax aberto, a opção "Dock em todos os monitores" mudada com ele aberto, e a tela cheia de verdade no segundo monitor.

@@ -361,7 +361,7 @@ mod tests {
                     "indicator": "dot", "indicatorColor": null,
                     "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
                     "showOpenApps": true, "middleClick": "newInstance",
-                    "taskbar": "hidden", "bottomSpace": 2
+                    "taskbar": "hidden", "everyMonitor": true, "bottomSpace": 2
                 },
                 "launchAtLogin": false
             })

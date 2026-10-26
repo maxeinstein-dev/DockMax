@@ -12,6 +12,8 @@ pub mod fullscreen;
 pub mod jumplist;
 pub mod memory;
 #[cfg(windows)]
+pub mod monitors;
+#[cfg(windows)]
 mod native;
 #[cfg(windows)]
 pub mod native_dock;

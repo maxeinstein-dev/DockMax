@@ -27,6 +27,8 @@ export const otherText: Messages = {
     middleClick: { newInstance: "New instance", none: "Nothing" },
     showOpenApps: "Show open apps",
     showOpenAppsHint: "The ones that are not pinned, after the widgets",
+    everyMonitor: "Dock on every monitor",
+    everyMonitorHint: "Each monitor with its own dock",
     app: {
       nav: "Settings sections",
       sections: {

@@ -4,9 +4,9 @@ O que o DockMax **não** faz hoje, e o que pode surpreender. Vale para o MVP (ve
 
 ## Sistema
 
-- **Só Windows 11**, testado em um monitor principal com escala de 100 % e de 125 %. Windows 10 não foi testado.
+- **Só Windows 11**, testado com um e com dois monitores, com escala de 100 % e de 125 %. Windows 10 não foi testado.
 - **O dock some quando o monitor dele está em tela cheia** (um vídeo, uma apresentação) e volta quando ela acaba, mesmo que você use o outro monitor nesse meio tempo ([spec 0010](specs/0010-fase-d4-monitores-e-tela-cheia.md)).
-- **Só o monitor principal recebe o dock.** Com a barra do Windows oculta, a do segundo monitor também some e esse monitor fica sem barra nenhuma ([ADR 0009](adr/0009-dock-substitui-a-barra-de-tarefas.md)). Um dock por monitor é da fase D.
+- **Um dock em cada monitor**, cada um reservando a borda do seu ([spec 0010](specs/0010-fase-d4-monitores-e-tela-cheia.md), D4b). Todos mostram os mesmos itens; não há itens diferentes por monitor. Em Configurações › "Dock em todos os monitores" dá para deixar só o do monitor principal: com a barra do Windows oculta, os outros monitores ficam sem barra nenhuma.
 - **O instalador não é assinado.** O SmartScreen do Windows avisa na instalação e é preciso escolher "Mais informações › Executar assim mesmo". Para compilar do código-fonte, o Controle Inteligente de Aplicativos precisa estar desativado (README).
 - **Só inicia com o Windows se você ligar "Iniciar com o Windows" em Configurações** (desligado por padrão).
 - **Leitor de tela nunca foi testado.** Os controles têm nomes e papéis acessíveis e há testes de acessibilidade por código, mas ninguém usou o aplicativo com um leitor de tela. O dock, desenhado sem navegador ([spec 0011](specs/0011-arquitetura-hibrida.md)), se apresenta à UI Automation como uma barra de ferramentas com um botão por item, que o leitor de tela pode acionar.

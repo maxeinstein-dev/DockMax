@@ -1,15 +1,16 @@
-//! The dock as an app bar: it reserves a band along an edge of the screen,
-//! so maximized windows stop at the band instead of going under the dock
-//! (ADR 0009).
+//! The dock as an app bar: it reserves a band along an edge of each screen
+//! it is on, so maximized windows stop at the band instead of going under
+//! the dock (ADR 0009, spec 0010 D4b: one band per monitor).
 //!
-//! The band is full width and as thick as the bar plus its distance from the
+//! A band is full width and as thick as the bar plus its distance from the
 //! edge; the dock window is smaller, centered, and taller (it holds the
 //! magnification and the label), and overlays the band. Windows wants a
-//! window of ours to talk to and a message loop to hear it: a hidden window
-//! on a thread of its own, which never touches Tauri (the main thread waits
-//! for it in `set`, so it must not wait for the main thread). What it has to
-//! tell the dock, it asks of `on_change`.
+//! window of ours for each band to talk to, and a message loop to hear them:
+//! hidden windows on a thread of their own, which never touches Tauri (the
+//! main thread waits for it in `set`, so it must not wait for the main
+//! thread). What it has to tell the dock, it asks of `on_change`.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, PoisonError, mpsc};
 use std::thread;
@@ -20,25 +21,31 @@ use ::windows::Win32::UI::Shell::{
     ABE_BOTTOM, ABE_TOP, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE, ABM_SETPOS, APPBARDATA, SHAppBarMessage,
 };
 use ::windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, MSG, RegisterClassW,
-    RegisterWindowMessageW, SendMessageW, TranslateMessage, WM_APP, WM_DISPLAYCHANGE,
-    WM_ENDSESSION, WM_SETTINGCHANGE, WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, MSG,
+    RegisterClassW, RegisterWindowMessageW, SendMessageW, TranslateMessage, WM_APP,
+    WM_DISPLAYCHANGE, WM_ENDSESSION, WM_SETTINGCHANGE, WNDCLASSW, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW, WS_POPUP,
 };
 use ::windows::core::{PCWSTR, w};
 
 use super::dock::{Edge, Rect};
 
-/// Posted to the hidden window by Windows about the band (`ABN_*` in
+/// Posted to a band's window by Windows about the band (`ABN_*` in
 /// `wparam`).
 const WM_CALLBACK: u32 = WM_APP + 2;
-/// Sent by `set`: puts the band where `Shared::wanted` says.
+/// Sent by `set` to a band's window: puts the band where it is wanted.
 const WM_APPLY: u32 = WM_APP + 3;
+/// Sent to the thread's own window: makes a band's window (its key in
+/// `lparam`, a `*const String`) and answers its handle.
+const WM_NEW_BAND: u32 = WM_APP + 4;
+/// Sent to a band's window: gives the band back and closes the window.
+const WM_DROP_BAND: u32 = WM_APP + 5;
 
 /// `ABN_POSCHANGED`: something else on the edge moved (the taskbar hid, a
 /// bar came or went); the band is asked again.
 const ABN_POSCHANGED: usize = 1;
 
-/// The band the dock wants.
+/// The band the dock wants on a monitor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Request {
     pub edge: Edge,
@@ -48,28 +55,34 @@ pub struct Request {
     pub thickness: u32,
 }
 
-#[derive(Default)]
-struct Shared {
+/// One monitor's band.
+#[derive(Debug, Default)]
+struct Band {
+    /// Its window (an `HWND` as a number).
+    hwnd: isize,
     wanted: Option<Request>,
     granted: Option<Rect>,
     registered: bool,
+}
+
+#[derive(Default)]
+struct Shared {
+    /// By monitor key.
+    bands: HashMap<String, Band>,
     on_change: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
-static SHARED: Mutex<Shared> = Mutex::new(Shared {
-    wanted: None,
-    granted: None,
-    registered: false,
-    on_change: None,
-});
+static SHARED: Mutex<Option<Shared>> = Mutex::new(None);
 
-/// The hidden window (an `HWND` as a number), 0 until the thread made it.
+/// The thread's own window (an `HWND` as a number), 0 until the thread made
+/// it.
 static WINDOW: AtomicIsize = AtomicIsize::new(0);
 /// The id Windows gave the `TaskbarCreated` message.
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
 
-fn shared() -> std::sync::MutexGuard<'static, Shared> {
-    SHARED.lock().unwrap_or_else(PoisonError::into_inner)
+fn with_shared<T>(change: impl FnOnce(&mut Shared) -> T) -> T {
+    let mut shared = SHARED.lock().unwrap_or_else(PoisonError::into_inner);
+    change(shared.get_or_insert_with(Shared::default))
 }
 
 fn window() -> Option<HWND> {
@@ -80,13 +93,13 @@ fn window() -> Option<HWND> {
 }
 
 /// Starts the thread and its window, once. `on_change` is called from that
-/// thread whenever the band or the monitors changed under the dock and the
+/// thread whenever a band or the monitors changed under the dock and the
 /// dock must place itself again; it must not block on the caller of `set`.
 pub fn start(on_change: impl Fn() + Send + Sync + 'static) {
     if window().is_some() {
         return;
     }
-    shared().on_change = Some(Arc::new(on_change));
+    with_shared(|shared| shared.on_change = Some(Arc::new(on_change)));
     let (ready, started) = mpsc::channel();
     let spawned = thread::Builder::new()
         .name("appbar".into())
@@ -100,25 +113,69 @@ pub fn start(on_change: impl Fn() + Send + Sync + 'static) {
     }
 }
 
-/// Reserves the band `request` describes, or gives it back with `None`;
-/// returns the band Windows granted, which can differ from the one asked
-/// for (another bar may hold the edge). Waits until the thread has done it.
-pub fn set(request: Option<Request>) -> Option<Rect> {
-    let hwnd = window()?;
-    {
-        let mut state = shared();
-        if state.wanted == request && state.granted.is_some() == request.is_some() {
-            return state.granted;
+/// Reserves the band `request` describes on the monitor `key`, or gives it
+/// back with `None`; returns the band Windows granted, which can differ from
+/// the one asked for (another bar may hold the edge). Waits until the thread
+/// has done it.
+pub fn set(key: &str, request: Option<Request>) -> Option<Rect> {
+    let manager = window()?;
+    let existing = with_shared(|shared| shared.bands.get(key).map(|band| band.hwnd));
+    let hwnd = match existing {
+        Some(hwnd) => hwnd,
+        None if request.is_none() => return None,
+        None => {
+            let name = key.to_string();
+            let made = unsafe {
+                SendMessageW(
+                    manager,
+                    WM_NEW_BAND,
+                    None,
+                    Some(LPARAM(std::ptr::from_ref(&name) as isize)),
+                )
+            };
+            if made.0 == 0 {
+                return None;
+            }
+            made.0
         }
-        state.wanted = request;
+    };
+    let unchanged = with_shared(|shared| {
+        let band = shared.bands.entry(key.to_string()).or_default();
+        band.hwnd = hwnd;
+        if band.wanted == request && band.granted.is_some() == request.is_some() {
+            return Some(band.granted);
+        }
+        band.wanted = request;
+        None
+    });
+    if let Some(granted) = unchanged {
+        return granted;
     }
-    unsafe { SendMessageW(hwnd, WM_APPLY, None, None) };
-    shared().granted
+    unsafe { SendMessageW(HWND(hwnd as _), WM_APPLY, None, None) };
+    with_shared(|shared| shared.bands.get(key).and_then(|band| band.granted))
 }
 
-/// Gives the band back (the process is ending).
+/// Gives back the bands of the monitors not in `keep` (they were
+/// unplugged, or the dock left them).
+pub fn retain(keep: &[String]) {
+    let gone: Vec<isize> = with_shared(|shared| {
+        let gone = shared
+            .bands
+            .iter()
+            .filter(|(key, _)| !keep.contains(key))
+            .map(|(_, band)| band.hwnd)
+            .collect();
+        shared.bands.retain(|key, _| keep.contains(key));
+        gone
+    });
+    for hwnd in gone {
+        unsafe { SendMessageW(HWND(hwnd as _), WM_DROP_BAND, None, None) };
+    }
+}
+
+/// Gives every band back (the process is ending).
 pub fn remove() {
-    set(None);
+    retain(&[]);
 }
 
 fn wide(rect: Rect) -> RECT {
@@ -140,8 +197,11 @@ fn narrow(rect: RECT) -> Rect {
 }
 
 /// The band as Windows keeps it, to be asked for again: the full-width
-/// strip along the edge. Returns what Windows granted.
-fn place(hwnd: HWND, request: Request) -> Rect {
+/// strip along the edge. Returns what Windows granted; `granted` is the band
+/// held now, which is kept as it is when Windows offers the same again: each
+/// `ABM_SETPOS` tells the other bands their edge moved, and they would answer
+/// in kind, one monitor's band to the other's, without end.
+fn place(hwnd: HWND, request: Request, granted: Option<Rect>) -> Rect {
     let edge = match request.edge {
         Edge::Bottom => ABE_BOTTOM,
         Edge::Top => ABE_TOP,
@@ -162,16 +222,47 @@ fn place(hwnd: HWND, request: Request) -> Rect {
         Edge::Bottom => data.rc.top = data.rc.bottom - thickness,
         Edge::Top => data.rc.bottom = data.rc.top + thickness,
     }
+    if granted == Some(narrow(data.rc)) {
+        return narrow(data.rc);
+    }
     unsafe { SHAppBarMessage(ABM_SETPOS, &mut data) };
     narrow(data.rc)
 }
 
-/// Makes the band what `Shared::wanted` says.
-fn apply(hwnd: HWND) {
-    let (wanted, registered) = {
-        let state = shared();
-        (state.wanted, state.registered)
-    };
+/// The band of the window `hwnd`, as `(wanted, granted, registered)`.
+fn band_of(hwnd: HWND) -> Option<(Option<Request>, Option<Rect>, bool)> {
+    with_shared(|shared| {
+        shared
+            .bands
+            .values()
+            .find(|band| band.hwnd == hwnd.0 as isize)
+            .map(|band| (band.wanted, band.granted, band.registered))
+    })
+}
+
+fn update_band(hwnd: HWND, change: impl FnOnce(&mut Band)) {
+    with_shared(|shared| {
+        if let Some(band) = shared
+            .bands
+            .values_mut()
+            .find(|band| band.hwnd == hwnd.0 as isize)
+        {
+            change(band);
+        }
+    });
+}
+
+/// Makes the band of the window `hwnd` what it wants; `drop` gives it back
+/// whatever it wants. Asked of Explorer's taskbar itself: a band asked
+/// through the tray host (`tray_host`) is granted but left out of the work
+/// area, and maximized windows would go under the dock.
+fn apply(hwnd: HWND, drop: bool) {
+    super::tray_host::aside(|| apply_now(hwnd, drop));
+}
+
+fn apply_now(hwnd: HWND, drop: bool) {
+    let (wanted, granted, registered) = band_of(hwnd).unwrap_or((None, None, true));
+    let wanted = if drop { None } else { wanted };
     let mut data = APPBARDATA {
         cbSize: size_of::<APPBARDATA>() as u32,
         hWnd: hwnd,
@@ -183,26 +274,75 @@ fn apply(hwnd: HWND) {
             if registered {
                 unsafe { SHAppBarMessage(ABM_REMOVE, &mut data) };
             }
-            let mut state = shared();
-            state.registered = false;
-            state.granted = None;
+            update_band(hwnd, |band| {
+                band.registered = false;
+                band.granted = None;
+            });
         }
         Some(request) => {
+            // Newly registered, the band is held nowhere yet.
+            let held = if registered { granted } else { None };
             if !registered {
                 unsafe { SHAppBarMessage(ABM_NEW, &mut data) };
-                shared().registered = true;
+                update_band(hwnd, |band| band.registered = true);
             }
-            let granted = place(hwnd, request);
-            shared().granted = Some(granted);
+            let granted = place(hwnd, request, held);
+            update_band(hwnd, |band| band.granted = Some(granted));
         }
     }
 }
 
+/// Every band again, registered anew: Explorer started again and forgot
+/// them.
+fn apply_all() {
+    let windows: Vec<isize> = with_shared(|shared| {
+        shared
+            .bands
+            .values_mut()
+            .map(|band| {
+                band.registered = false;
+                band.granted = None;
+                band.hwnd
+            })
+            .collect()
+    });
+    for hwnd in windows {
+        apply(HWND(hwnd as _), false);
+    }
+}
+
 fn changed() {
-    let callback = shared().on_change.clone();
+    let callback = with_shared(|shared| shared.on_change.clone());
     if let Some(callback) = callback {
         callback();
     }
+}
+
+fn class_instance() -> HINSTANCE {
+    unsafe { GetModuleHandleW(PCWSTR::null()) }
+        .map(|module| HINSTANCE(module.0))
+        .unwrap_or_default()
+}
+
+/// A hidden window of the thread.
+fn make_window(title: PCWSTR) -> Option<HWND> {
+    unsafe {
+        CreateWindowExW(
+            WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+            w!("DockMaxAppBar"),
+            title,
+            WS_POPUP,
+            0,
+            0,
+            0,
+            0,
+            None,
+            None,
+            Some(class_instance()),
+            None,
+        )
+    }
+    .ok()
 }
 
 unsafe extern "system" fn procedure(
@@ -211,37 +351,50 @@ unsafe extern "system" fn procedure(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    let manager = window().is_some_and(|manager| manager == hwnd);
     match msg {
+        WM_NEW_BAND if manager => {
+            let made = make_window(w!("DockMax app bar band"));
+            return LRESULT(made.map_or(0, |band| band.0 as isize));
+        }
         WM_APPLY => {
-            apply(hwnd);
+            apply(hwnd, false);
+            return LRESULT(0);
+        }
+        WM_DROP_BAND => {
+            apply(hwnd, true);
+            let _ = unsafe { DestroyWindow(hwnd) };
             return LRESULT(0);
         }
         WM_CALLBACK => {
             if wparam.0 == ABN_POSCHANGED {
                 // Explorer moved its taskbar: it may have shown it again.
                 super::taskbar::keep();
-                apply(hwnd);
+                apply(hwnd, false);
                 changed();
             }
             return LRESULT(0);
         }
-        WM_DISPLAYCHANGE => {
+        WM_DISPLAYCHANGE if manager => {
             super::taskbar::keep();
             changed();
         }
-        WM_SETTINGCHANGE => super::taskbar::keep(),
-        // The session ends without `RunEvent::Exit`: the band and the
+        WM_SETTINGCHANGE if manager => super::taskbar::keep(),
+        // The session ends without `RunEvent::Exit`: the bands and the
         // taskbar go back now.
-        WM_ENDSESSION if wparam.0 != 0 => {
-            shared().wanted = None;
-            apply(hwnd);
+        WM_ENDSESSION if manager && wparam.0 != 0 => {
+            let windows: Vec<isize> =
+                with_shared(|shared| shared.bands.values().map(|band| band.hwnd).collect());
+            for band in windows {
+                apply(HWND(band as _), true);
+            }
             super::tray_host::stop();
             super::taskbar::release();
         }
-        _ if msg == TASKBAR_CREATED.load(Ordering::Relaxed) && msg != 0 => {
+        _ if manager && msg == TASKBAR_CREATED.load(Ordering::Relaxed) && msg != 0 => {
             // Explorer started again and showed its taskbar.
             super::taskbar::keep();
-            apply(hwnd);
+            apply_all();
             changed();
         }
         _ => {}
@@ -249,17 +402,13 @@ unsafe extern "system" fn procedure(
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
-/// The thread: a hidden window and its message loop, for as long as the
-/// process lives.
+/// The thread: a hidden window, the bands' windows and their message loop,
+/// for as long as the process lives.
 fn run(ready: mpsc::Sender<()>) {
-    let class = w!("DockMaxAppBar");
-    let instance = unsafe { GetModuleHandleW(PCWSTR::null()) }
-        .map(|module| HINSTANCE(module.0))
-        .unwrap_or_default();
     let class_data = WNDCLASSW {
         lpfnWndProc: Some(procedure),
-        hInstance: instance,
-        lpszClassName: class,
+        hInstance: class_instance(),
+        lpszClassName: w!("DockMaxAppBar"),
         ..Default::default()
     };
     unsafe { RegisterClassW(&class_data) };
@@ -267,25 +416,9 @@ fn run(ready: mpsc::Sender<()>) {
         unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) },
         Ordering::Relaxed,
     );
-    let created = unsafe {
-        CreateWindowExW(
-            WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-            class,
-            w!("DockMax app bar"),
-            WS_POPUP,
-            0,
-            0,
-            0,
-            0,
-            None,
-            None,
-            Some(instance),
-            None,
-        )
-    };
-    match created {
-        Ok(hwnd) => WINDOW.store(hwnd.0 as isize, Ordering::Release),
-        Err(error) => log::warn!("appbar: the window was not created: {error}"),
+    match make_window(w!("DockMax app bar")) {
+        Some(hwnd) => WINDOW.store(hwnd.0 as isize, Ordering::Release),
+        None => log::warn!("appbar: the window was not created"),
     }
     let _ = ready.send(());
     if window().is_none() {
@@ -347,16 +480,19 @@ mod tests {
     fn asking_for_a_band_without_the_thread_does_nothing() {
         // No `start` in the tests: no window, nothing to ask.
         assert_eq!(
-            set(Some(Request {
-                edge: Edge::Bottom,
-                monitor: Rect {
-                    x: 0,
-                    y: 0,
-                    width: 100,
-                    height: 100,
-                },
-                thickness: 10,
-            })),
+            set(
+                "monitor",
+                Some(Request {
+                    edge: Edge::Bottom,
+                    monitor: Rect {
+                        x: 0,
+                        y: 0,
+                        width: 100,
+                        height: 100,
+                    },
+                    thickness: 10,
+                })
+            ),
             None
         );
     }
