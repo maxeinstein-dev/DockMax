@@ -183,6 +183,38 @@ describe("SettingsPanel", () => {
     });
   });
 
+  it("turns hiding on its own on, then shows its two times to change", () => {
+    invoke.mockReturnValue(new Promise(() => {}));
+    const { rerender } = render(<SettingsPanel settings={SETTINGS} />);
+    const toggle = screen.getByRole("switch", { name: text.autoHide });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    // The times only matter while it hides.
+    expect(
+      screen.queryByRole("slider", { name: text.autoHideReveal }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    const on = { ...SETTINGS, dock: { ...SETTINGS.dock, autoHide: true } };
+    expect(invoke).toHaveBeenLastCalledWith("update_settings", {
+      settings: on,
+    });
+
+    rerender(<SettingsPanel settings={on} />);
+    const reveal = screen.getByRole("slider", { name: text.autoHideReveal });
+    expect(reveal).toHaveAttribute("aria-valuetext", "0,3 s");
+    expect(
+      screen.getByRole("slider", { name: text.autoHideDelay }),
+    ).toHaveAttribute("aria-valuetext", "0,7 s");
+
+    fireEvent.change(reveal, { target: { value: "600" } });
+    fireEvent.pointerUp(reveal);
+
+    expect(invoke).toHaveBeenLastCalledWith("update_settings", {
+      settings: { ...on, dock: { ...on.dock, autoHideReveal: 600 } },
+    });
+  });
+
   it("turns starting with Windows on and off, saving the full settings", () => {
     invoke.mockReturnValue(new Promise(() => {}));
     const { rerender } = render(<SettingsPanel settings={SETTINGS} />);

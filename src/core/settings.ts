@@ -114,6 +114,12 @@ export const MAX_TRAY_IN_DOCK = 6;
 /** Distance between the dock and the screen edge, in logical pixels. */
 export const MAX_BOTTOM_SPACE = 64;
 export const DEFAULT_BOTTOM_SPACE = 2;
+/** The times of a dock hiding on its own, in milliseconds: on the screen
+ * edge before it comes up, and away before it goes down. */
+export const DEFAULT_AUTO_HIDE_REVEAL = 300;
+export const MAX_AUTO_HIDE_REVEAL = 2000;
+export const DEFAULT_AUTO_HIDE_DELAY = 700;
+export const MAX_AUTO_HIDE_DELAY = 5000;
 
 /** The look fields of `DockSettings` before the user changes anything;
  * equal to `DockSettings::default()` in `src-tauri/src/domain/settings.rs`. */
@@ -131,6 +137,9 @@ export const DEFAULT_LOOK = {
   middleClick: "newInstance",
   taskbar: "hidden",
   everyMonitor: true,
+  autoHide: false,
+  autoHideReveal: DEFAULT_AUTO_HIDE_REVEAL,
+  autoHideDelay: DEFAULT_AUTO_HIDE_DELAY,
   bottomSpace: DEFAULT_BOTTOM_SPACE,
 } as const satisfies Pick<
   DockSettings,
@@ -147,6 +156,9 @@ export const DEFAULT_LOOK = {
   | "middleClick"
   | "taskbar"
   | "everyMonitor"
+  | "autoHide"
+  | "autoHideReveal"
+  | "autoHideDelay"
   | "bottomSpace"
 >;
 
@@ -183,6 +195,14 @@ export interface DockSettings {
   /** A dock on every monitor, each holding its own edge, or only on the
    * primary one (spec 0010 D4b). */
   everyMonitor: boolean;
+  /** The dock goes off the screen when the pointer leaves it and comes back
+   * at the screen edge, giving its band to the programs. */
+  autoHide: boolean;
+  /** Milliseconds on the screen edge before it comes up,
+   * 0–`MAX_AUTO_HIDE_REVEAL`. */
+  autoHideReveal: number;
+  /** Milliseconds away before it goes down, 0–`MAX_AUTO_HIDE_DELAY`. */
+  autoHideDelay: number;
   /** Distance between the dock and the screen edge, in logical pixels,
    * 0–`MAX_BOTTOM_SPACE`. */
   bottomSpace: number;

@@ -62,6 +62,9 @@ struct DockSettingsInput {
     middle_click: MiddleClick,
     taskbar: TaskbarMode,
     every_monitor: bool,
+    auto_hide: bool,
+    auto_hide_reveal: u16,
+    auto_hide_delay: u16,
     bottom_space: u8,
 }
 
@@ -96,6 +99,9 @@ impl From<SettingsInput> for Settings {
                 middle_click: dock.middle_click,
                 taskbar: dock.taskbar,
                 every_monitor: dock.every_monitor,
+                auto_hide: dock.auto_hide,
+                auto_hide_reveal: dock.auto_hide_reveal,
+                auto_hide_delay: dock.auto_hide_delay,
                 bottom_space: dock.bottom_space,
             },
         }
@@ -274,6 +280,7 @@ fn apply(
         log::warn!("settings: saved, but failed to notify the windows: {error}");
     }
     dock::settings_changed(&app, &before, &updated.dock);
+    crate::tray::show_auto_hide(&app, updated.dock.auto_hide);
     if updated.launch_at_login != launch_before {
         apply_launch_at_login(updated.launch_at_login);
     }
@@ -387,7 +394,7 @@ mod tests {
     }
 
     /// The look fields of a full update payload.
-    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","showOpenApps":false,"middleClick":"none","taskbar":"hidden","everyMonitor":false,"bottomSpace":2"##;
+    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","showOpenApps":false,"middleClick":"none","taskbar":"hidden","everyMonitor":false,"autoHide":true,"autoHideReveal":500,"autoHideDelay":1500,"bottomSpace":2"##;
 
     fn full() -> String {
         format!(
@@ -429,6 +436,9 @@ mod tests {
                     middle_click: MiddleClick::None,
                     taskbar: TaskbarMode::Hidden,
                     every_monitor: false,
+                    auto_hide: true,
+                    auto_hide_reveal: 500,
+                    auto_hide_delay: 1500,
                     bottom_space: 2,
                 },
             }
@@ -477,6 +487,9 @@ mod tests {
             "indicator",
             "taskbar",
             "everyMonitor",
+            "autoHide",
+            "autoHideReveal",
+            "autoHideDelay",
             "bottomSpace",
         ] {
             let mut value: serde_json::Value = serde_json::from_str(&full()).unwrap();

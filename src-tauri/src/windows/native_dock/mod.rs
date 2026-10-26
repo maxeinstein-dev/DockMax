@@ -74,6 +74,9 @@ const ANIMATION_TIMER: usize = 1;
 const CLOCK_TIMER: usize = 2;
 const WARM_TIMER: usize = 3;
 const STATUS_TIMER: usize = 4;
+/// Looks at the pointer while the dock hides on its own.
+const AUTO_HIDE_TIMER: usize = 5;
+const AUTO_HIDE_EVERY: u32 = 100;
 
 /// How often the battery, the network and the volume are read again.
 const STATUS_EVERY: u32 = 3_000;
@@ -255,6 +258,15 @@ pub struct Dock {
     /// Hidden because a program is in full screen on its monitor (spec 0010
     /// D4): it comes back when that ends.
     hidden_for_fullscreen: bool,
+    /// Hiding on its own: how far off the screen the dock is drawn (0 in
+    /// place, 1 all out), whether it is headed out, and since when the
+    /// pointer is on the edge or away.
+    tucked: f64,
+    tucking: bool,
+    on_edge_since: Option<Instant>,
+    away_since: Option<Instant>,
+    /// The dock's menu is open (it runs a loop of its own).
+    menu_open: bool,
     effects: Vec<Effect>,
 }
 
@@ -411,6 +423,11 @@ fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
         animating: false,
         visible: false,
         hidden_for_fullscreen: false,
+        tucked: 0.0,
+        tucking: false,
+        on_edge_since: None,
+        away_since: None,
+        menu_open: false,
         effects: Vec::new(),
     };
     dock.arm_clock();
@@ -651,6 +668,7 @@ impl Dock {
             })
             .collect();
         self.landing = None;
+        self.arm_auto_hide();
         self.animate();
         self.paint();
     }
@@ -1040,6 +1058,12 @@ impl Dock {
         self.place();
         self.visible = true;
         self.paint();
+        self.show_window();
+        self.publish();
+    }
+
+    /// Puts the window on the screen, above the others, without the focus.
+    fn show_window(&self) {
         unsafe {
             let _ = ShowWindow(self.hwnd, SW_SHOWNOACTIVATE);
             let _ = SetWindowPos(
@@ -1052,7 +1076,79 @@ impl Dock {
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
             );
         }
-        self.publish();
+    }
+
+    /// Starts or stops looking at the pointer, as the setting says; with it
+    /// off, the dock comes back in place.
+    fn arm_auto_hide(&mut self) {
+        if self.data.settings.dock.auto_hide {
+            unsafe { SetTimer(Some(self.hwnd), AUTO_HIDE_TIMER, AUTO_HIDE_EVERY, None) };
+        } else {
+            let _ = unsafe { KillTimer(Some(self.hwnd), AUTO_HIDE_TIMER) };
+            self.untuck();
+        }
+    }
+
+    /// Brings the dock up; hiding on its own, it goes down again once the
+    /// pointer is away.
+    fn untuck(&mut self) {
+        self.on_edge_since = None;
+        self.away_since = None;
+        if self.tucking || self.tucked > 0.0 {
+            self.tucking = false;
+            if self.visible {
+                self.show_window();
+            }
+            self.animate();
+        }
+    }
+
+    /// One look at the pointer while the dock hides on its own: down once
+    /// the pointer is away for a moment, unless something of the dock is in
+    /// use; up once it rests on the screen edge.
+    fn watch_pointer(&mut self) {
+        if !self.data.settings.dock.auto_hide || !self.visible {
+            return;
+        }
+        let mut at = POINT::default();
+        if unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut at) }.is_err() {
+            return;
+        }
+        let point = (at.x, at.y);
+        let now = Instant::now();
+        let edge = self.edge();
+        let dock = &self.data.settings.dock;
+        let reveal_after = Duration::from_millis(u64::from(dock.auto_hide_reveal));
+        let tuck_after = Duration::from_millis(u64::from(dock.auto_hide_delay));
+        if self.tucking {
+            if at_screen_edge(point, self.monitor.rect, edge) {
+                let since = *self.on_edge_since.get_or_insert(now);
+                if now.duration_since(since) >= reveal_after {
+                    self.untuck();
+                }
+            } else {
+                self.on_edge_since = None;
+            }
+            return;
+        }
+        let busy = self.open.is_some()
+            || self.press.is_some()
+            || self.landing.is_some()
+            || self.menu_open
+            || menu_on_screen();
+        if busy || near_dock(point, self.window, self.monitor.rect, edge) {
+            self.away_since = None;
+            return;
+        }
+        let since = *self.away_since.get_or_insert(now);
+        if now.duration_since(since) >= tuck_after {
+            self.away_since = None;
+            self.tucking = true;
+            self.hovered = None;
+            self.status_hovered = false;
+            self.strip_hovered = None;
+            self.animate();
+        }
     }
 
     fn hide(&mut self) {
@@ -1218,6 +1314,20 @@ impl Dock {
                 moving = true;
             }
         }
+        let out = if self.tucking { 1.0 } else { 0.0 };
+        if self.tucked != out {
+            self.tucked = if self.motion {
+                tuck_step(self.tucked, out)
+            } else {
+                out
+            };
+            if self.tucked == 1.0 {
+                // All out: off the screen, and off any monitor beyond it.
+                let _ = unsafe { ShowWindow(self.hwnd, SW_HIDE) };
+            } else if self.tucked != out {
+                moving = true;
+            }
+        }
         let now = Instant::now();
         self.opening
             .retain(|_, started| now.saturating_duration_since(*started) < OPENING);
@@ -1241,9 +1351,14 @@ impl Dock {
             return;
         }
         let scene = self.scene();
+        // Hiding on its own: drawn that far past the screen edge.
+        let away = (self.tucked * f64::from(self.window.height)).round() as i32;
         let origin = POINT {
             x: self.window.x,
-            y: self.window.y,
+            y: match self.edge() {
+                DockEdge::Bottom => self.window.y + away,
+                DockEdge::Top => self.window.y - away,
+            },
         };
         if let Err(error) = self.painter.present(
             self.hwnd,
@@ -1781,8 +1896,13 @@ impl Dock {
         self.paint();
         let hwnd = self.hwnd.0 as isize;
         let edge = self.edge();
+        let auto_hide = self.data.settings.dock.auto_hide;
+        // Up, under its menu, until it closes.
+        self.menu_open = true;
         self.effects.push(Box::new(move |app| {
-            match show_dock_menu(HWND(hwnd as _), edge) {
+            let chosen = show_dock_menu(HWND(hwnd as _), edge, auto_hide);
+            post_to(hwnd, |dock: &mut Dock| dock.menu_open = false);
+            match chosen {
                 Some(MenuChoice::TaskManager) => {
                     if let Err(error) = super::apps::open_task_manager() {
                         log::warn!("dock: the Task Manager could not be opened: {error}");
@@ -1793,9 +1913,12 @@ impl Dock {
                         log::warn!("dock: the settings could not be opened: {error}");
                     }
                 }
-                Some(MenuChoice::Hide) => {
-                    if let Err(error) = super::dock::toggle(app) {
-                        log::warn!("dock: the dock could not be hidden: {error}");
+                Some(MenuChoice::AutoHide) => {
+                    let changed = crate::commands::settings::change(app, |settings| {
+                        settings.dock.auto_hide = !settings.dock.auto_hide;
+                    });
+                    if let Err(error) = changed {
+                        log::warn!("dock: hiding on its own could not be changed: {error}");
                     }
                 }
                 Some(MenuChoice::Quit) => app.exit(0),
@@ -1810,6 +1933,8 @@ impl Dock {
         if panel.is_some() {
             self.hovered = None;
             self.status_hovered = false;
+            // A panel anchors to the dock: up while it is open.
+            self.untuck();
         }
         self.open = panel;
         self.animate();
@@ -1828,6 +1953,55 @@ impl Dock {
         };
         let anchor = rest.items[index];
         self.toggle(panel, anchor);
+    }
+}
+
+/// Whether the pointer at `point` rests on the screen edge the dock is on,
+/// on its monitor (physical pixels): what brings a dock hiding on its own
+/// up.
+fn at_screen_edge(point: (i32, i32), monitor: Rect, edge: DockEdge) -> bool {
+    let (x, y) = point;
+    let right = monitor.x.saturating_add_unsigned(monitor.width);
+    let bottom = monitor.y.saturating_add_unsigned(monitor.height);
+    if x < monitor.x || x >= right {
+        return false;
+    }
+    match edge {
+        DockEdge::Bottom => y >= bottom - 2 && y < bottom,
+        DockEdge::Top => y >= monitor.y && y < monitor.y + 2,
+    }
+}
+
+/// Whether the pointer is on the dock or between it and the screen edge:
+/// where the dock stays up.
+fn near_dock(point: (i32, i32), window: Rect, monitor: Rect, edge: DockEdge) -> bool {
+    let (x, y) = point;
+    let right = window.x.saturating_add_unsigned(window.width);
+    if x < window.x || x >= right {
+        return false;
+    }
+    match edge {
+        DockEdge::Bottom => y >= window.y && y < monitor.y.saturating_add_unsigned(monitor.height),
+        DockEdge::Top => y >= monitor.y && y < window.y.saturating_add_unsigned(window.height),
+    }
+}
+
+/// Whether a menu is on the screen (the dock's, or one a tray icon in the
+/// dock opened): the dock stays up under it.
+fn menu_on_screen() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, IsWindowVisible};
+    unsafe { FindWindowW(w!("#32768"), None) }
+        .is_ok_and(|menu| unsafe { IsWindowVisible(menu) }.as_bool())
+}
+
+/// One frame of the dock going out or coming in (`now` and `target` from 0,
+/// in place, to 1, all out): a part of the way, and there once close.
+fn tuck_step(now: f64, target: f64) -> f64 {
+    let next = now + (target - now) * 0.25;
+    if (target - next).abs() < 0.01 {
+        target
+    } else {
+        next
     }
 }
 
@@ -1902,7 +2076,7 @@ fn opening_offset(
 enum MenuChoice {
     TaskManager,
     Settings,
-    Hide,
+    AutoHide,
     Quit,
 }
 
@@ -1913,19 +2087,20 @@ fn dock_menu_items() -> [Option<(MenuChoice, &'static str)>; 6] {
         Some((MenuChoice::TaskManager, text.task_manager)),
         None,
         Some((MenuChoice::Settings, text.open_settings)),
-        Some((MenuChoice::Hide, text.hide_dock)),
+        Some((MenuChoice::AutoHide, text.auto_hide)),
         None,
         Some((MenuChoice::Quit, text.quit)),
     ]
 }
 
 /// Shows the dock's menu at the pointer, opening away from the screen edge,
-/// and returns what was chosen.
-fn show_dock_menu(hwnd: HWND, edge: DockEdge) -> Option<MenuChoice> {
+/// with "Ocultar automaticamente" checked when `auto_hide`, and returns what
+/// was chosen.
+fn show_dock_menu(hwnd: HWND, edge: DockEdge, auto_hide: bool) -> Option<MenuChoice> {
     use windows::Win32::UI::WindowsAndMessaging::{
-        AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, MF_SEPARATOR, MF_STRING,
-        SetForegroundWindow, TPM_BOTTOMALIGN, TPM_CENTERALIGN, TPM_RETURNCMD, TPM_RIGHTBUTTON,
-        TPM_TOPALIGN, TrackPopupMenu, WM_NULL,
+        AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, MF_CHECKED, MF_SEPARATOR,
+        MF_STRING, SetForegroundWindow, TPM_BOTTOMALIGN, TPM_CENTERALIGN, TPM_RETURNCMD,
+        TPM_RIGHTBUTTON, TPM_TOPALIGN, TrackPopupMenu, WM_NULL,
     };
     let items = dock_menu_items();
     unsafe {
@@ -1933,9 +2108,13 @@ fn show_dock_menu(hwnd: HWND, edge: DockEdge) -> Option<MenuChoice> {
         for (index, item) in items.iter().enumerate() {
             // The command of an item is its place plus one: 0 is no choice.
             let added = match item {
-                Some((_, label)) => AppendMenuW(
+                Some((choice, label)) => AppendMenuW(
                     menu,
-                    MF_STRING,
+                    if *choice == MenuChoice::AutoHide && auto_hide {
+                        MF_STRING | MF_CHECKED
+                    } else {
+                        MF_STRING
+                    },
                     index + 1,
                     &windows::core::HSTRING::from(*label),
                 ),
@@ -2035,6 +2214,7 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
                 dock.arm_clock();
             }),
             STATUS_TIMER => with_dock(hwnd, Dock::read_system),
+            AUTO_HIDE_TIMER => with_dock(hwnd, Dock::watch_pointer),
             WARM_TIMER => with_dock(hwnd, |dock| {
                 let _ = unsafe { KillTimer(Some(dock.hwnd), WARM_TIMER) };
                 if dock.warmable() && dock.open.is_none() {
@@ -2086,23 +2266,15 @@ pub fn forget_icons() {
     });
 }
 
-/// Shows the docks, but not one whose monitor is in full screen.
+/// Shows the docks, up if they hide on their own, but not one whose monitor
+/// is in full screen.
 pub fn show() {
     SHOWN.store(true, Ordering::SeqCst);
     post(|dock| {
         if !dock.hidden_for_fullscreen {
             dock.show();
+            dock.untuck();
         }
-    });
-}
-
-/// Hides the docks (the user's choice, which a full screen ending does not
-/// undo).
-pub fn hide() {
-    SHOWN.store(false, Ordering::SeqCst);
-    post(|dock| {
-        dock.hidden_for_fullscreen = false;
-        dock.hide();
     });
 }
 
@@ -2314,6 +2486,55 @@ pub fn clicked_recently() -> bool {
 mod tests {
     use super::*;
 
+    const MONITOR: Rect = Rect {
+        x: -1920,
+        y: 6,
+        width: 1920,
+        height: 1200,
+    };
+
+    #[test]
+    fn the_pointer_on_the_screen_edge_brings_the_dock_up() {
+        assert!(at_screen_edge((-900, 1205), MONITOR, DockEdge::Bottom));
+        assert!(at_screen_edge((-1920, 1204), MONITOR, DockEdge::Bottom));
+        assert!(!at_screen_edge((-900, 1200), MONITOR, DockEdge::Bottom));
+        // The other monitor's edge is not this one's.
+        assert!(!at_screen_edge((100, 1205), MONITOR, DockEdge::Bottom));
+        assert!(at_screen_edge((-900, 6), MONITOR, DockEdge::Top));
+        assert!(!at_screen_edge((-900, 1205), MONITOR, DockEdge::Top));
+    }
+
+    #[test]
+    fn the_dock_stays_up_with_the_pointer_on_it_or_below_it() {
+        let window = Rect {
+            x: -1387,
+            y: 1065,
+            width: 853,
+            height: 138,
+        };
+
+        assert!(near_dock((-1000, 1100), window, MONITOR, DockEdge::Bottom));
+        // Between the dock and the screen edge.
+        assert!(near_dock((-1000, 1205), window, MONITOR, DockEdge::Bottom));
+        assert!(!near_dock((-1000, 1000), window, MONITOR, DockEdge::Bottom));
+        assert!(!near_dock((-1500, 1100), window, MONITOR, DockEdge::Bottom));
+    }
+
+    #[test]
+    fn the_dock_slides_out_and_in() {
+        let mut now = 0.0;
+        let mut frames = 0;
+        while now != 1.0 {
+            let next = tuck_step(now, 1.0);
+            assert!(next > now && next <= 1.0);
+            now = next;
+            frames += 1;
+        }
+        // About a quarter of a second at 60 frames a second.
+        assert!((8..=20).contains(&frames), "{frames} frames");
+        assert_eq!(tuck_step(1.0, 0.0), 0.75);
+    }
+
     #[test]
     fn the_dock_menu_has_what_the_tray_menu_has() {
         let labels: Vec<Option<&str>> = dock_menu_items()
@@ -2327,7 +2548,7 @@ mod tests {
                 Some("Gerenciador de Tarefas"),
                 None,
                 Some("Configurações"),
-                Some("Ocultar dock"),
+                Some("Ocultar automaticamente"),
                 None,
                 Some("Sair"),
             ]

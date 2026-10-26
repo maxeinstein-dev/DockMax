@@ -1,4 +1,6 @@
 import {
+  MAX_AUTO_HIDE_DELAY,
+  MAX_AUTO_HIDE_REVEAL,
   SIZE_PRESETS,
   type DockEdge,
   type DockOpacity,
@@ -14,6 +16,7 @@ import { format, useT, type Messages } from "../i18n";
 import OptionGroup, { type Option } from "./OptionGroup";
 import PanelFooter from "./PanelFooter";
 import NavRow from "./parts/NavRow";
+import RangeField from "./parts/RangeField";
 import ToggleField from "./parts/ToggleField";
 import TrayInDockField from "./TrayInDockField";
 import { useSettingsEditor } from "./useSettingsEditor";
@@ -24,6 +27,11 @@ const SIZES: readonly SizePreset[] = ["small", "medium", "large"];
 const OPACITIES: readonly DockOpacity[] = ["translucent", "solid"];
 const TASKBARS: readonly TaskbarMode[] = ["visible", "autohide", "hidden"];
 const MIDDLE_CLICKS: readonly MiddleClick[] = ["newInstance", "none"];
+
+/** Milliseconds as seconds, the Brazilian way: `0,3 s`. */
+function seconds(ms: number): string {
+  return `${(ms / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} s`;
+}
 
 /** The preset whose icon size is `iconSize`, or null when none is (a size
  * set by hand in the file): then no size option shows as chosen. */
@@ -187,6 +195,43 @@ function SettingsPanel({
           change((s) => ({ ...s, dock: { ...s.dock, everyMonitor } }))
         }
       />
+      <ToggleField
+        label={t.settings.autoHide}
+        hint={t.settings.autoHideHint}
+        checked={shown?.dock.autoHide ?? false}
+        disabled={shown === null}
+        onChange={(autoHide) =>
+          change((s) => ({ ...s, dock: { ...s.dock, autoHide } }))
+        }
+      />
+      {shown?.dock.autoHide ? (
+        <>
+          <RangeField
+            label={t.settings.autoHideReveal}
+            hint={t.settings.autoHideRevealHint}
+            value={shown.dock.autoHideReveal}
+            min={0}
+            max={MAX_AUTO_HIDE_REVEAL}
+            step={50}
+            display={seconds}
+            onCommit={(autoHideReveal) =>
+              change((s) => ({ ...s, dock: { ...s.dock, autoHideReveal } }))
+            }
+          />
+          <RangeField
+            label={t.settings.autoHideDelay}
+            hint={t.settings.autoHideDelayHint}
+            value={shown.dock.autoHideDelay}
+            min={0}
+            max={MAX_AUTO_HIDE_DELAY}
+            step={100}
+            display={seconds}
+            onCommit={(autoHideDelay) =>
+              change((s) => ({ ...s, dock: { ...s.dock, autoHideDelay } }))
+            }
+          />
+        </>
+      ) : null}
       <ToggleField
         label={t.settings.showOpenApps}
         hint={t.settings.showOpenAppsHint}
