@@ -304,11 +304,14 @@ fn show_hidden(saved: &mut Saved, state_path: &Path) -> io::Result<()> {
 /// Gives the taskbar back as it was, if this run holds it. Safe to call
 /// from anywhere, any number of times.
 pub fn release() {
-    let Some(Active { path, .. }) = active() else {
+    // Let go first: giving the taskbar back makes Explorer announce a change
+    // of settings, and `keep` (on the app bar's thread, or the keeper) would
+    // hide it again while this run still held it.
+    let taken = ACTIVE.lock().unwrap_or_else(PoisonError::into_inner).take();
+    let Some(Active { path, .. }) = taken else {
         return;
     };
     restore_file(&path, std::process::id());
-    *ACTIVE.lock().unwrap_or_else(PoisonError::into_inner) = None;
 }
 
 /// Restores the taskbar from the state file when `pid` is the process that
