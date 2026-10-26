@@ -33,6 +33,28 @@ fn resolve(storage: &Storage, id: PanelId) -> Result<Panel, WidgetError> {
                 Err(WidgetError::NotFound)
             }
         }
+        PanelId::Open(key) => {
+            // Only a program that is open now, and that is not pinned, has
+            // this menu.
+            if is_open_key(&key) {
+                Ok(Panel::Open { key })
+            } else {
+                Err(WidgetError::NotFound)
+            }
+        }
+    }
+}
+
+/// Whether `key` names an open program that is not pinned.
+fn is_open_key(key: &str) -> bool {
+    #[cfg(windows)]
+    {
+        crate::windows::open_apps::app_id_of_other(key).is_some()
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = key;
+        false
     }
 }
 
@@ -199,6 +221,20 @@ mod tests {
             resolve(&storage, PanelId::App(pinned.id)),
             Err(WidgetError::NotFound)
         );
+    }
+
+    #[test]
+    fn no_menu_opens_for_a_program_that_is_not_open() {
+        let storage = Storage::unavailable(UnavailableReason::OpenFailed);
+
+        // Well formed but nothing is open under it, and not a key at all.
+        for key in ["00000000000000aa", "", "not-a-key", "C:\\x.exe"] {
+            assert_eq!(
+                resolve(&storage, PanelId::Open(key.into())),
+                Err(WidgetError::NotFound),
+                "{key:?}"
+            );
+        }
     }
 
     #[test]

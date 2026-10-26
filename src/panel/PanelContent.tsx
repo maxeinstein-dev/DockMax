@@ -1,5 +1,11 @@
 import type { AppsSnapshot, PinnedApp } from "../core/apps";
-import { isAppPanel, isWidgetPanel, type PanelId } from "../core/panels";
+import {
+  isAppPanel,
+  isOpenPanel,
+  isWidgetPanel,
+  type PanelId,
+} from "../core/panels";
+import type { OpenNow, OpenOther } from "../core/openApps";
 import type { Settings } from "../core/settings";
 import {
   removeWidget,
@@ -15,6 +21,7 @@ import { definitionOf } from "../widgets/registry";
 import AboutPanel from "./AboutPanel";
 import AppMenuPanel from "./AppMenuPanel";
 import AppsPanel from "./AppsPanel";
+import OpenMenuPanel from "./OpenMenuPanel";
 import DockItems from "./DockItems";
 import SettingsPanel from "./SettingsPanel";
 import TrayPanel from "./TrayPanel";
@@ -41,6 +48,13 @@ type PanelContentProps = {
   /** The pinned program of an app panel, or null when the list doesn't
    * have it (then the panel shows nothing and the host closes it). */
   app: PinnedApp | null;
+  /** Who is open (`useOpenApps`): the menu of a pinned program offers to close
+   * its windows while it has some. */
+  open: OpenNow;
+  /** The open program that is not pinned of an open-program panel, or null
+   * when it is not open any more (then the panel shows nothing and the host
+   * closes it). */
+  other: OpenOther | null;
   /** The instance of a widget panel, or null when the list doesn't have
    * it (then the panel shows nothing and the host closes it). */
   instance: WidgetInstance<CreatableKind> | null;
@@ -114,13 +128,26 @@ function PanelContent({
   widgets,
   apps,
   app,
+  open,
+  other,
   instance,
   view,
   onView,
   onRemoved,
 }: PanelContentProps) {
   if (isAppPanel(panelId)) {
-    return app === null ? null : <AppMenuPanel app={app} onDone={onRemoved} />;
+    return app === null ? null : (
+      <AppMenuPanel
+        app={app}
+        openCount={open.apps.get(app.id)?.count ?? 0}
+        onDone={onRemoved}
+      />
+    );
+  }
+  if (isOpenPanel(panelId)) {
+    return other === null ? null : (
+      <OpenMenuPanel other={other} onDone={onRemoved} />
+    );
   }
   if (isWidgetPanel(panelId)) {
     if (instance === null) return null;

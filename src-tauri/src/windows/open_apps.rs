@@ -341,6 +341,48 @@ pub fn activate_other(app: &AppHandle, key: &str) -> bool {
     click_on(app, &hwnds)
 }
 
+/// Asks every window of the pinned program `id` to close; how many it asked.
+pub fn close_pinned(app: &AppHandle, id: &str) -> usize {
+    let hwnds: Vec<isize> = state()
+        .found
+        .iter()
+        .find(|found| found.id == id)
+        .map(|found| found.hwnds.clone())
+        .unwrap_or_default();
+    close_all(app, &hwnds)
+}
+
+/// The same for the open program `key` that is not pinned.
+pub fn close_other(app: &AppHandle, key: &str) -> usize {
+    let hwnds: Vec<isize> = state()
+        .others
+        .iter()
+        .find(|other| other.id == key)
+        .map(|other| other.hwnds.clone())
+        .unwrap_or_default();
+    close_all(app, &hwnds)
+}
+
+fn close_all(app: &AppHandle, hwnds: &[isize]) -> usize {
+    for hwnd in hwnds {
+        super::openwin::close(*hwnd);
+    }
+    // The windows that close announce themselves; this is for one that
+    // refuses, or that was already gone.
+    wake(app);
+    hwnds.len()
+}
+
+/// What to pin for the open program `key` that is not pinned: its id for the
+/// Apps folder (or its file) and its name.
+pub fn pin_target_of_other(key: &str) -> Option<(String, String)> {
+    state()
+        .others
+        .iter()
+        .find(|other| other.id == key)
+        .map(|other| (other.app_id.clone(), other.name.clone()))
+}
+
 /// What `app_icon` and `launch` take for the open program that is not pinned
 /// named by `key`: for a new instance of it. `None` when it is no longer open.
 pub fn app_id_of_other(key: &str) -> Option<String> {

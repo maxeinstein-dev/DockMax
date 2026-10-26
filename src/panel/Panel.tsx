@@ -5,6 +5,7 @@ import {
   PANEL_READY_COMMAND,
   PANEL_SHOW_EVENT,
   isAppPanel,
+  isOpenPanel,
   isWidgetPanel,
   panelKey,
   type LogicalSize,
@@ -13,6 +14,7 @@ import {
   type PanelShowPayload,
 } from "../core/panels";
 import { useApps, type AppsSnapshot, type PinnedApp } from "../core/apps";
+import { useOpenApps, type OpenNow, type OpenOther } from "../core/openApps";
 import { useSettings } from "../core/settings";
 import {
   useWidgets,
@@ -84,6 +86,13 @@ function appOf(
   return snapshot.apps.find((app) => app.id === panelId.app) ?? null;
 }
 
+/** The open program that is not pinned an open-program panel is the menu of;
+ * null when it is not open (any more). */
+function otherOf(open: OpenNow, panelId: PanelId): OpenOther | null {
+  if (!isOpenPanel(panelId)) return null;
+  return open.others.find((other) => other.key === panelId.open) ?? null;
+}
+
 const sameSize = (a: LogicalSize | null, b: LogicalSize) =>
   a !== null && a.width === b.width && a.height === b.height;
 
@@ -97,6 +106,7 @@ function Panel() {
   const settings = useSettings();
   const widgets = useWidgets();
   const apps = useApps();
+  const open = useOpenApps();
   /** The size last sent for the current request. */
   const sentSize = useRef<LogicalSize | null>(null);
   /** The request whose panel was closed for its instance being gone. */
@@ -130,13 +140,18 @@ function Panel() {
   // A widget panel whose instance is gone (removed elsewhere, or the
   // storage became unavailable) closes, once the list is known.
   const app = request ? appOf(apps, request.panelId) : null;
+  const other = request ? otherOf(open, request.panelId) : null;
   // The same for the menu of a program that was unpinned.
   const gone =
     request !== null &&
     ((isWidgetPanel(request.panelId) &&
       widgets !== null &&
       instance === null) ||
-      (isAppPanel(request.panelId) && apps !== null && app === null));
+      (isAppPanel(request.panelId) && apps !== null && app === null) ||
+      // The menu of an open program that closed meanwhile. The list of the
+      // open programs is read at once, so it is known by the time a panel
+      // shows; before that the panel waits.
+      (isOpenPanel(request.panelId) && open.loaded && other === null));
   // What the window shows: the size is sent again whenever it changes.
   const viewKey = `${view.sub} ${instance?.kind ?? ""}`;
 
@@ -219,7 +234,9 @@ function Panel() {
             ? "widget"
             : isAppPanel(panelId)
               ? "app"
-              : panelId
+              : isOpenPanel(panelId)
+                ? "open"
+                : panelId
         }
         data-widget={instance?.kind}
         aria-labelledby="panel-title"
@@ -238,6 +255,8 @@ function Panel() {
             widgets={widgets}
             apps={apps}
             app={app}
+            open={open}
+            other={other}
             instance={instance}
             view={view}
             onView={onView}

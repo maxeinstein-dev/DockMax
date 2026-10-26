@@ -175,6 +175,11 @@ export const otherText: Messages = {
       open: "Open",
       reveal: "Show in File Explorer",
       remove: "Remove from the dock",
+      newInstance: "New instance",
+      closeWindow: "Close window",
+      closeWindows: "Close all windows",
+      pin: "Pin to dock",
+      openFooter: "An open app that is not pinned",
       footer: "The taskbar menu",
     },
     unavailableNotice: {

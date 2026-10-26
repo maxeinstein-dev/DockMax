@@ -41,6 +41,9 @@ export const OPEN_APPS_COMMANDS = {
   activate: "activate_app",
   activateOpen: "activate_open",
   launchOpen: "launch_open",
+  closeApp: "close_app",
+  closeOpen: "close_open",
+  pinOpen: "pin_open",
 } as const;
 
 /** Event every window receives with the `OpenSnapshot` after a change. */
@@ -64,9 +67,12 @@ export function activateApp(id: WidgetId): Promise<boolean> {
 export interface OpenNow {
   apps: ReadonlyMap<string, OpenApp>;
   others: readonly OpenOther[];
+  /** Rust has answered at least once: before that, an empty list means
+   * nothing yet. */
+  loaded: boolean;
 }
 
-const NONE: OpenNow = { apps: new Map(), others: [] };
+const NONE: OpenNow = { apps: new Map(), others: [], loaded: false };
 
 function validSnapshot(value: unknown): value is OpenSnapshot {
   return (
@@ -83,6 +89,7 @@ function nowOf(snapshot: OpenSnapshot): OpenNow {
   return {
     apps: new Map(snapshot.apps.map((app) => [app.id, app])),
     others: snapshot.others,
+    loaded: true,
   };
 }
 
@@ -106,6 +113,41 @@ export function launchOpen(key: string): Promise<void> {
   return invoke<void>(OPEN_APPS_COMMANDS.launchOpen, { key }).catch(
     (error: unknown) => {
       log.warn(`apps: launch open failed: ${errorKind(error)}`);
+      throw error;
+    },
+  );
+}
+
+/** Asks every window of the open pinned program `id` to close, as the close
+ * button of each does (spec 0009 D3). Rejects with the app error code. */
+export function closeApp(id: WidgetId): Promise<void> {
+  return invoke<number>(OPEN_APPS_COMMANDS.closeApp, { id }).then(
+    () => undefined,
+    (error: unknown) => {
+      log.warn(`apps: close failed: ${errorKind(error)}`);
+      throw error;
+    },
+  );
+}
+
+/** The same for an open program that is not pinned, by its `key`. */
+export function closeOpen(key: string): Promise<void> {
+  return invoke<number>(OPEN_APPS_COMMANDS.closeOpen, { key }).then(
+    () => undefined,
+    (error: unknown) => {
+      log.warn(`apps: close open failed: ${errorKind(error)}`);
+      throw error;
+    },
+  );
+}
+
+/** Pins the open program `key` that is not pinned, at the end of the pinned
+ * ones. Rejects with the app error code. */
+export function pinOpen(key: string): Promise<void> {
+  return invoke<unknown>(OPEN_APPS_COMMANDS.pinOpen, { key }).then(
+    () => undefined,
+    (error: unknown) => {
+      log.warn(`apps: pin open failed: ${errorKind(error)}`);
       throw error;
     },
   );

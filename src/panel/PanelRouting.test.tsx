@@ -97,6 +97,7 @@ const LIST: WidgetsSnapshot = {
 
 let widgets: WidgetsSnapshot | Error;
 let apps: AppsSnapshot;
+let openSnapshot: unknown;
 let waits = 0;
 /** The frame's fake height: grows to tell one measure from another. */
 let frameHeight = 200;
@@ -138,6 +139,7 @@ describe("Panel routing", () => {
     frameHeight = 200;
     widgets = LIST;
     apps = { storage: { state: "ok" }, apps: [] };
+    openSnapshot = { apps: [], others: [] };
     props.panel = null;
     props.settings = null;
     invoke.mockReset();
@@ -145,6 +147,7 @@ describe("Panel routing", () => {
       if (command === "get_settings") return Promise.resolve(SETTINGS);
       if (command === "list_apps") return Promise.resolve(apps);
       if (command === "list_catalog") return Promise.resolve([]);
+      if (command === "list_open_apps") return Promise.resolve(openSnapshot);
       if (command === "app_menu") {
         return Promise.resolve({
           canReveal: false,
@@ -532,6 +535,62 @@ describe("Panel routing", () => {
       await renderPanel();
 
       show({ app: PROGRAM.id });
+
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(hides()).toBe(1);
+    });
+  });
+
+  describe("the menu of an open program that is not pinned", () => {
+    const OTHER = {
+      key: "00000000000000aa",
+      appId: "C:\\Apps\\code.exe",
+      name: "code",
+      count: 1,
+      active: false,
+    };
+
+    it("shows the menu of the program under its own title", async () => {
+      openSnapshot = { apps: [], others: [OTHER] };
+      await renderPanel();
+
+      show({ open: OTHER.key });
+      await act(async () => {});
+
+      expect(screen.getByRole("heading", { name: "code" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("menuitem", { name: "Fixar no dock" }),
+      ).toBeInTheDocument();
+      expect(card()).toHaveAttribute("data-panel", "open");
+      expect(readyCalls().length).toBeGreaterThan(0);
+    });
+
+    it("closes when the program is not open any more, once", async () => {
+      openSnapshot = { apps: [], others: [OTHER] };
+      await renderPanel();
+      show({ open: OTHER.key });
+      expect(hides()).toBe(0);
+
+      emit("open-windows-changed", { apps: [], others: [] });
+
+      expect(hides()).toBe(1);
+      emit("open-windows-changed", { apps: [], others: [] });
+      expect(hides()).toBe(1);
+    });
+
+    it("does not close while the open programs are not read", async () => {
+      openSnapshot = undefined;
+      await renderPanel();
+
+      show({ open: OTHER.key });
+
+      expect(hides()).toBe(0);
+    });
+
+    it("shows nothing for a program that is not open", async () => {
+      await renderPanel();
+
+      show({ open: OTHER.key });
 
       expect(screen.queryByRole("menu")).not.toBeInTheDocument();
       expect(hides()).toBe(1);
