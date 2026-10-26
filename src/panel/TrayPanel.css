@@ -59,3 +59,13 @@
   font-size: 12px;
   color: var(--ink-2);
 }
+
+/* An icon dragged out toward the dock: it follows the pointer (--drag-x,
+   --drag-y), above the others, with no transition. */
+.tray-icon[data-dragging] {
+  position: relative;
+  z-index: 2;
+  transform: translate(var(--drag-x, 0px), var(--drag-y, 0px));
+  cursor: grabbing;
+  transition: none;
+}

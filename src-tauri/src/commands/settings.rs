@@ -233,19 +233,39 @@ pub fn update_settings(
     state: State<'_, Mutex<SettingsState>>,
     settings: SettingsInput,
 ) -> Result<Settings, SettingsCommandError> {
+    apply(&app, &state, settings.into()).map_err(|error| SettingsCommandError::from(&error))
+}
+
+/// A change the Rust side makes (the drag of a tray icon onto the dock):
+/// `change` edits a copy of the settings in use, then it is saved and
+/// announced like one from the interface.
+pub fn change(
+    app: &AppHandle,
+    change: impl FnOnce(&mut Settings),
+) -> Result<Settings, SettingsError> {
+    let state = app.state::<Mutex<SettingsState>>();
+    let mut wanted = lock(&state).settings.clone();
+    change(&mut wanted);
+    apply(app, &state, wanted)
+}
+
+/// Saves `wanted` and tells the windows and the dock.
+fn apply(
+    app: &AppHandle,
+    state: &State<'_, Mutex<SettingsState>>,
+    wanted: Settings,
+) -> Result<Settings, SettingsError> {
     let (before, updated, launch_before) = {
-        let mut state = lock(&state);
+        let mut state = lock(state);
         let before = state.settings.dock.clone();
         let launch_before = state.settings.launch_at_login;
         let updated = state
-            .update(settings.into())
-            .map_err(|error| {
-                log::warn!("settings: change rejected: {error}");
-                SettingsCommandError::from(&error)
-            })?
+            .update(wanted)
+            .inspect_err(|error| log::warn!("settings: change rejected: {error}"))?
             .clone();
         (before, updated, launch_before)
     };
+    let app = app.clone();
     // The lock is released before emitting and placing the dock, which
     // reads the settings.
     if let Err(error) = app.emit(CHANGED_EVENT, &updated) {

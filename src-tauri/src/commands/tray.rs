@@ -143,9 +143,87 @@ pub fn tray_click(window: WebviewWindow, key: String, button: Button) -> Result<
     })
 }
 
+/// A tray icon dragged out of the tray panel and let go at `(x, y)`, in
+/// physical pixels on the screen: on the dock, the dock shows it itself from
+/// then on, where it was let go (as the PrimoDock). `false` when it was let
+/// go elsewhere, or the dock already shows `MAX_TRAY_IN_DOCK`.
+#[cfg(windows)]
+#[tauri::command]
+pub async fn tray_to_dock(
+    app: AppHandle,
+    window: WebviewWindow,
+    key: String,
+    x: i32,
+    y: i32,
+) -> Result<bool, String> {
+    if window.label() != panel::LABEL {
+        return Err("only the panel drags tray icons".into());
+    }
+    if key.len() > MAX_KEY {
+        return Err("no such icon".into());
+    }
+    let Some(id) = snapshot()
+        .into_iter()
+        .find(|icon| icon.key == key)
+        .and_then(|icon| icon.id)
+    else {
+        return Err("no such icon".into());
+    };
+    let Some(before) = crate::windows::native_dock::tray_drop_index(x, y) else {
+        return Ok(false);
+    };
+    let mut placed = false;
+    crate::commands::settings::change(&app, |settings| {
+        placed = keep_in_dock(&mut settings.dock.tray_in_dock, &id, before.as_deref());
+    })
+    .map_err(|_| "the dock could not keep the icon".to_string())?;
+    Ok(placed)
+}
+
+/// Puts `id` in `kept` before `before` (or at the end), moving it if it is
+/// there already; refused (`false`) when `kept` is full without it.
+pub fn keep_in_dock(kept: &mut Vec<String>, id: &str, before: Option<&str>) -> bool {
+    let had = kept.iter().any(|kept| kept == id);
+    if !had && kept.len() >= crate::domain::settings::MAX_TRAY_IN_DOCK {
+        return false;
+    }
+    kept.retain(|kept| kept != id);
+    let at = before
+        .and_then(|before| kept.iter().position(|kept| kept == before))
+        .unwrap_or(kept.len());
+    kept.insert(at, id.to_string());
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_dropped_icon_goes_before_the_one_it_was_let_go_on_or_at_the_end() {
+        let mut kept = vec!["a".to_string(), "b".to_string()];
+
+        assert!(keep_in_dock(&mut kept, "c", Some("b")));
+        assert_eq!(kept, ["a", "c", "b"]);
+        assert!(keep_in_dock(&mut kept, "d", None));
+        assert_eq!(kept, ["a", "c", "b", "d"]);
+        // Moved, not repeated.
+        assert!(keep_in_dock(&mut kept, "a", None));
+        assert_eq!(kept, ["c", "b", "d", "a"]);
+        // An unknown place means the end.
+        assert!(keep_in_dock(&mut kept, "e", Some("gone")));
+        assert_eq!(kept.last().map(String::as_str), Some("e"));
+    }
+
+    #[test]
+    fn a_full_dock_refuses_a_seventh_icon_but_moves_its_own() {
+        let mut kept: Vec<String> = (0..6).map(|n| n.to_string()).collect();
+
+        assert!(!keep_in_dock(&mut kept, "new", None));
+        assert_eq!(kept.len(), 6);
+        assert!(keep_in_dock(&mut kept, "5", Some("0")));
+        assert_eq!(kept[0], "5");
+    }
 
     #[test]
     fn the_pages_get_camel_case_and_never_a_window_handle() {

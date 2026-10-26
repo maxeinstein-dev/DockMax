@@ -146,6 +146,35 @@ describe("TrayPanel", () => {
     expect(calls("hide_panel")).toHaveLength(1);
   });
 
+  it("drags an icon out and lets it go on the dock, in physical pixels, without clicking it", async () => {
+    await renderTray([FORTI]);
+    const button = screen.getByRole("button", { name: FORTI.tip });
+
+    fireEvent.pointerDown(button, { button: 0, screenX: 100, screenY: 50 });
+    fireEvent.pointerMove(button, { screenX: 103, screenY: 52 });
+    expect(button).not.toHaveAttribute("data-dragging");
+    fireEvent.pointerMove(button, { screenX: 120, screenY: 400 });
+    expect(button).toHaveAttribute("data-dragging");
+    await act(async () => {
+      fireEvent.pointerUp(button, { screenX: 120, screenY: 400 });
+      fireEvent.click(button);
+    });
+
+    const scale = window.devicePixelRatio || 1;
+    expect(calls("tray_to_dock")).toEqual([
+      [
+        "tray_to_dock",
+        {
+          key: FORTI.key,
+          x: Math.round(120 * scale),
+          y: Math.round(400 * scale),
+        },
+      ],
+    ]);
+    expect(calls("tray_click")).toHaveLength(0);
+    expect(button).not.toHaveAttribute("data-dragging");
+  });
+
   it("cannot click an icon that takes no clicks", async () => {
     await renderTray([icon("5:1", "Volume", { clickable: false })]);
 

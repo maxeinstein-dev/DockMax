@@ -32,6 +32,14 @@ export const TRAY_CHANGED_EVENT = "tray-changed";
 export const LIST_TRAY_COMMAND = "list_tray";
 export const TRAY_CLICK_COMMAND = "tray_click";
 
+/** Command the tray panel calls when an icon dragged out of it is let go,
+ * with the point on the screen in physical pixels: on the dock, the dock
+ * shows the icon itself from then on. Answers whether it does. */
+export const TRAY_TO_DOCK_COMMAND = "tray_to_dock";
+
+/** How far the pointer goes before a press on an icon becomes a drag. */
+export const TRAY_DRAG_THRESHOLD = 6;
+
 export type TrayButton = "left" | "right";
 
 export interface TrayClickArgs {
@@ -74,6 +82,24 @@ export function clickIcon(key: string, button: TrayButton): Promise<void> {
       log.warn(`tray: click failed: ${errorKind(error)}`);
     },
   );
+}
+
+/** An icon dragged out of the panel and let go at `screen` (CSS pixels on
+ * the screen, `PointerEvent.screenX/Y`): Rust keeps it in the dock when it was
+ * let go there. Failures are logged by kind. */
+export function dropOnDock(
+  key: string,
+  screen: { x: number; y: number },
+  scale: number,
+): Promise<boolean> {
+  return invoke<boolean>(TRAY_TO_DOCK_COMMAND, {
+    key,
+    x: Math.round(screen.x * scale),
+    y: Math.round(screen.y * scale),
+  }).catch((error: unknown) => {
+    log.warn(`tray: drop failed: ${errorKind(error)}`);
+    return false;
+  });
 }
 
 /** The icons in the notification area, kept current by `tray-changed`;

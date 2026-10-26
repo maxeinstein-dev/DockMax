@@ -566,6 +566,33 @@ impl Dock {
             .unwrap_or_default()
     }
 
+    /// `tray_drop_index`, on the dock's thread.
+    fn tray_drop_index(&self, x: i32, y: i32) -> Option<Option<String>> {
+        if !self.visible {
+            return None;
+        }
+        let x = f64::from(x - self.window.x) / self.scale;
+        let y = f64::from(y - self.window.y) / self.scale;
+        let placement = self.placement_now();
+        // The bar, with a little room around it: a drop is not aimed to the
+        // pixel.
+        let bar = placement.bar;
+        let near = x >= bar.x - 8.0
+            && x < bar.x + bar.width + 8.0
+            && y >= bar.y - 8.0
+            && y < bar.y + bar.height + 8.0;
+        if !near {
+            return None;
+        }
+        // From the cell under the pointer on (before network, volume and
+        // battery, after the arrow), the first tray icon kept in the dock.
+        let from = self.strip_hit(x, y).unwrap_or(self.strip.len());
+        Some(self.strip[from..].iter().find_map(|cell| match cell {
+            Cell::Tray(icon) => icon.id.clone(),
+            _ => None,
+        }))
+    }
+
     /// The cell of the strip under the point.
     fn strip_hit(&self, x: f64, y: f64) -> Option<usize> {
         self.strip_cells()
@@ -1743,6 +1770,19 @@ pub fn press_named(name: String) -> bool {
     received
         .recv_timeout(Duration::from_secs(5))
         .unwrap_or(false)
+}
+
+/// Where a tray icon dragged out of the tray panel and let go at `(x, y)`
+/// (physical pixels on the screen) goes among those the dock shows: `None`
+/// when it was not let go on the dock; else before the tray icon kept in the
+/// dock that follows the cell under the pointer (its lasting id), or at the
+/// end (`Some(None)`). From a thread other than the main one.
+pub fn tray_drop_index(x: i32, y: i32) -> Option<Option<String>> {
+    let (sent, received) = std::sync::mpsc::channel();
+    post(move |dock| {
+        let _ = sent.send(dock.tray_drop_index(x, y));
+    });
+    received.recv_timeout(Duration::from_secs(5)).ok().flatten()
 }
 
 /// The monitors or the band changed under the dock: places it again.

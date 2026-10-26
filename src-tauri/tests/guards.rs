@@ -39,6 +39,9 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // icons (ADR 0009, Fase E); a click names an icon the list gave.
             "allow-list-tray",
             "allow-tray-click",
+            // Dragging a tray icon onto the dock keeps it there; the command
+            // names an icon the list gave and a point on the screen.
+            "allow-tray-to-dock",
             // The apps list in Configurações: the catalog to choose from,
             // and pin, unpin and reorder (spec 0006).
             "allow-list-apps",
