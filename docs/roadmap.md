@@ -291,6 +291,7 @@ Para cada tarefa:
 8. Antes do teste manual do usuário, capturar o build real via CDP nos dois temas (pega contraste e controle faltando antes do teste).
 9. Medir memória e CPU em repouso em todo PR que mude a interface.
 10. Versionar por fase (v0.2.0 no fim da Fase 2), para o painel Sobre e o instalador nascerem alinhados.
+11. A `main` é protegida (2026-10-27): o PR só entra com a CI (`checks`) verde e a branch atualizada com a `main`, também para o dono; a branch é apagada no merge. Um PR empilhado sobre outro fica vermelho no job `base` até apontar para a `main`: mergeie primeiro o de baixo (o #45 caiu na branch do R1 por isso).
 
 ## Estimativa geral
 
