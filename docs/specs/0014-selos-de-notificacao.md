@@ -68,7 +68,34 @@ Cada dock mostra os itens do espaço do seu monitor (spec 0013), e o selo vai ne
 
 Uma chave só, **"Mostrar selos de notificação"**, ligada por padrão, junto de "Mostrar apps abertos" (o visual de Configurações fica para o rebranding). Desligada, o dock para de desenhar os selos; a thread de leitura só começa quando a chave está ligada. **Proposta, valendo até o autor decidir.**
 
-## 6. Ficou para depois / não verificado
+## 6. Teste ao vivo (2026-10-27): bloqueio, decisão do autor
+
+**A barra transparente só tem botões na UI Automation enquanto não está recolhida.** Medido sem o DockMax, na barra principal:
+
+| Estado da barra                           | Botões na UIA |
+| ----------------------------------------- | ------------- |
+| normal                                    | 6             |
+| transparente, sem ocultação automática    | 6             |
+| transparente, ocultação automática recolhida | **0**      |
+
+Recolhida, a barra do Windows 11 desmonta o seu conteúdo XAML: sobram só `TrayNotifyWnd`, `ReBarWindow32` e `MSTaskSwWClass`, sem nenhum botão. E é a ocultação automática que faz a barra não reservar espaço. Do jeito que está, **no modo "oculta" o DockMax não acha selo nenhum**. Os selos funcionam no modo "Visível". `WS_EX_TRANSPARENT` não tem nada a ver: tirá-lo não traz os botões de volta.
+
+Caminhos para o autor escolher:
+
+1. **Barra transparente sem ocultação automática:** os selos funcionam, mas a barra reserva os 48 px dela, e o dock fica acima deles ou passa a usar essa faixa.
+2. **Voltar a esconder com `SW_HIDE`** (o código anterior a esta spec) e ter selos só no modo "Visível".
+3. **Investigar** um jeito invisível de "subir" a barra recolhida de tempos em tempos para ler. Não sei se existe sem roubar o foco.
+
+**Proposta, valendo até o autor decidir:** o PR fica aberto, sem merge, até a escolha. A troca para transparente só vale a pena com o caminho 1 ou 3.
+
+Também visto no teste:
+
+- **Devolução:** pelo fim de sessão (`WM_ENDSESSION`) a barra volta exatamente como era nos dois monitores (estilo, camadas, visibilidade, ocultação automática, topo). Pelo vigia, depois de o DockMax ser morto à força, o estilo, as camadas e a ocultação automática voltam, mas **a barra principal não volta a ficar sempre no topo**: o Windows ignora o `SetWindowPos(HWND_TOPMOST)` vindo de um processo sem direito de primeiro plano, inclusive o vigia. Isso já valia para o código anterior, que também baixava a barra; ela só voltou ao topo quando um DockMax vivo fechou depois. Fica como pendência à parte.
+- **A barra secundária não é sempre no topo** (`WS_EX_TOOLWINDOW` sem `WS_EX_TOPMOST`): a devolução agora só põe no topo quem estava.
+- **Memória** (30 s depois de abrir, os dois monitores): 85,0 MB privados com os selos contra 84,1 MB do build da main; mais 7 threads (as da UI Automation). A leitura custa ~40 ms de uma chamada ao Explorer.
+- `--restore-taskbar` não foi testado ao vivo, só nos testes de unidade do arquivo de estado.
+
+## 7. Ficou para depois / não verificado
 
 - **Se o número muda com a barra transparente** sem nenhuma outra mudança na barra: os eventos da UI Automation chegam com a janela invisível? A batida de 10 s cobre o caso, com até 10 s de atraso. Ver o relato do teste ao vivo no PR.
 - O selo na UI Automation do dock (o leitor de tela ainda não o anuncia).
