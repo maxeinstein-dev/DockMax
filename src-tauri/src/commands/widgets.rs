@@ -545,6 +545,7 @@ mod tests {
             (WidgetError::InvalidWorkday, "invalidWorkday"),
             (WidgetError::InvalidTarget, "invalidTarget"),
             (WidgetError::InvalidFolder, "invalidFolder"),
+            (WidgetError::InvalidWidth, "invalidWidth"),
             (WidgetError::NoteTooLarge, "noteTooLarge"),
             (WidgetError::InvalidConfig, "invalidConfig"),
             (WidgetError::Unavailable, "unavailable"),

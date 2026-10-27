@@ -209,6 +209,20 @@
   --l: 38%;
 }
 
+/* Vinho: Atividade (spec 0017 F1). */
+.t-activity {
+  --h: 350;
+  --sat: 28%;
+  --l: 38%;
+}
+
+/* Índigo: Atividade de rede (spec 0017 F1). */
+.t-network {
+  --h: 248;
+  --sat: 24%;
+  --l: 40%;
+}
+
 /* Argila. */
 .t-calendar {
   --h: 16;

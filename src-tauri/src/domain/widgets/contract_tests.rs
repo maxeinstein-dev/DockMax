@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 
 use super::clock::{ClockIconStyle, HourCycle};
 use super::shortcut::ShortcutTarget;
+use super::system::{ActivityShow, ActivityStyle};
 use super::time_progress::{Period, WeekStart};
 use super::*;
 
@@ -184,6 +185,8 @@ fn the_enum_fixture_is_every_value_of_each_closed_set_in_order() {
         "UnavailableReason": UnavailableReason::ALL,
         "StorageState": tags(&every_storage_status(), "state"),
         "ShortcutTargetType": tags(&every_shortcut_target(), "type"),
+        "ActivityShow": ActivityShow::ALL,
+        "ActivityStyle": ActivityStyle::ALL,
         "WidgetErrorCode": WidgetErrorCode::ALL,
     });
     assert_eq!(enums, expected, "{ENUMS} doesn't match the Rust enums");
@@ -196,5 +199,7 @@ fn the_enum_fixture_is_every_value_of_each_closed_set_in_order() {
     assert_closed_set(&enums, "WeekStart", &WeekStart::ALL);
     assert_closed_set(&enums, "MoveDirection", &MoveDirection::ALL);
     assert_closed_set(&enums, "UnavailableReason", &UnavailableReason::ALL);
+    assert_closed_set(&enums, "ActivityShow", &ActivityShow::ALL);
+    assert_closed_set(&enums, "ActivityStyle", &ActivityStyle::ALL);
     assert_closed_set(&enums, "WidgetErrorCode", &WidgetErrorCode::ALL);
 }

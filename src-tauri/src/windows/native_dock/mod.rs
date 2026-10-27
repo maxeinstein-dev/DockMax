@@ -61,7 +61,7 @@ use crate::domain::dock_layout::{
 };
 use crate::domain::open_apps::OpenSnapshot;
 use crate::domain::settings::{DockEdge, MiddleClick, OpenAnimation, Settings, TaskbarMode, Theme};
-use crate::domain::widgets::WidgetsSnapshot;
+use crate::domain::widgets::{WidgetConfig, WidgetsSnapshot};
 use crate::domain::workspaces::Workspace;
 use crate::persistence::database::Storage;
 
@@ -80,6 +80,9 @@ const WARM_TIMER: usize = 3;
 /// 0015).
 const PREVIEW_TIMER: usize = 6;
 const STATUS_TIMER: usize = 4;
+/// Reads the processor, the memory and the network again while a system
+/// widget is on the dock (spec 0017 F1).
+const ACTIVITY_TIMER: usize = 7;
 /// Looks at the pointer while the dock hides on its own.
 const AUTO_HIDE_TIMER: usize = 5;
 /// The key of a workspace dot for assistive technology, before its id.
@@ -88,6 +91,8 @@ const AUTO_HIDE_EVERY: u32 = 100;
 
 /// How often the battery, the network and the volume are read again.
 const STATUS_EVERY: u32 = 3_000;
+/// How often the system widgets read again.
+const ACTIVITY_EVERY: u32 = 2_000;
 
 /// A frame of the animations.
 const FRAME: Duration = Duration::from_millis(16);
@@ -250,6 +255,9 @@ pub struct Dock {
     strip_hovered: Option<usize>,
     /// The battery, the network and the volume, as last read.
     system: Option<super::system_status::Status>,
+    /// The last reading for the system widgets; `None` while none is on
+    /// the dock, when nothing is read.
+    activity: Option<crate::domain::system_activity::Reading>,
     /// The tray icons' images, by icon key: the image they came from and
     /// the bitmap.
     tray_images: HashMap<String, (String, Option<ID2D1Bitmap>)>,
@@ -430,6 +438,7 @@ fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
         strip: Vec::new(),
         strip_hovered: None,
         system: Some(super::system_status::read()),
+        activity: None,
         tray_images: HashMap::new(),
         pressed: None,
         press: None,
@@ -607,6 +616,8 @@ fn names() -> Names {
         note: dock.note,
         shortcut: dock.shortcut,
         files: dock.files,
+        activity: dock.activity,
+        network: dock.network,
     }
 }
 
@@ -772,6 +783,7 @@ impl Dock {
         let names = names();
         self.names = found.items.iter().map(|item| names.of(item)).collect();
         self.items = found.items;
+        self.arm_activity();
         self.groups = found.groups;
         self.growth = self
             .items
@@ -874,6 +886,42 @@ impl Dock {
 
     /// The battery, the network and the volume, read again; laid out again
     /// when they changed (an icon may come or go).
+    /// Reads the system for its widgets every [`ACTIVITY_EVERY`] while one
+    /// is on the dock, and stops when none is: then nothing is read.
+    fn arm_activity(&mut self) {
+        let wanted = self.items.iter().any(|item| {
+            matches!(
+                item,
+                Item::Widget(widget) if matches!(
+                    widget.config,
+                    WidgetConfig::Activity(_) | WidgetConfig::Network(_)
+                )
+            )
+        });
+        match (wanted, self.activity.is_some()) {
+            (true, false) => {
+                self.activity = Some(super::system_activity::sample());
+                unsafe { SetTimer(Some(self.hwnd), ACTIVITY_TIMER, ACTIVITY_EVERY, None) };
+            }
+            (false, true) => {
+                self.activity = None;
+                let _ = unsafe { KillTimer(Some(self.hwnd), ACTIVITY_TIMER) };
+            }
+            _ => {}
+        }
+    }
+
+    fn read_activity(&mut self) {
+        if self.activity.is_none() {
+            return;
+        }
+        let reading = super::system_activity::sample();
+        if self.activity.as_ref() != Some(&reading) {
+            self.activity = Some(reading);
+            self.paint();
+        }
+    }
+
     fn read_system(&mut self) {
         let now = Some(super::system_status::read());
         if now != self.system {
@@ -1735,7 +1783,7 @@ impl Dock {
         match item {
             Item::App(app) => program(&app.app_id, None),
             Item::Other(other) => program(&other.app_id, other.badge.then_some(other.key.as_str())),
-            Item::Widget(widget) => faces::widget(widget, size, clock),
+            Item::Widget(widget) => faces::widget(widget, size, clock, self.activity.as_ref()),
             Item::System(SystemItem::Settings) => Face::Glyph {
                 glaze: theme::Glaze::SETTINGS,
                 paths: paint::SETTINGS_GLYPH,
@@ -2705,6 +2753,7 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
                 dock.arm_clock();
             }),
             STATUS_TIMER => with_dock(hwnd, Dock::read_system),
+            ACTIVITY_TIMER => with_dock(hwnd, Dock::read_activity),
             AUTO_HIDE_TIMER => with_dock(hwnd, Dock::watch_pointer),
             PREVIEW_TIMER => with_dock(hwnd, |dock| {
                 let _ = unsafe { KillTimer(Some(dock.hwnd), PREVIEW_TIMER) };
@@ -2855,6 +2904,8 @@ pub fn view() -> Option<View> {
                             }
                         }
                         crate::domain::widgets::WidgetConfig::TimeProgress(_) => "ring",
+                        crate::domain::widgets::WidgetConfig::Activity(_) => "meters",
+                        crate::domain::widgets::WidgetConfig::Network(_) => "rates",
                         _ => "glyph",
                     },
                 };

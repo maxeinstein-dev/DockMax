@@ -72,6 +72,8 @@ pub struct Names {
     pub note: &'static str,
     pub shortcut: &'static str,
     pub files: &'static str,
+    pub activity: &'static str,
+    pub network: &'static str,
 }
 
 impl Names {
@@ -87,6 +89,8 @@ impl Names {
                     WidgetKind::Note => self.note,
                     WidgetKind::Shortcut => self.shortcut,
                     WidgetKind::Files => self.files,
+                    WidgetKind::Activity => self.activity,
+                    WidgetKind::Network => self.network,
                 }
                 .to_string()
             }),
@@ -237,6 +241,8 @@ mod tests {
         note: "Nota",
         shortcut: "Atalho",
         files: "Arquivos",
+        activity: "Atividade",
+        network: "Atividade de rede",
     };
 
     fn id(n: u8) -> WidgetId {

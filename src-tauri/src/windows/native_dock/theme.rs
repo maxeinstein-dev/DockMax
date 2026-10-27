@@ -145,6 +145,18 @@ impl Glaze {
         s: 22.0,
         l: 44.0,
     };
+    /// Vinho.
+    pub const ACTIVITY: Glaze = Glaze {
+        h: 350.0,
+        s: 28.0,
+        l: 38.0,
+    };
+    /// Índigo.
+    pub const NETWORK: Glaze = Glaze {
+        h: 248.0,
+        s: 24.0,
+        l: 40.0,
+    };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {
         h: 222.0,
@@ -226,6 +238,46 @@ mod tests {
         assert_eq!(dark.surface, Color::rgba(38, 39, 44, 1.0));
         assert_eq!(light.accent, Color::rgb(0x2f, 0x5b, 0xd3));
         assert_eq!(dark.accent, Color::rgb(0x7c, 0x9c, 0xff));
+    }
+
+    /// The value of `name` in the rule for `class` in tokens.css.
+    fn token(css: &str, class: &str, name: &str) -> f32 {
+        let rule = css
+            .split_once(&format!(".{class} {{"))
+            .and_then(|(_, rest)| rest.split_once('}'))
+            .unwrap_or_else(|| panic!("no .{class} in tokens.css"))
+            .0;
+        let line = rule
+            .lines()
+            .find_map(|line| line.trim().strip_prefix(&format!("{name}:")))
+            .unwrap_or_else(|| panic!("no {name} in .{class}"));
+        line.trim()
+            .trim_end_matches(';')
+            .trim_end_matches('%')
+            .parse()
+            .unwrap()
+    }
+
+    #[test]
+    fn the_glazes_are_the_ones_of_tokens_css() {
+        let css = include_str!("../../../../src/themes/tokens.css");
+        let glazes = [
+            ("t-clock", Glaze::CLOCK),
+            ("t-progress", Glaze::PROGRESS),
+            ("t-notes", Glaze::NOTES),
+            ("t-files", Glaze::FILES),
+            ("t-settings", Glaze::SETTINGS),
+            ("t-activity", Glaze::ACTIVITY),
+            ("t-network", Glaze::NETWORK),
+        ];
+        for (class, glaze) in glazes {
+            let css_glaze = Glaze {
+                h: token(css, class, "--h"),
+                s: token(css, class, "--sat"),
+                l: token(css, class, "--l"),
+            };
+            assert_eq!(glaze, css_glaze, "{class}");
+        }
     }
 
     #[test]

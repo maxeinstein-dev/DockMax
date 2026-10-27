@@ -5,6 +5,8 @@
 
 use std::collections::VecDeque;
 
+use serde::Serialize;
+
 /// The processor's times since the computer started, in 100 ns units, as
 /// `GetSystemTimes` gives them: `kernel` includes `idle`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -30,7 +32,7 @@ pub fn cpu_percent(before: CpuTimes, after: CpuTimes) -> Option<f64> {
 }
 
 /// The memory: what is in use, of the total, in bytes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
 pub struct Memory {
     pub total: u64,
     pub available: u64,
@@ -43,10 +45,6 @@ impl Memory {
             let used = self.total.saturating_sub(self.available);
             used as f64 / self.total as f64 * 100.0
         })
-    }
-
-    pub fn used(self) -> u64 {
-        self.total.saturating_sub(self.available)
     }
 }
 
@@ -94,14 +92,12 @@ fn one_decimal(value: f64) -> String {
     }
 }
 
-/// A size of memory, the Brazilian way: `7,8 GB`, `512 MB`.
-pub fn size_text(bytes: u64) -> String {
-    let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
-    if gb >= 1.0 {
-        format!("{} GB", one_decimal(gb))
-    } else {
-        format!("{} MB", (bytes as f64 / (1024.0 * 1024.0)).round() as u64)
-    }
+/// A rate in the few characters a one-icon tile has room for: `0K`,
+/// `340K`, `1,2M`, `12M`, `1,1G`.
+pub fn rate_short(bytes_per_second: f64) -> String {
+    let text = rate_text(bytes_per_second);
+    let (number, unit) = text.split_once(' ').unwrap_or((&text, ""));
+    format!("{number}{}", unit.chars().next().unwrap_or('K'))
 }
 
 /// The last `capacity` values, oldest first: what a graph draws.
@@ -132,11 +128,104 @@ impl History {
     pub fn values(&self) -> impl Iterator<Item = f64> + '_ {
         self.values.iter().copied()
     }
+}
 
-    /// The highest value kept, for the graph's scale; at least `floor`, so a
-    /// quiet network doesn't fill the graph with noise.
-    pub fn peak(&self, floor: f64) -> f64 {
-        self.values.iter().copied().fold(floor, f64::max)
+/// How many readings the graphs keep: a minute, at one every 2 s.
+pub const HISTORY: usize = 30;
+
+/// What the system widgets show now: the dock's tiles and the panel.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reading {
+    /// The processor's use, 0–100; `None` until two readings were made.
+    pub cpu: Option<f64>,
+    pub memory: Option<Memory>,
+    /// Bytes per second.
+    pub down: f64,
+    pub up: f64,
+    /// The last [`HISTORY`] values, oldest first.
+    pub cpu_history: Vec<f64>,
+    pub down_history: Vec<f64>,
+    pub up_history: Vec<f64>,
+}
+
+/// Turns the system's counters, read one after another, into a
+/// [`Reading`]: the processor's use and the rates are the change since the
+/// reading before.
+#[derive(Debug, Clone)]
+pub struct Sampler {
+    cpu_times: Option<CpuTimes>,
+    counters: Option<NetCounters>,
+    cpu: History,
+    down: History,
+    up: History,
+    reading: Reading,
+}
+
+impl Default for Sampler {
+    fn default() -> Self {
+        Sampler {
+            cpu_times: None,
+            counters: None,
+            cpu: History::new(HISTORY),
+            down: History::new(HISTORY),
+            up: History::new(HISTORY),
+            reading: Reading {
+                cpu: None,
+                memory: None,
+                down: 0.0,
+                up: 0.0,
+                cpu_history: Vec::new(),
+                down_history: Vec::new(),
+                up_history: Vec::new(),
+            },
+        }
+    }
+}
+
+impl Sampler {
+    /// Takes the counters read now, `seconds` after the ones before (any
+    /// value the first time). A counter that couldn't be read leaves its
+    /// value out.
+    pub fn feed(
+        &mut self,
+        seconds: f64,
+        cpu: Option<CpuTimes>,
+        memory: Option<Memory>,
+        counters: Option<NetCounters>,
+    ) -> &Reading {
+        let percent = match (self.cpu_times, cpu) {
+            (Some(before), Some(after)) => cpu_percent(before, after),
+            _ => None,
+        };
+        self.cpu_times = cpu;
+        let (down, up) = match (self.counters, counters) {
+            (Some(before), Some(after)) => net_rates(before, after, seconds),
+            _ => (0.0, 0.0),
+        };
+        let first = self.counters.is_none();
+        self.counters = counters;
+        if let Some(percent) = percent {
+            self.cpu.push(percent);
+        }
+        if !first && counters.is_some() {
+            self.down.push(down);
+            self.up.push(up);
+        }
+        self.reading = Reading {
+            cpu: percent,
+            memory,
+            down,
+            up,
+            cpu_history: self.cpu.values().collect(),
+            down_history: self.down.values().collect(),
+            up_history: self.up.values().collect(),
+        };
+        &self.reading
+    }
+
+    pub fn reading(&self) -> &Reading {
+        &self.reading
     }
 }
 
@@ -170,7 +259,6 @@ mod tests {
             available: 4,
         };
         assert_eq!(memory.percent(), Some(75.0));
-        assert_eq!(memory.used(), 12);
         assert_eq!(Memory::default().percent(), None);
     }
 
@@ -196,8 +284,9 @@ mod tests {
         assert_eq!(rate_text(1.2 * 1024.0 * 1024.0), "1,2 MB/s");
         assert_eq!(rate_text(12.4 * 1024.0 * 1024.0), "12 MB/s");
         assert_eq!(rate_text(1.1 * 1024.0 * 1024.0 * 1024.0), "1,1 GB/s");
-        assert_eq!(size_text(8 * 1024 * 1024 * 1024), "8,0 GB");
-        assert_eq!(size_text(512 * 1024 * 1024), "512 MB");
+        assert_eq!(rate_short(0.0), "0K");
+        assert_eq!(rate_short(340.0 * 1024.0), "340K");
+        assert_eq!(rate_short(1.2 * 1024.0 * 1024.0), "1,2M");
     }
 
     #[test]
@@ -207,7 +296,37 @@ mod tests {
             history.push(value);
         }
         assert_eq!(history.values().collect::<Vec<_>>(), [2.0, 3.0, 4.0]);
-        assert_eq!(history.peak(10.0), 10.0);
-        assert_eq!(history.peak(1.0), 4.0);
+    }
+
+    #[test]
+    fn the_sampler_measures_the_change_since_the_reading_before() {
+        let mut sampler = Sampler::default();
+        let times = |idle, kernel| CpuTimes {
+            idle,
+            kernel,
+            user: 0,
+        };
+        let counters = |received| NetCounters { received, sent: 0 };
+
+        let first = sampler.feed(0.0, Some(times(0, 0)), None, Some(counters(0)));
+        assert_eq!(first.cpu, None);
+        assert_eq!(first.down, 0.0);
+        assert!(first.down_history.is_empty());
+
+        let second = sampler
+            .feed(2.0, Some(times(50, 100)), None, Some(counters(4_000)))
+            .clone();
+        assert_eq!(second.cpu, Some(50.0));
+        assert_eq!(second.down, 2_000.0);
+        assert_eq!(second.cpu_history, [50.0]);
+        assert_eq!(second.down_history, [2_000.0]);
+
+        // The network couldn't be read: no rate, and the next one starts
+        // over.
+        let third = sampler.feed(2.0, Some(times(150, 200)), None, None).clone();
+        assert_eq!(third.cpu, Some(0.0));
+        assert_eq!(third.down, 0.0);
+        assert_eq!(third.down_history, [2_000.0]);
+        assert_eq!(sampler.reading(), &third);
     }
 }

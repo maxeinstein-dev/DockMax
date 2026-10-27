@@ -60,6 +60,8 @@ pub struct DockMessages {
     pub note: &'static str,
     pub shortcut: &'static str,
     pub files: &'static str,
+    pub activity: &'static str,
+    pub network: &'static str,
     /// The progress tile without a period running.
     pub no_value: &'static str,
     /// An item's name while it carries the attention badge; `{name}` is
@@ -127,6 +129,8 @@ const PT_BR: Messages = Messages {
         note: "Nota",
         shortcut: "Atalho",
         files: "Arquivos",
+        activity: "Atividade",
+        network: "Atividade de rede",
         no_value: "–",
         with_notice: "{name} (com aviso)",
         workspace: "Espaço {name}",
