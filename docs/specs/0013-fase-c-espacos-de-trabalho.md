@@ -23,7 +23,7 @@ Um espaço de trabalho tem um **nome**, uma **cor** (uma paleta fixa, a mesma da
 |---|---|
 | **C1. Modelo e troca do dock** | Espaços no banco, migração que põe tudo o que existe num espaço "Principal", criar, renomear, mudar a cor, reordenar e excluir espaços em Configurações; fixar e desafixar valem para o espaço ativo do monitor; bolinhas, roda, `Ctrl+Alt+1…9` e menu trocam os **itens** do dock. As janelas ainda não mudam. |
 | **C2. Janelas por espaço** | Cada janela tem um espaço; trocar esconde as dos outros espaços naquele monitor e mostra as do novo; o dock mostra só os apps abertos do espaço; tudo o que foi escondido volta se o DockMax fechar ou cair. |
-| **C3. Acabamento** | "Mover para o espaço" no menu do programa; a cor do indicador seguindo o espaço (opção); a opção de troca global em vez de por monitor; widgets em vários espaços pela interface. |
+| **C3. Acabamento** | "Mover para o espaço" no menu do programa; a cor do indicador seguindo o espaço (opção); a opção de troca global em vez de por monitor; widgets em vários espaços pela interface; as bolinhas para o leitor de tela; a troca animada. |
 
 Cada recorte é um PR, com o plano e a verificação no app real, e mede a memória (o dock nativo não deve crescer de forma visível com espaços).
 
@@ -74,8 +74,7 @@ CREATE TABLE workspace_items (
 
 ### 3.4 Ficou para depois
 
-- As bolinhas na UI Automation (o leitor de tela ainda não as encontra).
-- A troca animada: hoje os itens do outro espaço aparecem sem deslizar.
+- ~~As bolinhas na UI Automation~~ e ~~a troca animada~~: feitas no C3.
 - A aparência da seção, que entra no rebranding de Configurações e dos menus (roadmap).
 
 ## 4. C2 em detalhe: janelas por espaço (feito)
@@ -88,6 +87,15 @@ Como nas áreas de trabalho do Windows, mas **por monitor**: cada espaço guarda
 - **Excluir um espaço** mostra de volta as janelas estacionadas dele, que passam ao espaço do monitor delas.
 - **Segurança, como a barra do Windows (ADR 0009):** antes de esconder qualquer janela, a lista das estacionadas é gravada (`parked-windows.json`, ao lado do estado da barra). Elas voltam: na saída normal, num pânico, no reinício por queda do WebView2, no fim da sessão do Windows, pelo vigia (`dockmax-guard.exe`) se o DockMax morrer (ele sobe uma vez por execução, também com a barra visível), e na próxima abertura. Uma janela que não pôde ser anotada não é escondida.
 - **O espaço de cada janela sobrevive a um reinício (decisão do autor, 2026-10-27):** como o `session.json` do PrimoDock, o DockMax guarda o espaço de cada janela (`window-workspaces.json`), com o identificador da janela e o do processo dela, para não confundir uma janela nova que o Windows numerou igual. Toda saída mostra todas as janelas (é a regra de segurança), e na abertura seguinte cada janela recupera o seu espaço, e as que não são do espaço mostrado no monitor dela são estacionadas de novo.
+
+## 4b. C3 em detalhe: acabamento (feito)
+
+- **"Mover para <espaço>"** no menu de um programa (fixado ou só aberto), com dois ou mais espaços e janelas abertas: uma entrada para cada espaço menos o em uso. As janelas do programa no espaço em uso passam ao escolhido (`move_app_windows`, `move_open_windows`); em seguida cada monitor é acertado com o espaço que mostra: as que estavam na tela são estacionadas, e as que esperavam por aquele espaço num monitor que o mostra voltam. O menu passou a ler os espaços (`list_workspaces` liberado para a janela dos painéis).
+- **"Trocar de espaço em todos os monitores"** (Configurações › Geral, `switchEveryMonitor`, desligada): trocar num dock (bolinha, roda, atalho, menu, leitor de tela) troca todos os monitores para o mesmo espaço; as janelas de cada um seguem a regra do C2, e a que vem para a frente é a do monitor que trocou. Desligada, vale a decisão 2 (por monitor).
+- **"Indicador na cor do espaço"** (Configurações › Geral, `indicatorFollowsWorkspace`, desligada): a marca dos apps abertos usa a cor do espaço mostrado naquele dock, por cima da cor do indicador escolhida em Aparência.
+- **Widgets em vários espaços:** em "Itens do dock", com um espaço escolhido, o grupo **"De outros espaços"** lista os widgets que outros espaços mostram e este não; um clique mostra o widget aqui também (`share_widget`), no fim. Continua sendo uma instância só (a nota é a mesma em todos). Remover tira só deste espaço; sai de vez quando nenhum espaço o tem mais (C1).
+- **Bolinhas para o leitor de tela:** cada bolinha é um botão na UI Automation do dock, antes dos itens, chamado "Espaço <nome>" (e "(mostrado)" no do monitor); acioná-lo troca o espaço só naquele dock (antes, acionar um item pelo leitor de tela agia em todos os docks que tinham a mesma chave).
+- **Troca animada:** os itens do espaço novo entram deslizando 36 px a partir do lado em que ele está (o seguinte pela direita, o anterior pela esquerda); os que estão nos dois espaços deslizam do lugar antigo. Sem animação quando o Windows pede menos movimento.
 
 ## 5. Fora desta fase
 
@@ -115,6 +123,8 @@ O autor pediu para seguir sem responder (2026-10-27); valem as propostas até el
   - reaberto com o outro espaço na tela, a sessão escondeu as mesmas 4 de novo, e a volta as trouxe;
   - no fim, as janelas visíveis eram as mesmas do começo, sem nenhuma mostrada à mão.
 - **Não verificado (C2):** com o mouse e o teclado de verdade; dois monitores em espaços diferentes; uma janela arrastada para o outro monitor; excluir um espaço com janelas escondidas; o fim da sessão do Windows.
+- **Verificado (C3, 2026-10-27):** testes das opções no arquivo e no comando de configurações, do widget mostrado em dois espaços (uma instância; tirar de um mantém no outro; espaço ou widget desconhecido recusado), do menu ("Mover para" só com dois espaços e janelas abertas, nunca para o espaço em uso) e de "De outros espaços".
+- **Não verificado (C3):** no app real, mover janelas pelo menu, as duas opções, as bolinhas pelo Narrador e a animação. Ver o PR.
 - **Testes (C1 e C2):** a migração sobre um banco real (os itens e a ordem iguais no "Principal"), fixar e desafixar por espaço, excluir espaço, o estado de cada monitor, a regra de dono das janelas e a lista de estacionadas (a pura, com janelas de mentira).
 - **App real:**
   - criar três espaços e trocar pelas quatro formas;

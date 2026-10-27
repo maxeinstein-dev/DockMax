@@ -34,6 +34,7 @@
     "allow-recolor-workspace",
     "allow-move-workspace",
     "allow-delete-workspace",
+    "allow-share-widget",
     "log:allow-log"
   ]
 }

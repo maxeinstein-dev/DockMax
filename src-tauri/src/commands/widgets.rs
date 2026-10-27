@@ -175,6 +175,24 @@ pub fn remove(storage: &mut Storage, id: &str, workspace: Option<&str>) -> Resul
     Ok(())
 }
 
+/// Shows the instance `id` in the workspace `workspace` too, at its end
+/// (spec 0013 C3): still one instance, a note's text the same in each.
+/// Taking it out of one is `remove`.
+pub fn share(storage: &mut Storage, id: &str, workspace: &str) -> Result<(), WidgetError> {
+    let id = parse_id(id)?;
+    let workspace = workspace_of(storage, Some(workspace))?;
+    let key = key_of(&id);
+    let known = storage
+        .workspaces()?
+        .iter()
+        .any(|each| each.items.contains(&key));
+    if !known {
+        return Err(WidgetError::NotFound);
+    }
+    storage.add_to_workspace(&workspace, &key)?;
+    Ok(())
+}
+
 /// Moves an instance one place up or down among the widgets of the
 /// workspace `workspace` (or the one in use); at either end nothing changes.
 pub fn shift(
@@ -332,6 +350,18 @@ pub fn remove_widget(
 ) -> Result<(), WidgetCommandError> {
     change(&app, &state, "remove", |storage| {
         remove(storage, &id, workspace.as_deref())
+    })
+}
+
+#[tauri::command]
+pub fn share_widget(
+    app: AppHandle,
+    state: State<'_, Mutex<Storage>>,
+    id: String,
+    workspace: String,
+) -> Result<(), WidgetCommandError> {
+    change(&app, &state, "share", |storage| {
+        share(storage, &id, &workspace)
     })
 }
 
@@ -528,6 +558,49 @@ mod tests {
                 "{error:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_widget_shown_in_two_workspaces_is_one_instance() {
+        let dir = tempdir().unwrap();
+        let (mut storage, [clock, ..]) = open(&dir);
+        let first = storage.in_use().unwrap().id;
+        let second = storage.create_workspace(None).unwrap().id;
+
+        share(&mut storage, &clock, &second).unwrap();
+        // Twice is once.
+        share(&mut storage, &clock, &second).unwrap();
+        let key = format!("widget:{clock}");
+        let holding = |storage: &mut Storage| {
+            storage
+                .workspaces()
+                .unwrap()
+                .into_iter()
+                .filter(|each| each.items.contains(&key))
+                .map(|each| each.id)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(holding(&mut storage), [first.clone(), second.clone()]);
+
+        // Out of the first, it stays in the second.
+        remove(&mut storage, &clock, Some(&first)).unwrap();
+        assert_eq!(holding(&mut storage), std::slice::from_ref(&second));
+        assert!(
+            snapshot(&storage)
+                .unwrap()
+                .widgets
+                .iter()
+                .any(|widget| widget.id.to_string() == clock)
+        );
+
+        assert_eq!(
+            share(&mut storage, STRANGER, &first),
+            Err(WidgetError::NotFound)
+        );
+        assert_eq!(
+            share(&mut storage, &clock, STRANGER),
+            Err(WidgetError::NotFound)
+        );
     }
 
     #[test]

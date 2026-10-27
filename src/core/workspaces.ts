@@ -88,6 +88,8 @@ export const WORKSPACE_COMMANDS = {
   recolor: "recolor_workspace",
   move: "move_workspace",
   delete: "delete_workspace",
+  moveAppWindows: "move_app_windows",
+  moveOpenWindows: "move_open_windows",
 } as const;
 
 /** Event every window receives with a `WorkspacesSnapshot` after a change. */
@@ -132,6 +134,20 @@ export function moveWorkspace(
  * workspace has go with it. */
 export function deleteWorkspace(id: string): Promise<void> {
   return run(WORKSPACE_COMMANDS.delete, { id });
+}
+
+/** "Mover para <espaço>" (spec 0013 C3): the windows of the pinned program
+ * `id` in the workspace in use go to `workspace`. How many moved. */
+export function moveAppWindows(id: string, workspace: string): Promise<number> {
+  return run(WORKSPACE_COMMANDS.moveAppWindows, { id, workspace });
+}
+
+/** The same for the open program `key` that is not pinned. */
+export function moveOpenWindows(
+  key: string,
+  workspace: string,
+): Promise<number> {
+  return run(WORKSPACE_COMMANDS.moveOpenWindows, { key, workspace });
 }
 
 /** A name the user may give: one line, no spaces at the ends, 1 to

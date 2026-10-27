@@ -10,6 +10,10 @@
       "id",
       "workspace"
     ],
+    "share_widget": [
+      "id",
+      "workspace"
+    ],
     "move_widget": [
       "id",
       "direction",

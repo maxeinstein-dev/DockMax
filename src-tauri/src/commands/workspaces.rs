@@ -169,27 +169,162 @@ pub fn delete_workspace(
     Ok(())
 }
 
+/// The monitors a switch on `monitor` reaches: every one with "Trocar em
+/// todos os monitores" (spec 0013 C3), `monitor` first; else `monitor`.
+fn reached(app: &AppHandle, monitor: &str) -> Vec<String> {
+    let mut monitors = vec![monitor.to_owned()];
+    #[cfg(windows)]
+    if crate::commands::settings::current(app)
+        .dock
+        .switch_every_monitor
+    {
+        monitors.extend(
+            crate::windows::monitors::all()
+                .into_iter()
+                .map(|other| other.key)
+                .filter(|key| key != monitor),
+        );
+    }
+    #[cfg(not(windows))]
+    let _ = app;
+    monitors
+}
+
 /// The dock on the monitor `monitor` (its device name) shows the workspace
-/// `id`, which is now in use.
+/// `id`, which is now in use; with "Trocar em todos os monitores", every
+/// monitor does.
 pub fn switch(app: &AppHandle, monitor: &str, id: &str) {
     let state = app.state::<Mutex<Storage>>();
-    let from = lock(&state).shown_on(monitor).ok().map(|w| w.id);
+    let monitors = reached(app, monitor);
+    let from: Vec<Option<String>> = {
+        let mut storage = lock(&state);
+        monitors
+            .iter()
+            .map(|monitor| storage.shown_on(monitor).ok().map(|w| w.id))
+            .collect()
+    };
     let switched = change(app, &state, "switch", |storage| {
+        // The monitor of the dock last: it is the one in use.
+        for other in monitors.iter().skip(1) {
+            storage.switch_workspace(other, id)?;
+        }
         storage.switch_workspace(monitor, id)
     });
     // The windows follow (spec 0013 C2): those of the workspace left are
-    // parked, those of the one shown come back, the top one in front.
+    // parked, those of the one shown come back, the top one of the monitor
+    // that switched in front.
     #[cfg(windows)]
-    if switched.is_ok()
-        && let Some(from) = from.filter(|from| from != id)
-    {
-        if let Some(top) = crate::windows::window_spaces::switch(monitor, &from, id) {
+    if switched.is_ok() {
+        let mut front = None;
+        for (at, (monitor, from)) in monitors.iter().zip(from).enumerate() {
+            let Some(from) = from.filter(|from| from != id) else {
+                continue;
+            };
+            let top = crate::windows::window_spaces::switch(monitor, &from, id);
+            if at == 0 {
+                front = top;
+            }
+        }
+        if let Some(top) = front {
             crate::windows::openwin::focus(top);
         }
         crate::windows::open_apps::wake(app);
     }
     #[cfg(not(windows))]
     let _ = (switched, from);
+}
+
+/// Every monitor parks the windows that are not of the workspace it shows
+/// and brings back the ones of it (after windows changed workspace).
+#[cfg(windows)]
+fn settle(app: &AppHandle) {
+    let state = app.state::<Mutex<Storage>>();
+    let shown: Vec<(String, String)> = {
+        let mut storage = lock(&state);
+        crate::windows::monitors::all()
+            .into_iter()
+            .filter_map(|monitor| {
+                let workspace = storage.shown_on(&monitor.key).ok()?;
+                Some((monitor.key, workspace.id))
+            })
+            .collect()
+    };
+    for (monitor, workspace) in &shown {
+        crate::windows::window_spaces::switch(monitor, workspace, workspace);
+    }
+    crate::windows::open_apps::wake(app);
+}
+
+/// The windows `hwnds` go to the workspace `target`, which must exist: they
+/// leave the screen unless their monitor shows it.
+#[cfg(windows)]
+fn give_windows(
+    app: &AppHandle,
+    hwnds: &[isize],
+    target: &str,
+) -> Result<usize, WorkspaceCommandError> {
+    let state = app.state::<Mutex<Storage>>();
+    let exists = lock(&state)
+        .workspaces()?
+        .iter()
+        .any(|workspace| workspace.id == target);
+    if !exists {
+        return Err(WorkspaceError::NotFound.into());
+    }
+    if !hwnds.is_empty() {
+        crate::windows::window_spaces::give(hwnds, target);
+        settle(app);
+    }
+    Ok(hwnds.len())
+}
+
+/// "Mover para <espaço>" in the menu of a pinned program (spec 0013 C3): its
+/// windows in the workspace in use go to `workspace`. How many moved.
+#[tauri::command]
+pub fn move_app_windows(
+    app: AppHandle,
+    id: String,
+    workspace: String,
+) -> Result<usize, WorkspaceCommandError> {
+    #[cfg(windows)]
+    {
+        let from = in_use_id(&app);
+        let hwnds = crate::windows::open_apps::windows_of_pinned(&id, from.as_deref());
+        give_windows(&app, &hwnds, &workspace)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, id, workspace);
+        Ok(0)
+    }
+}
+
+/// The same for an open program that is not pinned, by its `key`.
+#[tauri::command]
+pub fn move_open_windows(
+    app: AppHandle,
+    key: String,
+    workspace: String,
+) -> Result<usize, WorkspaceCommandError> {
+    #[cfg(windows)]
+    {
+        let from = in_use_id(&app);
+        let hwnds = crate::windows::open_apps::windows_of_other(&key, from.as_deref());
+        give_windows(&app, &hwnds, &workspace)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, key, workspace);
+        Ok(0)
+    }
+}
+
+/// The id of the workspace in use.
+#[cfg(windows)]
+fn in_use_id(app: &AppHandle) -> Option<String> {
+    let state = app.state::<Mutex<Storage>>();
+    let mut storage = lock(&state);
+    storage.in_use().ok().map(|workspace| workspace.id)
 }
 
 /// The dock on `monitor` goes to the workspace at `index` (the shortcut

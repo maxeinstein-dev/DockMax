@@ -65,6 +65,10 @@ pub struct DockMessages {
     /// An item's name while it carries the attention badge; `{name}` is
     /// replaced.
     pub with_notice: &'static str,
+    /// A workspace dot, for assistive technology (spec 0013 C3), and the one
+    /// shown; `{name}` is replaced.
+    pub workspace: &'static str,
+    pub workspace_shown: &'static str,
     /// The labels of the small icons at the end; `{n}` is a percentage.
     pub show_hidden_icons: &'static str,
     pub tray_icon: &'static str,
@@ -122,6 +126,8 @@ const PT_BR: Messages = Messages {
         files: "Arquivos",
         no_value: "–",
         with_notice: "{name} (com aviso)",
+        workspace: "Espaço {name}",
+        workspace_shown: "Espaço {name} (mostrado)",
         show_hidden_icons: "Mostrar ícones ocultos",
         tray_icon: "Ícone da bandeja",
         wifi: "Wi-Fi",

@@ -77,6 +77,8 @@ const WARM_TIMER: usize = 3;
 const STATUS_TIMER: usize = 4;
 /// Looks at the pointer while the dock hides on its own.
 const AUTO_HIDE_TIMER: usize = 5;
+/// The key of a workspace dot for assistive technology, before its id.
+const WORKSPACE_KEY: &str = "workspace:";
 const AUTO_HIDE_EVERY: u32 = 100;
 
 /// How often the battery, the network and the volume are read again.
@@ -179,6 +181,10 @@ struct Landing {
 
 /// The longest a drag let go waits for the new order.
 const LANDING: Duration = Duration::from_secs(1);
+
+/// How far the items of a workspace just shown start along the bar, in
+/// logical pixels, before they glide to their places (spec 0013 C3).
+const SWITCH_SLIDE: f64 = 36.0;
 
 impl Press {
     /// The item's place in its group.
@@ -649,15 +655,33 @@ impl Dock {
         self.hovered.filter(|&index| index < self.items.len())
     }
 
-    /// Reads the data again and lays the dock out for it.
+    /// Reads the data again and lays the dock out for it. After a switch of
+    /// workspace, the items of the new one glide in from the side it lies on
+    /// (spec 0013 C3).
     fn reload(&mut self) {
+        let position = |data: &Data| {
+            let id = &data.workspace.as_ref()?.id;
+            data.workspaces.iter().position(|w| &w.id == id)
+        };
+        let before = position(&self.data);
         self.data = read_data(&self.app, &self.monitor.key);
-        self.rebuild();
+        let enter = match (before, position(&self.data)) {
+            (Some(before), Some(after)) if after > before => SWITCH_SLIDE,
+            (Some(before), Some(after)) if after < before => -SWITCH_SLIDE,
+            _ => 0.0,
+        };
+        self.rebuild_entering(enter);
     }
 
     /// Lays the dock out for the data it has: the items, their names, the
     /// window, and paints.
     fn rebuild(&mut self) {
+        self.rebuild_entering(0.0);
+    }
+
+    /// `rebuild`, with the items that were not on the dock coming from
+    /// `enter` logical pixels along the bar.
+    fn rebuild_entering(&mut self, enter: f64) {
         // Where each item is drawn now, on the screen, by key: from there it
         // slides to its new place.
         let drawn: HashMap<String, f64> = self.drawn_x().collect();
@@ -671,7 +695,7 @@ impl Dock {
             .zip(&rest.items)
             .map(|(item, area)| {
                 let Some(before) = drawn.get(&item.key()) else {
-                    return 0.0;
+                    return if self.motion { enter } else { 0.0 };
                 };
                 let offset = before - (left + area.x);
                 // Another monitor, or no motion: straight there.
@@ -1005,38 +1029,59 @@ impl Dock {
         // Configurações) and its box on the screen.
         let attention = dock_items::needs_attention(self.data.widgets.as_ref());
         let notice = crate::i18n::messages().dock.with_notice;
+        // The workspace dots first, as on the screen (spec 0013 C3).
+        let text = &crate::i18n::messages().dock;
+        let shown = self.data.workspace.as_ref().map(|w| w.id.as_str());
+        let side = 2.0 * dock_layout::ACTIVE_DOT_RADIUS;
+        let dots: Vec<access::Entry> = rest
+            .switcher
+            .map(|area| dock_layout::switcher_dots(area, self.data.workspaces.len()))
+            .unwrap_or_default()
+            .into_iter()
+            .zip(&self.data.workspaces)
+            .map(|((x, y), workspace)| {
+                let on_screen = to_screen(Area {
+                    x: x - side / 2.0,
+                    y: y - side / 2.0,
+                    width: side,
+                    height: side,
+                });
+                let name = if Some(workspace.id.as_str()) == shown {
+                    text.workspace_shown
+                } else {
+                    text.workspace
+                };
+                access::Entry {
+                    key: format!("{WORKSPACE_KEY}{}", workspace.id),
+                    name: name.replace("{name}", &workspace.name),
+                    rect: (
+                        f64::from(on_screen.x),
+                        f64::from(on_screen.y),
+                        f64::from(on_screen.width),
+                        f64::from(on_screen.height),
+                    ),
+                }
+            })
+            .collect();
         access::publish(
             hwnd,
-            self.items
-                .iter()
-                .zip(&self.names)
-                .zip(&rest.items)
-                .map(|((item, name), area)| {
-                    let on_screen = to_screen(*area);
-                    access::Entry {
-                        key: item.key(),
-                        name: if attention && matches!(item, Item::System(SystemItem::Settings)) {
-                            notice.replace("{name}", name)
-                        } else {
-                            name.clone()
-                        },
-                        rect: (
-                            f64::from(on_screen.x),
-                            f64::from(on_screen.y),
-                            f64::from(on_screen.width),
-                            f64::from(on_screen.height),
-                        ),
-                    }
-                })
+            dots.into_iter()
                 .chain(
-                    self.strip
+                    self.items
                         .iter()
-                        .zip(self.strip_cells())
-                        .map(|(cell, area)| {
-                            let on_screen = to_screen(area);
+                        .zip(&self.names)
+                        .zip(&rest.items)
+                        .map(|((item, name), area)| {
+                            let on_screen = to_screen(*area);
                             access::Entry {
-                                key: cell.key(),
-                                name: cell.tip(),
+                                key: item.key(),
+                                name: if attention
+                                    && matches!(item, Item::System(SystemItem::Settings))
+                                {
+                                    notice.replace("{name}", name)
+                                } else {
+                                    name.clone()
+                                },
                                 rect: (
                                     f64::from(on_screen.x),
                                     f64::from(on_screen.y),
@@ -1044,7 +1089,25 @@ impl Dock {
                                     f64::from(on_screen.height),
                                 ),
                             }
-                        }),
+                        })
+                        .chain(
+                            self.strip
+                                .iter()
+                                .zip(self.strip_cells())
+                                .map(|(cell, area)| {
+                                    let on_screen = to_screen(area);
+                                    access::Entry {
+                                        key: cell.key(),
+                                        name: cell.tip(),
+                                        rect: (
+                                            f64::from(on_screen.x),
+                                            f64::from(on_screen.y),
+                                            f64::from(on_screen.width),
+                                            f64::from(on_screen.height),
+                                        ),
+                                    }
+                                }),
+                        ),
                 )
                 .collect(),
         );
@@ -1052,7 +1115,11 @@ impl Dock {
 
     /// Presses the item `key` (assistive technology), as a click would.
     fn press(&mut self, key: &str) {
-        if let Some(index) = self.items.iter().position(|item| item.key() == key) {
+        if let Some(id) = key.strip_prefix(WORKSPACE_KEY) {
+            if let Some(index) = self.data.workspaces.iter().position(|w| w.id == id) {
+                self.switch_to(index);
+            }
+        } else if let Some(index) = self.items.iter().position(|item| item.key() == key) {
             self.click(index);
             self.paint();
         } else if let Some(index) = self.strip.iter().position(|cell| cell.key() == key) {
@@ -1548,10 +1615,13 @@ impl Dock {
             date: format!("{:02}/{:02}/{:04}", clock.wDay, clock.wMonth, clock.wYear),
             hovered: self.status_hovered,
         });
-        let indicator_color = settings
-            .indicator_color
-            .as_deref()
-            .and_then(Color::hex)
+        let workspace_color = settings
+            .indicator_follows_workspace
+            .then_some(self.data.workspace.as_ref())
+            .flatten()
+            .and_then(|workspace| Color::hex(&workspace.color));
+        let indicator_color = workspace_color
+            .or_else(|| settings.indicator_color.as_deref().and_then(Color::hex))
             .or(look.indicator)
             .unwrap_or(palette.accent);
         Scene {
