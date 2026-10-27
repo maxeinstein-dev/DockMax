@@ -16,6 +16,21 @@ Use o build de release mais novo, com o mouse e o teclado de verdade. Ao fechar 
 - [x] Ocultar automaticamente: desce, sobe na borda e fica à mostra com o ponteiro em cima ([PR #29](https://github.com/maxeinstein-dev/DockMax/pull/29)).
 - [x] Abrir o DockMax pelo menu Iniciar traz o dock de volta.
 
+## Resultado da rodada de 2026-10-27
+
+O autor rodou os blocos 1 a 4 com o build do main depois do #29.
+
+- **Passou:** tela cheia no segundo monitor com o principal em uso: só o dock do segundo some.
+- **Não se repetiu ao testar de novo:** o programa fixado duplicado e o dock voltando por cima da tela cheia no principal. Se voltarem, a sonda `spike_open_and_full_screen` (em `windows/open_apps.rs`) mostra o estado da máquina.
+- **Falhou:**
+  - Um programa fixado, quando aberto, aparece duas vezes: no grupo dos fixados e no dos abertos.
+  - O ícone do próprio DockMax não aparece na bandeja.
+  - O menu de um ícone da bandeja clicado no dock do segundo monitor abre no monitor principal. Causa: o FortiClient e outros programas "system aware" enxergam a tela na escala do monitor principal, e a posição do ícone ia em pixels físicos (o segundo monitor está em 125 %). **Corrigido no #34**, confirmado pelo autor.
+  - Os painéis do Windows (Wi-Fi, volume e bateria) abrem sempre no monitor principal. O Windows só os abre pelo atalho Win+A, sem escolha de monitor.
+  - Com tela cheia no monitor principal e o segundo monitor em uso, o dock do principal volta por cima do vídeo.
+- **Não feito:** o instalador (não há outra máquina) e o uso longo.
+- **Retirado:** "Ícones dos apps". É um seletor de pacotes lidos de uma pasta, e o DockMax não traz pacote embutido, então só há "Original" (ver limitações).
+
 ## 1. Cliques no dock (uns 10 minutos)
 
 - [ ] **Esquerdo num programa fixado fechado:** abre o programa, com a animação de abertura escolhida.
@@ -35,7 +50,7 @@ Use o build de release mais novo, com o mouse e o teclado de verdade. Ao fechar 
 - [ ] Os nove estilos, um por um, e os reflexos onde o estilo tem.
 - [ ] O dock na **borda de cima**: posição, faixa reservada, menus abrindo para baixo, arrasto, ocultar automaticamente.
 - [ ] **Escala de 150 %** num monitor: o dock nítido, no tamanho certo e com a faixa certa.
-- [ ] Configurações › "Ícones dos apps" e as opções novas, vistas no app de Configurações de verdade.
+- [ ] As opções novas de Configurações (Dock em todos os monitores, Ocultar automaticamente e os dois tempos), vistas no app de Configurações de verdade.
 
 ## 3. Arquivos e janelas (uns 10 minutos)
 
@@ -47,7 +62,7 @@ Use o build de release mais novo, com o mouse e o teclado de verdade. Ao fechar 
 - [ ] O mouse no **segundo dock**: abrir um painel (abre no monitor dele), um menu e um arrasto.
 - [ ] **Ligar e desligar um monitor** com o DockMax aberto: o dock dele some e volta, e a faixa é devolvida.
 - [ ] Desligar e religar "Dock em todos os monitores" com o DockMax aberto.
-- [ ] **Tela cheia de verdade no segundo monitor** (um vídeo do YouTube em tela cheia): só o dock daquele monitor some, e usar o outro monitor não o traz de volta por cima do vídeo.
+- [x] **Tela cheia de verdade no segundo monitor** (um vídeo do YouTube em tela cheia): só o dock daquele monitor some, e usar o outro monitor não o traz de volta por cima do vídeo. (Autor, 2026-10-27.)
 - [ ] **Tela cheia no monitor principal**, idem, e um jogo em tela cheia exclusiva, se houver.
 
 ## 5. Instalador (uns 20 minutos, numa máquina limpa ou virtual)
