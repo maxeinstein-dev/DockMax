@@ -1,13 +1,11 @@
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import {
-  DOCK_STYLES,
   INDICATOR_COLORS,
   MAX_CORNERS,
   MAX_HOVER_SCALE,
   MIN_CORNERS,
   MIN_HOVER_SCALE,
   type DockSettings,
-  type DockStyle,
   type HoverEffect,
   type IconShape,
   type Indicator,
@@ -22,8 +20,9 @@ import OptionGroup, { type Option } from "./OptionGroup";
 import PanelFooter from "./PanelFooter";
 import PanelHeader from "./parts/PanelHeader";
 import RangeField from "./parts/RangeField";
-import SelectField from "./parts/SelectField";
+import SettingsGroup from "./parts/SettingsGroup";
 import ToggleField from "./parts/ToggleField";
+import StyleGallery from "./StyleGallery";
 import { useSettingsEditor } from "./useSettingsEditor";
 import "./Look.css";
 
@@ -141,10 +140,15 @@ function SwatchGroup({
 type LookPanelProps = {
   /** The settings in use, or null while they can't be read. */
   settings: Settings | null;
-  /** Voltar to the settings. */
   /** Back to the main view of the panel; none in the Configurações app,
    * where the views are sections. */
   onBack?: () => void;
+  /** The programs pinned in the workspace in use, for the miniatures of the
+   * styles; none in the panel, where they show widget tiles. */
+  appIds?: readonly string[];
+  /** The rows in titled cards, as the Configurações app shows them (spec
+   * 0014 R1). */
+  grouped?: boolean;
 };
 
 /**
@@ -153,13 +157,19 @@ type LookPanelProps = {
  * indicator. Every choice is applied and saved at once, like the rest of the
  * Settings panel.
  */
-function LookPanel({ settings, onBack }: LookPanelProps) {
+function LookPanel({
+  settings,
+  onBack,
+  appIds = [],
+  grouped = false,
+}: LookPanelProps) {
   const t = useT();
   const { shown, change, error } = useSettingsEditor(settings);
   const disabled = shown === null;
   const dock = shown?.dock ?? null;
   const look = dock ? dockLookOf(dock) : null;
   const text = t.settings.look;
+  const groups = t.settings.app.groups;
 
   const update = (patch: Partial<DockSettings>) =>
     change((s) => ({ ...s, dock: { ...s.dock, ...patch } }));
@@ -182,6 +192,52 @@ function LookPanel({ settings, onBack }: LookPanelProps) {
     });
   const tweaked = dock !== null && dock.tweaks[dock.style] !== undefined;
 
+  // The changes to the chosen style: a list, so the panel and the app
+  // put the same rows in their own frame.
+  const tweaks = [
+    <ToggleField
+      key="border"
+      label={text.border}
+      checked={look?.border ?? false}
+      disabled={disabled}
+      onChange={(border) => tweak({ border })}
+    />,
+    <RangeField
+      key="corners"
+      label={text.corners}
+      hint={text.cornersHint}
+      value={look?.corners ?? MIN_CORNERS}
+      min={MIN_CORNERS}
+      max={MAX_CORNERS}
+      step={5}
+      display={(value) => `${value}%`}
+      disabled={disabled}
+      onCommit={(corners) => tweak({ corners })}
+    />,
+    <ToggleField
+      key="reflections"
+      label={text.reflections}
+      hint={text.reflectionsHint}
+      checked={look?.reflections ?? false}
+      disabled={disabled}
+      onChange={(reflections) => tweak({ reflections })}
+    />,
+    <div key="restore" className="toggle-row">
+      <div className="toggle-text">
+        <span className="toggle-label">{text.restore}</span>
+        <span className="toggle-hint">{text.restoreHint}</span>
+      </div>
+      <button
+        type="button"
+        className="secondary-button"
+        disabled={disabled || !tweaked}
+        onClick={restore}
+      >
+        {text.restore}
+      </button>
+    </div>,
+  ];
+
   return (
     <>
       {onBack ? (
@@ -189,108 +245,86 @@ function LookPanel({ settings, onBack }: LookPanelProps) {
       ) : (
         <PanelHeader title={text.title} />
       )}
-      <SelectField
-        label={text.style}
-        value={dock?.style ?? "native"}
-        options={DOCK_STYLES.map((style) => ({
-          value: style,
-          label: text.styles[style],
-        }))}
-        disabled={disabled}
-        onChange={(value) => update({ style: value as DockStyle })}
-      />
-      <section className="look-group" aria-label={text.tweaks}>
-        <h2 className="look-group-title">{text.tweaks}</h2>
-        <ToggleField
-          label={text.border}
-          checked={look?.border ?? false}
+      <SettingsGroup title={groups.style} grouped={grouped}>
+        <StyleGallery
+          label={text.style}
+          dock={dock}
+          appIds={appIds}
           disabled={disabled}
-          onChange={(border) => tweak({ border })}
+          onSelect={(style) => update({ style })}
         />
-        <RangeField
-          label={text.corners}
-          hint={text.cornersHint}
-          value={look?.corners ?? MIN_CORNERS}
-          min={MIN_CORNERS}
-          max={MAX_CORNERS}
-          step={5}
-          display={(value) => `${value}%`}
+      </SettingsGroup>
+      {grouped ? (
+        <SettingsGroup title={groups.tweaks} grouped>
+          {tweaks}
+        </SettingsGroup>
+      ) : (
+        <section className="look-group" aria-label={text.tweaks}>
+          <h2 className="look-group-title">{text.tweaks}</h2>
+          {tweaks}
+        </section>
+      )}
+      <SettingsGroup title={groups.hover} grouped={grouped}>
+        <OptionGroup
+          label={text.hover}
+          options={options(HOVERS, text.hoverOptions)}
+          selected={dock?.hover ?? null}
+          onSelect={(hover) => update({ hover })}
+        />
+        {dock?.hover === "scale" ? (
+          <RangeField
+            label={text.hoverScale}
+            value={dock.hoverScale}
+            min={MIN_HOVER_SCALE}
+            max={MAX_HOVER_SCALE}
+            step={5}
+            display={(value) =>
+              `${(value / 100).toFixed(2).replace(".", ",")}×`
+            }
+            onCommit={(hoverScale) => update({ hoverScale })}
+          />
+        ) : null}
+      </SettingsGroup>
+      <SettingsGroup title={groups.indicator} grouped={grouped}>
+        <OptionGroup
+          label={text.indicator}
+          options={options(INDICATORS, text.indicatorOptions)}
+          selected={dock?.indicator ?? null}
+          onSelect={(indicator) => update({ indicator })}
+        />
+        {/* The color right after the mark it colors. */}
+        <SwatchGroup
+          label={text.indicatorColor}
+          defaultLabel={text.indicatorDefault}
+          colorName={(color) =>
+            text.colors[color as keyof typeof text.colors] ?? color
+          }
+          color={dock?.indicatorColor ?? null}
           disabled={disabled}
-          onCommit={(corners) => tweak({ corners })}
+          onSelect={(indicatorColor) => update({ indicatorColor })}
         />
-        <ToggleField
-          label={text.reflections}
-          hint={text.reflectionsHint}
-          checked={look?.reflections ?? false}
+      </SettingsGroup>
+      <SettingsGroup title={groups.icons} grouped={grouped}>
+        <OptionGroup
+          label={text.iconShape}
+          options={options(ICON_SHAPES, text.iconShapeOptions)}
+          selected={dock?.iconShape ?? null}
+          onSelect={(iconShape) => update({ iconShape })}
+        />
+        <IconPacksField
+          selected={dock?.iconPack ?? null}
           disabled={disabled}
-          onChange={(reflections) => tweak({ reflections })}
+          onSelect={(iconPack) => update({ iconPack })}
         />
-        <div className="toggle-row">
-          <div className="toggle-text">
-            <span className="toggle-label">{text.restore}</span>
-            <span className="toggle-hint">{text.restoreHint}</span>
-          </div>
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={disabled || !tweaked}
-            onClick={restore}
-          >
-            {text.restore}
-          </button>
-        </div>
-      </section>
-      <OptionGroup
-        label={text.hover}
-        options={options(HOVERS, text.hoverOptions)}
-        selected={dock?.hover ?? null}
-        onSelect={(hover) => update({ hover })}
-      />
-      {dock?.hover === "scale" ? (
-        <RangeField
-          label={text.hoverScale}
-          value={dock.hoverScale}
-          min={MIN_HOVER_SCALE}
-          max={MAX_HOVER_SCALE}
-          step={5}
-          display={(value) => `${(value / 100).toFixed(2).replace(".", ",")}×`}
-          onCommit={(hoverScale) => update({ hoverScale })}
+      </SettingsGroup>
+      <SettingsGroup title={groups.openAnimation} grouped={grouped}>
+        <OptionGroup
+          label={text.openAnimation}
+          options={options(OPEN_ANIMATIONS, text.openAnimationOptions)}
+          selected={dock?.openAnimation ?? null}
+          onSelect={(openAnimation) => update({ openAnimation })}
         />
-      ) : null}
-      <OptionGroup
-        label={text.indicator}
-        options={options(INDICATORS, text.indicatorOptions)}
-        selected={dock?.indicator ?? null}
-        onSelect={(indicator) => update({ indicator })}
-      />
-      {/* The color right after the mark it colors. */}
-      <SwatchGroup
-        label={text.indicatorColor}
-        defaultLabel={text.indicatorDefault}
-        colorName={(color) =>
-          text.colors[color as keyof typeof text.colors] ?? color
-        }
-        color={dock?.indicatorColor ?? null}
-        disabled={disabled}
-        onSelect={(indicatorColor) => update({ indicatorColor })}
-      />
-      <OptionGroup
-        label={text.iconShape}
-        options={options(ICON_SHAPES, text.iconShapeOptions)}
-        selected={dock?.iconShape ?? null}
-        onSelect={(iconShape) => update({ iconShape })}
-      />
-      <IconPacksField
-        selected={dock?.iconPack ?? null}
-        disabled={disabled}
-        onSelect={(iconPack) => update({ iconPack })}
-      />
-      <OptionGroup
-        label={text.openAnimation}
-        options={options(OPEN_ANIMATIONS, text.openAnimationOptions)}
-        selected={dock?.openAnimation ?? null}
-        onSelect={(openAnimation) => update({ openAnimation })}
-      />
+      </SettingsGroup>
       <PanelFooter alert={error && t.settings.errors[error]}>
         {t.settings.footer}
       </PanelFooter>

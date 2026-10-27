@@ -220,9 +220,12 @@ export interface Settings {
   dock: DockSettings;
   /** Whether the DockMax opens when the user signs in to Windows. */
   launchAtLogin: boolean;
-  /** Whether Alt+Space opens the launcher (spec 0012); the menus open it
+  /** Whether the hotkey opens the launcher (spec 0012); the menus open it
    * either way. */
   launcher: boolean;
+  /** What opens the launcher (spec 0012 L3), as Rust writes it
+   * (`Alt+Space`); changed only through `setLauncherHotkey`. */
+  launcherHotkey: string;
   /** The launcher's web search by keyword (spec 0012 L2); the first is the
    * default search. */
   launcherKeywords: WebKeyword[];
@@ -325,6 +328,8 @@ export type SettingsErrorCode =
   | "lookOutOfRange"
   /** A keyword of the launcher's web search is malformed or repeated. */
   | "launcherKeywordsInvalid"
+  /** The launcher's hotkey is malformed or one it can't take. */
+  | "launcherHotkeyInvalid"
   | "unsupportedVersion"
   | "writeFailed"
   /** The settings can't be changed in this run (no config folder), or the
@@ -342,6 +347,7 @@ const ERROR_CODES: ReadonlySet<string> = new Set(
     iconSizeOutOfRange: true,
     lookOutOfRange: true,
     launcherKeywordsInvalid: true,
+    launcherHotkeyInvalid: true,
     unsupportedVersion: true,
     writeFailed: true,
     notReady: true,

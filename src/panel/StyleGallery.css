@@ -1,0 +1,174 @@
+/* Configurações › Aparência › Tema (spec 0014 R1): the styles as cards, each
+   with the dock drawn in it. The paint of each style comes from
+   src/dock/paints.ts through the CSSOM (--mini-*), never an inline style.
+   Named exception to "only tokens": the wallpaper of the miniatures is one
+   fixed gradient in both themes, so the light and the dark styles both show
+   on it, as the silver of the shelf is fixed in the real dock. */
+.style-gallery-field {
+  display: grid;
+  gap: 8px;
+}
+
+.style-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 10px;
+}
+
+.style-card {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--r-panel);
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: var(--track);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  cursor: pointer;
+}
+
+.style-card:hover {
+  box-shadow: inset 0 0 0 1px var(--field-line);
+}
+
+.style-card[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.style-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.style-card:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.style-card-name {
+  padding: 7px 10px 8px;
+  font-size: 12.5px;
+}
+
+.style-card[aria-pressed="true"] .style-card-name {
+  font-weight: 600;
+}
+
+/* The wallpaper: dusk blue, the same in every card and theme. */
+.mini-wall {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 78px;
+  padding-bottom: 14px;
+  box-sizing: border-box;
+  background:
+    radial-gradient(
+      120% 90% at 20% 0%,
+      rgb(140 160 205 / 0.55),
+      transparent 60%
+    ),
+    linear-gradient(165deg, #56688f 0%, #2e3a57 55%, #191f2e 100%);
+}
+
+/* The bar: 28 px tall, 18 px items; the corners come from the style. */
+.mini-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: var(--mini-radius, 8px);
+  background: var(--mini-fill, rgb(var(--surface-rgb) / var(--surface-a)));
+  box-shadow:
+    inset 0 1px 0 var(--mini-hi, var(--hi)),
+    0 3px 8px -3px rgb(0 0 0 / 0.5),
+    var(--mini-glow, 0 0 0 transparent);
+}
+
+.mini-bar[data-flat] {
+  box-shadow:
+    inset 0 1px 0 var(--mini-hi, var(--hi)),
+    var(--mini-glow, 0 0 0 transparent);
+}
+
+/* The hairline, over the fill. */
+.mini-bar[data-border]::after,
+.mini-bar[data-outline]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+
+/* Neon's gradient outline: the gradient, masked down to a 1 px ring. */
+.mini-bar[data-outline]::after {
+  padding: 1px;
+  box-shadow: none;
+  background: var(--mini-outline);
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+
+/* Prateleira Aqua: the silver shelf under the items, narrower on top. */
+.mini-bar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 11px;
+  background: var(--mini-shelf, none);
+  clip-path: polygon(0 100%, 100% 100%, 97% 0, 3% 0);
+  pointer-events: none;
+}
+
+.mini-app {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 22%;
+  object-fit: contain;
+}
+
+span.mini-app {
+  background: rgb(255 255 255 / 0.35);
+}
+
+.mini-bar .mini-tile {
+  position: relative;
+}
+
+.mini-bar[data-reflections] .mini-app,
+.mini-bar[data-reflections] .mini-tile {
+  -webkit-box-reflect: below 1px
+    linear-gradient(transparent 55%, rgb(255 255 255 / 0.3));
+}
+
+/* The mark under the first item, in the style's color or the one chosen. */
+.mini-indicator {
+  position: absolute;
+  left: 13px;
+  bottom: 2px;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--r-dot);
+  transform: translateX(-50%);
+  background: var(--mini-indicator, var(--accent));
+}
+
+.mini-indicator[data-shape="dash"] {
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+}

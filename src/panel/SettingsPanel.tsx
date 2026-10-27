@@ -17,6 +17,7 @@ import OptionGroup, { type Option } from "./OptionGroup";
 import PanelFooter from "./PanelFooter";
 import NavRow from "./parts/NavRow";
 import RangeField from "./parts/RangeField";
+import SettingsGroup from "./parts/SettingsGroup";
 import ToggleField from "./parts/ToggleField";
 import LauncherField from "./LauncherField";
 import TrayInDockField from "./TrayInDockField";
@@ -102,6 +103,9 @@ type SettingsPanelProps = {
   /** Shows the launcher's switch and history (`LauncherField`): the
    * Configurações app's, which may ask about the launcher. */
   withLauncher?: boolean;
+  /** The rows in titled cards, in the order of the Configurações app (spec
+   * 0014 R1): Dock, Barra de tarefas, Comportamento, Lançador, Inicialização. */
+  grouped?: boolean;
 };
 
 /**
@@ -122,6 +126,7 @@ function SettingsPanel({
   focusAppsRow = false,
   withTrayInDock = false,
   withLauncher = false,
+  grouped = false,
 }: SettingsPanelProps) {
   const t = useT();
   const { shown, change, error } = useSettingsEditor(settings);
@@ -130,6 +135,203 @@ function SettingsPanel({
   const size = shown ? sizePresetOf(shown.dock.iconSize) : null;
   const opacity = shown?.dock.opacity ?? null;
   const taskbar = shown?.dock.taskbar ?? null;
+
+  const groups = t.settings.app.groups;
+
+  if (grouped) {
+    return (
+      <>
+        <SettingsGroup title={groups.dock} grouped>
+          <OptionGroup
+            label={t.settings.groups.theme}
+            options={options(THEMES, t.settings.theme)}
+            selected={theme}
+            onSelect={(value) => change((s) => ({ ...s, theme: value }))}
+          />
+          <OptionGroup
+            label={t.settings.groups.edge}
+            options={options(EDGES, t.settings.edge)}
+            selected={edge}
+            onSelect={(value) =>
+              change((s) => ({
+                ...s,
+                dock: { ...s.dock, edge: value },
+              }))
+            }
+          />
+          <OptionGroup
+            label={t.settings.groups.size}
+            options={options(SIZES, t.settings.size)}
+            selected={size}
+            onSelect={(value) =>
+              change((s) => ({
+                ...s,
+                dock: { ...s.dock, iconSize: SIZE_PRESETS[value] },
+              }))
+            }
+          />
+          <OptionGroup
+            label={t.settings.groups.opacity}
+            options={options(OPACITIES, t.settings.opacity)}
+            selected={opacity}
+            onSelect={(value) =>
+              change((s) => ({
+                ...s,
+                dock: { ...s.dock, opacity: value },
+              }))
+            }
+          />
+        </SettingsGroup>
+        <SettingsGroup title={groups.taskbar} grouped>
+          <OptionGroup
+            label={t.settings.groups.taskbar}
+            options={options(TASKBARS, t.settings.taskbar)}
+            selected={taskbar}
+            onSelect={(value) =>
+              change((s) => ({
+                ...s,
+                dock: { ...s.dock, taskbar: value },
+              }))
+            }
+          />
+          {/* The dock holds the tray only with the taskbar hidden altogether. */}
+          {withTrayInDock && shown !== null && taskbar === "hidden" ? (
+            <TrayInDockField
+              inDock={shown.dock.trayInDock ?? []}
+              onChange={(trayInDock) =>
+                change((s) => ({ ...s, dock: { ...s.dock, trayInDock } }))
+              }
+            />
+          ) : null}
+        </SettingsGroup>
+        <SettingsGroup title={groups.behavior} grouped>
+          <ToggleField
+            label={t.settings.everyMonitor}
+            hint={t.settings.everyMonitorHint}
+            checked={shown?.dock.everyMonitor ?? true}
+            disabled={shown === null}
+            onChange={(everyMonitor) =>
+              change((s) => ({ ...s, dock: { ...s.dock, everyMonitor } }))
+            }
+          />
+          <ToggleField
+            label={t.settings.autoHide}
+            hint={t.settings.autoHideHint}
+            checked={shown?.dock.autoHide ?? false}
+            disabled={shown === null}
+            onChange={(autoHide) =>
+              change((s) => ({ ...s, dock: { ...s.dock, autoHide } }))
+            }
+          />
+          {shown?.dock.autoHide ? (
+            <>
+              <RangeField
+                label={t.settings.autoHideReveal}
+                hint={t.settings.autoHideRevealHint}
+                value={shown.dock.autoHideReveal}
+                min={0}
+                max={MAX_AUTO_HIDE_REVEAL}
+                step={50}
+                display={seconds}
+                onCommit={(autoHideReveal) =>
+                  change((s) => ({ ...s, dock: { ...s.dock, autoHideReveal } }))
+                }
+              />
+              <RangeField
+                label={t.settings.autoHideDelay}
+                hint={t.settings.autoHideDelayHint}
+                value={shown.dock.autoHideDelay}
+                min={0}
+                max={MAX_AUTO_HIDE_DELAY}
+                step={100}
+                display={seconds}
+                onCommit={(autoHideDelay) =>
+                  change((s) => ({ ...s, dock: { ...s.dock, autoHideDelay } }))
+                }
+              />
+            </>
+          ) : null}
+          <ToggleField
+            label={t.settings.showOpenApps}
+            hint={t.settings.showOpenAppsHint}
+            checked={shown?.dock.showOpenApps ?? true}
+            disabled={shown === null}
+            onChange={(showOpenApps) =>
+              change((s) => ({ ...s, dock: { ...s.dock, showOpenApps } }))
+            }
+          />
+          <OptionGroup
+            label={t.settings.groups.middleClick}
+            options={options(MIDDLE_CLICKS, t.settings.middleClick)}
+            selected={shown?.dock.middleClick ?? null}
+            onSelect={(value) =>
+              change((s) => ({ ...s, dock: { ...s.dock, middleClick: value } }))
+            }
+          />
+        </SettingsGroup>
+        {withLauncher ? (
+          <SettingsGroup title={groups.launcher} grouped>
+            {withLauncher ? (
+              <LauncherField
+                on={shown?.launcher ?? null}
+                hotkey={shown?.launcherHotkey ?? null}
+                onChange={(launcher) => change((s) => ({ ...s, launcher }))}
+              />
+            ) : null}
+            {withLauncher && shown !== null ? (
+              <WebKeywordsField
+                keywords={shown.launcherKeywords}
+                onChange={(launcherKeywords) =>
+                  change((s) => ({ ...s, launcherKeywords }))
+                }
+              />
+            ) : null}
+          </SettingsGroup>
+        ) : null}
+        <SettingsGroup title={groups.startup} grouped>
+          <ToggleField
+            label={t.settings.launchAtLogin}
+            hint={t.settings.launchAtLoginHint}
+            checked={shown?.launchAtLogin ?? false}
+            disabled={shown === null}
+            onChange={(launchAtLogin) =>
+              change((s) => ({ ...s, launchAtLogin }))
+            }
+          />
+        </SettingsGroup>
+        {onOpenLook ? (
+          <NavRow
+            label={t.settings.look.title}
+            value={shown ? t.settings.look.styles[shown.dock.style] : ""}
+            onClick={onOpenLook}
+            focusOnMount={focusLookRow}
+          />
+        ) : null}
+        {onOpenApps ? (
+          <NavRow
+            label={t.apps.title}
+            value={appsValue(t, apps)}
+            warning={apps !== null && apps.storage.state !== "ok"}
+            onClick={onOpenApps}
+            focusOnMount={focusAppsRow}
+          />
+        ) : null}
+        {onOpenItems ? (
+          <NavRow
+            label={t.widgets.items.title}
+            value={itemsValue(t, widgets)}
+            // The notice lives in the subview (spec 0003 §2.4 item 7).
+            warning={widgets !== null && widgets.storage.state !== "ok"}
+            onClick={onOpenItems}
+            focusOnMount={focusItemsRow}
+          />
+        ) : null}
+        <PanelFooter alert={error && t.settings.errors[error]}>
+          {t.settings.footer}
+        </PanelFooter>
+      </>
+    );
+  }
 
   return (
     <>
@@ -266,6 +468,7 @@ function SettingsPanel({
       {withLauncher ? (
         <LauncherField
           on={shown?.launcher ?? null}
+          hotkey={shown?.launcherHotkey ?? null}
           onChange={(launcher) => change((s) => ({ ...s, launcher }))}
         />
       ) : null}

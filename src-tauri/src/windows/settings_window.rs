@@ -16,6 +16,16 @@ pub const LABEL: &str = "settings";
 /// Event sent to the open window to show a section (the launcher's pages).
 pub const SECTION_EVENT: &str = "settings-section";
 
+/// Event sent to the window when Alt+Space (with any other modifiers) is
+/// pressed while the launcher's hotkey is captured: Windows turns it into the
+/// window's menu before the page sees it (spec 0012 L3).
+pub const HOTKEY_KEY_EVENT: &str = "launcher-hotkey-pressed";
+
+/// The subclass that hands Alt+Space to the capture.
+const SUBCLASS_ID: usize = 0x4C33;
+
+static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
+
 /// Opens the Configurações window, or brings it to the front if it is open.
 pub fn open(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     open_at(app, None)
@@ -28,6 +38,7 @@ pub fn open_section(app: &AppHandle, section: Section) -> Result<(), Box<dyn Err
 }
 
 fn open_at(app: &AppHandle, section: Option<Section>) -> Result<(), Box<dyn Error>> {
+    let _ = APP.set(app.clone());
     if let Some(window) = app.get_webview_window(LABEL) {
         let _ = window.unminimize();
         window.show()?;
@@ -60,12 +71,92 @@ fn open_at(app: &AppHandle, section: Option<Section>) -> Result<(), Box<dyn Erro
             if let Some(start) = &start {
                 builder = builder.initialization_script(start);
             }
-            let built = builder.build();
-            if let Err(error) = built {
-                log::warn!("settings: the window could not be made: {error}");
+            match builder.build() {
+                // The subclass on the window's own thread.
+                Ok(window) => {
+                    let installed = app.run_on_main_thread(move || {
+                        if let Err(error) = install(&window) {
+                            log::warn!("settings: Alt+Space is not handed to the capture: {error}");
+                        }
+                    });
+                    if let Err(error) = installed {
+                        log::warn!("settings: the window setup was not scheduled: {error}");
+                    }
+                }
+                Err(error) => log::warn!("settings: the window could not be made: {error}"),
             }
         })?;
     Ok(())
+}
+
+/// Hands Alt+Space to the hotkey's capture instead of opening the window's
+/// menu, while the capture runs.
+#[cfg(windows)]
+fn install(window: &tauri::WebviewWindow) -> Result<(), Box<dyn Error>> {
+    use windows::Win32::UI::Shell::SetWindowSubclass;
+    let hwnd = window.hwnd()?;
+    if unsafe { SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, 0) }.as_bool() {
+        Ok(())
+    } else {
+        Err("failed to subclass the window".into())
+    }
+}
+
+#[cfg(not(windows))]
+fn install(_window: &tauri::WebviewWindow) -> Result<(), Box<dyn Error>> {
+    Ok(())
+}
+
+/// Alt+Space as the capture writes it, with the other modifiers down now.
+#[cfg(windows)]
+fn alt_space_now() -> String {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetKeyState, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_RWIN, VK_SHIFT,
+    };
+    let down = |key: VIRTUAL_KEY| unsafe { GetKeyState(i32::from(key.0)) } < 0;
+    let mut text = String::new();
+    if down(VK_CONTROL) {
+        text.push_str("Ctrl+");
+    }
+    text.push_str("Alt+");
+    if down(VK_SHIFT) {
+        text.push_str("Shift+");
+    }
+    if down(VK_LWIN) || down(VK_RWIN) {
+        text.push_str("Win+");
+    }
+    text.push_str("Space");
+    text
+}
+
+#[cfg(windows)]
+unsafe extern "system" fn subclass_proc(
+    hwnd: windows::Win32::Foundation::HWND,
+    message: u32,
+    wparam: windows::Win32::Foundation::WPARAM,
+    lparam: windows::Win32::Foundation::LPARAM,
+    _id: usize,
+    _data: usize,
+) -> windows::Win32::Foundation::LRESULT {
+    use windows::Win32::Foundation::LRESULT;
+    use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass};
+    use windows::Win32::UI::WindowsAndMessaging::{SC_KEYMENU, WM_NCDESTROY, WM_SYSCOMMAND};
+    // The window's menu by the keyboard: Alt+Space, its character a space.
+    let menu_by_space = message == WM_SYSCOMMAND
+        && (wparam.0 & 0xFFF0) == SC_KEYMENU as usize
+        && lparam.0 == isize::from(b' ');
+    if menu_by_space && super::launcher::capturing() {
+        if let Some(app) = APP.get()
+            && let Err(error) = app.emit_to(LABEL, HOTKEY_KEY_EVENT, alt_space_now())
+        {
+            log::warn!("settings: Alt+Space did not reach the capture: {error}");
+        }
+        return LRESULT(0);
+    }
+    if message == WM_NCDESTROY {
+        let _ = unsafe { RemoveWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID) };
+    }
+    unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
 }
 
 #[cfg(test)]

@@ -10,6 +10,7 @@ use std::io;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use super::hotkey;
 use super::icon_pack::is_valid_pack_id;
 use super::launcher_web::{self, WebKeyword};
 
@@ -71,6 +72,9 @@ pub struct Settings {
     /// The launcher's web search by keyword (spec 0012 L2); the first is
     /// the default search.
     pub launcher_keywords: Vec<WebKeyword>,
+    /// What opens the launcher (spec 0012 L3), as `hotkey::Hotkey` writes
+    /// it (`Alt+Space`).
+    pub launcher_hotkey: String,
 }
 
 impl Default for Settings {
@@ -82,6 +86,7 @@ impl Default for Settings {
             launch_at_login: false,
             launcher: true,
             launcher_keywords: launcher_web::defaults(),
+            launcher_hotkey: hotkey::DEFAULT.to_owned(),
         }
     }
 }
@@ -98,6 +103,9 @@ impl Settings {
         }
         if !launcher_web::is_valid_list(&self.launcher_keywords) {
             return Err(SettingsError::LauncherKeywordsInvalid);
+        }
+        if hotkey::check(&self.launcher_hotkey).is_err() {
+            return Err(SettingsError::LauncherHotkeyInvalid);
         }
         self.dock.validate_look()
     }
@@ -452,6 +460,9 @@ pub enum SettingsError {
     /// A keyword of the launcher's web search is malformed or repeated.
     #[error("launcher keyword invalid")]
     LauncherKeywordsInvalid,
+    /// The launcher's hotkey is malformed or one it can't take.
+    #[error("launcher hotkey invalid")]
+    LauncherHotkeyInvalid,
     #[error("settings file could not be written ({0})")]
     Write(io::ErrorKind),
     /// There is nowhere to save: the app config folder could not be
@@ -468,6 +479,7 @@ impl SettingsError {
             SettingsError::IconSizeOutOfRange => SettingsErrorCode::IconSizeOutOfRange,
             SettingsError::LookOutOfRange => SettingsErrorCode::LookOutOfRange,
             SettingsError::LauncherKeywordsInvalid => SettingsErrorCode::LauncherKeywordsInvalid,
+            SettingsError::LauncherHotkeyInvalid => SettingsErrorCode::LauncherHotkeyInvalid,
             SettingsError::UnsupportedVersion => SettingsErrorCode::UnsupportedVersion,
             SettingsError::Write(_) => SettingsErrorCode::WriteFailed,
             SettingsError::Unavailable => SettingsErrorCode::NotReady,
@@ -488,6 +500,8 @@ pub enum SettingsErrorCode {
     /// A keyword of the launcher's web search is malformed or repeated, or
     /// there are too many.
     LauncherKeywordsInvalid,
+    /// The launcher's hotkey is malformed or one it can't take.
+    LauncherHotkeyInvalid,
     /// The format version is not `CURRENT_VERSION`.
     UnsupportedVersion,
     /// The settings could not be saved; the previous ones stay.
@@ -546,6 +560,26 @@ mod tests {
     fn icon_size_range_limits_are_accepted() {
         assert_eq!(with_icon_size(32).validate(), Ok(()));
         assert_eq!(with_icon_size(96).validate(), Ok(()));
+    }
+
+    #[test]
+    fn a_hotkey_the_launcher_cannot_take_is_rejected() {
+        for hotkey in ["", "Space", "Ctrl+C", "Win+L", "alt+space"] {
+            let settings = Settings {
+                launcher_hotkey: hotkey.into(),
+                ..Settings::default()
+            };
+            assert_eq!(
+                settings.validate(),
+                Err(SettingsError::LauncherHotkeyInvalid),
+                "{hotkey:?}"
+            );
+        }
+        let settings = Settings {
+            launcher_hotkey: "Ctrl+Shift+K".into(),
+            ..Settings::default()
+        };
+        assert_eq!(settings.validate(), Ok(()));
     }
 
     #[test]
@@ -619,7 +653,8 @@ mod tests {
                 {"keyword": "yt", "name": "YouTube", "template": "https://www.youtube.com/results?search_query=%s"},
                 {"keyword": "w", "name": "Wikipédia", "template": "https://pt.wikipedia.org/w/index.php?search=%s"},
                 {"keyword": "gh", "name": "GitHub", "template": "https://github.com/search?q=%s"}
-              ]
+              ],
+              "launcherHotkey": "Alt+Space"
             }"#,
         )
         .unwrap();

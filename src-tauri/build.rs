@@ -54,6 +54,8 @@ fn main() {
             "open_icon_packs_folder",
             "launcher_status",
             "clear_launcher_history",
+            "set_launcher_hotkey",
+            "capture_launcher_hotkey",
             "list_workspaces",
             "create_workspace",
             "rename_workspace",

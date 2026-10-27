@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { createContext, useEffect, useRef } from "react";
 
 /** Id of the panel's heading: `aria-labelledby` of the card in `Panel.tsx`
  * points at it, so every view's title names the panel. */
@@ -17,3 +17,7 @@ export function useFocusOnMount<T extends HTMLElement>(focus: boolean) {
   }, []);
   return ref;
 }
+
+/** Set by the Configurações app, whose section header already names the
+ * view (spec 0014 R1): a panel header with no action then draws nothing. */
+export const NamedBySection = createContext(false);

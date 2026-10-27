@@ -168,6 +168,7 @@ mod tests {
             launch_at_login: false,
             launcher: true,
             launcher_keywords: crate::domain::launcher_web::defaults(),
+            launcher_hotkey: crate::domain::hotkey::DEFAULT.to_owned(),
             dock: DockSettings {
                 edge: DockEdge::Top,
                 icon_size: 64,
@@ -373,7 +374,8 @@ mod tests {
                 {"keyword": "yt", "name": "YouTube", "template": "https://www.youtube.com/results?search_query=%s"},
                 {"keyword": "w", "name": "Wikipédia", "template": "https://pt.wikipedia.org/w/index.php?search=%s"},
                 {"keyword": "gh", "name": "GitHub", "template": "https://github.com/search?q=%s"}
-              ]
+              ],
+              "launcherHotkey": "Alt+Space"
             })
         );
     }

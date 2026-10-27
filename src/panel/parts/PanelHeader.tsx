@@ -1,5 +1,6 @@
+import { useContext } from "react";
 import { useT } from "../../i18n";
-import { PANEL_TITLE_ID, useFocusOnMount } from "./focus";
+import { NamedBySection, PANEL_TITLE_ID, useFocusOnMount } from "./focus";
 import Icon from "./Icon";
 import IconButton from "./IconButton";
 import "./parts.css";
@@ -38,6 +39,8 @@ function PanelHeader({
 }: PanelHeaderProps) {
   const t = useT();
   const action = useFocusOnMount<HTMLButtonElement>(focusAction);
+  const named = useContext(NamedBySection);
+  if (named && !onBack && !onAdjust) return null;
   return (
     <div className="panel-header">
       {onBack ? (

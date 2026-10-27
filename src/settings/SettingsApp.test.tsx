@@ -34,6 +34,7 @@ const SETTINGS: Settings = {
   launchAtLogin: false,
   launcher: true,
   launcherKeywords: [],
+  launcherHotkey: "Alt+Space",
   dock: {
     edge: "bottom",
     iconSize: 48,
@@ -89,6 +90,86 @@ describe("SettingsApp", () => {
     expect(
       screen.getByRole("group", { name: ptBR.settings.groups.theme }),
     ).toBeInTheDocument();
+  });
+
+  it("heads each section with its plate, title and line", async () => {
+    await renderApp();
+
+    for (const button of within(nav()).getAllByRole("button")) {
+      // The plate is decorative: the button keeps the section's name.
+      expect(button.querySelector(".section-plate")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
+    }
+    expect(document.querySelector(".section-header")).toHaveTextContent(
+      text.leads.general,
+    );
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Geral" }),
+    ).toBeInTheDocument();
+  });
+
+  it("puts Geral in titled groups, the launcher among them", async () => {
+    await renderApp();
+
+    expect(
+      screen
+        .getAllByRole("heading", { level: 2 })
+        .map((heading) => heading.textContent),
+    ).toEqual([
+      text.groups.dock,
+      text.groups.taskbar,
+      text.groups.behavior,
+      text.groups.launcher,
+      text.groups.startup,
+    ]);
+    expect(
+      within(
+        screen.getByRole("region", { name: text.groups.startup }),
+      ).getByRole("switch", { name: ptBR.settings.launchAtLogin }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the styles with the programs of the workspace in use", async () => {
+    invoke.mockImplementation((command: string, args?: { appId?: string }) => {
+      if (command === "get_settings") return Promise.resolve(SETTINGS);
+      if (command === "list_apps") {
+        return Promise.resolve({
+          storage: { state: "ok" },
+          apps: [
+            { id: "a1", appId: "Edge", name: "Edge" },
+            { id: "a2", appId: "Code", name: "Code" },
+          ],
+        });
+      }
+      if (command === "list_workspaces") {
+        return Promise.resolve({
+          workspaces: [
+            { id: "w1", name: "Principal", color: "#0A84FF", items: [] },
+            { id: "w2", name: "Trabalho", color: "#FF9F0A", items: ["app:a2"] },
+          ],
+          inUse: "w2",
+        });
+      }
+      if (command === "app_icon") {
+        return Promise.resolve(`data:image/png;base64,${args?.appId ?? ""}`);
+      }
+      return new Promise(() => {});
+    });
+    await renderApp();
+
+    fireEvent.click(sectionButton("Aparência do dock"));
+    await act(async () => {});
+
+    const card = within(
+      screen.getByRole("group", { name: ptBR.settings.look.style }),
+    ).getByRole("button", { name: "Neon" });
+    // Only the program of Trabalho, the workspace in use.
+    expect(
+      [...card.querySelectorAll("img")].map((img) => img.getAttribute("src")),
+    ).toEqual(["data:image/png;base64,Code"]);
   });
 
   it("has no rows that open subviews: the sections are in the side bar", async () => {

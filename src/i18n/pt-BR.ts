@@ -1,4 +1,5 @@
 import type { AppErrorCode } from "../core/apps";
+import type { HotkeyErrorCode } from "../core/launcher";
 import type { PackErrorCode } from "../core/iconPacks";
 import type {
   DockEdge,
@@ -85,6 +86,32 @@ const messages = {
         items: "Itens do dock",
         about: "Sobre",
       },
+      /** The top of the side bar (spec 0014 R1). */
+      brand: "Configurações",
+      /** The line under each section's title. */
+      leads: {
+        general: "Como o DockMax se encaixa no Windows.",
+        workspaces:
+          "Cada espaço tem os seus apps e widgets e guarda as suas janelas.",
+        look: "Deixe o dock com a sua cara.",
+        apps: "Os programas fixados no dock de cada espaço.",
+        items: "Os widgets do dock de cada espaço.",
+        about: "Versão, licença e onde ficam os seus dados.",
+      },
+      /** The titles of the groups of Geral and Aparência. */
+      groups: {
+        dock: "Dock",
+        taskbar: "Windows",
+        behavior: "Comportamento",
+        launcher: "Lançador",
+        startup: "Inicialização",
+        style: "Tema",
+        tweaks: "Personalizar este tema",
+        hover: "Ao passar o mouse",
+        indicator: "Indicador",
+        icons: "Ícones",
+        openAnimation: "Animação de abertura",
+      },
     },
     /** The switch that opens the DockMax when the user signs in. */
     showOpenApps: "Mostrar apps abertos",
@@ -106,16 +133,37 @@ const messages = {
     launchAtLogin: "Iniciar com o Windows",
     launchAtLoginHint: "Abre o DockMax ao entrar no Windows",
     /** The launcher (spec 0012): its switch, the notice when another
-     * program holds Alt+Space, and its history. */
+     * program holds its hotkey, its history and the hotkey; `{hotkey}` is
+     * replaced. */
     launcher: {
-      label: "Lançador (Alt+Espaço)",
+      label: "Lançador ({hotkey})",
       hint: "Busca e abre apps de qualquer lugar; também em Buscar apps…, no menu do dock",
-      taken: "Alt+Espaço está em uso por outro programa.",
+      taken: "{hotkey} está em uso por outro programa.",
       takenDetail: "Abra o lançador por Buscar apps…, no menu do dock.",
       history: "Histórico do lançador",
       historyHint: "Os apps que você mais abre por ele aparecem primeiro",
       clear: "Limpar o histórico",
       cleared: "Histórico limpo",
+      hotkey: {
+        label: "Atalho do lançador",
+        hint: "Clique no botão e pressione a nova combinação",
+        change: "Alterar o atalho, hoje {hotkey}",
+        press: "Pressione a combinação… (Esc cancela)",
+        saving: "Salvando…",
+        saved: "Atalho salvo: {hotkey}",
+        restore: "Voltar para Alt+Espaço",
+        space: "Espaço",
+        errors: {
+          malformed: "Essa combinação não pode ser usada.",
+          noModifier: "Use Ctrl, Alt, Shift ou Win junto com a tecla.",
+          takesTyping:
+            "Essa combinação tiraria a digitação ou um atalho de edição de todos os programas. Use Alt ou Win, ou Ctrl com Shift.",
+          reserved: "Essa combinação é do Windows ou do DockMax.",
+          taken: "Essa combinação está em uso por outro programa.",
+          notSaved: "Não foi possível salvar o atalho. Tente de novo.",
+          unsupportedKey: "Use uma letra, um número, F1 a F24 ou Espaço.",
+        } satisfies Record<HotkeyErrorCode, string>,
+      },
       keywords: {
         label: "Busca na web",
         hint: "No lançador, digite a palavra-chave, um espaço e o que buscar: g dockmax. A primeira da lista é a busca padrão, usada quando nada mais é encontrado.",
@@ -281,6 +329,7 @@ const messages = {
       lookOutOfRange: "Esse ajuste do visual não é aceito.",
       launcherKeywordsInvalid:
         "Essa palavra-chave da busca na web não é aceita.",
+      launcherHotkeyInvalid: "Esse atalho do lançador não é aceito.",
       iconSizeOutOfRange:
         "Esse tamanho não é aceito. Escolha Pequeno, Médio ou Grande.",
       unsupportedVersion:
