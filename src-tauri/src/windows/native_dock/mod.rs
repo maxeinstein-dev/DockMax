@@ -2257,6 +2257,21 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
 
 /// The data changed (programs, widgets, open programs, settings): the docks
 /// read it again.
+/// Lets go of the docks and what draws them, on the main thread, as the app
+/// ends (`RunEvent::Exit`). Left in the thread's storage, they would be
+/// dropped inside `ExitProcess`, after Windows has ended the other threads:
+/// Direct2D then calls DXGI, which refuses (`DXGI_ERROR_INVALID_CALL`) and
+/// ends the process with an exception, so every exit was a crash. The
+/// windows go with the process.
+pub fn shutdown() {
+    let docks = DOCKS.with(|slot| {
+        slot.try_borrow_mut()
+            .map(|mut docks| std::mem::take(&mut *docks))
+            .unwrap_or_default()
+    });
+    drop(docks);
+}
+
 pub fn refresh() {
     post(Dock::reload);
 }

@@ -444,6 +444,17 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
 
 type WindowProcedure = unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT;
 
+/// Lets go of the launcher and what draws it, on the main thread, as the app
+/// ends: for the same reason as the docks (`native_dock::shutdown`).
+pub fn shutdown() {
+    let launcher = LAUNCHER.with(|slot| {
+        slot.try_borrow_mut()
+            .ok()
+            .and_then(|mut launcher| launcher.take())
+    });
+    drop(launcher);
+}
+
 /// Takes Alt+Space (`on`) or lets it go, from any thread: the hotkey
 /// belongs to the launcher's window, on the main thread.
 pub fn set_enabled(on: bool) {
