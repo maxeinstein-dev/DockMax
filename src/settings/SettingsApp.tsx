@@ -25,6 +25,7 @@ import {
   type Section,
 } from "./sections";
 import "./SettingsApp.css";
+import "./SettingsSections.css";
 
 /** The glaze of each section's plate (spec 0014 R1; DESIGN.md "Tertiary",
  * the static .t-* classes of tokens.css). */

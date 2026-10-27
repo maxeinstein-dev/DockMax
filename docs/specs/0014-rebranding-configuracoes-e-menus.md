@@ -1,6 +1,6 @@
 # Spec 0014 — Rebranding de Configurações e dos menus
 
-**Status:** R1, R2 e R3 feitos; R4 a fazer.
+**Status:** R1, R2 e R3 feitos; R4 implementado.
 **Origem:** pedido do autor (2026-10-27): Configurações, os menus do dock e da bandeja e as outras telas de apoio estão "muito simples e sem vida". Referência de acabamento: o PrimoDock ([interface](../reference/primodock/interface.md), "Janela de configurações" e "Menus"), com o tema WhiteSur GTK e o dock do ZorinOS como inspiração. Exemplo dado pelo autor: em Aparência, mostrar os temas aplicados, e não só os nomes.
 
 ## 1. Decisões do autor (2026-10-27)
@@ -91,6 +91,16 @@ A busca nos ajustes, a prévia do dock sobre o papel de parede de verdade, a apa
 - **Onde:** o menu do dock (agora com o título "Espaços de trabalho" sobre os espaços, cada um com a sua cor) e o do ícone da bandeja, que deixou o menu do Tauri e é o mesmo do dock sem os espaços. A detecção de menu na tela (que segura o dock levantado) conta o menu novo.
 - **O menu de um programa** (o painel com a Jump List) ganhou a mesma aparência, em CSS: itens mais altos de cantos arredondados, o item sob o ponteiro ou o foco preenchido no azul, ícones de linha nas ações do dock (abrir, mostrar no Explorador, fechar, remover).
 - Os menus dos ícones da bandeja de outros programas continuam os deles.
+
+## 5d. Como o R4 ficou
+
+- **As seções de Configurações** que o painel também usa (Espaços, Apps do dock, Itens do dock, Sobre) ganharam o acabamento dos grupos, num CSS só da janela de Configurações (`SettingsSections.css`, preso a `.settings-card`; um teste garante que nenhuma regra escapa para o painel):
+  - **Apps do dock:** os fixados num cartão, com ícones de 32 px; os **apps instalados viram uma grade de ícones** (36 px) com o nome embaixo, em até duas linhas, como no PrimoDock;
+  - **Itens do dock:** os widgets num cartão, com ladrilhos maiores, e os botões de adicionar como ladrilhos;
+  - **Espaços:** fichas maiores, a escolhida no azul, o cartão do espaço e as cores com anel na escolhida;
+  - **Sobre:** o ladrilho de 72 px e as informações num cartão com fios entre as linhas.
+- **Painel da bandeja:** o foco do teclado aparece (não aparecia) e os cantos seguem os da linguagem.
+- **Conferidos sem mudança:** os painéis dos widgets (Relógio, Progresso, Nota), que já seguem o `DESIGN.md`, e o lançador, de onde os menus do R3 tiraram as cores.
 
 ## 6. Verificação
 

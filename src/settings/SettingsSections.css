@@ -1,0 +1,202 @@
+/* The finish of the sections of the Configurações app (spec 0014 R4): the
+   views the panel shares (Espaços, Apps do dock, Itens do dock, Sobre) in
+   the language of the groups (SettingsGroup): cards a step lighter than the
+   window, hairlines between the rows, larger icons, the catalog as a grid
+   of icons. Only inside the app's card: the panel keeps its own look. Only
+   tokens from tokens.css. */
+
+/* ---- Cards ---- */
+
+.settings-card .apps-list,
+.settings-card .dock-items-list,
+.settings-card .about-list,
+.settings-card .workspace-card {
+  border-radius: var(--r-panel);
+  background: var(--track);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+
+.settings-card .apps-list,
+.settings-card .dock-items-list {
+  max-height: 360px;
+  padding: 2px 0;
+}
+
+/* ---- The rows of programs and widgets ---- */
+
+.settings-card .apps-row,
+.settings-card .dock-items-row {
+  grid-template-columns: 32px minmax(0, 1fr) auto auto auto;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+}
+
+.settings-card .apps-row .apps-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.settings-card .apps-name,
+.settings-card .dock-items-name {
+  font-size: 13.5px;
+}
+
+.settings-card .dock-items-row .mini-tile {
+  width: 30px;
+  height: 30px;
+}
+
+/* Adicionar: its label as the title of a group. */
+.settings-card .apps-add-label,
+.settings-card .dock-items-add-label {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.settings-card .apps-add,
+.settings-card .dock-items-add {
+  gap: 10px;
+  margin-top: 6px;
+}
+
+/* ---- The installed programs as a grid of icons ---- */
+
+.settings-card .apps-catalog {
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 4px;
+  max-height: 320px;
+  padding: 6px;
+  border-radius: var(--r-panel);
+  background: var(--track);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+
+.settings-card .apps-pick {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 10px 6px 8px;
+  border-radius: var(--r-panel);
+  text-align: center;
+}
+
+.settings-card .apps-pick .apps-icon {
+  width: 36px;
+  height: 36px;
+}
+
+/* The name in two lines at most, under the icon. */
+.settings-card .apps-pick .apps-name {
+  display: -webkit-box;
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.3;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.settings-card .apps-pick:disabled {
+  opacity: 0.55;
+}
+
+/* ---- Itens do dock: the add buttons as tiles ---- */
+
+.settings-card .dock-items-add-buttons {
+  gap: 8px;
+}
+
+.settings-card .dock-items-add-buttons .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 10px;
+  border-radius: var(--r-panel);
+  font-size: 13px;
+}
+
+/* ---- Espaços de trabalho ---- */
+
+.settings-card .workspaces-lead {
+  max-width: 62ch;
+}
+
+.settings-card .workspace-chips {
+  gap: 8px;
+}
+
+.settings-card .workspace-chip {
+  padding: 8px 14px;
+  border-radius: var(--r-panel);
+  background: var(--track);
+  font-size: 13.5px;
+}
+
+.settings-card .workspace-chip[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.settings-card .workspace-chip.add {
+  background: transparent;
+}
+
+.settings-card .workspace-dot {
+  width: 12px;
+  height: 12px;
+}
+
+.settings-card .workspace-card {
+  gap: 14px;
+  padding: 14px;
+}
+
+.settings-card .workspace-color {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+
+/* The color in use: a ring around it, apart from the swatch. */
+.settings-card .workspace-color[aria-checked="true"] {
+  box-shadow:
+    0 0 0 2px rgb(var(--surface-rgb)),
+    0 0 0 4px var(--ink);
+}
+
+/* ---- Sobre ---- */
+
+.settings-card .about-head {
+  gap: 18px;
+}
+
+.settings-card .about-tile {
+  width: 72px;
+  height: 72px;
+}
+
+.settings-card .about-head h2 {
+  font-size: 20px;
+}
+
+.settings-card .about-head p {
+  font-size: 13px;
+}
+
+.settings-card .about-list {
+  gap: 0;
+  font-size: 13px;
+}
+
+.settings-card .about-list > div {
+  padding: 10px 14px;
+}
+
+.settings-card .about-list > div + div {
+  border-top: 1px solid var(--hair);
+}
