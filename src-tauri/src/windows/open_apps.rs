@@ -663,6 +663,11 @@ mod imp {
             let quiet = now_ms().saturating_sub(LAST_EVENT.load(Ordering::SeqCst)) >= QUIET_MS;
             if quiet && GEOMETRY_DIRTY.swap(false, Ordering::SeqCst) {
                 crate::windows::fullscreen::check(app);
+                // A window taken to another monitor joins its workspace now,
+                // not at the next window that opens or takes the focus.
+                if crate::windows::window_spaces::changed_monitor() {
+                    DIRTY.store(true, Ordering::SeqCst);
+                }
             }
             if DIRTY.load(Ordering::SeqCst) && quiet {
                 DIRTY.store(false, Ordering::SeqCst);

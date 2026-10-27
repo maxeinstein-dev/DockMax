@@ -304,6 +304,30 @@ pub fn follow_windows(app: &AppHandle, hwnds: &[isize]) {
     }
 }
 
+/// Whether a window known on the screen is on another monitor than the one
+/// it was seen on: a move alone brings no look at the windows, and the window
+/// joins the workspace of its new monitor only at one.
+pub fn changed_monitor() -> bool {
+    let tracked: Vec<(isize, String)> = with_state(|inner| {
+        inner
+            .known
+            .iter()
+            .filter(|(value, _)| !inner.parked.iter().any(|parked| parked.hwnd == **value))
+            .map(|(&value, tracked)| (value, tracked.monitor.clone()))
+            .collect()
+    });
+    if tracked.is_empty() {
+        return false;
+    }
+    let names = monitor_names();
+    tracked.iter().any(|(value, monitor)| {
+        let now = unsafe { MonitorFromWindow(hwnd(*value), MONITOR_DEFAULTTONEAREST) };
+        names
+            .get(&(now.0 as isize))
+            .is_some_and(|name| name != monitor)
+    })
+}
+
 /// Whether the window `hwnd` counts on the dock of `workspace`.
 pub fn counts(hwnd: isize, workspace: Option<&str>) -> bool {
     with_state(|inner| counts_for(&inner.known, hwnd, workspace))
