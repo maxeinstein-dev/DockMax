@@ -39,6 +39,12 @@ export const otherText: Messages = {
     switchEveryMonitorHint: "A switch on one dock switches the others",
     indicatorFollowsWorkspace: "Indicator in the workspace color",
     indicatorFollowsWorkspaceHint: "The open apps' mark wears its color",
+    previews: "Preview on hover",
+    previewsHint: "Rest the pointer on an open app to see its windows",
+    previewDelay: "Preview delay",
+    previewDelayHint: "How long resting before the preview shows",
+    previewsOnlySeveral: "Only with 2 or more windows",
+    previewsOnlySeveralHint: "An app with a single window shows no preview",
     app: {
       nav: "Settings sections",
       sections: {

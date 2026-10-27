@@ -81,6 +81,9 @@ struct DockSettingsInput {
     bottom_space: u8,
     switch_every_monitor: bool,
     indicator_follows_workspace: bool,
+    previews: bool,
+    preview_delay: u16,
+    previews_only_several: bool,
 }
 
 impl From<SettingsInput> for Settings {
@@ -133,6 +136,9 @@ impl From<SettingsInput> for Settings {
                 bottom_space: dock.bottom_space,
                 switch_every_monitor: dock.switch_every_monitor,
                 indicator_follows_workspace: dock.indicator_follows_workspace,
+                previews: dock.previews,
+                preview_delay: dock.preview_delay,
+                previews_only_several: dock.previews_only_several,
             },
         }
     }
@@ -435,7 +441,7 @@ mod tests {
     }
 
     /// The look fields of a full update payload.
-    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","showOpenApps":false,"middleClick":"none","taskbar":"hidden","everyMonitor":false,"autoHide":true,"autoHideReveal":500,"autoHideDelay":1500,"bottomSpace":2,"switchEveryMonitor":true,"indicatorFollowsWorkspace":true"##;
+    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","showOpenApps":false,"middleClick":"none","taskbar":"hidden","everyMonitor":false,"autoHide":true,"autoHideReveal":500,"autoHideDelay":1500,"bottomSpace":2,"switchEveryMonitor":true,"indicatorFollowsWorkspace":true,"previews":false,"previewDelay":400,"previewsOnlySeveral":true"##;
 
     fn full() -> String {
         format!(
@@ -490,6 +496,9 @@ mod tests {
                     bottom_space: 2,
                     switch_every_monitor: true,
                     indicator_follows_workspace: true,
+                    previews: false,
+                    preview_delay: 400,
+                    previews_only_several: true,
                 },
             }
         );
@@ -543,6 +552,9 @@ mod tests {
             "bottomSpace",
             "switchEveryMonitor",
             "indicatorFollowsWorkspace",
+            "previews",
+            "previewDelay",
+            "previewsOnlySeveral",
         ] {
             let mut value: serde_json::Value = serde_json::from_str(&full()).unwrap();
             value["dock"].as_object_mut().unwrap().remove(field);

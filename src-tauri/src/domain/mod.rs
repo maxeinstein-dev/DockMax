@@ -14,6 +14,7 @@ pub mod launcher_pages;
 pub mod launcher_web;
 pub mod live_faces;
 pub mod open_apps;
+pub mod previews;
 pub mod settings;
 pub mod thumbnail;
 pub mod widgets;
