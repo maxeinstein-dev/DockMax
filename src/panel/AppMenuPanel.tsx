@@ -16,6 +16,7 @@ import { moveAppWindows, type WorkspacesSnapshot } from "../core/workspaces";
 import { format, useT } from "../i18n";
 import PanelFooter from "./PanelFooter";
 import MoveToWorkspace from "./parts/MoveToWorkspace";
+import Icon from "./parts/Icon";
 import PanelHeader from "./parts/PanelHeader";
 import "./AppMenuPanel.css";
 
@@ -155,6 +156,7 @@ function AppMenuPanel({
             className="app-menu-item"
             onClick={() => done(launchApp(app.id))}
           >
+            <Icon name="launch" />
             {text.open}
           </button>
           {canReveal ? (
@@ -164,6 +166,7 @@ function AppMenuPanel({
               className="app-menu-item"
               onClick={() => done(revealApp(app.id))}
             >
+              <Icon name="folder" />
               {text.reveal}
             </button>
           ) : null}
@@ -174,6 +177,7 @@ function AppMenuPanel({
               className="app-menu-item"
               onClick={() => done(closeApp(app.id))}
             >
+              <Icon name="close" />
               {openCount > 1 ? text.closeWindows : text.closeWindow}
             </button>
           ) : null}
@@ -183,6 +187,7 @@ function AppMenuPanel({
             className="app-menu-item"
             onClick={() => done(unpinApp(app.id))}
           >
+            <Icon name="unpin" />
             {text.remove}
           </button>
         </div>
