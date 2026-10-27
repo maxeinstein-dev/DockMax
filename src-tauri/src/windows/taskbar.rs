@@ -221,7 +221,7 @@ pub fn hold(mode: TaskbarMode, state_path: &Path) -> Result<(), Box<dyn Error>> 
                 hidden: Vec::new(),
             };
             saved.write(state_path)?;
-            spawn_watchdog(state_path);
+            ensure_watchdog(state_path);
             saved
         }
     };
@@ -420,6 +420,18 @@ fn watchdog_command_line(guard: &Path, pid: u32, state_path: &Path) -> Option<St
     ))
 }
 
+/// Whether this run started its watchdog.
+static WATCHDOG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Starts the watchdog once in a run: for the taskbar, or for the windows
+/// the workspaces hide (spec 0013 C2). `state_path` is the taskbar's state
+/// file, whether there is one or not; the parked windows' file is next to it.
+pub fn ensure_watchdog(state_path: &Path) {
+    if !WATCHDOG.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        spawn_watchdog(state_path);
+    }
+}
+
 /// Starts the watchdog: a copy of this executable that outlives the app,
 /// however it ends, and restores the taskbar then. No window, no console.
 fn spawn_watchdog(state_path: &Path) {
@@ -462,6 +474,7 @@ pub fn watch(pid: u32, state_path: &Path) {
         let _ = unsafe { CloseHandle(handle) };
     }
     restore_file(state_path, pid);
+    super::window_spaces::restore_file(&state_path.with_file_name(super::window_spaces::FILE), pid);
 }
 
 /// `--restore-taskbar <state file>`: restores whatever the file holds,
@@ -470,6 +483,7 @@ pub fn restore_now(state_path: &Path) {
     if let Some(saved) = Saved::read(state_path) {
         restore_file(state_path, saved.pid);
     }
+    super::window_spaces::restore_now(&state_path.with_file_name(super::window_spaces::FILE));
 }
 
 #[cfg(test)]

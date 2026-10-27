@@ -78,13 +78,16 @@ CREATE TABLE workspace_items (
 - A troca animada: hoje os itens do outro espaço aparecem sem deslizar.
 - A aparência da seção, que entra no rebranding de Configurações e dos menus (roadmap).
 
-## 4. C2 em detalhe: janelas por espaço
+## 4. C2 em detalhe: janelas por espaço (feito)
 
-- **Dono:** uma janela de programa (as que a barra de tarefas mostraria, o mesmo critério dos apps abertos da spec 0009) pertence ao espaço ativo no monitor dela **quando apareceu**. As que já estavam abertas quando o DockMax abriu pertencem ao espaço ativo do monitor delas.
-- **Trocar** de A para B num monitor: as janelas de A naquele monitor que estão visíveis são **estacionadas** (escondidas com `ShowWindow(SW_HIDE)`, o que as tira também do Alt+Tab); as de B estacionadas naquele monitor voltam como estavam (minimizadas continuam minimizadas). A janela que estava na frente em B volta à frente.
-- **Uma janela levada a outro monitor** passa a ser do espaço ativo dele (pergunta em aberto 1).
-- **Segurança, como a barra do Windows (ADR 0009):** a lista das janelas estacionadas é gravada num arquivo de estado antes de esconder qualquer uma; o vigia (`dockmax-guard.exe`) mostra todas de volta se o DockMax cair; a saída normal, o fim da sessão do Windows e a próxima abertura também mostram todas. Nunca se esconde uma janela sem antes gravá-la.
-- **Apps abertos no dock:** só os do espaço ativo no monitor. O indicador de um programa fixado conta só as janelas dele nesse espaço.
+Como nas áreas de trabalho do Windows, mas **por monitor**: cada espaço guarda as suas janelas (`domain/window_spaces.rs`, `windows/window_spaces.rs`).
+
+- **Dono:** uma janela de programa (as que a barra de tarefas mostraria, o mesmo critério dos apps abertos da spec 0009) pertence ao espaço mostrado no monitor dela quando apareceu. As que já estavam abertas quando o DockMax abriu também. **Uma janela levada a outro monitor passa a ser do espaço de lá** (proposta 1, valendo até o autor decidir).
+- **Trocar** de A para B num monitor: as janelas daquele monitor que não são de B são **estacionadas** (`ShowWindow(SW_HIDE)`, o que as tira também do Alt+Tab); as de B estacionadas naquele monitor voltam como estavam (minimizadas continuam minimizadas), e a do topo vem para a frente. Os outros monitores não mudam.
+- **O dock** mostra só os apps abertos do seu espaço, e o indicador de um programa fixado conta só as janelas dele ali. **Clicar num programa que só tem janelas em outro espaço abre uma janela nova** (proposta 2). Os menus de um programa ("Fechar janela") agem nas janelas do espaço daquele dock.
+- **Excluir um espaço** mostra de volta as janelas estacionadas dele, que passam ao espaço do monitor delas.
+- **Segurança, como a barra do Windows (ADR 0009):** antes de esconder qualquer janela, a lista das estacionadas é gravada (`parked-windows.json`, ao lado do estado da barra). Elas voltam: na saída normal, num pânico, no reinício por queda do WebView2, no fim da sessão do Windows, pelo vigia (`dockmax-guard.exe`) se o DockMax morrer (ele sobe uma vez por execução, também com a barra visível), e na próxima abertura. Uma janela que não pôde ser anotada não é escondida.
+- **O espaço de cada janela sobrevive a um reinício (decisão do autor, 2026-10-27):** como o `session.json` do PrimoDock, o DockMax guarda o espaço de cada janela (`window-workspaces.json`), com o identificador da janela e o do processo dela, para não confundir uma janela nova que o Windows numerou igual. Toda saída mostra todas as janelas (é a regra de segurança), e na abertura seguinte cada janela recupera o seu espaço, e as que não são do espaço mostrado no monitor dela são estacionadas de novo.
 
 ## 5. Fora desta fase
 
@@ -92,7 +95,7 @@ Pilhas de widgets e espaçadores (do PrimoDock), a prévia do dock sobre o papel
 
 ## 6. Perguntas em aberto para o autor
 
-O autor pediu para seguir sem responder (2026-10-27); valem as propostas até ele decidir:
+O autor pediu para seguir sem responder (2026-10-27); valem as propostas até ele decidir (as duas já no C2):
 
 1. Uma janela arrastada para o outro monitor passa para o espaço ativo de lá (proposta) ou continua no espaço de origem? (C2)
 2. Clicar num programa fixado cujas janelas estão todas **em outro espaço** abre uma nova janela no espaço atual (proposta) ou troca para o espaço onde ele está? (C2)
@@ -105,6 +108,13 @@ O autor pediu para seguir sem responder (2026-10-27); valem as propostas até el
   - a tela de Configurações (fichas, renomear, cor, excluir, o espaço passado aos comandos);
   - no app real (release), sem mexer no ponteiro: a migração sobre os dados do autor criou o "Principal" com o que o dock tinha; com um segundo espaço vazio ativo no monitor principal, o dock mostrou as bolinhas e nenhum item; a roda do mouse voltou ao "Principal", e o item voltou. Dados e barra restaurados.
 - **Não verificado (C1):** o clique nas bolinhas, `Ctrl+Alt+número` e o menu com o mouse e o teclado de verdade; a seção de Configurações com o mouse; dois monitores em espaços diferentes ao mesmo tempo (o segundo estava em tela cheia).
+- **Verificado (C2, 2026-10-27):** testes das regras (dono de uma janela nova, de uma que muda de monitor, de uma fechada e de uma estacionada; o que uma troca esconde e o que traz de volta; o que cada dock conta) e do arquivo das estacionadas (gravado, apagado com a última, o vigia só mostra o que o processo dele escondeu).
+- **Verificado no app real (C2, 2026-10-27),** com o DockMax de teste, uma janela de teste e as janelas do autor, a roda do mouse mandada ao dock e sem mexer no ponteiro:
+  - a troca para o outro espaço escondeu as 4 janelas do monitor principal (a de teste e 3 do autor), e a volta as trouxe;
+  - com janelas escondidas, o DockMax derrubado: o vigia mostrou todas;
+  - reaberto com o outro espaço na tela, a sessão escondeu as mesmas 4 de novo, e a volta as trouxe;
+  - no fim, as janelas visíveis eram as mesmas do começo, sem nenhuma mostrada à mão.
+- **Não verificado (C2):** com o mouse e o teclado de verdade; dois monitores em espaços diferentes; uma janela arrastada para o outro monitor; excluir um espaço com janelas escondidas; o fim da sessão do Windows.
 - **Testes (C1 e C2):** a migração sobre um banco real (os itens e a ordem iguais no "Principal"), fixar e desafixar por espaço, excluir espaço, o estado de cada monitor, a regra de dono das janelas e a lista de estacionadas (a pura, com janelas de mentira).
 - **App real:**
   - criar três espaços e trocar pelas quatro formas;

@@ -216,6 +216,7 @@ pub fn run() {
         let previous = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             windows::taskbar::release();
+            windows::window_spaces::release_all();
             previous(info);
         }));
     }
@@ -284,6 +285,8 @@ pub fn run() {
                     windows::tray_host::stop();
                     windows::appbar::remove();
                     windows::taskbar::release();
+                    // The windows the workspaces hid (spec 0013 C2).
+                    windows::window_spaces::release_all();
                     // Direct2D is let go while DXGI still answers: at the
                     // end of the process, it crashed every exit.
                     windows::launcher::shutdown();

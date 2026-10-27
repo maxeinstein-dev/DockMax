@@ -159,16 +159,37 @@ pub fn delete_workspace(
 ) -> Result<(), WorkspaceCommandError> {
     change(&app, &state, "delete", |storage| {
         storage.delete_workspace(&id)
-    })
+    })?;
+    // Its hidden windows come back, and join what their monitor shows.
+    #[cfg(windows)]
+    {
+        crate::windows::window_spaces::forget_workspace(&id);
+        crate::windows::open_apps::wake(&app);
+    }
+    Ok(())
 }
 
 /// The dock on the monitor `monitor` (its device name) shows the workspace
 /// `id`, which is now in use.
 pub fn switch(app: &AppHandle, monitor: &str, id: &str) {
     let state = app.state::<Mutex<Storage>>();
-    let _ = change(app, &state, "switch", |storage| {
+    let from = lock(&state).shown_on(monitor).ok().map(|w| w.id);
+    let switched = change(app, &state, "switch", |storage| {
         storage.switch_workspace(monitor, id)
     });
+    // The windows follow (spec 0013 C2): those of the workspace left are
+    // parked, those of the one shown come back, the top one in front.
+    #[cfg(windows)]
+    if switched.is_ok()
+        && let Some(from) = from.filter(|from| from != id)
+    {
+        if let Some(top) = crate::windows::window_spaces::switch(monitor, &from, id) {
+            crate::windows::openwin::focus(top);
+        }
+        crate::windows::open_apps::wake(app);
+    }
+    #[cfg(not(windows))]
+    let _ = (switched, from);
 }
 
 /// The dock on `monitor` goes to the workspace at `index` (the shortcut
