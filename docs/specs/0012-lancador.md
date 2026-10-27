@@ -64,18 +64,18 @@ O Windows dá ao processo que recebe um atalho registrado o direito de trazer um
 
 **Como ela é** (`windows/launcher/`):
 
-- Uma janela pop-up comum, **não** em camadas, sem entrada na barra de tarefas (`WS_EX_TOOLWINDOW`), sempre no topo, com os cantos arredondados e o fundo acrílico do Windows 11 pelo DWM (`DWMWA_WINDOW_CORNER_PREFERENCE`, `DWMWA_SYSTEMBACKDROP_TYPE`). Não pode ser em camadas porque abriga um controle filho: uma janela de `UpdateLayeredWindow` não mostra controles filhos.
+- Uma janela pop-up comum, **não** em camadas, sem entrada na barra de tarefas (`WS_EX_TOOLWINDOW`), sempre no topo, com os cantos arredondados do Windows 11 pelo DWM (`DWMWA_WINDOW_CORNER_PREFERENCE`). Não pode ser em camadas porque abriga um controle filho: uma janela de `UpdateLayeredWindow` não mostra controles filhos. **O fundo é uma placa sólida, sem acrílico** (mudança no L1): a caixa de texto do Windows pinta com GDI, sem transparência, e sobre o acrílico o texto sairia errado.
 - **A caixa de texto é um `EDIT` do Windows**, subclassificado para Cima, Baixo, Enter, Esc e Alt+número. Com isso vêm de graça o IME, colar, desfazer, a seleção, o cursor e o papel de campo de edição na UI Automation. Desenhar a própria caixa de texto em Direct2D exigiria refazer tudo isso, inclusive o TSF do IME.
-- **A lista de resultados é desenhada com Direct2D e DirectWrite**, reaproveitando do dock a fábrica, o desenho do ícone e o texto.
+- **A lista de resultados é desenhada com Direct2D e DirectWrite**, numa janela filha própria, com o Direct2D **por software** (mudança no L1: o de hardware carregava um dispositivo Direct3D, uns 25 MB, para oito linhas).
 - **Tamanho e lugar:** 640 pixels lógicos de largura, a caixa com 56 de altura, até **8 resultados** de 48 cada; centrada na horizontal e a um quarto da altura do monitor **onde está o ponteiro** (como o Ulauncher), no DPI desse monitor.
 - **Visual:** segue o claro ou escuro do Windows, com o mesmo destaque do dock. A referência é a caixa do Ulauncher com o tema WhiteSur: uma placa arredondada translúcida, o ícone do app à esquerda, o nome e, embaixo, um subtítulo menor e mais apagado ("App", "Configurações do Windows", "Calculadora").
 - **Fecha** com Esc, ao perder o foco (`WM_ACTIVATE` inativo), depois de abrir um resultado e com o atalho de novo. Fechar esconde a janela e limpa o texto; não guarda a última busca.
-- **Liberar:** a janela, os recursos do Direct2D e o cache de ícones saem **45 s** depois de fechada, como o painel ([spec 0011](0011-arquitetura-hibrida.md) §5). O catálogo de apps (nomes e ids, poucas dezenas de KB) fica em memória.
+- **Liberar:** os recursos do Direct2D e o cache de ícones saem **45 s** depois de fechada, como o painel ([spec 0011](0011-arquitetura-hibrida.md) §5). As janelas ficam (o Alt+Espaço é registrado nelas e elas custam quase nada). O catálogo de apps (nomes e ids, poucas dezenas de KB) fica em memória.
 - **Com o dock oculto automaticamente** ou um monitor em tela cheia, o lançador abre do mesmo jeito: é uma janela do usuário, não parte do dock.
 
 **O catálogo de apps.** `apps::catalog()` demora (é uma enumeração da pasta Aplicativos pelo shell). No primeiro uso, a caixa abre na hora e a lista mostra "Lendo os apps…" até o catálogo chegar, lido numa thread de trabalho. Nas aberturas seguintes, o catálogo em memória responde na hora e é relido em segundo plano, trocado quando chegar (um app instalado aparece na abertura seguinte à leitura). Ler o catálogo já ao abrir o DockMax é uma alternativa a medir no L1: a enumeração carrega DLLs do shell, e a memória que elas somam em repouso decide.
 
-**Ícones** só dos resultados visíveis, lidos fora da thread principal pelo mesmo caminho do dock (`apps::icon_png`, ou o pacote de ícones escolhido), num cache de até 64 ícones de 32 pixels físicos, descartado ao liberar a janela.
+**Ícones** só dos resultados visíveis, num cache de até 64, descartado ao liberar a janela. O do pacote de ícones escolhido é um arquivo e é lido no processo. O do Windows é lido **num processo auxiliar** (decisão do autor, 2026-10-27): o próprio `dockmax.exe` com `--launcher-icons`, que vive enquanto o lançador está aberto e sai quando ele fecha. Ler o ícone de um app da Loja pelo shell deixava uns 20 MB presos no processo depois de algumas buscas.
 
 ## 5. Busca e ordenação
 
@@ -113,7 +113,7 @@ O Windows dá ao processo que recebe um atalho registrado o direito de trazer um
 | Digitar | Busca a cada tecla (o catálogo cabe em memória; sem atraso) |
 | Cima, Baixo | Muda o resultado selecionado, sem sair da caixa de texto |
 | Enter | Abre o selecionado (o primeiro, se nenhum foi escolhido) |
-| Alt+1…9 | Abre o n-ésimo resultado, como no Ulauncher; o número aparece à direita de cada linha enquanto Alt está apertado |
+| Alt+1…9 | Abre o n-ésimo resultado, como no Ulauncher; o atalho aparece sempre à direita de cada linha (no L1, sempre, e não só com Alt apertado) |
 | Esc | Fecha |
 | Page Up, Page Down, Home, End na lista | Ficam com a caixa de texto (o cursor); a lista tem só 8 linhas |
 
@@ -121,11 +121,11 @@ O mouse também funciona: passar o ponteiro seleciona e o clique abre.
 
 ## 7. Acessibilidade
 
-- **A caixa de texto** é um `EDIT`: o leitor de tela a lê como "Buscar apps, campo de edição", com o nome dado pelo provedor da janela.
+- **A caixa de texto** é um `EDIT` com um provedor de UI Automation próprio (no L1, a caixa do Windows aparecia como um painel sem nome): campo de edição "Buscar apps", com o valor digitado.
 - **A lista** tem um provedor de **UI Automation** próprio, como o do dock: uma lista "Resultados" com um item por resultado (nome e subtítulo, a posição "3 de 8", o padrão **SelectionItem** marcando o selecionado e o **Invoke**, que abre).
 - **Anúncios:** mudar a seleção levanta o evento de item selecionado, que o Narrador lê ("Visual Studio Code, App, 1 de 8"); depois de uma pausa de 300 ms na digitação, um evento de notificação (`UiaRaiseNotificationEvent`) diz "8 resultados" ou "Nenhum resultado".
 - **Alto contraste:** com o modo de contraste do Windows ligado, a janela troca o acrílico e as cores do tema pelas cores do sistema (`COLOR_WINDOW`, `COLOR_WINDOWTEXT`, `COLOR_HIGHLIGHT`) e marca o selecionado com borda, não só com cor.
-- **Movimento:** sem animação de abrir e fechar quando o Windows pede menos movimento; com ela, só um esmaecer de 100 ms.
+- **Movimento:** sem animação de abrir e fechar (no L1 não há esmaecer nenhum).
 - **Tamanho do texto:** a fonte segue o "Tamanho do texto" da Acessibilidade do Windows, além do DPI; as linhas crescem com ela.
 - **Só teclado:** tudo o que o mouse faz no lançador também se faz pelo teclado (seção 6).
 
@@ -166,6 +166,26 @@ O mouse também funciona: passar o ponteiro seleciona e o clique abre.
 Se a primeira linha passar da meta por causa do catálogo lido ao abrir o DockMax, o catálogo passa a ser lido só no primeiro uso.
 
 **Não dá para verificar sem o autor:** o Narrador de verdade, o IME de outro idioma e o atalho com o teclado físico (o teste usa entrada simulada). Esses itens entram nas "Verificações pendentes" do [roadmap](../roadmap.md).
+
+## 8a. Verificado (L1, 2026-10-27)
+
+No build de teste em release (`dockmax-e2e.exe`, dados numa pasta temporária, barra do Windows visível), na máquina do autor, com entrada de teclado simulada:
+
+- Alt+Espaço abre o lançador em **10–23 ms**, em primeiro plano e com o foco na caixa.
+- `bloco` → Bloco de notas, `vsc` → Visual Studio Code, `configuracoes` → Configurações, `gdt` → Gerenciador de Tarefas (todos selecionados em primeiro); `zqxjzqxj` → nenhum; `c` mostra 8 resultados e Baixo, Baixo seleciona o terceiro.
+- Enter em `mapa de caracteres` abre um processo novo do Mapa de Caracteres e o lançador fecha; o teste fechou só esse processo. Reaberto, o lançador mostra "Recentes" com o Mapa de Caracteres. Esc fecha.
+- A UI Automation mostra o campo de edição "Buscar apps" (com o valor digitado e o foco) e a lista "Resultados" com os itens, o tipo "App" e a seleção.
+- A barra do Windows ficou igual antes e depois; nenhum processo sobrou.
+
+| Medida (memória privada, processo principal contra o repouso) | Resultado | Meta |
+|---|---|---|
+| Em repouso, lançador nunca aberto | sem diferença medível | +1 MB |
+| Aberto, depois de buscas que leram os ícones de uns 30 apps | **+7,2 MB**, mais o auxiliar com **9,9 MB** | +10 MB |
+| 50 s depois de fechar | **+1,8 MB**; o auxiliar já saiu | +3 MB |
+
+Com o auxiliar, o total aberto passa da meta de 10 MB, mas só enquanto o lançador está na tela.
+
+**Não verificado:** o Narrador de verdade, o IME de outro idioma, o Alt+Espaço com o teclado físico, outro programa segurando o Alt+Espaço, alto contraste, escala de 150 % e dois monitores; a suíte de ponta a ponta (a CI roda).
 
 ## 9. Extensões (depois)
 
