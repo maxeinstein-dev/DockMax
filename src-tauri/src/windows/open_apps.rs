@@ -54,12 +54,15 @@ struct State {
     /// dock showed them: kept while they are hidden (the setting off), so
     /// they come back where they were.
     order: Vec<String>,
+    /// The window in front at the last look.
+    foreground: Option<isize>,
 }
 
 static STATE: Mutex<State> = Mutex::new(State {
     found: Vec::new(),
     others: Vec::new(),
     order: Vec::new(),
+    foreground: None,
 });
 
 fn state() -> std::sync::MutexGuard<'static, State> {
@@ -140,6 +143,67 @@ fn snapshot_of(state: &State) -> OpenSnapshot {
 /// The programs that have windows now, as the dock sees them.
 pub fn snapshot() -> OpenSnapshot {
     snapshot_of(&state())
+}
+
+/// Whether the window `hwnd` counts for the workspace `workspace` (spec
+/// 0013 C2): every window when there is none.
+fn counts(hwnd: isize, workspace: Option<&str>) -> bool {
+    #[cfg(windows)]
+    {
+        super::window_spaces::counts(hwnd, workspace)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (hwnd, workspace);
+        true
+    }
+}
+
+/// The windows of `hwnds` that count for `workspace`.
+fn of_workspace(hwnds: &[isize], workspace: Option<&str>) -> Vec<isize> {
+    hwnds
+        .iter()
+        .copied()
+        .filter(|hwnd| counts(*hwnd, workspace))
+        .collect()
+}
+
+/// The programs that have windows in the workspace `workspace`, as its dock
+/// sees them: the windows of the other workspaces don't count (a program
+/// with none here is not open here).
+pub fn snapshot_for(workspace: Option<&str>) -> OpenSnapshot {
+    let state = state();
+    let front = state.foreground;
+    let found = state
+        .found
+        .iter()
+        .filter_map(|found| {
+            let hwnds = of_workspace(&found.hwnds, workspace);
+            (!hwnds.is_empty()).then(|| Found {
+                id: found.id.clone(),
+                active: front.is_some_and(|front| hwnds.contains(&front)),
+                hwnds,
+            })
+        })
+        .collect();
+    let others = state
+        .others
+        .iter()
+        .filter_map(|other| {
+            let hwnds = of_workspace(&other.hwnds, workspace);
+            (!hwnds.is_empty()).then(|| Other {
+                active: front.is_some_and(|front| hwnds.contains(&front)),
+                hwnds,
+                ..other.clone()
+            })
+        })
+        .collect();
+    snapshot_of(&State {
+        found,
+        others,
+        order: Vec::new(),
+        foreground: front,
+    })
 }
 
 fn identity_of(app_id: &str) -> Identity {
@@ -285,6 +349,14 @@ fn look(app: &AppHandle) {
         cache.retain(|id, _| pinned.iter().any(|app| app.app_id == *id));
     }
     let open_windows = super::openwin::enumerate();
+    #[cfg(windows)]
+    super::window_spaces::follow_windows(
+        app,
+        &open_windows
+            .iter()
+            .map(|window| window.hwnd)
+            .collect::<Vec<_>>(),
+    );
     let windows: Vec<WindowFacts> = open_windows
         .iter()
         .map(|window| WindowFacts {
@@ -316,6 +388,7 @@ fn look(app: &AppHandle) {
         found,
         others: others_now,
         order,
+        foreground,
     };
     let after = snapshot_of(&after_state);
     let before = snapshot_of(&state());
@@ -345,24 +418,26 @@ fn click_on(app: &AppHandle, hwnds: &[isize]) -> bool {
 /// Brings the program `id` (the dock's own id of a pinned program) to the
 /// front, minimizes it, or passes to its next window (`domain::open_apps`).
 /// `false` when it has no window: the caller opens it.
-pub fn activate(app: &AppHandle, id: &str) -> bool {
+/// Only the windows of the workspace `workspace` count: with none there, it
+/// is `false`, and the caller opens a new one (spec 0013 C2).
+pub fn activate(app: &AppHandle, id: &str, workspace: Option<&str>) -> bool {
     let hwnds = state()
         .found
         .iter()
         .find(|found| found.id == id)
-        .map(|found| found.hwnds.clone())
+        .map(|found| of_workspace(&found.hwnds, workspace))
         .unwrap_or_default();
     click_on(app, &hwnds)
 }
 
 /// The same for an open program that is not pinned, named by the `key` the
 /// dock was given for it. `false` when it is no longer open.
-pub fn activate_other(app: &AppHandle, key: &str) -> bool {
+pub fn activate_other(app: &AppHandle, key: &str, workspace: Option<&str>) -> bool {
     let hwnds = state()
         .others
         .iter()
         .find(|other| other.id == key)
-        .map(|other| other.hwnds.clone())
+        .map(|other| of_workspace(&other.hwnds, workspace))
         .unwrap_or_default();
     click_on(app, &hwnds)
 }
@@ -388,24 +463,25 @@ pub fn place_other(app: &AppHandle, key: &str, index: usize) {
     super::dock::refresh();
 }
 
-/// Asks every window of the pinned program `id` to close; how many it asked.
-pub fn close_pinned(app: &AppHandle, id: &str) -> usize {
+/// Asks every window of the pinned program `id` in the workspace
+/// `workspace` to close; how many it asked.
+pub fn close_pinned(app: &AppHandle, id: &str, workspace: Option<&str>) -> usize {
     let hwnds: Vec<isize> = state()
         .found
         .iter()
         .find(|found| found.id == id)
-        .map(|found| found.hwnds.clone())
+        .map(|found| of_workspace(&found.hwnds, workspace))
         .unwrap_or_default();
     close_all(app, &hwnds)
 }
 
 /// The same for the open program `key` that is not pinned.
-pub fn close_other(app: &AppHandle, key: &str) -> usize {
+pub fn close_other(app: &AppHandle, key: &str, workspace: Option<&str>) -> usize {
     let hwnds: Vec<isize> = state()
         .others
         .iter()
         .find(|other| other.id == key)
-        .map(|other| other.hwnds.clone())
+        .map(|other| of_workspace(&other.hwnds, workspace))
         .unwrap_or_default();
     close_all(app, &hwnds)
 }

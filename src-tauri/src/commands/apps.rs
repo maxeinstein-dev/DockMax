@@ -477,6 +477,15 @@ pub async fn launch_app(
     }
 }
 
+/// The workspace in use (the dock used last): the windows a panel's menu
+/// acts on are the ones of its workspace (spec 0013 C2).
+#[cfg(windows)]
+fn in_use(app: &AppHandle) -> Option<String> {
+    let state = app.state::<Mutex<Storage>>();
+    let mut storage = lock(&state);
+    storage.in_use().ok().map(|workspace| workspace.id)
+}
+
 /// The pinned programs that have windows open (spec 0009), for the dock's
 /// first read; after that `open-windows-changed` carries the same list. No
 /// window handle leaves Rust.
@@ -501,7 +510,12 @@ pub fn activate_app(app: AppHandle, id: String) -> Result<bool, AppCommandError>
     let id = WidgetId::parse(&id).map_err(|_| AppCommandError::from(AppError::NotFound))?;
     #[cfg(windows)]
     {
-        Ok(crate::windows::open_apps::activate(&app, id.as_str()))
+        let workspace = in_use(&app);
+        Ok(crate::windows::open_apps::activate(
+            &app,
+            id.as_str(),
+            workspace.as_deref(),
+        ))
     }
     #[cfg(not(windows))]
     {
@@ -520,7 +534,12 @@ pub fn activate_open(app: AppHandle, key: String) -> Result<bool, AppCommandErro
     }
     #[cfg(windows)]
     {
-        Ok(crate::windows::open_apps::activate_other(&app, &key))
+        let workspace = in_use(&app);
+        Ok(crate::windows::open_apps::activate_other(
+            &app,
+            &key,
+            workspace.as_deref(),
+        ))
     }
     #[cfg(not(windows))]
     {
@@ -590,7 +609,12 @@ pub fn close_app(app: AppHandle, id: String) -> Result<usize, AppCommandError> {
     let id = WidgetId::parse(&id).map_err(|_| AppCommandError::from(AppError::NotFound))?;
     #[cfg(windows)]
     {
-        Ok(crate::windows::open_apps::close_pinned(&app, id.as_str()))
+        let workspace = in_use(&app);
+        Ok(crate::windows::open_apps::close_pinned(
+            &app,
+            id.as_str(),
+            workspace.as_deref(),
+        ))
     }
     #[cfg(not(windows))]
     {
@@ -607,7 +631,12 @@ pub fn close_open(app: AppHandle, key: String) -> Result<usize, AppCommandError>
     }
     #[cfg(windows)]
     {
-        Ok(crate::windows::open_apps::close_other(&app, &key))
+        let workspace = in_use(&app);
+        Ok(crate::windows::open_apps::close_other(
+            &app,
+            &key,
+            workspace.as_deref(),
+        ))
     }
     #[cfg(not(windows))]
     {

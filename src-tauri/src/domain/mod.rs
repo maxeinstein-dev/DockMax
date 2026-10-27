@@ -16,4 +16,5 @@ pub mod open_apps;
 pub mod settings;
 pub mod thumbnail;
 pub mod widgets;
+pub mod window_spaces;
 pub mod workspaces;

@@ -155,6 +155,11 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         // A previous run that was killed may have left the taskbar changed.
         if let Some(path) = taskbar_state_path(app) {
             super::taskbar::recover(&path);
+            // The windows a run left hidden come back, and the workspace of
+            // each is read (spec 0013 C2).
+            if let Some(dir) = path.parent() {
+                super::window_spaces::setup(dir);
+            }
         }
         apply_taskbar(app, commands::settings::current(app).dock.taskbar);
     }

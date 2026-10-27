@@ -38,6 +38,8 @@ pub mod system_status;
 pub mod taskbar;
 #[cfg(windows)]
 pub mod tray_host;
+#[cfg(windows)]
+pub mod window_spaces;
 
 /// The WebView2 arguments every window of the app shares (they must be the
 /// same in all of them, or the windows can't share the browser process):

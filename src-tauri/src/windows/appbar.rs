@@ -400,6 +400,7 @@ unsafe extern "system" fn procedure(
             }
             super::tray_host::stop();
             super::taskbar::release();
+            super::window_spaces::release_all();
         }
         // The tray host sends `TaskbarCreated` too, so that programs send
         // their icons to it: only a new taskbar window means Explorer

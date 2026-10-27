@@ -541,26 +541,27 @@ fn read_data(app: &AppHandle, monitor: &str) -> Data {
     let settings = crate::commands::settings::current(app);
     #[cfg(windows)]
     let tray = crate::commands::tray::icons();
-    let (widgets, apps, workspace, workspaces) = match app.try_state::<Mutex<Storage>>() {
-        Some(state) => {
-            let mut storage = state.lock().unwrap_or_else(PoisonError::into_inner);
-            (
-                crate::commands::widgets::snapshot(&storage).ok(),
-                crate::commands::apps::snapshot(&storage).ok(),
-                storage
-                    .shown_on(monitor)
-                    .inspect_err(|error| log::warn!("dock: no workspace to show: {error}"))
-                    .ok(),
-                storage.workspaces().unwrap_or_default(),
-            )
-        }
-        None => (None, None, None, Vec::new()),
-    };
+    let (widgets, apps, workspace, workspaces): (_, _, Option<Workspace>, _) =
+        match app.try_state::<Mutex<Storage>>() {
+            Some(state) => {
+                let mut storage = state.lock().unwrap_or_else(PoisonError::into_inner);
+                (
+                    crate::commands::widgets::snapshot(&storage).ok(),
+                    crate::commands::apps::snapshot(&storage).ok(),
+                    storage
+                        .shown_on(monitor)
+                        .inspect_err(|error| log::warn!("dock: no workspace to show: {error}"))
+                        .ok(),
+                    storage.workspaces().unwrap_or_default(),
+                )
+            }
+            None => (None, None, None, Vec::new()),
+        };
     Data {
         settings,
         widgets,
         apps,
-        open: super::open_apps::snapshot(),
+        open: super::open_apps::snapshot_for(workspace.as_ref().map(|w| w.id.as_str())),
         workspace,
         workspaces,
         tray,
@@ -1714,6 +1715,12 @@ impl Dock {
         self.paint();
     }
 
+    /// The workspace this dock shows (spec 0013); `None` when they can't be
+    /// read.
+    fn workspace_id(&self) -> Option<String> {
+        self.data.workspace.as_ref().map(|w| w.id.clone())
+    }
+
     /// The workspace dot under the point, when the bar starts with them.
     fn switcher_hit(&self, x: f64, y: f64) -> Option<usize> {
         let area = self.placement_now().switcher?;
@@ -1889,9 +1896,10 @@ impl Dock {
                 let key = item.key();
                 let running = dock_items::running(&self.data.open, &item).is_some();
                 let hwnd = self.hwnd.0 as isize;
+                let workspace = self.workspace_id();
                 if running {
                     self.effects.push(Box::new(move |app| {
-                        if !super::open_apps::activate(app, &id) {
+                        if !super::open_apps::activate(app, &id, workspace.as_deref()) {
                             post_to(hwnd, move |dock| dock.launch_pinned(key, id));
                         }
                     }));
@@ -1901,8 +1909,9 @@ impl Dock {
             }
             Item::Other(other) => {
                 let key = other.key.clone();
+                let workspace = self.workspace_id();
                 self.effects.push(Box::new(move |app| {
-                    super::open_apps::activate_other(app, &key);
+                    super::open_apps::activate_other(app, &key, workspace.as_deref());
                 }));
             }
             _ => {
