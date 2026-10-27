@@ -2,7 +2,7 @@
 
 Fase F da [spec 0004](0004-paridade-primodock.md) (§3.5), depois da fase E. Referência do PrimoDock em [`docs/reference/primodock/interface.md`](../reference/primodock/interface.md) (aba Widgets: catálogo, "Em uso", largura do tile) e [`settings-e-dados.md`](../reference/primodock/settings-e-dados.md).
 
-**Status:** proposta.
+**Status:** em andamento: F1 implementado (PR a abrir); F2 a F5 a fazer.
 
 ## 1. Decisões do autor (2026-10-27)
 
@@ -51,6 +51,15 @@ Pilhas de widgets (vários num lugar, trocados pela roda), espaçadores, "Widget
 3. **Pomodoro:** 25 min de foco e 5 de pausa, com uma pausa longa de 15 min a cada 4 focos, e um aviso do Windows ao fim de cada etapa; os tempos mudam nos ajustes do widget.
 4. **Catálogo:** uma aba **Widgets** em Configurações, no lugar de "Itens do dock", com o catálogo e o "Em uso"; a ordem dos widgets no dock continua em Espaços › Editar widgets.
 5. **Calendário (2026-10-27):** ligado ao **Google Agenda** do autor, mostra as **próximas reuniões** e avança sozinho conforme o tempo passa, como o widget do celular. **Sem a data**, que o fim do dock já mostra. O ícone traz a próxima reunião (hora e começo do título, ou "em 10 min"); o painel lista as seguintes do dia e de amanhã. Como ligar à conta fica para o plano do F2: o **endereço secreto no formato iCal** (só leitura, sem login, colado nos ajustes; o endereço é um segredo e fica fora dos registros) ou o **OAuth do Google** (exige um projeto no Google Cloud e a tela de consentimento). A recomendação é começar pelo endereço iCal.
+
+## 6b. Como o F1 ficou (2026-10-27)
+
+- **Tile largo:** o dock nativo soma larguras (`dock_layout::span_width`); um tile de 2 ícones é um retângulo arredondado com o mesmo esmalte (`paint.rs`, `wide_glaze`).
+- **Atividade** (`activity`): mostra os dois, só o processador ou só a memória; no dock, em barras, anéis ou números; 1 ou 2 ícones. Esmalte Vinho (`.t-activity`).
+- **Atividade de rede** (`network`): 1 ícone com as duas taxas curtas (`↓340K`), 2 ícones (o padrão) com as taxas e o gráfico do último minuto. Esmalte Índigo (`.t-network`).
+- **Provedor:** um amostrador único (`windows/system_activity.rs`) lê CPU, memória e rede. O dock liga um timer de 2 s só enquanto um desses widgets está nele; sem eles, nada é lido. Leituras com menos de 1,5 s de diferença reaproveitam a última, então dois monitores e o painel leem o sistema uma vez.
+- **Painel:** em vez do evento `widget-data` da §3, o painel aberto pede a leitura a cada 2 s (`read_system_activity`, só na janela do painel) e para ao fechar.
+- **Aba Widgets:** substitui "Itens do dock" em Configurações (o id da seção continua `items`). Em cima, "Em uso" (a lista do espaço, com subir, descer, remover e os widgets de outros espaços); embaixo, o catálogo, com busca sem acentos e prateleiras Sistema, Tempo e Produtividade. **Largura e estilo** se ajustam nos Ajustes de cada widget (pelo painel), não na linha de "Em uso"; levar isso para a linha fica para depois, se fizer falta.
 
 ## 7. Verificação
 
