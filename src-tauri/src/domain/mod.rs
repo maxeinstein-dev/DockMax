@@ -18,6 +18,7 @@ pub mod menu;
 pub mod open_apps;
 pub mod previews;
 pub mod settings;
+pub mod system_activity;
 pub mod thumbnail;
 pub mod widgets;
 pub mod window_spaces;
