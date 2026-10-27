@@ -36,13 +36,20 @@ O atraso e "só com 2 ou mais" aparecem só com a prévia ligada (como os tempos
 | Recorte | Entrega |
 |---|---|
 | **E1. O cartão** | Prévia ao passar o mouse com miniaturas ao vivo, título, ativar e fechar; as três opções em Configurações. |
-| **E2. Acabamento** | O cartão pelo teclado e pelo leitor de tela; a janela em destaque ao passar sobre a célula (as outras esmaecem, como o "Espiar" do Windows); entrada e saída animadas. |
+| **E2. Acabamento** | O cartão pelo leitor de tela e a entrada animada. |
 
 Cada recorte é um PR, com o plano, a verificação no app real e a memória medida.
 
+## 4b. E2 em detalhe (feito)
+
+- **Leitor de tela:** o cartão é uma barra de ferramentas "Janelas de <app>", servida pelo mesmo provedor de UI Automation do dock (`native_dock::access`, que agora atende outra janela com o nome e o jeito de apertar dela). Cada janela é um botão com o título dela ("Janela sem título" sem título), seguido de "Fechar <título>". Acionar um botão faz o mesmo que o clique; o pedido chega da thread da UI Automation e é feito na thread do cartão.
+- **Entrada animada:** um cartão novo entra deslizando 8 px do lado do dock em 120 ms, desacelerando no fim. Um cartão que toma o lugar de outro (o ponteiro em outro programa, uma janela fechada) só aparece. Sem animação quando o Windows pede menos movimento. A saída continua imediata, como a da barra do Windows.
+- **Decisão do autor (2026-10-27): sem o "Espiar".** Esmaecer as outras janelas da tela, como a barra do Windows faz, só é possível com uma função não documentada do DWM (`DwmpActivateLivePreview`), que pode mudar numa atualização do Windows. A célula sob o ponteiro continua realçada no próprio cartão.
+- **Teclado:** fica de fora junto com o do dock. O dock nativo nunca toma o foco (spec 0011), então o cartão não tem como receber as setas; quem usa o teclado chega às janelas pelo Alt+Tab, e o leitor de tela chega ao cartão pelos botões acima.
+
 ## 5. Fora desta fase
 
-Controles de mídia e botões da barra de miniaturas (`ITaskbarList3::ThumbBarAddButtons`), prévia das abas de um navegador, e a prévia sobre os widgets.
+O "Espiar" (decisão do autor, §4b), o cartão pelo teclado (§4b), controles de mídia e botões da barra de miniaturas (`ITaskbarList3::ThumbBarAddButtons`), prévia das abas de um navegador, e a prévia sobre os widgets.
 
 ## 6. Perguntas em aberto para o autor
 
@@ -60,5 +67,6 @@ Valem as propostas até o autor decidir:
   - o X sob o ponteiro ficou vermelho; o clique fechou aquela janela, e o cartão continuou só com a outra;
   - memória privada: 84,2 MB ao abrir, 87,3 MB depois de usar o cartão.
 - **Não verificado (E1):** trazer para a frente uma janela que estava atrás (a clicada já era a da frente), uma janela minimizada, o segundo monitor e o dock no topo.
+- **Verificado (E2, 2026-10-27):** testes do deslize (do lado do dock, desacelerando, parado no fim) e do código de cada botão do leitor de tela.
 - **Testes:** a geometria (cartão acima, abaixo e ao lado conforme a borda; dentro da tela; células encolhendo; "+N"), as opções no arquivo e no comando de configurações, e quando a prévia abre (atraso, "só com 2 ou mais", sem janelas no espaço).
 - **App real:** passar o mouse num programa com uma e com várias janelas, nos dois monitores e com o dock em cada borda; clicar numa miniatura (inclusive minimizada); fechar pelo X; sair do ícone para o cartão sem ele sumir; medir a memória antes e depois.
