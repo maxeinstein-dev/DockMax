@@ -1,6 +1,6 @@
 # Spec 0014 — Rebranding de Configurações e dos menus
 
-**Status:** proposta; R1 em andamento.
+**Status:** R1 feito (estrutura de Configurações e temas com miniatura); R2 a R4 a fazer.
 **Origem:** pedido do autor (2026-10-27): Configurações, os menus do dock e da bandeja e as outras telas de apoio estão "muito simples e sem vida". Referência de acabamento: o PrimoDock ([interface](../reference/primodock/interface.md), "Janela de configurações" e "Menus"), com o tema WhiteSur GTK e o dock do ZorinOS como inspiração. Exemplo dado pelo autor: em Aparência, mostrar os temas aplicados, e não só os nomes.
 
 ## 1. Decisões do autor (2026-10-27)
@@ -79,3 +79,12 @@ A busca nos ajustes, a prévia do dock sobre o papel de parede de verdade, a apa
 - Testes da barra lateral (seções, a ativa, o teclado), do cabeçalho e da grade de temas (escolher, as setas, o tema com as mudanças do usuário, sem programas fixados); o teste da tabela de cores contra o Rust.
 - No app real (release), nos dois temas: capturas de Configurações (Geral e Aparência) e a troca de tema pelo cartão mudando o dock.
 - Medir a memória com Configurações aberta, antes e depois.
+
+**Verificado (R1, 2026-10-27),** com a cópia de teste (release, dados temporários), sem mexer no ponteiro:
+
+- Configurações abriu pelo lançador; capturas de Geral e Aparência nos temas claro e escuro: a barra lateral com as placas, o cabeçalho de cada seção, os grupos em cartões e os nove temas com o dock em miniatura (sem programas fixados nos dados de teste, as miniaturas mostram os ladrilhos dos widgets);
+- o cartão Neon salvou `neon` e mudou o dock; o Nativo voltou; o tema Escuro foi salvo e Configurações o seguiu;
+- Esc fechou Configurações; o "Sair" saiu sem queda no log, sem processo sobrando e com a barra do Windows igual.
+- **Memória privada** (processo e WebView2): 212 MB com o dock aberto e 243 MB com Configurações aberta na Aparência. Não houve medição da main na mesma rodada, então a diferença do R1 em si não foi medida; Configurações só existe enquanto está aberta.
+
+**Não verificado (R1):** as miniaturas com programas fixados de verdade, com o mouse, e o leitor de tela na grade de temas.
