@@ -91,8 +91,7 @@ const messages = {
       /** The line under each section's title. */
       leads: {
         general: "Como o DockMax se encaixa no Windows.",
-        workspaces:
-          "Cada espaço tem os seus apps e widgets e guarda as suas janelas.",
+        workspaces: "Um dock para cada coisa que você faz.",
         look: "Deixe o dock com a sua cara.",
         apps: "Os programas fixados no dock de cada espaço.",
         items: "Os widgets do dock de cada espaço.",

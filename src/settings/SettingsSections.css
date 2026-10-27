@@ -171,13 +171,13 @@
 
 /* ---- Sobre ---- */
 
+/* The section's header already has the plate: no second tile under it. */
 .settings-card .about-head {
-  gap: 18px;
+  grid-template-columns: 1fr;
 }
 
 .settings-card .about-tile {
-  width: 72px;
-  height: 72px;
+  display: none;
 }
 
 .settings-card .about-head h2 {

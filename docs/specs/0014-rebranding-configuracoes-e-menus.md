@@ -98,7 +98,7 @@ A busca nos ajustes, a prévia do dock sobre o papel de parede de verdade, a apa
   - **Apps do dock:** os fixados num cartão, com ícones de 32 px; os **apps instalados viram uma grade de ícones** (36 px) com o nome embaixo, em até duas linhas, como no PrimoDock;
   - **Itens do dock:** os widgets num cartão, com ladrilhos maiores, e os botões de adicionar como ladrilhos;
   - **Espaços:** fichas maiores, a escolhida no azul, o cartão do espaço e as cores com anel na escolhida;
-  - **Sobre:** o ladrilho de 72 px e as informações num cartão com fios entre as linhas.
+  - **Sobre:** as informações num cartão com fios entre as linhas; o ladrilho some, porque o cabeçalho da seção já tem a placa.
 - **Painel da bandeja:** o foco do teclado aparece (não aparecia) e os cantos seguem os da linguagem.
 - **Conferidos sem mudança:** os painéis dos widgets (Relógio, Progresso, Nota), que já seguem o `DESIGN.md`, e o lançador, de onde os menus do R3 tiraram as cores.
 
@@ -142,3 +142,13 @@ A busca nos ajustes, a prévia do dock sobre o papel de parede de verdade, a apa
   - nas duas rodadas, "Sair" sem queda no log, sem processo sobrando e com a barra do Windows igual.
 
 **Não verificado (R3):** o mouse de verdade, o leitor de tela falando, o contraste alto e escala acima de 100 %.
+
+**Verificado (R4, 2026-10-27),** com a cópia de teste (release, dados temporários), Configurações aberta pelo menu do dock (a letra "c"):
+
+- capturas de Apps do dock (a grade de apps instalados, com ícones e nomes), Itens do dock, Espaços e Sobre, nos temas claro e escuro;
+- o Bloco de notas, fixado pela grade, entrou na lista de fixados e ficou esmaecido na grade;
+- Esc fechou Configurações; o "Sair" saiu sem queda no log, sem processo sobrando e com a barra do Windows igual;
+- memória privada com Configurações em Apps do dock: 263 MB;
+- as capturas mostraram o ícone "i" repetido no Sobre e a frase do cabeçalho de Espaços repetindo a explicação; os dois foram ajustados depois (não capturados de novo).
+
+**Não verificado (R4):** o painel da bandeja com o foco do teclado, o mouse de verdade e o leitor de tela.
