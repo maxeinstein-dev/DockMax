@@ -26,17 +26,28 @@
   border-radius: var(--r-panel);
   font: inherit;
   text-align: left;
+  position: relative;
   color: var(--ink);
   background: var(--track);
-  box-shadow: inset 0 0 0 1px var(--hair);
   cursor: pointer;
 }
 
-.choice-card:hover {
+/* The edge over the picture: an inset shadow on the card itself sits under
+   it, and the chosen ring showed only around the name. */
+.choice-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--hair);
+  pointer-events: none;
+}
+
+.choice-card:hover::after {
   box-shadow: inset 0 0 0 1px var(--field-line);
 }
 
-.choice-card[aria-pressed="true"] {
+.choice-card[aria-pressed="true"]::after {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
