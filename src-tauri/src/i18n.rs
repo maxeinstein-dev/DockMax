@@ -69,6 +69,11 @@ pub struct DockMessages {
     /// shown; `{name}` is replaced.
     pub workspace: &'static str,
     pub workspace_shown: &'static str,
+    /// The preview card (spec 0015), for assistive technology: the card,
+    /// a window without a title, and a close button; `{name}` is replaced.
+    pub previews: &'static str,
+    pub untitled: &'static str,
+    pub close_window: &'static str,
     /// The labels of the small icons at the end; `{n}` is a percentage.
     pub show_hidden_icons: &'static str,
     pub tray_icon: &'static str,
@@ -131,6 +136,9 @@ const PT_BR: Messages = Messages {
         with_notice: "{name} (com aviso)",
         workspace: "Espaço {name}",
         workspace_shown: "Espaço {name} (mostrado)",
+        previews: "Janelas de {name}",
+        untitled: "Janela sem título",
+        close_window: "Fechar {name}",
         show_hidden_icons: "Mostrar ícones ocultos",
         tray_icon: "Ícone da bandeja",
         wifi: "Wi-Fi",

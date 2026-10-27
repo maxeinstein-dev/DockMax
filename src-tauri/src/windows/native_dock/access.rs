@@ -5,6 +5,10 @@
 //! What the provider says comes from `ENTRIES`, which the dock keeps up to
 //! date; UI Automation may call from its own threads. A press goes back to the
 //! dock through `post`.
+//!
+//! Another window of the dock's (the preview card, spec 0015) uses it too,
+//! with `publish_for`: its own name, and its own way to press, which must not
+//! block (UI Automation's thread).
 
 // The patterns below match Windows' constants, which keep their own names.
 #![allow(non_upper_case_globals)]
@@ -40,22 +44,56 @@ pub struct Entry {
     pub rect: (f64, f64, f64, f64),
 }
 
-/// Each dock's items, by its window (one dock per monitor).
-static ENTRIES: Mutex<Vec<(isize, Vec<Entry>)>> = Mutex::new(Vec::new());
+/// How a window other than a dock presses one of its items: its window and
+/// the item's key.
+pub type Press = fn(isize, &str);
+
+/// What a window shows to assistive technology.
+struct Published {
+    hwnd: isize,
+    /// Its name; the dock's is `LABEL`.
+    label: String,
+    entries: Vec<Entry>,
+    /// `None` for a dock: the press goes to it through `post_to`.
+    press: Option<Press>,
+}
+
+/// Each window's items: one dock per monitor, and the preview card.
+static ENTRIES: Mutex<Vec<Published>> = Mutex::new(Vec::new());
 
 /// What the dock of the window `hwnd` shows now.
 pub fn publish(hwnd: isize, entries: Vec<Entry>) {
-    let mut all = ENTRIES.lock().unwrap_or_else(PoisonError::into_inner);
-    all.retain(|(window, _)| *window != hwnd);
-    all.push((hwnd, entries));
+    put(Published {
+        hwnd,
+        label: LABEL.to_owned(),
+        entries,
+        press: None,
+    });
 }
 
-/// The dock of the window `hwnd` is gone.
+/// What the window `hwnd`, named `label`, shows now; `press` presses its
+/// items.
+pub fn publish_for(hwnd: isize, label: String, entries: Vec<Entry>, press: Press) {
+    put(Published {
+        hwnd,
+        label,
+        entries,
+        press: Some(press),
+    });
+}
+
+fn put(published: Published) {
+    let mut all = ENTRIES.lock().unwrap_or_else(PoisonError::into_inner);
+    all.retain(|known| known.hwnd != published.hwnd);
+    all.push(published);
+}
+
+/// The window `hwnd` is gone, or shows nothing.
 pub fn forget(hwnd: isize) {
     ENTRIES
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .retain(|(window, _)| *window != hwnd);
+        .retain(|known| known.hwnd != hwnd);
 }
 
 fn entries(hwnd: isize) -> Vec<Entry> {
@@ -63,9 +101,22 @@ fn entries(hwnd: isize) -> Vec<Entry> {
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .iter()
-        .find(|(window, _)| *window == hwnd)
-        .map(|(_, entries)| entries.clone())
+        .find(|known| known.hwnd == hwnd)
+        .map(|known| known.entries.clone())
         .unwrap_or_default()
+}
+
+/// The name of the window `hwnd` and how its items are pressed.
+fn owner(hwnd: isize) -> (String, Option<Press>) {
+    ENTRIES
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .iter()
+        .find(|known| known.hwnd == hwnd)
+        .map_or_else(
+            || (LABEL.to_owned(), None),
+            |known| (known.label.clone(), known.press),
+        )
 }
 
 /// The dock's name for assistive technology.
@@ -114,7 +165,7 @@ impl IRawElementProviderSimple_Impl for Root_Impl {
     fn GetPropertyValue(&self, property: UIA_PROPERTY_ID) -> Result<VARIANT> {
         Ok(match property {
             UIA_ControlTypePropertyId => VARIANT::from(UIA_ToolBarControlTypeId.0),
-            UIA_NamePropertyId => VARIANT::from(BSTR::from(LABEL)),
+            UIA_NamePropertyId => VARIANT::from(BSTR::from(owner(self.hwnd).0.as_str())),
             _ => VARIANT::default(),
         })
     }
@@ -309,6 +360,10 @@ impl IRawElementProviderFragment_Impl for Item_Impl {
 
 impl IInvokeProvider_Impl for Item_Impl {
     fn Invoke(&self) -> Result<()> {
+        if let (_, Some(press)) = owner(self.hwnd) {
+            press(self.hwnd, &self.key);
+            return Ok(());
+        }
         // Only this dock: each monitor has the same workspace dots.
         let key = self.key.clone();
         super::post_to(self.hwnd, move |dock| dock.press(&key));
