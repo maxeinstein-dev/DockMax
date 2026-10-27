@@ -1,6 +1,6 @@
 # Spec 0012 — Lançador: buscar e abrir pelo teclado
 
-**Status:** L1 entregue (PR #33); L2 implementado (calculadora, busca na web, páginas de configurações). L3 não começou.
+**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado.
 **Origem:** pedido do autor (2026-10-26) de um lançador no estilo do [Ulauncher](https://ulauncher.io/): uma caixa de busca aberta por um atalho de teclado global, que acha e abre apps e, no futuro, arquivos e extensões. O PrimoDock tem algo parecido ("O botão Iniciar abre: Apps do PrimoDock", [interface](../reference/primodock/interface.md)), mas só pelo mouse e sem busca por teclado.
 
 ## 1. Decisões do autor (2026-10-26)
@@ -51,6 +51,15 @@ O Windows dá ao processo que recebe um atalho registrado o direito de trazer um
 **Se o registro falhar** (`ERROR_HOTKEY_ALREADY_REGISTERED`, outro programa pegou o atalho primeiro), o DockMax não insiste nem tenta tomá-lo de volta: grava o motivo no log, mostra o aviso de atenção em Configurações › Geral, junto da chave Lançador ("Alt+Espaço está em uso por outro programa"), e o lançador continua abrindo pelo item "Buscar apps…" dos menus do dock e da bandeja. O registro é tentado de novo quando o DockMax abre e quando a chave é religada.
 
 **No L3,** o campo do atalho em Configurações captura uma combinação, desregistra a atual enquanto captura (senão a combinação abre o lançador) e recusa as que não têm modificador, as reservadas pelo Windows (Win+L, Ctrl+Alt+Del, Win+Espaço) e as que falham no registro, dizendo o porquê.
+
+**Como o L3 ficou** (`domain/hotkey.rs`, `commands/launcher.rs`, `src/panel/HotkeyField.tsx`):
+
+- **O formato:** o atalho fica em `settings.json` como texto, `launcherHotkey` (padrão `"Alt+Space"`): os modificadores na ordem Ctrl, Alt, Shift, Win, cada um uma vez, e uma tecla. Um arquivo antigo carrega com Alt+Espaço; um atalho inválido escrito à mão é recusado ao salvar e, ao abrir, o lançador usa Alt+Espaço.
+- **As teclas:** letras, números, F1–F24 e Espaço, pela posição da tecla (`KeyboardEvent.code`), como o Windows registra. Enter, Tab, setas e o teclado numérico ficam de fora.
+- **Recusadas, com o motivo:** sem modificador; Shift sozinho, ou Ctrl sozinho com letra ou número (tirariam a digitação ou atalhos como Ctrl+C de todos os programas; Ctrl+Espaço e Ctrl+F5 valem); Win sozinho com uma tecla (o Windows usa quase todas: Win+L, Win+Espaço, Win+1…); Alt+F4; Ctrl+Alt e um número (a fase C); e a combinação que outro programa já segura.
+- **A captura:** o botão mostra o atalho ("Alt+Espaço"); clicado, pede "Pressione a combinação… (Esc cancela)" e o Rust solta o atalho atual (`capture_launcher_hotkey`). Os modificadores sozinhos esperam a tecla; Esc, Tab ou sair do botão cancelam e o atalho volta. Se Configurações fechar no meio, o Rust pega o atalho de volta sozinho depois de 60 s.
+- **Salvar** (`set_launcher_hotkey`, assíncrono porque espera a thread principal): com o lançador ligado, o Rust registra a combinação nova **antes** de salvar; se outro programa a segura, devolve o atalho anterior e responde "Essa combinação está em uso por outro programa". Só depois salva nas configurações. "Voltar para Alt+Espaço" aparece quando o atalho é outro.
+- **Os textos** que citavam Alt+Espaço usam o atalho em uso: "Lançador (Ctrl+Shift+Espaço)", "Ctrl+Shift+Espaço está em uso por outro programa".
 
 ## 4. A janela: nativa, pesando a memória
 
