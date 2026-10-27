@@ -442,6 +442,86 @@ fn anchored_rect(
     (now.saturating_duration_since(at) <= ANCHOR_LIFETIME).then_some(rect)
 }
 
+/// A point of a monitor as a program that sees it at another scale does:
+/// the monitor's corner stays where it is and the rest shrinks (or grows) by
+/// the ratio of the program's dots per inch to the monitor's. A program not
+/// aware of each monitor's scale (FortiClient is "system aware", at the
+/// primary monitor's 100 %) sees a monitor at 125 % that way, and a point in
+/// physical pixels would fall off it, on the primary monitor.
+fn scaled_point(
+    point: (i32, i32),
+    corner: (i32, i32),
+    window_dpi: u32,
+    monitor_dpi: u32,
+) -> (i32, i32) {
+    if window_dpi == monitor_dpi || monitor_dpi == 0 {
+        return point;
+    }
+    let ratio = f64::from(window_dpi) / f64::from(monitor_dpi);
+    let along = |value: i32, from: i32| from + (f64::from(value - from) * ratio).round() as i32;
+    (along(point.0, corner.0), along(point.1, corner.1))
+}
+
+/// How the window `hwnd` sees the screen around `point` (physical pixels):
+/// `None` when it sees physical pixels (aware of each monitor's scale), else
+/// its dots per inch, and the corner and dots per inch of the monitor.
+fn view_of(hwnd: isize, point: (i32, i32)) -> Option<(u32, (i32, i32), u32)> {
+    use ::windows::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint,
+    };
+    use ::windows::Win32::UI::HiDpi::{
+        DPI_AWARENESS_PER_MONITOR_AWARE, GetAwarenessFromDpiAwarenessContext, GetDpiForMonitor,
+        GetDpiForWindow, GetWindowDpiAwarenessContext, MDT_EFFECTIVE_DPI,
+    };
+    let window = HWND(hwnd as *mut _);
+    let awareness =
+        unsafe { GetAwarenessFromDpiAwarenessContext(GetWindowDpiAwarenessContext(window)) };
+    if awareness.0 >= DPI_AWARENESS_PER_MONITOR_AWARE.0 {
+        return None;
+    }
+    let window_dpi = unsafe { GetDpiForWindow(window) };
+    let monitor = unsafe {
+        MonitorFromPoint(
+            POINT {
+                x: point.0,
+                y: point.1,
+            },
+            MONITOR_DEFAULTTONEAREST,
+        )
+    };
+    let mut info = MONITORINFO {
+        cbSize: size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    if !unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
+        return None;
+    }
+    let (mut dpi_x, mut dpi_y) = (0u32, 0u32);
+    unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) }.ok()?;
+    Some((window_dpi, (info.rcMonitor.left, info.rcMonitor.top), dpi_x))
+}
+
+/// `point` (physical pixels) as the window `hwnd` sees it.
+fn point_for(hwnd: isize, point: (i32, i32)) -> (i32, i32) {
+    match view_of(hwnd, point) {
+        Some((window_dpi, corner, monitor_dpi)) => {
+            scaled_point(point, corner, window_dpi, monitor_dpi)
+        }
+        None => point,
+    }
+}
+
+/// `rect` (physical pixels) as the window `hwnd` sees it.
+fn in_coordinates_of(hwnd: isize, rect: ScreenRect) -> ScreenRect {
+    let (x, y, width, height) = rect;
+    let Some((window_dpi, corner, monitor_dpi)) = view_of(hwnd, (x, y)) else {
+        return rect;
+    };
+    let near = scaled_point((x, y), corner, window_dpi, monitor_dpi);
+    let far = scaled_point((x + width, y + height), corner, window_dpi, monitor_dpi);
+    (near.0, near.1, far.0 - near.0, far.1 - near.1)
+}
+
 /// The answer to a question about an icon's rectangle, when the host knows
 /// the icon and a click is fresh; `None` leaves it to Explorer.
 fn answer_rect(query: RectQuery) -> Option<isize> {
@@ -461,7 +541,7 @@ fn answer_rect(query: RectQuery) -> Option<isize> {
     if TRACE.load(Ordering::Relaxed) {
         log::warn!("tray trace: rect query {query:?}: icon known, rect {rect:?}");
     }
-    let (x, y, width, height) = rect?;
+    let (x, y, width, height) = in_coordinates_of(query.hwnd, rect?);
     Some(match query.part {
         RectPart::Position => pack_pair(x, y),
         RectPart::Size => pack_pair(width, height),
@@ -837,7 +917,9 @@ pub fn click_at(key: &str, button: Button, place: Option<ScreenRect>) -> Result<
     // The program asks the first `Shell_TrayWnd` where its icon is: the
     // host's, not the hidden taskbar's, which says the corner of the screen.
     raise();
-    for (wparam, lparam) in click_messages(&icon, button, (cursor.x, cursor.y)) {
+    // In the program's own view of the screen, like the rectangle.
+    let at = point_for(icon.hwnd, (cursor.x, cursor.y));
+    for (wparam, lparam) in click_messages(&icon, button, at) {
         unsafe { PostMessageW(Some(target), icon.callback, wparam, lparam) }
             .map_err(|error| error.to_string())?;
     }
@@ -1415,6 +1497,20 @@ mod tests {
         assert_eq!(pack_pair(32, 48), 0x0030_0020);
         // A monitor to the left of the primary one has negative x: 16 bits.
         assert_eq!(pack_pair(-100, 50) & 0xFFFF, 0xFF9C);
+    }
+
+    #[test]
+    fn a_point_is_given_in_the_view_of_a_program_at_another_scale() {
+        // The second monitor of the author: left of the primary one, at
+        // 125 % (120 dpi); FortiClient sees it at 96 dpi.
+        let corner = (-1920, 6);
+        // The cell of the icon on that monitor's dock.
+        assert_eq!(scaled_point((-1080, 1150), corner, 96, 120), (-1248, 921));
+        // The corner stays where it is.
+        assert_eq!(scaled_point(corner, corner, 96, 120), corner);
+        // On a monitor at the program's scale, nothing changes.
+        assert_eq!(scaled_point((900, 1000), (0, 0), 96, 96), (900, 1000));
+        assert_eq!(scaled_point((900, 1000), (0, 0), 96, 0), (900, 1000));
     }
 
     #[test]

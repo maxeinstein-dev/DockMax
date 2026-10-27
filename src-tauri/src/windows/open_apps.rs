@@ -595,3 +595,81 @@ mod imp {
         }
     }
 }
+
+#[cfg(all(test, windows))]
+mod probe {
+    use super::*;
+    use crate::domain::open_apps::matches;
+
+    /// Not a check: prints, for the machine as it is, each open window and
+    /// the pinned program it is matched to (the ids in `DOCKMAX_PINNED`,
+    /// separated by `|`), and, for each monitor, the topmost candidate and
+    /// whether the dock counts it as full screen. Reads only.
+    /// `DOCKMAX_PINNED=a|b cargo test spike_open_and_full_screen -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "reads the windows of the machine"]
+    fn spike_open_and_full_screen() {
+        // Physical pixels, as the app sees them.
+        let _ = unsafe {
+            ::windows::Win32::UI::HiDpi::SetProcessDpiAwarenessContext(
+                ::windows::Win32::UI::HiDpi::DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+            )
+        };
+        let pinned: Vec<String> = std::env::var("DOCKMAX_PINNED")
+            .unwrap_or_default()
+            .split('|')
+            .filter(|id| !id.is_empty())
+            .map(str::to_owned)
+            .collect();
+        for window in super::super::openwin::enumerate() {
+            let facts = WindowFacts {
+                hwnd: window.hwnd,
+                aumid: window.aumid.clone(),
+                exe: window
+                    .exe
+                    .as_ref()
+                    .map(|exe| exe.to_string_lossy().into_owned()),
+            };
+            let owner = pinned
+                .iter()
+                .find(|id| matches(&facts, &identity_of(id)))
+                .map_or("-", String::as_str);
+            let mut rect = ::windows::Win32::Foundation::RECT::default();
+            let _ = unsafe {
+                ::windows::Win32::UI::WindowsAndMessaging::GetWindowRect(
+                    ::windows::Win32::Foundation::HWND(window.hwnd as _),
+                    &mut rect,
+                )
+            };
+            println!(
+                "{:?} | {},{},{},{} | aumid={:?} | exe={:?} | pinned={owner}",
+                window.title,
+                rect.left,
+                rect.top,
+                rect.right,
+                rect.bottom,
+                window.aumid,
+                window.exe
+            );
+        }
+        let candidates = super::super::openwin::fullscreen_candidates();
+        for monitor in super::super::monitors::all() {
+            let top = candidates
+                .iter()
+                .find(|candidate| candidate.monitor == monitor.handle);
+            let bounds = crate::domain::fullscreen::Bounds {
+                left: monitor.rect.x,
+                top: monitor.rect.y,
+                right: monitor.rect.x + monitor.rect.width as i32,
+                bottom: monitor.rect.y + monitor.rect.height as i32,
+            };
+            println!(
+                "{} {:?}: top {:?} -> full screen {}",
+                monitor.key,
+                monitor.rect,
+                top,
+                crate::domain::fullscreen::is_fullscreen(&candidates, monitor.handle, bounds)
+            );
+        }
+    }
+}
