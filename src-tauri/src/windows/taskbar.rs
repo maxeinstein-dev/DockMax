@@ -44,7 +44,7 @@ use ::windows::Win32::UI::WindowsAndMessaging::{
     GetWindowThreadProcessId, HWND_NOTOPMOST, HWND_TOPMOST, IsWindow, IsWindowVisible,
     LAYERED_WINDOW_ATTRIBUTES_FLAGS, LWA_ALPHA, SW_SHOWNA, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
     SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, ShowWindow, WS_EX_LAYERED,
-    WS_EX_TRANSPARENT,
+    WS_EX_TOPMOST, WS_EX_TRANSPARENT,
 };
 use ::windows::core::BOOL;
 use serde::{Deserialize, Serialize};
@@ -372,6 +372,11 @@ fn spawn_keeper() {
     }
 }
 
+/// Whether a faded window was a topmost one before.
+fn was_topmost(faded: &Faded) -> bool {
+    faded.ex_style & WS_EX_TOPMOST.0 as isize != 0
+}
+
 /// Gives a faded window what it was: its style and, if it was layered, its
 /// layered attributes; then has it painted again, as a window that stops
 /// being layered must be.
@@ -440,12 +445,15 @@ fn restore_file(path: &Path, pid: u32) {
     for faded in &saved.faded {
         unfade(faded);
     }
-    let touched = saved
-        .hidden
-        .iter()
-        .map(|&hwnd| (hwnd, true))
-        .chain(saved.faded.iter().map(|faded| (faded.hwnd, false)));
-    for (value, hidden) in touched {
+    // A hidden window (of a version before spec 0014) was a topmost one; a
+    // faded one says whether it was (the secondary taskbars are not).
+    let touched = saved.hidden.iter().map(|&hwnd| (hwnd, true, true)).chain(
+        saved
+            .faded
+            .iter()
+            .map(|faded| (faded.hwnd, false, was_topmost(faded))),
+    );
+    for (value, hidden, topmost) in touched {
         let hwnd = hwnd_of(value);
         if unsafe { IsWindow(Some(hwnd)) }.as_bool() {
             // A faded window was never hidden: Explorer alone says whether
@@ -453,7 +461,10 @@ fn restore_file(path: &Path, pid: u32) {
             if hidden {
                 let _ = unsafe { ShowWindow(hwnd, SW_SHOWNA) };
             }
-            // The taskbar is a topmost window; `fade_visible` lowered it.
+            // `fade_visible` lowered it below the topmost windows.
+            if !topmost {
+                continue;
+            }
             let _ = unsafe {
                 SetWindowPos(
                     hwnd,
@@ -666,6 +677,20 @@ mod tests {
         assert_eq!(Saved::read(&path), None);
         // An unreadable file is left where it is.
         assert!(path.exists());
+    }
+
+    #[test]
+    fn a_faded_window_goes_back_on_top_only_if_it_was() {
+        let faded = |ex_style| Faded {
+            hwnd: 1,
+            ex_style,
+            layered: None,
+        };
+
+        // The primary taskbar (`WS_EX_TOOLWINDOW | WS_EX_TOPMOST`) and a
+        // secondary one, as Windows 11 has them.
+        assert!(was_topmost(&faded(0x88)));
+        assert!(!was_topmost(&faded(0x80)));
     }
 
     #[test]
