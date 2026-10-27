@@ -727,11 +727,7 @@ impl Launcher {
             .collect();
         let candidates = found
             .iter()
-            .map(|app| Candidate {
-                key: app.key.clone(),
-                name: app.name.clone(),
-                file: search::file_of(&app.id),
-            })
+            .map(|app| Candidate::app(&app.id, &app.name))
             .collect();
         self.catalog = Some((found, candidates));
         if is_open() {
