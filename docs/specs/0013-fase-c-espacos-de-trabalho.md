@@ -109,7 +109,12 @@ O autor pediu para seguir sem responder (2026-10-27); valem as propostas até el
   - no app real (release), sem mexer no ponteiro: a migração sobre os dados do autor criou o "Principal" com o que o dock tinha; com um segundo espaço vazio ativo no monitor principal, o dock mostrou as bolinhas e nenhum item; a roda do mouse voltou ao "Principal", e o item voltou. Dados e barra restaurados.
 - **Não verificado (C1):** o clique nas bolinhas, `Ctrl+Alt+número` e o menu com o mouse e o teclado de verdade; a seção de Configurações com o mouse; dois monitores em espaços diferentes ao mesmo tempo (o segundo estava em tela cheia).
 - **Verificado (C2, 2026-10-27):** testes das regras (dono de uma janela nova, de uma que muda de monitor, de uma fechada e de uma estacionada; o que uma troca esconde e o que traz de volta; o que cada dock conta) e do arquivo das estacionadas (gravado, apagado com a última, o vigia só mostra o que o processo dele escondeu).
-- **Não verificado (C2):** no app real, com janelas de verdade. Ver o PR.
+- **Verificado no app real (C2, 2026-10-27),** com o DockMax de teste, uma janela de teste e as janelas do autor, a roda do mouse mandada ao dock e sem mexer no ponteiro:
+  - a troca para o outro espaço escondeu as 4 janelas do monitor principal (a de teste e 3 do autor), e a volta as trouxe;
+  - com janelas escondidas, o DockMax derrubado: o vigia mostrou todas;
+  - reaberto com o outro espaço na tela, a sessão escondeu as mesmas 4 de novo, e a volta as trouxe;
+  - no fim, as janelas visíveis eram as mesmas do começo, sem nenhuma mostrada à mão.
+- **Não verificado (C2):** com o mouse e o teclado de verdade; dois monitores em espaços diferentes; uma janela arrastada para o outro monitor; excluir um espaço com janelas escondidas; o fim da sessão do Windows.
 - **Testes (C1 e C2):** a migração sobre um banco real (os itens e a ordem iguais no "Principal"), fixar e desafixar por espaço, excluir espaço, o estado de cada monitor, a regra de dono das janelas e a lista de estacionadas (a pura, com janelas de mentira).
 - **App real:**
   - criar três espaços e trocar pelas quatro formas;

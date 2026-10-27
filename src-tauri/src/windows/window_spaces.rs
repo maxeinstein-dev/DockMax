@@ -250,7 +250,7 @@ fn on_screen(hwnds: &[isize]) -> Vec<(isize, String)> {
 pub fn follow_windows(app: &AppHandle, hwnds: &[isize]) {
     let now = on_screen(hwnds);
     let mut shown: HashMap<String, Option<String>> = HashMap::new();
-    {
+    let existing: Vec<String> = {
         let state = app.state::<Mutex<Storage>>();
         let mut storage = state.lock().unwrap_or_else(PoisonError::into_inner);
         for (_, monitor) in &now {
@@ -259,9 +259,15 @@ pub fn follow_windows(app: &AppHandle, hwnds: &[isize]) {
                 shown.insert(monitor.clone(), workspace);
             }
         }
-    }
+        storage
+            .workspaces()
+            .map(|all| all.into_iter().map(|w| w.id).collect())
+            .unwrap_or_default()
+    };
     // The first look of a run gives each window the workspace it had in the
-    // last run, then parks again those not shown on their monitor.
+    // last run, then parks again those not shown on their monitor. A
+    // workspace that is gone since (deleted, or another database) gives
+    // nothing back: the window joins what its monitor shows.
     let restoring = with_state(|inner| {
         let remembered = inner.remembered.take()?;
         for (value, monitor) in &now {
@@ -269,6 +275,7 @@ pub fn follow_windows(app: &AppHandle, hwnds: &[isize]) {
             if let Some(owned) = remembered
                 .iter()
                 .find(|owned| owned.hwnd == *value && owned.pid == pid && pid != 0)
+                .filter(|owned| existing.contains(&owned.workspace))
             {
                 inner.known.insert(
                     *value,
