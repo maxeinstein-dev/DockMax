@@ -1,62 +1,9 @@
-/* Configurações › Aparência › Tema (spec 0014 R1): the styles as cards, each
-   with the dock drawn in it. The paint of each style comes from
-   src/dock/paints.ts through the CSSOM (--mini-*), never an inline style.
-   Named exception to "only tokens": the wallpaper of the miniatures is one
-   fixed gradient in both themes, so the light and the dark styles both show
-   on it, as the silver of the shelf is fixed in the real dock. */
-.style-gallery-field {
-  display: grid;
-  gap: 8px;
-}
-
-.style-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  gap: 10px;
-}
-
-.style-card {
-  display: grid;
-  gap: 0;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: var(--r-panel);
-  font: inherit;
-  text-align: left;
-  color: var(--ink);
-  background: var(--track);
-  box-shadow: inset 0 0 0 1px var(--hair);
-  cursor: pointer;
-}
-
-.style-card:hover {
-  box-shadow: inset 0 0 0 1px var(--field-line);
-}
-
-.style-card[aria-pressed="true"] {
-  box-shadow: inset 0 0 0 2px var(--accent);
-}
-
-.style-card:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.style-card:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.style-card-name {
-  padding: 7px 10px 8px;
-  font-size: 12.5px;
-}
-
-.style-card[aria-pressed="true"] .style-card-name {
-  font-weight: 600;
-}
-
+/* The miniatures of the dock's styles (spec 0014 R1, StyleGallery). The
+   paint of each style comes from src/dock/paints.ts through the CSSOM
+   (--mini-*), never an inline style. Named exception to "only tokens": the
+   wallpaper of the miniatures is one fixed gradient in both themes, so the
+   light and the dark styles both show on it, as the silver of the shelf is
+   fixed in the real dock. */
 /* The wallpaper: dusk blue, the same in every card and theme. */
 .mini-wall {
   position: relative;
