@@ -16,14 +16,16 @@ vi.mock("../core/log", async (importOriginal) => ({
 const button = () => screen.getByRole("button", { pressed: false });
 const capturing = () => screen.getByRole("button", { name: text.press });
 
+/** A key press as Chromium reports it on Windows: the virtual key in
+ * `keyCode`, the text in `key`. */
 function press(
-  code: string,
+  keyCode: number,
   modifiers: Partial<
     Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>
   > = {},
-  key = code,
+  key = "",
 ) {
-  fireEvent.keyDown(capturing(), { code, key, ...modifiers });
+  fireEvent.keyDown(capturing(), { keyCode, key, ...modifiers });
 }
 
 describe("HotkeyField", () => {
@@ -52,12 +54,12 @@ describe("HotkeyField", () => {
     expect(capturing()).toHaveAttribute("aria-pressed", "true");
 
     // Modifiers alone wait for the key.
-    press("ControlLeft", { ctrlKey: true }, "Control");
+    press(17, { ctrlKey: true }, "Control");
     expect(invoke).not.toHaveBeenCalledWith(
       "set_launcher_hotkey",
       expect.anything(),
     );
-    press("KeyK", { ctrlKey: true, shiftKey: true }, "K");
+    press(75, { ctrlKey: true, shiftKey: true }, "K");
     await act(async () => {});
 
     expect(invoke).toHaveBeenCalledWith("set_launcher_hotkey", {
@@ -77,7 +79,7 @@ describe("HotkeyField", () => {
     render(<HotkeyField hotkey="Alt+Space" />);
 
     fireEvent.click(button());
-    press("Space", { altKey: true, shiftKey: true }, " ");
+    press(32, { altKey: true, shiftKey: true }, " ");
     await act(async () => {});
 
     expect(screen.getByRole("alert")).toHaveTextContent(text.errors.taken);
@@ -87,7 +89,7 @@ describe("HotkeyField", () => {
     render(<HotkeyField hotkey="Alt+Space" />);
 
     fireEvent.click(button());
-    press("Enter", { altKey: true }, "Enter");
+    press(13, { altKey: true }, "Enter");
 
     expect(screen.getByRole("alert")).toHaveTextContent(
       text.errors.unsupportedKey,
@@ -103,7 +105,7 @@ describe("HotkeyField", () => {
     render(<HotkeyField hotkey="Alt+Space" />);
 
     fireEvent.click(button());
-    press("Escape", {}, "Escape");
+    press(27, {}, "Escape");
 
     expect(onWindowKey).not.toHaveBeenCalled();
     expect(button()).toHaveTextContent("Alt+Espaço");
@@ -152,42 +154,38 @@ describe("hotkeyFromEvent", () => {
 
   it("writes the combination as Rust keeps it", () => {
     expect(
-      hotkeyFromEvent({ ...none, code: "KeyK", ctrlKey: true, shiftKey: true }),
+      hotkeyFromEvent({ ...none, keyCode: 75, ctrlKey: true, shiftKey: true }),
     ).toBe("Ctrl+Shift+K");
     expect(
       hotkeyFromEvent({
-        code: "Space",
+        keyCode: 32,
         ctrlKey: true,
         altKey: true,
         shiftKey: true,
         metaKey: true,
       }),
     ).toBe("Ctrl+Alt+Shift+Win+Space");
-    expect(hotkeyFromEvent({ ...none, code: "Digit7", altKey: true })).toBe(
+    expect(hotkeyFromEvent({ ...none, keyCode: 55, altKey: true })).toBe(
       "Alt+7",
     );
-    expect(hotkeyFromEvent({ ...none, code: "F12", altKey: true })).toBe(
+    expect(hotkeyFromEvent({ ...none, keyCode: 123, altKey: true })).toBe(
       "Alt+F12",
     );
-    expect(hotkeyFromEvent({ ...none, code: "KeyQ" })).toBe("Q");
+    expect(hotkeyFromEvent({ ...none, keyCode: 135, altKey: true })).toBe(
+      "Alt+F24",
+    );
+    expect(hotkeyFromEvent({ ...none, keyCode: 81 })).toBe("Q");
   });
 
   it("tells modifiers and other keys apart", () => {
-    expect(hotkeyFromEvent({ ...none, code: "AltLeft", altKey: true })).toBe(
-      "modifier",
-    );
-    expect(hotkeyFromEvent({ ...none, code: "MetaRight", metaKey: true })).toBe(
-      "modifier",
-    );
-    for (const code of [
-      "Enter",
-      "Tab",
-      "ArrowUp",
-      "F25",
-      "Numpad1",
-      "Semicolon",
-    ]) {
-      expect(hotkeyFromEvent({ ...none, code, altKey: true })).toBe(
+    for (const keyCode of [16, 17, 18, 91, 92]) {
+      expect(hotkeyFromEvent({ ...none, keyCode, altKey: true })).toBe(
+        "modifier",
+      );
+    }
+    // Enter, Tab, Up, F25 (none), the keypad's 1, the semicolon, 0 (unknown).
+    for (const keyCode of [13, 9, 38, 136, 97, 186, 0]) {
+      expect(hotkeyFromEvent({ ...none, keyCode, altKey: true })).toBe(
         "unsupported",
       );
     }

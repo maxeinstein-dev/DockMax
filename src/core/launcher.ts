@@ -76,44 +76,32 @@ export function captureLauncherHotkey(on: boolean): void {
   });
 }
 
-/** The key part of a hotkey from a key's `code`: `KeyK` is `K`, `Digit7`
- * is `7`, `F5` is `F5`, `Space` is `Space`; null for the other keys. */
-function keyName(code: string): string | null {
-  const letter = /^Key([A-Z])$/.exec(code);
-  if (letter) return letter[1] ?? null;
-  const digit = /^Digit([0-9])$/.exec(code);
-  if (digit) return digit[1] ?? null;
-  const fn = /^F([1-9]|1[0-9]|2[0-4])$/.exec(code);
-  if (fn) return code;
-  return code === "Space" ? "Space" : null;
+/** The key part of a hotkey from Windows' virtual-key code (`keyCode`):
+ * 75 is `K`, 55 is `7`, 116 is `F5`, 32 is `Space`; null for the other
+ * keys. */
+function keyName(keyCode: number): string | null {
+  if (keyCode >= 65 && keyCode <= 90) return String.fromCharCode(keyCode);
+  if (keyCode >= 48 && keyCode <= 57) return String.fromCharCode(keyCode);
+  if (keyCode >= 112 && keyCode <= 135) return `F${keyCode - 111}`;
+  return keyCode === 32 ? "Space" : null;
 }
 
-const MODIFIER_CODES = new Set([
-  "ControlLeft",
-  "ControlRight",
-  "AltLeft",
-  "AltRight",
-  "ShiftLeft",
-  "ShiftRight",
-  "MetaLeft",
-  "MetaRight",
-  "OSLeft",
-  "OSRight",
-]);
+/** Shift, Ctrl, Alt and the two Windows keys. */
+const MODIFIER_KEYS = new Set([16, 17, 18, 91, 92]);
 
 /** What a key press makes, as Rust writes a hotkey (`Ctrl+Shift+K`):
  * `modifier` while only modifiers are down, `unsupported` for a key a hotkey
- * can't have. By the key's place (`code`), not its letter, as Windows
- * registers it. */
+ * can't have. By the virtual key (`keyCode`), which is what Windows
+ * registers: on any keyboard layout, the hotkey is the key pressed. */
 export function hotkeyFromEvent(event: {
-  code: string;
+  keyCode: number;
   ctrlKey: boolean;
   altKey: boolean;
   shiftKey: boolean;
   metaKey: boolean;
 }): string | "modifier" | "unsupported" {
-  if (MODIFIER_CODES.has(event.code)) return "modifier";
-  const key = keyName(event.code);
+  if (MODIFIER_KEYS.has(event.keyCode)) return "modifier";
+  const key = keyName(event.keyCode);
   if (key === null) return "unsupported";
   const parts = [
     event.ctrlKey ? "Ctrl" : null,
