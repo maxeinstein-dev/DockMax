@@ -14,6 +14,9 @@ import LookPanel from "../panel/LookPanel";
 import SettingsPanel from "../panel/SettingsPanel";
 import WorkspacePicker from "../panel/WorkspacePicker";
 import WorkspacesPanel from "../panel/WorkspacesPanel";
+import Icon from "../panel/parts/Icon";
+import { NamedBySection } from "../panel/parts/focus";
+import { inWorkspace } from "../core/workspaces";
 import {
   SECTIONS,
   SECTION_EVENT,
@@ -22,6 +25,35 @@ import {
   type Section,
 } from "./sections";
 import "./SettingsApp.css";
+
+/** The glaze of each section's plate (spec 0014 R1; DESIGN.md "Tertiary",
+ * the static .t-* classes of tokens.css). */
+const PLATES: Readonly<Record<Section, string>> = {
+  general: "t-settings",
+  workspaces: "t-clock",
+  look: "t-music",
+  apps: "t-files",
+  items: "t-notes",
+  about: "t-about",
+};
+
+/** A section's plate: its glaze with its line icon. Decorative. */
+function Plate({
+  section,
+  large = false,
+}: {
+  section: Section;
+  large?: boolean;
+}) {
+  return (
+    <span
+      className={`section-plate ${PLATES[section]}${large ? " large" : ""}`}
+      aria-hidden="true"
+    >
+      <Icon name={section} />
+    </span>
+  );
+}
 
 function closeWindow() {
   getCurrentWindow()
@@ -50,6 +82,12 @@ function SettingsApp() {
    * docks show; at first the one in use. */
   const [chosen, setChosen] = useState<string | null>(null);
   const all = spaces?.workspaces ?? [];
+  // The programs of the workspace in use, in dock order: the miniatures of
+  // the styles show them, as the dock in use does.
+  const inUse = all.find((each) => each.id === spaces?.inUse) ?? all[0];
+  const pinnedInUse = inWorkspace(apps?.apps ?? [], inUse, "app").map(
+    (app) => app.appId,
+  );
   const editing =
     all.find((each) => each.id === chosen) ??
     all.find((each) => each.id === spaces?.inUse) ??
@@ -79,6 +117,10 @@ function SettingsApp() {
   return (
     <div className="settings-app">
       <nav className="settings-nav" aria-label={text.nav}>
+        <div className="settings-brand" aria-hidden="true">
+          <span className="settings-brand-name">DockMax</span>
+          <span className="settings-brand-sub">{text.brand}</span>
+        </div>
         {SECTIONS.map((each) => (
           <button
             key={each}
@@ -87,6 +129,7 @@ function SettingsApp() {
             aria-current={each === section ? "page" : undefined}
             onClick={() => setSection(each)}
           >
+            <Plate section={each} />
             {text.sections[each]}
           </button>
         ))}
@@ -98,54 +141,58 @@ function SettingsApp() {
           data-section={section}
           aria-labelledby="panel-title"
         >
-          {section === "general" ? (
-            <>
-              <h1 id="panel-title">{t.panel.titles.settings}</h1>
+          <header className="section-header">
+            <Plate section={section} large />
+            <div className="section-header-text">
+              <h1 id="panel-title">{text.sections[section]}</h1>
+              <p className="section-lead">{text.leads[section]}</p>
+            </div>
+          </header>
+          <NamedBySection.Provider value={true}>
+            {section === "general" ? (
               <SettingsPanel
                 settings={settings}
                 widgets={widgets}
                 apps={apps}
                 withTrayInDock
                 withLauncher
+                grouped
               />
-            </>
-          ) : null}
-          {section === "workspaces" ? (
-            <WorkspacesPanel
-              snapshot={spaces}
-              selected={editing}
-              onSelect={setChosen}
-              onEditApps={() => setSection("apps")}
-              onEditItems={() => setSection("items")}
-            />
-          ) : null}
-          {section === "look" ? <LookPanel settings={settings} /> : null}
-          {section === "apps" ? (
-            <>
-              <WorkspacePicker
-                workspaces={all}
+            ) : null}
+            {section === "workspaces" ? (
+              <WorkspacesPanel
+                snapshot={spaces}
                 selected={editing}
                 onSelect={setChosen}
+                onEditApps={() => setSection("apps")}
+                onEditItems={() => setSection("items")}
               />
-              <AppsPanel snapshot={apps} workspace={editing} />
-            </>
-          ) : null}
-          {section === "items" ? (
-            <>
-              <WorkspacePicker
-                workspaces={all}
-                selected={editing}
-                onSelect={setChosen}
-              />
-              <DockItems snapshot={widgets} workspace={editing} />
-            </>
-          ) : null}
-          {section === "about" ? (
-            <>
-              <h1 id="panel-title">{t.panel.titles.about}</h1>
-              <AboutPanel />
-            </>
-          ) : null}
+            ) : null}
+            {section === "look" ? (
+              <LookPanel settings={settings} appIds={pinnedInUse} grouped />
+            ) : null}
+            {section === "apps" ? (
+              <>
+                <WorkspacePicker
+                  workspaces={all}
+                  selected={editing}
+                  onSelect={setChosen}
+                />
+                <AppsPanel snapshot={apps} workspace={editing} />
+              </>
+            ) : null}
+            {section === "items" ? (
+              <>
+                <WorkspacePicker
+                  workspaces={all}
+                  selected={editing}
+                  onSelect={setChosen}
+                />
+                <DockItems snapshot={widgets} workspace={editing} />
+              </>
+            ) : null}
+            {section === "about" ? <AboutPanel /> : null}
+          </NamedBySection.Provider>
         </section>
       </main>
     </div>

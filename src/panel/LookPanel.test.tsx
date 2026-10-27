@@ -123,12 +123,8 @@ describe("LookPanel", () => {
       <LookPanel settings={withDock({ style: "neon" })} onBack={vi.fn()} />,
     );
 
-    const list = screen.getByRole("combobox", { name: text.style });
-    expect(
-      within(list)
-        .getAllByRole("option")
-        .map((entry) => entry.textContent),
-    ).toEqual([
+    const cards = within(group(text.style)).getAllByRole("button");
+    expect(cards.map((card) => card.textContent)).toEqual([
       "Nativo",
       "Liquid Glass",
       "Meia-noite",
@@ -139,15 +135,17 @@ describe("LookPanel", () => {
       "Papel",
       "Flutuante",
     ]);
-    expect(list).toHaveValue("neon");
+    expect(chosen(text.style)).toEqual(["Neon"]);
   });
 
   it("saves the full settings on choosing a style", () => {
     render(<LookPanel settings={SETTINGS} onBack={vi.fn()} />);
 
-    fireEvent.change(screen.getByRole("combobox", { name: text.style }), {
-      target: { value: "aquaShelf" },
-    });
+    fireEvent.click(
+      within(group(text.style)).getByRole("button", {
+        name: "Prateleira Aqua",
+      }),
+    );
 
     expect(saves()).toHaveLength(1);
     expect(sentSettings()).toEqual(withDock({ style: "aquaShelf" }));
@@ -463,7 +461,9 @@ describe("LookPanel", () => {
   it("cannot change anything while the settings can't be read", () => {
     render(<LookPanel settings={null} onBack={vi.fn()} />);
 
-    expect(screen.getByRole("combobox", { name: text.style })).toBeDisabled();
+    for (const card of within(group(text.style)).getAllByRole("button")) {
+      expect(card).toBeDisabled();
+    }
     expect(screen.getByRole("switch", { name: text.border })).toBeDisabled();
     expect(screen.getByRole("slider", { name: text.corners })).toBeDisabled();
     for (const swatch of within(group(text.indicatorColor)).getAllByRole(

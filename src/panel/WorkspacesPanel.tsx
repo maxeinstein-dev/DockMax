@@ -19,6 +19,7 @@ import PanelFooter from "./PanelFooter";
 import IconButton from "./parts/IconButton";
 import InlineConfirm from "./parts/InlineConfirm";
 import TextField from "./parts/TextField";
+import PanelHeader from "./parts/PanelHeader";
 import "./Workspaces.css";
 
 export interface WorkspacesPanelProps {
@@ -120,7 +121,7 @@ function WorkspacesPanel({
 
   return (
     <div className="workspaces">
-      <h1 id="panel-title">{text.title}</h1>
+      <PanelHeader title={text.title} />
       <p className="workspaces-lead">{text.lead}</p>
       {snapshot === null ? (
         <p className="workspaces-lead">{text.loading}</p>

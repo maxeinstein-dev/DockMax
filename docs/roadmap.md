@@ -231,7 +231,7 @@ Não verificado: máquina limpa ou virtual, Windows 10, atualização por cima d
 
 ### Rebranding de Configurações e menus
 
-- [ ] Configurações, os menus do dock e da bandeja e o resto das telas de apoio estão "muito simples" (autor, 2026-10-27). Referências: o acabamento do PrimoDock ([interface](reference/primodock/interface.md): abas com ícones coloridos em placa, menus com ícones e destaque), o tema WhiteSur GTK e o dock do ZorinOS. Precisa de spec própria.
+- [ ] Configurações, os menus do dock e da bandeja e o resto das telas de apoio estão "muito simples" (autor, 2026-10-27). Referências: o acabamento do PrimoDock ([interface](reference/primodock/interface.md): abas com ícones coloridos em placa, menus com ícones e destaque), o tema WhiteSur GTK e o dock do ZorinOS. Spec: [0014](specs/0014-rebranding-configuracoes-e-menus.md), em quatro recortes; o R1 (estrutura de Configurações e temas com miniatura) foi feito em 2026-10-27.
 
 ### Personalização do dock
 - [ ] Cor de destaque escolhida pelo usuário (o token `--accent` já existe)
