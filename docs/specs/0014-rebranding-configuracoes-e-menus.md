@@ -1,6 +1,6 @@
 # Spec 0014 — Rebranding de Configurações e dos menus
 
-**Status:** R1 feito (estrutura de Configurações e temas com miniatura); R2 implementado (as outras escolhas em cartões); R3 e R4 a fazer.
+**Status:** R1 feito (estrutura de Configurações e temas com miniatura); R2 feito (as outras escolhas em cartões); R3 e R4 a fazer.
 **Origem:** pedido do autor (2026-10-27): Configurações, os menus do dock e da bandeja e as outras telas de apoio estão "muito simples e sem vida". Referência de acabamento: o PrimoDock ([interface](../reference/primodock/interface.md), "Janela de configurações" e "Menus"), com o tema WhiteSur GTK e o dock do ZorinOS como inspiração. Exemplo dado pelo autor: em Aparência, mostrar os temas aplicados, e não só os nomes.
 
 ## 1. Decisões do autor (2026-10-27)
@@ -97,3 +97,13 @@ A busca nos ajustes, a prévia do dock sobre o papel de parede de verdade, a apa
 - **Memória privada** (processo e WebView2): 212 MB com o dock aberto e 243 MB com Configurações aberta na Aparência. Não houve medição da main na mesma rodada, então a diferença do R1 em si não foi medida; Configurações só existe enquanto está aberta.
 
 **Não verificado (R1):** as miniaturas com programas fixados de verdade, com o mouse, e o leitor de tela na grade de temas.
+
+**Verificado (R2, 2026-10-27),** com a cópia de teste (release, dados temporários), sem mexer no ponteiro:
+
+- capturas de Geral (Posição e Barra de tarefas do Windows em cartões, com as frases) e da Aparência (efeito ao passar o mouse, indicador, formato dos ícones, animação de abertura) nos temas claro e escuro;
+- o cartão Ampliação salvou `magnify` e o Tremor salvou `shake`;
+- Esc fechou Configurações; o "Sair" saiu sem queda no log, sem processo sobrando e com a barra do Windows igual;
+- memória privada: 211 MB com o dock e 258 MB com Configurações aberta na Aparência (com as miniaturas animando);
+- as capturas mostraram que a miniatura cobria a parte de cima do anel do cartão escolhido; o anel passou para uma camada por cima dela (não capturado de novo depois da correção).
+
+**Não verificado (R2):** a animação vista em movimento (as capturas são quadros parados), "Reduzir movimento" ligado no Windows, o mouse de verdade e o leitor de tela.
