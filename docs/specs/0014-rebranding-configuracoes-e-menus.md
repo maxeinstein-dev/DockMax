@@ -1,6 +1,6 @@
 # Spec 0014 — Rebranding de Configurações e dos menus
 
-**Status:** R1 feito (estrutura de Configurações e temas com miniatura); R2 feito (as outras escolhas em cartões); R3 e R4 a fazer.
+**Status:** R1, R2 e R3 feitos; R4 a fazer.
 **Origem:** pedido do autor (2026-10-27): Configurações, os menus do dock e da bandeja e as outras telas de apoio estão "muito simples e sem vida". Referência de acabamento: o PrimoDock ([interface](../reference/primodock/interface.md), "Janela de configurações" e "Menus"), com o tema WhiteSur GTK e o dock do ZorinOS como inspiração. Exemplo dado pelo autor: em Aparência, mostrar os temas aplicados, e não só os nomes.
 
 ## 1. Decisões do autor (2026-10-27)
@@ -83,6 +83,15 @@ A busca nos ajustes, a prévia do dock sobre o papel de parede de verdade, a apa
 - O painel antigo continua com os botões de texto: os cartões só aparecem no app de Configurações.
 - Os deslizantes já tinham o valor em algarismos tabulares. As seções Espaços, Apps, Itens e Sobre ganharam o cabeçalho no R1; o acabamento interno delas passa para o R4.
 
+## 5c. Como o R3 ficou
+
+- **Uma janela de menu nativa** (`windows/menu/`, classe `DockMaxMenu`), desenhada com Direct2D como o lançador e com as mesmas cores (o azul de seleção do lançador; as do Windows no contraste alto): cartão de cantos arredondados (o Windows 11 põe a borda e a sombra), um ícone de linha (da fonte de ícones do Windows) ou a bolinha do espaço em cada item, o item sob o ponteiro ou o teclado preenchido no azul, o atalho em cinza à direita, a marca (✓) no azul, títulos de grupo e separadores. A largura segue o texto mais largo (de 240 a 420 px).
+- **Funciona como o menu do Windows** (`show` espera a escolha, como o `TrackPopupMenu`): abre acima do clique com o dock embaixo e abaixo com o dock em cima, sempre dentro da tela; setas, Home, End, Enter, Espaço e a primeira letra (sem acento) escolhem; Esc, Alt, F10 e um clique fora fecham.
+- **UI Automation:** um menu com itens (nome, atalho, posição, ligado ou desligado em "Ocultar automaticamente"), separadores e o título; o item ativo recebe o foco, e "Invocar" escolhe. O leitor de tela ouve o menu abrir e fechar.
+- **Onde:** o menu do dock (agora com o título "Espaços de trabalho" sobre os espaços, cada um com a sua cor) e o do ícone da bandeja, que deixou o menu do Tauri e é o mesmo do dock sem os espaços. A detecção de menu na tela (que segura o dock levantado) conta o menu novo.
+- **O menu de um programa** (o painel com a Jump List) ganhou a mesma aparência, em CSS: itens mais altos de cantos arredondados, o item sob o ponteiro ou o foco preenchido no azul, ícones de linha nas ações do dock (abrir, mostrar no Explorador, fechar, remover).
+- Os menus dos ícones da bandeja de outros programas continuam os deles.
+
 ## 6. Verificação
 
 - Testes da barra lateral (seções, a ativa, o teclado), do cabeçalho e da grade de temas (escolher, as setas, o tema com as mudanças do usuário, sem programas fixados); o teste da tabela de cores contra o Rust.
@@ -107,3 +116,19 @@ A busca nos ajustes, a prévia do dock sobre o papel de parede de verdade, a apa
 - as capturas mostraram que a miniatura cobria a parte de cima do anel do cartão escolhido; o anel passou para uma camada por cima dela (não capturado de novo depois da correção).
 
 **Não verificado (R2):** a animação vista em movimento (as capturas são quadros parados), "Reduzir movimento" ligado no Windows, o mouse de verdade e o leitor de tela.
+
+**Verificado (R3, 2026-10-27),** com a cópia de teste (release, dados temporários), o teclado mandado por `SendInput` e o botão direito mandado ao dock:
+
+- o botão direito no dock abriu o menu novo (classe `DockMaxMenu`), e nenhum menu do Windows; captura: cartão escuro arredondado, ícones, separadores, "Ocultar automaticamente" com a marca azul quando ligado;
+- a UI Automation leu um menu "DockMax" com os itens e separadores na ordem; duas setas para baixo deram o foco a "Gerenciador de Tarefas" (a primeira acende "Buscar apps…"), com o fundo azul na captura;
+- Esc fechou; outra janela na frente fechou; a letra "o" escolheu "Ocultar automaticamente" (salvo `true`) e, de novo, desligou (salvo `false`);
+- "Sair" pelo menu novo (End e Enter) saiu sem queda no log, sem processo sobrando e com a barra do Windows igual;
+- memória privada: 207 MB com o dock e 219 MB com o menu aberto (o menu é um processo só, sem WebView2).
+
+- **Segunda rodada (R3, 2026-10-27),** com o dock no topo da tela:
+  - o menu do dock abriu para baixo do ponteiro;
+  - o clique direito no ícone da bandeja (a mensagem do próprio ícone) abriu o menu novo, o mesmo do dock sem os espaços, sem nenhum menu do Windows; a seta deu o foco a "Buscar apps…" e Esc fechou;
+  - com o Bloco de notas fixado por Configurações › Apps do dock, o clique direito nele abriu o menu do programa com a aparência nova (a Jump List com "Recentes", o item com o foco preenchido no azul);
+  - nas duas rodadas, "Sair" sem queda no log, sem processo sobrando e com a barra do Windows igual.
+
+**Não verificado (R3):** o mouse de verdade, o leitor de tela falando, o contraste alto e escala acima de 100 %.
