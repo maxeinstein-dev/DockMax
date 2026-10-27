@@ -187,6 +187,23 @@ Com o auxiliar, o total aberto passa da meta de 10 MB, mas só enquanto o lança
 
 **Não verificado:** o Narrador de verdade, o IME de outro idioma, o Alt+Espaço com o teclado físico, outro programa segurando o Alt+Espaço, alto contraste, escala de 150 % e dois monitores; a suíte de ponta a ponta (a CI roda).
 
+## 8b. Verificado (L2, 2026-10-27)
+
+No build de teste em release, na máquina do autor, com entrada de teclado simulada e a barra do Windows visível:
+
+- `2+2*3` → "= 8", `7/2` → "= 3,5", `200*10%` → "= 20", sempre em primeiro e selecionados, com o subtítulo "Calculadora · Enter copia o resultado".
+- `g dockmax` → um resultado só, "Buscar “dockmax”" (Google · busca na web); `yt lo-fi` → "Buscar “lo-fi”" (YouTube); `zqxjzqxj` → a busca padrão do Google, sozinha; `g ` (sem termo) → os apps com "g".
+- `wifi` → "Wi-Fi" e `papel de parede` → "Plano de fundo", com o subtítulo "Configurações do Windows".
+- Enter em `aparencia` ("Aparência do dock", Configurações do DockMax): o lançador fecha e a janela de Configurações abre já na seção Aparência do dock (conferido pela captura da janela). Reaberto, o lançador mostra a página em "Recentes".
+- A barra do Windows ficou igual antes e depois; nenhum processo sobrou.
+
+| Medida (memória privada, processo principal) | Resultado | Meta |
+|---|---|---|
+| Aberto, depois das buscas | **+7,0 MB**, mais o auxiliar de ícones com **8 MB** | +10 MB |
+| 50 s depois de fechar | **+2,2 MB** (no segundo teste, +3,4 MB, com a janela de Configurações aberta); o auxiliar já saiu | +3 MB |
+
+**Não verificado:** o Enter na conta (a área de transferência do autor tinha HTML, e o teste não a sobrescreve), o Enter em `g dockmax` e em `wifi` (abririam o navegador e as Configurações do Windows), o Narrador e o editor de palavras-chave pelo teclado. Esses itens estão no [roadmap](../roadmap.md).
+
 ## 9. Extensões (depois)
 
 Fica aqui só o desenho que o L1 não pode fechar:
