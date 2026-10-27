@@ -117,7 +117,7 @@ fn colors() -> (Colors, bool) {
     }
 }
 
-/// The work area and the scale of the monitor at `at`.
+/// The work area of the monitor at `at`, and the menu's scale there.
 fn monitor_at(at: POINT) -> (Area, f64) {
     unsafe {
         let monitor = MonitorFromPoint(at, MONITOR_DEFAULTTONEAREST);
@@ -136,7 +136,8 @@ fn monitor_at(at: POINT) -> (Area, f64) {
                 width: work.right - work.left,
                 height: work.bottom - work.top,
             },
-            f64::from(dpi.max(96)) / 96.0,
+            // Windows' "Text size" too, as the launcher.
+            f64::from(dpi.max(96)) / 96.0 * super::launcher::text_scale(),
         )
     }
 }

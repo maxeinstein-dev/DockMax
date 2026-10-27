@@ -641,7 +641,7 @@ fn colorref(c: Rgb) -> COLORREF {
 }
 
 /// How much bigger Windows' "Text size" makes text: 1 at 100 %.
-fn text_scale() -> f64 {
+pub(crate) fn text_scale() -> f64 {
     use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
     let mut value: u32 = 100;
     let mut size = size_of::<u32>() as u32;
