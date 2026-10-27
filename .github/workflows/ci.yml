@@ -13,6 +13,26 @@ permissions:
   contents: read
 
 jobs:
+  # Um PR empilhado (com base na branch de outro PR) que for mergeado cai
+  # nessa branch, não na main (aconteceu com o #45). Fica vermelho até a
+  # base ser a main: mergeie antes o PR de baixo; com a branch dele apagada
+  # no merge, o GitHub muda a base deste sozinho.
+  base:
+    name: base
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: O PR aponta para a main
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          if [ "$BASE" != "main" ]; then
+            echo "::error::Este PR aponta para '$BASE', não para a main. Mergeie antes o PR de baixo; quando a branch dele for apagada no merge, a base deste muda para a main."
+            exit 1
+          fi
+          echo "Base: main"
+
   checks:
     name: checks
     runs-on: windows-latest
