@@ -1,4 +1,4 @@
-# Spec 0014 — Selos de notificação
+# Spec 0016 — Selos de notificação
 
 Fora das fases da [spec 0004](0004-paridade-primodock.md): pedido do autor depois do spike de 2026-10-27. É a bolinha com o número de não lidas que o celular põe no ícone do app (WhatsApp, Telegram, Outlook, Teams), desenhada nos ícones do dock.
 

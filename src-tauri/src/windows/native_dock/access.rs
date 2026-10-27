@@ -309,8 +309,9 @@ impl IRawElementProviderFragment_Impl for Item_Impl {
 
 impl IInvokeProvider_Impl for Item_Impl {
     fn Invoke(&self) -> Result<()> {
+        // Only this dock: each monitor has the same workspace dots.
         let key = self.key.clone();
-        super::post(move |dock| dock.press(&key));
+        super::post_to(self.hwnd, move |dock| dock.press(&key));
         Ok(())
     }
 }

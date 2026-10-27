@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppMenu, PinnedApp } from "../core/apps";
+import type { WorkspacesSnapshot } from "../core/workspaces";
 import { ptBR } from "../i18n/pt-BR";
 import AppMenuPanel from "./AppMenuPanel";
 
@@ -233,6 +234,68 @@ describe("AppMenuPanel", () => {
       await renderMenu(() => {}, 2);
 
       expect(item(text.closeWindows)).toBeInTheDocument();
+    });
+  });
+
+  describe("moving its windows to another workspace (spec 0013 C3)", () => {
+    const SPACES: WorkspacesSnapshot = {
+      workspaces: [
+        { id: "w-main", name: "Principal", color: "#0A84FF", items: [] },
+        { id: "w-work", name: "Trabalho", color: "#FF9F0A", items: [] },
+      ],
+      inUse: "w-main",
+    };
+
+    it("offers every workspace but the one in use, and asks Rust", async () => {
+      answer();
+      const onDone = vi.fn();
+      render(
+        <AppMenuPanel
+          app={APP}
+          openCount={1}
+          workspaces={SPACES}
+          onDone={onDone}
+        />,
+      );
+      await flush();
+
+      expect(
+        screen.queryByRole("menuitem", { name: "Mover para Principal" }),
+      ).toBeNull();
+      fireEvent.click(item("Mover para Trabalho"));
+      await flush();
+
+      expect(sent("move_app_windows")).toEqual([
+        { id: APP.id, workspace: "w-work" },
+      ]);
+      expect(onDone).toHaveBeenCalledTimes(1);
+    });
+
+    it("offers nothing without windows open or with a single workspace", async () => {
+      answer();
+      const { rerender } = render(
+        <AppMenuPanel
+          app={APP}
+          openCount={0}
+          workspaces={SPACES}
+          onDone={() => {}}
+        />,
+      );
+      await flush();
+      expect(
+        screen.queryByRole("menuitem", { name: "Mover para Trabalho" }),
+      ).toBeNull();
+
+      rerender(
+        <AppMenuPanel
+          app={APP}
+          openCount={1}
+          workspaces={{ ...SPACES, workspaces: SPACES.workspaces.slice(0, 1) }}
+          onDone={() => {}}
+        />,
+      );
+      await flush();
+      expect(screen.queryByRole("menuitem", { name: /Mover para/ })).toBeNull();
     });
   });
 });

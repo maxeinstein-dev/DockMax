@@ -1,4 +1,4 @@
-//! The notification badges, read from the Windows taskbar (spec 0014).
+//! The notification badges, read from the Windows taskbar (spec 0016).
 //!
 //! A program that counts what is unread (WhatsApp, Telegram, Outlook, Teams)
 //! puts the number on its button of the taskbar; UI Automation shows it as a

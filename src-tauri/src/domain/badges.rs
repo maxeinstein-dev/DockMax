@@ -1,4 +1,4 @@
-//! The notification badges (spec 0014): the number a program puts on its
+//! The notification badges (spec 0016): the number a program puts on its
 //! button of the Windows taskbar, read there and drawn on its icon of the
 //! dock. Pure rules: the taskbar is read in `windows/badges.rs` and the
 //! badge drawn in `windows/native_dock`.

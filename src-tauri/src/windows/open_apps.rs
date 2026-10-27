@@ -463,27 +463,35 @@ pub fn place_other(app: &AppHandle, key: &str, index: usize) {
     super::dock::refresh();
 }
 
-/// Asks every window of the pinned program `id` in the workspace
-/// `workspace` to close; how many it asked.
-pub fn close_pinned(app: &AppHandle, id: &str, workspace: Option<&str>) -> usize {
-    let hwnds: Vec<isize> = state()
+/// The windows of the pinned program `id` in the workspace `workspace`.
+pub fn windows_of_pinned(id: &str, workspace: Option<&str>) -> Vec<isize> {
+    state()
         .found
         .iter()
         .find(|found| found.id == id)
         .map(|found| of_workspace(&found.hwnds, workspace))
-        .unwrap_or_default();
-    close_all(app, &hwnds)
+        .unwrap_or_default()
 }
 
 /// The same for the open program `key` that is not pinned.
-pub fn close_other(app: &AppHandle, key: &str, workspace: Option<&str>) -> usize {
-    let hwnds: Vec<isize> = state()
+pub fn windows_of_other(key: &str, workspace: Option<&str>) -> Vec<isize> {
+    state()
         .others
         .iter()
         .find(|other| other.id == key)
         .map(|other| of_workspace(&other.hwnds, workspace))
-        .unwrap_or_default();
-    close_all(app, &hwnds)
+        .unwrap_or_default()
+}
+
+/// Asks every window of the pinned program `id` in the workspace
+/// `workspace` to close; how many it asked.
+pub fn close_pinned(app: &AppHandle, id: &str, workspace: Option<&str>) -> usize {
+    close_all(app, &windows_of_pinned(id, workspace))
+}
+
+/// The same for the open program `key` that is not pinned.
+pub fn close_other(app: &AppHandle, key: &str, workspace: Option<&str>) -> usize {
+    close_all(app, &windows_of_other(key, workspace))
 }
 
 fn close_all(app: &AppHandle, hwnds: &[isize]) -> usize {
@@ -518,7 +526,7 @@ pub fn aumid_of_other(key: &str) -> Option<String> {
 
 /// What the windows of the open program `key` that is not pinned are grouped
 /// by: their AppID, else their file, lowercased. For its notification badge
-/// (spec 0014).
+/// (spec 0016).
 pub fn group_key_of_other(key: &str) -> Option<String> {
     state()
         .others

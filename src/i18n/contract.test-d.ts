@@ -37,6 +37,10 @@ export const otherText: Messages = {
     autoHideDelayHint: "How long away before it goes down",
     everyMonitor: "Dock on every monitor",
     everyMonitorHint: "Each monitor with its own dock",
+    switchEveryMonitor: "Switch workspace on every monitor",
+    switchEveryMonitorHint: "A switch on one dock switches the others",
+    indicatorFollowsWorkspace: "Indicator in the workspace color",
+    indicatorFollowsWorkspaceHint: "The open apps' mark wears its color",
     app: {
       nav: "Settings sections",
       sections: {
@@ -331,6 +335,7 @@ export const otherText: Messages = {
       closeWindow: "Close window",
       closeWindows: "Close all windows",
       pin: "Pin to dock",
+      moveTo: "Move to {name}",
       openFooter: "An open app that is not pinned",
       footer: "The taskbar menu",
     },

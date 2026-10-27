@@ -163,7 +163,7 @@ pub fn tray_cells(area: Area, count: usize, icon: f64) -> Vec<Area> {
         .collect()
 }
 
-/// The notification badge on a tile (spec 0014): a pill on its top right
+/// The notification badge on a tile (spec 0016): a pill on its top right
 /// corner, reaching a little beyond it, as on a phone. `text_width` is the
 /// width of its number (0 for a badge with no number, which is a smaller
 /// round dot).

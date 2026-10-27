@@ -6,7 +6,7 @@
 //! the process, and a reboot), and its windows, made see-through and deaf to
 //! the mouse (`WS_EX_LAYERED` with an alpha of 0, and `WS_EX_TRANSPARENT`).
 //! They stay shown so that UI Automation still finds their buttons, where
-//! the notification badges are read (spec 0014): a window hidden with
+//! the notification badges are read (spec 0016): a window hidden with
 //! `SW_HIDE` has none. Both are restored on every way out the dock has:
 //!
 //! 1. the normal exit and the end of the Windows session (`release`);
@@ -76,7 +76,7 @@ pub struct Saved {
     /// Whether the taskbar hid itself on its own.
     pub autohide: bool,
     /// The taskbar windows hidden with `SW_HIDE` (handles, as numbers), as
-    /// the versions before spec 0014 hid them: kept so that the file one of
+    /// the versions before spec 0016 hid them: kept so that the file one of
     /// them left still restores.
     #[serde(default)]
     pub hidden: Vec<isize>,
@@ -445,7 +445,7 @@ fn restore_file(path: &Path, pid: u32) {
     for faded in &saved.faded {
         unfade(faded);
     }
-    // A hidden window (of a version before spec 0014) was a topmost one; a
+    // A hidden window (of a version before spec 0016) was a topmost one; a
     // faded one says whether it was (the secondary taskbars are not).
     let touched = saved.hidden.iter().map(|&hwnd| (hwnd, true, true)).chain(
         saved
@@ -697,7 +697,7 @@ mod tests {
     fn a_file_of_an_earlier_version_still_reads() {
         let dir = tempdir().unwrap();
         let path = dir.path().join(STATE_FILE);
-        // Before spec 0014 the windows were hidden, and the file had no
+        // Before spec 0016 the windows were hidden, and the file had no
         // `faded`.
         fs::write(&path, br#"{"pid":7,"autohide":false,"hidden":[10,20]}"#).unwrap();
 

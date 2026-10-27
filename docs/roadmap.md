@@ -25,14 +25,14 @@ Ordem decidida pelo autor em 2026-10-26, depois da fase D: **C → E → F → G
 | **A. Visual** | Concluída: nove estilos, efeito ao passar o mouse, indicador, posições ([spec 0005](specs/0005-fase-a-visual.md)). |
 | **B. Itens e ícones** | Concluída no escopo do MVP ([spec 0006](specs/0006-fase-b-apps.md), [spec 0007](specs/0007-fase-b4-icones.md)); a personalização de ícones (B4b, B4c) fica para o futuro. |
 | **D. Windows** | **Concluída em 2026-10-26**: barra de aplicativos e barra do Windows oculta (ADR 0009), apps abertos, ativar e minimizar, menus ([spec 0009](specs/0009-fase-d-janelas.md)), tela cheia e um dock por monitor ([spec 0010](specs/0010-fase-d4-monitores-e-tela-cheia.md)), dock nativo ([spec 0011](specs/0011-arquitetura-hibrida.md)) e ocultar automaticamente. Falta a [rodada de verificações](roteiro-de-verificacao.md). |
-| **C. Espaços de trabalho** | **Em andamento** ([spec 0013](specs/0013-fase-c-espacos-de-trabalho.md)): C1 (espaços, troca no dock e edição em Configurações) e C2 (janelas por espaço, guardadas entre execuções) feitos; falta o C3. |
+| **C. Espaços de trabalho** | **Concluída** ([spec 0013](specs/0013-fase-c-espacos-de-trabalho.md)): C1 (espaços, troca no dock e edição em Configurações), C2 (janelas por espaço, guardadas entre execuções) e C3 (mover janelas para outro espaço, troca em todos os monitores, indicador na cor do espaço, widgets em vários espaços, bolinhas no leitor de tela, troca animada). |
 | **E. Prévias e bandeja** | A bandeja já está pronta (painel da seta, ícones no dock, menus no lugar); faltam as prévias das janelas. |
 | **F. Widgets** | Depois da E. |
 | **G. Extras** | Depois da F. |
 
 Fora das fases: o **lançador** no estilo do Ulauncher ([spec 0012](specs/0012-lancador.md)). O L1 entrou em 2026-10-27 (Alt+Espaço, busca nos apps, recentes), no [PR #33](https://github.com/maxeinstein-dev/DockMax/pull/33). O L2 (calculadora, busca na web por palavra-chave, Configurações do DockMax e do Windows) entrou no [PR #37](https://github.com/maxeinstein-dev/DockMax/pull/37). O L3 (personalizar o atalho) vem no PR seguinte.
 
-Também fora das fases: os **selos de notificação** ([spec 0014](specs/0014-selos-de-notificacao.md)), o número de não lidas que o app põe no botão da barra do Windows, lido pela UI Automation e desenhado no ícone do dock. Para isso a barra passa a ficar transparente e sem receber cliques, em vez de escondida.
+Também fora das fases: os **selos de notificação** ([spec 0016](specs/0016-selos-de-notificacao.md)), o número de não lidas que o app põe no botão da barra do Windows, lido pela UI Automation e desenhado no ícone do dock. Para isso a barra passa a ficar transparente e sem receber cliques, em vez de escondida.
 
 ## Visão do produto
 

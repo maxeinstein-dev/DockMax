@@ -17,6 +17,7 @@ import {
 import { useApps, type AppsSnapshot, type PinnedApp } from "../core/apps";
 import { useOpenApps, type OpenNow, type OpenOther } from "../core/openApps";
 import { useSettings } from "../core/settings";
+import { useWorkspaces } from "../core/workspaces";
 import {
   useWidgets,
   type CreatableKind,
@@ -108,6 +109,7 @@ function Panel() {
   const widgets = useWidgets();
   const apps = useApps();
   const open = useOpenApps();
+  const workspaces = useWorkspaces();
   /** The size last sent for the current request. */
   const sentSize = useRef<LogicalSize | null>(null);
   /** The request whose panel was closed for its instance being gone. */
@@ -265,6 +267,7 @@ function Panel() {
             app={app}
             open={open}
             other={other}
+            workspaces={workspaces}
             instance={instance}
             view={view}
             onView={onView}

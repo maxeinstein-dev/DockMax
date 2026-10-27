@@ -12,8 +12,10 @@ import {
   type AppMenu,
   type PinnedApp,
 } from "../core/apps";
+import { moveAppWindows, type WorkspacesSnapshot } from "../core/workspaces";
 import { format, useT } from "../i18n";
 import PanelFooter from "./PanelFooter";
+import MoveToWorkspace from "./parts/MoveToWorkspace";
 import PanelHeader from "./parts/PanelHeader";
 import "./AppMenuPanel.css";
 
@@ -25,6 +27,9 @@ export interface AppMenuPanelProps {
   /** How many windows the program has open (spec 0009 D3): with any, the menu
    * offers to close them. */
   openCount?: number;
+  /** The workspaces: with two or more, the menu offers to move the open
+   * windows to another (spec 0013 C3). */
+  workspaces?: WorkspacesSnapshot | null;
   /** An entry or an action was done: the host closes the panel. */
   onDone: () => void;
 }
@@ -43,7 +48,12 @@ interface Read {
  * Choosing an entry runs it by its key (Rust remembers what each key runs);
  * the page never holds a path.
  */
-function AppMenuPanel({ app, openCount = 0, onDone }: AppMenuPanelProps) {
+function AppMenuPanel({
+  app,
+  openCount = 0,
+  workspaces = null,
+  onDone,
+}: AppMenuPanelProps) {
   const t = useT();
   const text = t.apps.menu;
   const headings = useId();
@@ -81,7 +91,7 @@ function AppMenuPanel({ app, openCount = 0, onDone }: AppMenuPanelProps) {
     setError(isAppCommandError(reason) ? reason.code : "notReady");
   }
 
-  function done(action: Promise<void>) {
+  function done(action: Promise<unknown>) {
     setError(null);
     action.then(onDone, fail);
   }
@@ -176,6 +186,12 @@ function AppMenuPanel({ app, openCount = 0, onDone }: AppMenuPanelProps) {
             {text.remove}
           </button>
         </div>
+        {openCount > 0 ? (
+          <MoveToWorkspace
+            workspaces={workspaces}
+            onMove={(workspace) => done(moveAppWindows(app.id, workspace))}
+          />
+        ) : null}
       </div>
       <PanelFooter alert={error && t.apps.errors[error]}>
         {text.footer}

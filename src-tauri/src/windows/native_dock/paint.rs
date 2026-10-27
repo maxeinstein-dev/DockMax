@@ -117,7 +117,7 @@ pub struct Tile {
     pub dot: Option<(f64, f32)>,
     /// The item's box (for the focus ring).
     pub item: Area,
-    /// The program's notification badge (spec 0014).
+    /// The program's notification badge (spec 0016).
     pub notice: Option<Badge>,
 }
 
@@ -1535,7 +1535,7 @@ impl Painter {
         }
     }
 
-    /// The notification badge on a program's tile (spec 0014): the number
+    /// The notification badge on a program's tile (spec 0016): the number
     /// in white on the danger color, in a ring of the bar's, or a dot for a
     /// badge with no number.
     fn notice(&mut self, scene: &Scene, tile: Area, notice: Badge) {

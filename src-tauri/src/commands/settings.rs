@@ -80,6 +80,8 @@ struct DockSettingsInput {
     auto_hide_reveal: u16,
     auto_hide_delay: u16,
     bottom_space: u8,
+    switch_every_monitor: bool,
+    indicator_follows_workspace: bool,
 }
 
 impl From<SettingsInput> for Settings {
@@ -131,6 +133,8 @@ impl From<SettingsInput> for Settings {
                 auto_hide_reveal: dock.auto_hide_reveal,
                 auto_hide_delay: dock.auto_hide_delay,
                 bottom_space: dock.bottom_space,
+                switch_every_monitor: dock.switch_every_monitor,
+                indicator_follows_workspace: dock.indicator_follows_workspace,
             },
         }
     }
@@ -433,7 +437,7 @@ mod tests {
     }
 
     /// The look fields of a full update payload.
-    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","showOpenApps":false,"showBadges":false,"middleClick":"none","taskbar":"hidden","everyMonitor":false,"autoHide":true,"autoHideReveal":500,"autoHideDelay":1500,"bottomSpace":2"##;
+    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","showOpenApps":false,"showBadges":false,"middleClick":"none","taskbar":"hidden","everyMonitor":false,"autoHide":true,"autoHideReveal":500,"autoHideDelay":1500,"bottomSpace":2,"switchEveryMonitor":true,"indicatorFollowsWorkspace":true"##;
 
     fn full() -> String {
         format!(
@@ -487,6 +491,8 @@ mod tests {
                     auto_hide_reveal: 500,
                     auto_hide_delay: 1500,
                     bottom_space: 2,
+                    switch_every_monitor: true,
+                    indicator_follows_workspace: true,
                 },
             }
         );
@@ -538,6 +544,8 @@ mod tests {
             "autoHideReveal",
             "autoHideDelay",
             "bottomSpace",
+            "switchEveryMonitor",
+            "indicatorFollowsWorkspace",
         ] {
             let mut value: serde_json::Value = serde_json::from_str(&full()).unwrap();
             value["dock"].as_object_mut().unwrap().remove(field);

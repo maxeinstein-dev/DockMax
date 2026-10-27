@@ -142,6 +142,8 @@ export const DEFAULT_LOOK = {
   autoHideReveal: DEFAULT_AUTO_HIDE_REVEAL,
   autoHideDelay: DEFAULT_AUTO_HIDE_DELAY,
   bottomSpace: DEFAULT_BOTTOM_SPACE,
+  switchEveryMonitor: false,
+  indicatorFollowsWorkspace: false,
 } as const satisfies Pick<
   DockSettings,
   | "style"
@@ -162,6 +164,8 @@ export const DEFAULT_LOOK = {
   | "autoHideReveal"
   | "autoHideDelay"
   | "bottomSpace"
+  | "switchEveryMonitor"
+  | "indicatorFollowsWorkspace"
 >;
 
 export interface DockSettings {
@@ -188,7 +192,7 @@ export interface DockSettings {
    * the widgets (spec 0009 D2). */
   showOpenApps: boolean;
   /** Whether a program's icon wears the notification badge of its button of
-   * the Windows taskbar (spec 0014). */
+   * the Windows taskbar (spec 0016). */
   showBadges: boolean;
   /** What the middle button does on a program of the dock. */
   middleClick: MiddleClick;
@@ -211,6 +215,11 @@ export interface DockSettings {
   /** Distance between the dock and the screen edge, in logical pixels,
    * 0–`MAX_BOTTOM_SPACE`. */
   bottomSpace: number;
+  /** A switch of workspace goes to every monitor at once (spec 0013 C3). */
+  switchEveryMonitor: boolean;
+  /** The mark under an open item wears the color of the workspace shown,
+   * over `indicatorColor` (spec 0013 C3). */
+  indicatorFollowsWorkspace: boolean;
 }
 
 export interface Settings {

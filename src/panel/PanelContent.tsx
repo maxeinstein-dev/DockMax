@@ -7,6 +7,7 @@ import {
 } from "../core/panels";
 import type { OpenNow, OpenOther } from "../core/openApps";
 import type { Settings } from "../core/settings";
+import type { WorkspacesSnapshot } from "../core/workspaces";
 import {
   removeWidget,
   updateWidget,
@@ -55,6 +56,9 @@ type PanelContentProps = {
    * when it is not open any more (then the panel shows nothing and the host
    * closes it). */
   other: OpenOther | null;
+  /** The workspaces (`useWorkspaces`): a program's menu moves its windows to
+   * another. */
+  workspaces: WorkspacesSnapshot | null;
   /** The instance of a widget panel, or null when the list doesn't have
    * it (then the panel shows nothing and the host closes it). */
   instance: WidgetInstance<CreatableKind> | null;
@@ -130,6 +134,7 @@ function PanelContent({
   app,
   open,
   other,
+  workspaces,
   instance,
   view,
   onView,
@@ -140,13 +145,14 @@ function PanelContent({
       <AppMenuPanel
         app={app}
         openCount={open.apps.get(app.id)?.count ?? 0}
+        workspaces={workspaces}
         onDone={onRemoved}
       />
     );
   }
   if (isOpenPanel(panelId)) {
     return other === null ? null : (
-      <OpenMenuPanel other={other} onDone={onRemoved} />
+      <OpenMenuPanel other={other} workspaces={workspaces} onDone={onRemoved} />
     );
   }
   if (isWidgetPanel(panelId)) {

@@ -130,6 +130,11 @@ const messages = {
     everyMonitor: "Dock em todos os monitores",
     everyMonitorHint:
       "Cada monitor com o seu dock, no lugar da barra de tarefas",
+    switchEveryMonitor: "Trocar de espaço em todos os monitores",
+    switchEveryMonitorHint: "Trocar num dock troca os outros monitores junto",
+    indicatorFollowsWorkspace: "Indicador na cor do espaço",
+    indicatorFollowsWorkspaceHint:
+      "A marca dos apps abertos usa a cor do espaço mostrado",
     launchAtLogin: "Iniciar com o Windows",
     launchAtLoginHint: "Abre o DockMax ao entrar no Windows",
     /** The launcher (spec 0012): its switch, the notice when another
@@ -473,6 +478,8 @@ const messages = {
       closeWindow: "Fechar janela",
       closeWindows: "Fechar todas as janelas",
       pin: "Fixar no dock",
+      /** Spec 0013 C3. */
+      moveTo: "Mover para {name}",
       footer: "O menu da barra de tarefas",
       openFooter: "Um app aberto, que não está fixado",
     },
@@ -656,6 +663,9 @@ const messages = {
       listLabel: "Widgets na ordem do dock",
       empty: "Nenhum widget no dock. Adicione um abaixo.",
       add: "Adicionar",
+      /** The widgets of the other workspaces, to show in this one too
+       * (spec 0013 C3): the same widget, a note with the same text. */
+      fromOthers: "De outros espaços",
       /** In place of the count at the limit; the add buttons turn off. */
       limit: "Limite de {max} widgets",
       footer: "A ordem é a do dock",

@@ -217,7 +217,7 @@ pub struct DockSettings {
     /// the widgets (spec 0009 D2).
     pub show_open_apps: bool,
     /// Whether a program's icon wears the notification badge its button of
-    /// the Windows taskbar has (spec 0014).
+    /// the Windows taskbar has (spec 0016).
     pub show_badges: bool,
     /// The icons of the notification area the dock shows itself, at its end
     /// beside the battery, the network and the volume, by `is_tray_key`
@@ -245,6 +245,12 @@ pub struct DockSettings {
     /// Distance between the dock and the screen edge, in logical pixels,
     /// within `0..=MAX_BOTTOM_SPACE`.
     pub bottom_space: u8,
+    /// A switch of workspace goes to every monitor at once (spec 0013 C3),
+    /// not only to the one of the dock that switched.
+    pub switch_every_monitor: bool,
+    /// The mark under an open item wears the color of the workspace shown
+    /// (spec 0013 C3), over `indicator_color`.
+    pub indicator_follows_workspace: bool,
 }
 
 impl Default for DockSettings {
@@ -272,6 +278,8 @@ impl Default for DockSettings {
             auto_hide_reveal: DEFAULT_AUTO_HIDE_REVEAL,
             auto_hide_delay: DEFAULT_AUTO_HIDE_DELAY,
             bottom_space: DEFAULT_BOTTOM_SPACE,
+            switch_every_monitor: false,
+            indicator_follows_workspace: false,
         }
     }
 }
@@ -642,9 +650,9 @@ mod tests {
                 "style": "native", "tweaks": {}, "hover": "scale", "hoverScale": 110,
                 "indicator": "dot", "indicatorColor": null,
                 "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
-                "showOpenApps": true, "showBadges": true,
-                "middleClick": "newInstance",
-                "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2
+                "showOpenApps": true, "showBadges": true, "middleClick": "newInstance",
+                "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2,
+                "switchEveryMonitor": false, "indicatorFollowsWorkspace": false
               },
               "launchAtLogin": false,
               "launcher": true,

@@ -215,6 +215,30 @@ function SettingsPanel({
             }
           />
           <ToggleField
+            label={t.settings.switchEveryMonitor}
+            hint={t.settings.switchEveryMonitorHint}
+            checked={shown?.dock.switchEveryMonitor ?? false}
+            disabled={shown === null}
+            onChange={(switchEveryMonitor) =>
+              change((s) => ({
+                ...s,
+                dock: { ...s.dock, switchEveryMonitor },
+              }))
+            }
+          />
+          <ToggleField
+            label={t.settings.indicatorFollowsWorkspace}
+            hint={t.settings.indicatorFollowsWorkspaceHint}
+            checked={shown?.dock.indicatorFollowsWorkspace ?? false}
+            disabled={shown === null}
+            onChange={(indicatorFollowsWorkspace) =>
+              change((s) => ({
+                ...s,
+                dock: { ...s.dock, indicatorFollowsWorkspace },
+              }))
+            }
+          />
+          <ToggleField
             label={t.settings.autoHide}
             hint={t.settings.autoHideHint}
             checked={shown?.dock.autoHide ?? false}
@@ -401,6 +425,27 @@ function SettingsPanel({
         disabled={shown === null}
         onChange={(everyMonitor) =>
           change((s) => ({ ...s, dock: { ...s.dock, everyMonitor } }))
+        }
+      />
+      <ToggleField
+        label={t.settings.switchEveryMonitor}
+        hint={t.settings.switchEveryMonitorHint}
+        checked={shown?.dock.switchEveryMonitor ?? false}
+        disabled={shown === null}
+        onChange={(switchEveryMonitor) =>
+          change((s) => ({ ...s, dock: { ...s.dock, switchEveryMonitor } }))
+        }
+      />
+      <ToggleField
+        label={t.settings.indicatorFollowsWorkspace}
+        hint={t.settings.indicatorFollowsWorkspaceHint}
+        checked={shown?.dock.indicatorFollowsWorkspace ?? false}
+        disabled={shown === null}
+        onChange={(indicatorFollowsWorkspace) =>
+          change((s) => ({
+            ...s,
+            dock: { ...s.dock, indicatorFollowsWorkspace },
+          }))
         }
       />
       <ToggleField

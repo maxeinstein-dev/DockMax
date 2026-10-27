@@ -9,6 +9,7 @@ import {
   isWidgetCommandError,
   moveWidget,
   removeWidget,
+  shareWidget,
   type CreatableKind,
   type MoveDirection,
   type WidgetErrorCode,
@@ -221,6 +222,14 @@ function DockItems({ snapshot, workspace, onBack }: DockItemsProps) {
     : [];
   const space = workspace?.id;
   const full = widgets.length >= MAX_WIDGETS;
+  /** The widgets other workspaces show and this one doesn't (spec 0013
+   * C3): one click shows them here too. */
+  const others =
+    available && workspace
+      ? snapshot.widgets.filter(
+          (instance) => !widgets.some((shown) => shown.id === instance.id),
+        )
+      : [];
 
   /** Moves the focus to `focusTarget` when the snapshot allows it. */
   function restoreFocus() {
@@ -322,6 +331,16 @@ function DockItems({ snapshot, workspace, onBack }: DockItemsProps) {
     focusTarget.current = null;
     addWidget({ kind, workspace: space }).then((instance) => {
       focusTarget.current = { kind: "added", id: instance.id };
+      restoreFocus();
+    }, fail);
+  }
+
+  function share(id: WidgetId) {
+    if (space === undefined) return;
+    setError(null);
+    focusTarget.current = null;
+    shareWidget({ id, workspace: space }).then(() => {
+      focusTarget.current = { kind: "added", id };
       restoreFocus();
     }, fail);
   }
@@ -507,6 +526,38 @@ function DockItems({ snapshot, workspace, onBack }: DockItemsProps) {
           ) : (
             <p className="dock-items-empty">{t.widgets.items.empty}</p>
           )}
+          {others.length > 0 ? (
+            <div
+              className="dock-items-add"
+              role="group"
+              aria-labelledby="dock-items-share-label"
+            >
+              <div className="dock-items-add-head">
+                <span
+                  id="dock-items-share-label"
+                  className="dock-items-add-label"
+                >
+                  {t.widgets.items.fromOthers}
+                </span>
+              </div>
+              <div className="dock-items-add-buttons">
+                {others.map((instance) => (
+                  <button
+                    key={instance.id}
+                    type="button"
+                    className="secondary-button"
+                    disabled={full}
+                    onClick={() => share(instance.id)}
+                  >
+                    {isCreatableInstance(instance) ? (
+                      <MiniTile kind={instance.kind} small />
+                    ) : null}
+                    {widgetName(t, instance)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div
             className="dock-items-add"
             role="group"
