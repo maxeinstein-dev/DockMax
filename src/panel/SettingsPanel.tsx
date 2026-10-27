@@ -1,5 +1,6 @@
 import {
   MAX_AUTO_HIDE_DELAY,
+  MAX_PREVIEW_DELAY,
   MAX_AUTO_HIDE_REVEAL,
   SIZE_PRESETS,
   type DockEdge,
@@ -288,6 +289,42 @@ function SettingsPanel({
             </>
           ) : null}
           <ToggleField
+            label={t.settings.previews}
+            hint={t.settings.previewsHint}
+            checked={shown?.dock.previews ?? true}
+            disabled={shown === null}
+            onChange={(previews) =>
+              change((s) => ({ ...s, dock: { ...s.dock, previews } }))
+            }
+          />
+          {shown?.dock.previews ? (
+            <>
+              <RangeField
+                label={t.settings.previewDelay}
+                hint={t.settings.previewDelayHint}
+                value={shown.dock.previewDelay}
+                min={0}
+                max={MAX_PREVIEW_DELAY}
+                step={50}
+                display={seconds}
+                onCommit={(previewDelay) =>
+                  change((s) => ({ ...s, dock: { ...s.dock, previewDelay } }))
+                }
+              />
+              <ToggleField
+                label={t.settings.previewsOnlySeveral}
+                hint={t.settings.previewsOnlySeveralHint}
+                checked={shown.dock.previewsOnlySeveral}
+                onChange={(previewsOnlySeveral) =>
+                  change((s) => ({
+                    ...s,
+                    dock: { ...s.dock, previewsOnlySeveral },
+                  }))
+                }
+              />
+            </>
+          ) : null}
+          <ToggleField
             label={t.settings.showOpenApps}
             hint={t.settings.showOpenAppsHint}
             checked={shown?.dock.showOpenApps ?? true}
@@ -493,6 +530,42 @@ function SettingsPanel({
             display={seconds}
             onCommit={(autoHideDelay) =>
               change((s) => ({ ...s, dock: { ...s.dock, autoHideDelay } }))
+            }
+          />
+        </>
+      ) : null}
+      <ToggleField
+        label={t.settings.previews}
+        hint={t.settings.previewsHint}
+        checked={shown?.dock.previews ?? true}
+        disabled={shown === null}
+        onChange={(previews) =>
+          change((s) => ({ ...s, dock: { ...s.dock, previews } }))
+        }
+      />
+      {shown?.dock.previews ? (
+        <>
+          <RangeField
+            label={t.settings.previewDelay}
+            hint={t.settings.previewDelayHint}
+            value={shown.dock.previewDelay}
+            min={0}
+            max={MAX_PREVIEW_DELAY}
+            step={50}
+            display={seconds}
+            onCommit={(previewDelay) =>
+              change((s) => ({ ...s, dock: { ...s.dock, previewDelay } }))
+            }
+          />
+          <ToggleField
+            label={t.settings.previewsOnlySeveral}
+            hint={t.settings.previewsOnlySeveralHint}
+            checked={shown.dock.previewsOnlySeveral}
+            onChange={(previewsOnlySeveral) =>
+              change((s) => ({
+                ...s,
+                dock: { ...s.dock, previewsOnlySeveral },
+              }))
             }
           />
         </>

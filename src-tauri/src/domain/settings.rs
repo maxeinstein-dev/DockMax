@@ -52,6 +52,10 @@ pub const MAX_AUTO_HIDE_REVEAL: u16 = 2000;
 /// How long the pointer is away before it goes down, in milliseconds.
 pub const DEFAULT_AUTO_HIDE_DELAY: u16 = 700;
 pub const MAX_AUTO_HIDE_DELAY: u16 = 5000;
+/// Milliseconds over an open program before its windows' previews show
+/// (spec 0015).
+pub const DEFAULT_PREVIEW_DELAY: u16 = 200;
+pub const MAX_PREVIEW_DELAY: u16 = 1000;
 
 /// The distance between the dock and the edge unless the user changes it:
 /// the dock takes the place of the taskbar, so it sits close to the edge.
@@ -126,6 +130,7 @@ impl DockSettings {
         if self.bottom_space > MAX_BOTTOM_SPACE
             || self.auto_hide_reveal > MAX_AUTO_HIDE_REVEAL
             || self.auto_hide_delay > MAX_AUTO_HIDE_DELAY
+            || self.preview_delay > MAX_PREVIEW_DELAY
         {
             return Err(SettingsError::LookOutOfRange);
         }
@@ -248,6 +253,13 @@ pub struct DockSettings {
     /// The mark under an open item wears the color of the workspace shown
     /// (spec 0013 C3), over `indicator_color`.
     pub indicator_follows_workspace: bool,
+    /// The pointer resting on an open program shows its windows' previews
+    /// (spec 0015), after `preview_delay` milliseconds, within
+    /// `0..=MAX_PREVIEW_DELAY`; with `previews_only_several`, only for a
+    /// program with two windows or more.
+    pub previews: bool,
+    pub preview_delay: u16,
+    pub previews_only_several: bool,
 }
 
 impl Default for DockSettings {
@@ -276,6 +288,9 @@ impl Default for DockSettings {
             bottom_space: DEFAULT_BOTTOM_SPACE,
             switch_every_monitor: false,
             indicator_follows_workspace: false,
+            previews: true,
+            preview_delay: DEFAULT_PREVIEW_DELAY,
+            previews_only_several: false,
         }
     }
 }
@@ -648,7 +663,8 @@ mod tests {
                 "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
                 "showOpenApps": true, "middleClick": "newInstance",
                 "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2,
-                "switchEveryMonitor": false, "indicatorFollowsWorkspace": false
+                "switchEveryMonitor": false, "indicatorFollowsWorkspace": false,
+                "previews": true, "previewDelay": 200, "previewsOnlySeveral": false
               },
               "launchAtLogin": false,
               "launcher": true,
