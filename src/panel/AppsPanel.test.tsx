@@ -135,6 +135,32 @@ describe("AppsPanel", () => {
       expect(sent("unpin_app")).toEqual([{ id: NOTEPAD.id }]);
     });
 
+    it("edits the workspace it is given: its programs, in its order", async () => {
+      const workspace = {
+        id: "w-work",
+        name: "Trabalho",
+        color: "#FF9F0A",
+        items: [`app:${NOTEPAD.id}`],
+      };
+      render(
+        <AppsPanel
+          snapshot={snapshot([CALCULATOR, NOTEPAD])}
+          workspace={workspace}
+        />,
+      );
+      await flush();
+
+      expect(
+        within(pinnedList())
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual([expect.stringContaining("Bloco de notas")]);
+      fireEvent.click(button("Remover Bloco de notas do dock"));
+      expect(sent("unpin_app")).toEqual([
+        { id: NOTEPAD.id, workspace: "w-work" },
+      ]);
+    });
+
     it("shows the reason in the footer when a change is refused", async () => {
       answer({ move_app: () => Promise.reject({ code: "notFound" }) });
       await renderPanel(snapshot([CALCULATOR, NOTEPAD]));

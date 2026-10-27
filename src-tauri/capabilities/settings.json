@@ -28,6 +28,12 @@
     "allow-clear-launcher-history",
     "allow-set-launcher-hotkey",
     "allow-capture-launcher-hotkey",
+    "allow-list-workspaces",
+    "allow-create-workspace",
+    "allow-rename-workspace",
+    "allow-recolor-workspace",
+    "allow-move-workspace",
+    "allow-delete-workspace",
     "log:allow-log"
   ]
 }

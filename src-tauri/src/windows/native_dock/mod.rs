@@ -38,14 +38,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     IDC_ARROW, KillTimer, LoadCursorW, PostMessageW, RegisterClassW, SPI_GETCLIENTAREAANIMATION,
     SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
     SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SetTimer, SetWindowPos, ShowWindow, SystemParametersInfoW,
-    WM_APP, WM_CAPTURECHANGED, WM_CLOSE, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_GETOBJECT,
+    WM_APP, WM_CAPTURECHANGED, WM_CLOSE, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_GETOBJECT, WM_HOTKEY,
     WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE,
-    WM_RBUTTONUP, WM_SETTINGCHANGE, WM_TIMER, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    WM_MOUSEWHEEL, WM_RBUTTONUP, WM_SETTINGCHANGE, WM_TIMER, WNDCLASSW, WS_EX_LAYERED,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 use windows::core::{PCWSTR, w};
 
-use self::paint::{Face, Painter, Scene, Status, StripCell, Tile, Tip};
+use self::paint::{Dot, Face, Painter, Scene, Status, StripCell, Tile, Tip};
 use self::strip::Cell;
 use self::theme::{Color, Palette};
 use super::dock::Rect;
@@ -60,6 +60,7 @@ use crate::domain::dock_layout::{
 use crate::domain::open_apps::OpenSnapshot;
 use crate::domain::settings::{DockEdge, MiddleClick, OpenAnimation, Settings, TaskbarMode, Theme};
 use crate::domain::widgets::WidgetsSnapshot;
+use crate::domain::workspaces::Workspace;
 use crate::persistence::database::Storage;
 
 /// The class of the docks' windows (and of the hidden one that wakes them).
@@ -197,8 +198,10 @@ struct Data {
     widgets: Option<WidgetsSnapshot>,
     apps: Option<AppsSnapshot>,
     open: OpenSnapshot,
-    /// How the programs and the widgets mix (`Storage::dock_order`).
-    order: Vec<String>,
+    /// The workspace the dock's monitor shows (spec 0013), and every one,
+    /// for the switcher; `None` and empty when they can't be read.
+    workspace: Option<Workspace>,
+    workspaces: Vec<Workspace>,
     /// The icons of the notification area (while the dock holds it).
     tray: Vec<crate::commands::tray::TrayIcon>,
 }
@@ -229,6 +232,8 @@ pub struct Dock {
     growth: Vec<Magnification>,
     hovered: Option<usize>,
     status_hovered: bool,
+    /// The workspace dot under the pointer (spec 0013).
+    switcher_hovered: Option<usize>,
     /// The small icons at the end, and the one under the pointer.
     strip: Vec<Cell>,
     strip_hovered: Option<usize>,
@@ -384,12 +389,13 @@ fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
     };
     // Files dropped on the dock are pinned (spec 0006 B2).
     super::drop_target::install(app, hwnd);
+    let data = read_data(app, &monitor.key);
     let dock = Dock {
         app: app.clone(),
         hwnd,
         monitor,
         painter,
-        data: read_data(app),
+        data,
         items: Vec::new(),
         names: Vec::new(),
         groups: Vec::new(),
@@ -406,6 +412,7 @@ fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
         growth: Vec::new(),
         hovered: None,
         status_hovered: false,
+        switcher_hovered: None,
         strip: Vec::new(),
         strip_hovered: None,
         system: Some(super::system_status::read()),
@@ -529,27 +536,33 @@ fn run_queue() {
     }
 }
 
-fn read_data(app: &AppHandle) -> Data {
+/// What the dock on the monitor `monitor` (its device name) shows.
+fn read_data(app: &AppHandle, monitor: &str) -> Data {
     let settings = crate::commands::settings::current(app);
     #[cfg(windows)]
     let tray = crate::commands::tray::icons();
-    let (widgets, apps, order) = match app.try_state::<Mutex<Storage>>() {
+    let (widgets, apps, workspace, workspaces) = match app.try_state::<Mutex<Storage>>() {
         Some(state) => {
-            let storage = state.lock().unwrap_or_else(PoisonError::into_inner);
+            let mut storage = state.lock().unwrap_or_else(PoisonError::into_inner);
             (
                 crate::commands::widgets::snapshot(&storage).ok(),
                 crate::commands::apps::snapshot(&storage).ok(),
-                storage.dock_order(),
+                storage
+                    .shown_on(monitor)
+                    .inspect_err(|error| log::warn!("dock: no workspace to show: {error}"))
+                    .ok(),
+                storage.workspaces().unwrap_or_default(),
             )
         }
-        None => (None, None, Vec::new()),
+        None => (None, None, None, Vec::new()),
     };
     Data {
         settings,
         widgets,
         apps,
         open: super::open_apps::snapshot(),
-        order,
+        workspace,
+        workspaces,
         tray,
     }
 }
@@ -613,6 +626,7 @@ impl Dock {
             hover: Hover::of(dock.hover, dock.hover_scale),
             status: dock.taskbar != TaskbarMode::Visible,
             tray: self.strip.len(),
+            switcher: self.data.workspaces.len(),
         }
     }
 
@@ -636,7 +650,7 @@ impl Dock {
 
     /// Reads the data again and lays the dock out for it.
     fn reload(&mut self) {
-        self.data = read_data(&self.app);
+        self.data = read_data(&self.app, &self.monitor.key);
         self.rebuild();
     }
 
@@ -669,6 +683,7 @@ impl Dock {
             .collect();
         self.landing = None;
         self.arm_auto_hide();
+        arm_hotkeys(self.data.workspaces.len());
         self.animate();
         self.paint();
     }
@@ -693,7 +708,7 @@ impl Dock {
             apps: self.data.apps.as_ref(),
             open: &self.data.open,
             show_open: settings.dock.show_open_apps,
-            order: &self.data.order,
+            workspace: self.data.workspace.as_ref().map(|w| w.items.as_slice()),
         });
         self.strip = strip::cells(
             settings.dock.taskbar,
@@ -1492,6 +1507,40 @@ impl Dock {
                 text: self.strip.get(index)?.tip(),
             })
         });
+        // The workspace dots, and the name of the one under the pointer.
+        let dot_centers = now_placement
+            .switcher
+            .map(|area| dock_layout::switcher_dots(area, self.data.workspaces.len()))
+            .unwrap_or_default();
+        let shown = self.data.workspace.as_ref().map(|w| w.id.as_str());
+        let dots: Vec<Dot> = dot_centers
+            .iter()
+            .zip(&self.data.workspaces)
+            .enumerate()
+            .map(|(index, (&center, workspace))| Dot {
+                center,
+                color: Color::hex(&workspace.color).unwrap_or(palette.accent),
+                active: Some(workspace.id.as_str()) == shown,
+                hovered: self.switcher_hovered == Some(index),
+            })
+            .collect();
+        let tip = tip.or_else(|| {
+            let index = self.switcher_hovered.filter(|_| self.open.is_none())?;
+            let (x, y) = *dot_centers.get(index)?;
+            let side = 2.0 * dock_layout::ACTIVE_DOT_RADIUS;
+            Some(Tip {
+                anchor: dock_layout::tip_anchor(
+                    Area {
+                        x: x - side / 2.0,
+                        y: y - side / 2.0,
+                        width: side,
+                        height: side,
+                    },
+                    edge,
+                ),
+                text: self.data.workspaces.get(index)?.name.clone(),
+            })
+        });
         let status = now_placement.status.map(|area| Status {
             area,
             time: format!("{:02}:{:02}", clock.wHour, clock.wMinute),
@@ -1512,6 +1561,7 @@ impl Dock {
             icon: geometry.icon,
             bar: now_placement.bar,
             separators: now_placement.separators.clone(),
+            dots,
             tiles,
             status,
             strip,
@@ -1607,15 +1657,21 @@ impl Dock {
             .status
             .is_some_and(|area| area.contains(x, y));
         let cell = self.strip_hit(x, y);
-        let hovered = if status || cell.is_some() {
+        let dot = self.switcher_hit(x, y);
+        let hovered = if status || cell.is_some() || dot.is_some() {
             None
         } else {
             self.hit(x, y)
         };
-        if hovered != self.hovered || status != self.status_hovered || cell != self.strip_hovered {
+        if hovered != self.hovered
+            || status != self.status_hovered
+            || cell != self.strip_hovered
+            || dot != self.switcher_hovered
+        {
             self.hovered = hovered;
             self.status_hovered = status;
             self.strip_hovered = cell;
+            self.switcher_hovered = dot;
             let _ = unsafe { KillTimer(Some(self.hwnd), WARM_TIMER) };
             if self.warmable() {
                 unsafe { SetTimer(Some(self.hwnd), WARM_TIMER, WARM_DELAY, None) };
@@ -1649,6 +1705,7 @@ impl Dock {
             return;
         }
         self.hovered = None;
+        self.switcher_hovered = None;
         self.status_hovered = false;
         self.strip_hovered = None;
         self.pressed = None;
@@ -1657,7 +1714,50 @@ impl Dock {
         self.paint();
     }
 
+    /// The workspace dot under the point, when the bar starts with them.
+    fn switcher_hit(&self, x: f64, y: f64) -> Option<usize> {
+        let area = self.placement_now().switcher?;
+        dock_layout::switcher_hit(area, self.data.workspaces.len(), x, y)
+    }
+
+    /// Shows the workspace at `index` on this dock's monitor.
+    fn switch_to(&mut self, index: usize) {
+        let Some(id) = self.data.workspaces.get(index).map(|w| w.id.clone()) else {
+            return;
+        };
+        if self.data.workspace.as_ref().is_some_and(|w| w.id == id) {
+            return;
+        }
+        let monitor = self.monitor.key.clone();
+        self.effects.push(Box::new(move |app| {
+            crate::commands::workspaces::switch(app, &monitor, &id);
+        }));
+    }
+
+    /// The mouse wheel over the dock: the next workspace down, the one
+    /// before up (spec 0013).
+    fn wheel(&mut self, delta: i16) {
+        if self.data.workspaces.len() < 2 || delta == 0 {
+            return;
+        }
+        let monitor = self.monitor.key.clone();
+        let forward = delta < 0;
+        self.effects.push(Box::new(move |app| {
+            crate::commands::workspaces::switch_by(app, &monitor, forward);
+        }));
+    }
+
+    /// The user is on this dock: its workspace is the one in use (where a
+    /// program pinned from a menu goes).
+    fn use_here(&mut self) {
+        let monitor = self.monitor.key.clone();
+        self.effects.push(Box::new(move |app| {
+            crate::commands::workspaces::use_from_dock(app, &monitor);
+        }));
+    }
+
     fn left_down(&mut self, x: f64, y: f64) {
+        self.use_here();
         shared().clicked = Some(Instant::now());
         let index = self.hit(x, y);
         self.pressed = index;
@@ -1691,6 +1791,11 @@ impl Dock {
                 });
             }
             self.animate();
+            self.paint();
+            return;
+        }
+        if let Some(index) = self.switcher_hit(x, y) {
+            self.switch_to(index);
             self.paint();
             return;
         }
@@ -1751,36 +1856,24 @@ impl Dock {
             }));
             return true;
         }
-        // A program or a widget, among both: the dock's order, then the
-        // place among its own kind.
+        // A program or a widget, among both: the order of the workspace
+        // this dock shows (spec 0013).
         let group = &self.items[press.range()];
-        let Some((order, among)) = dock_items::moved(group, press.local(), target) else {
+        let Some((order, _)) = dock_items::moved(group, press.local(), target) else {
+            return false;
+        };
+        let Some(workspace) = self.data.workspace.as_ref().map(|w| w.id.clone()) else {
             return false;
         };
         self.effects.push(Box::new(move |app| {
             {
                 let state = app.state::<Mutex<Storage>>();
                 let mut storage = state.lock().unwrap_or_else(PoisonError::into_inner);
-                if let Err(error) = storage.set_dock_order(&order) {
+                if let Err(error) = storage.reorder_workspace(&workspace, &order) {
                     log::warn!("dock: the order could not be kept: {error}");
                 }
             }
-            match item {
-                Item::App(pinned) => {
-                    let state = app.state::<Mutex<Storage>>();
-                    let id = pinned.id.as_str().to_string();
-                    if let Err(error) =
-                        crate::commands::apps::place_app(app.clone(), state, id, among)
-                    {
-                        log::warn!("dock: placing a program failed: {error:?}");
-                    }
-                }
-                Item::Widget(widget) => {
-                    crate::commands::widgets::place_widget(app, widget.id.as_str(), among);
-                }
-                _ => {}
-            }
-            // Only the mix may have changed: the dock reads it again.
+            crate::commands::workspaces::notify(app);
             super::dock::refresh();
         }));
         true
@@ -1896,11 +1989,24 @@ impl Dock {
         self.paint();
         let hwnd = self.hwnd.0 as isize;
         let edge = self.edge();
-        let auto_hide = self.data.settings.dock.auto_hide;
+        let shown = self.data.workspace.as_ref().map(|w| w.id.clone());
+        let workspaces: Vec<(String, bool)> = self
+            .data
+            .workspaces
+            .iter()
+            .map(|w| (w.name.clone(), Some(&w.id) == shown.as_ref()))
+            .collect();
+        let items = dock_menu_items(
+            self.data.settings.dock.auto_hide,
+            &workspaces,
+            crate::commands::workspaces::can_create(&self.data.workspaces),
+        );
+        let monitor = self.monitor.key.clone();
+        let ids: Vec<String> = self.data.workspaces.iter().map(|w| w.id.clone()).collect();
         // Up, under its menu, until it closes.
         self.menu_open = true;
         self.effects.push(Box::new(move |app| {
-            let chosen = show_dock_menu(HWND(hwnd as _), edge, auto_hide);
+            let chosen = show_dock_menu(HWND(hwnd as _), edge, items);
             post_to(hwnd, |dock: &mut Dock| dock.menu_open = false);
             match chosen {
                 Some(MenuChoice::TaskManager) => {
@@ -1923,6 +2029,14 @@ impl Dock {
                     }
                 }
                 Some(MenuChoice::Quit) => app.exit(0),
+                Some(MenuChoice::Workspace(index)) => {
+                    if let Some(id) = ids.get(index) {
+                        crate::commands::workspaces::switch(app, &monitor, id);
+                    }
+                }
+                Some(MenuChoice::NewWorkspace) => {
+                    crate::commands::workspaces::create_and_switch(app, &monitor);
+                }
                 None => {}
             }
         }));
@@ -2072,6 +2186,71 @@ fn opening_offset(
     }
 }
 
+/// How many `Ctrl+Alt+<number>` shortcuts are registered (spec 0013): one
+/// per workspace, and none with a single workspace, so that `AltGr+<number>`
+/// (which Windows reports as `Ctrl+Alt`) still types where there is nothing to
+/// switch to.
+static HOTKEYS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Registers `Ctrl+Alt+1…N` for `count` workspaces on the wake window. A
+/// shortcut another program already has is skipped, with a line in the log.
+fn arm_hotkeys(count: usize) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, RegisterHotKey, UnregisterHotKey,
+    };
+    let wanted = if count >= 2 { count.min(9) } else { 0 };
+    let had = HOTKEYS.swap(wanted, Ordering::SeqCst);
+    if had == wanted {
+        return;
+    }
+    let wake = HWND(WAKE.load(Ordering::SeqCst) as _);
+    for number in 1..=9i32 {
+        let _ = unsafe { UnregisterHotKey(Some(wake), number) };
+    }
+    for number in 1..=wanted as i32 {
+        let key = 0x30 + number as u32;
+        let registered = unsafe {
+            RegisterHotKey(
+                Some(wake),
+                number,
+                MOD_CONTROL | MOD_ALT | MOD_NOREPEAT,
+                key,
+            )
+        };
+        if registered.is_err() {
+            log::warn!("dock: Ctrl+Alt+{number} is taken by another program");
+        }
+    }
+}
+
+/// `Ctrl+Alt+<number>`: the dock on the monitor the pointer is on goes to
+/// that workspace.
+fn hotkey(number: usize) {
+    let Some(index) = number.checked_sub(1) else {
+        return;
+    };
+    let mut at = POINT::default();
+    let _ = unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut at) };
+    let monitor = unsafe {
+        windows::Win32::Graphics::Gdi::MonitorFromPoint(
+            at,
+            windows::Win32::Graphics::Gdi::MONITOR_DEFAULTTONEAREST,
+        )
+    };
+    let key = {
+        let shared = shared();
+        shared
+            .docks
+            .iter()
+            .find(|placed| placed.handle == monitor.0 as isize)
+            .or(shared.docks.first())
+            .map(|placed| placed.monitor.clone())
+    };
+    if let (Some(key), Some(app)) = (key, APP.get()) {
+        crate::commands::workspaces::switch_to_index(app, &key, index);
+    }
+}
+
 /// What the dock's menu offers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MenuChoice {
@@ -2080,46 +2259,92 @@ enum MenuChoice {
     Settings,
     AutoHide,
     Quit,
+    /// Show the workspace at this index (spec 0013).
+    Workspace(usize),
+    NewWorkspace,
 }
 
-/// The dock's menu, in order; `None` is a separator.
-fn dock_menu_items() -> [Option<(MenuChoice, &'static str)>; 7] {
+/// One line of the dock's menu: what it does, its text, and whether it
+/// carries the check.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MenuEntry {
+    choice: MenuChoice,
+    label: String,
+    checked: bool,
+}
+
+impl MenuEntry {
+    fn new(choice: MenuChoice, label: &str, checked: bool) -> Option<MenuEntry> {
+        Some(MenuEntry {
+            choice,
+            label: label.to_owned(),
+            checked,
+        })
+    }
+}
+
+/// The dock's menu, in order; `None` is a separator. `workspaces` are the
+/// names and whether each is the one shown: with two or more, they come with
+/// their shortcut, the shown one checked; "Novo espaço" comes while one more
+/// can be made.
+fn dock_menu_items(
+    auto_hide: bool,
+    workspaces: &[(String, bool)],
+    can_create: bool,
+) -> Vec<Option<MenuEntry>> {
     let text = &crate::i18n::messages().tray;
-    [
-        Some((MenuChoice::Launcher, text.search_apps)),
-        Some((MenuChoice::TaskManager, text.task_manager)),
+    let mut items = vec![
+        MenuEntry::new(MenuChoice::Launcher, text.search_apps, false),
+        MenuEntry::new(MenuChoice::TaskManager, text.task_manager, false),
         None,
-        Some((MenuChoice::Settings, text.open_settings)),
-        Some((MenuChoice::AutoHide, text.auto_hide)),
+    ];
+    if workspaces.len() >= 2 {
+        for (index, (name, shown)) in workspaces.iter().enumerate() {
+            let label = format!("{name}\tCtrl+Alt+{}", index + 1);
+            items.push(MenuEntry::new(MenuChoice::Workspace(index), &label, *shown));
+        }
+    }
+    if can_create {
+        items.push(MenuEntry::new(
+            MenuChoice::NewWorkspace,
+            text.new_workspace,
+            false,
+        ));
+    }
+    if workspaces.len() >= 2 || can_create {
+        items.push(None);
+    }
+    items.extend([
+        MenuEntry::new(MenuChoice::Settings, text.open_settings, false),
+        MenuEntry::new(MenuChoice::AutoHide, text.auto_hide, auto_hide),
         None,
-        Some((MenuChoice::Quit, text.quit)),
-    ]
+        MenuEntry::new(MenuChoice::Quit, text.quit, false),
+    ]);
+    items
 }
 
-/// Shows the dock's menu at the pointer, opening away from the screen edge,
-/// with "Ocultar automaticamente" checked when `auto_hide`, and returns what
-/// was chosen.
-fn show_dock_menu(hwnd: HWND, edge: DockEdge, auto_hide: bool) -> Option<MenuChoice> {
+/// Shows the menu `items` at the pointer, opening away from the screen edge,
+/// and returns what was chosen.
+fn show_dock_menu(hwnd: HWND, edge: DockEdge, items: Vec<Option<MenuEntry>>) -> Option<MenuChoice> {
     use windows::Win32::UI::WindowsAndMessaging::{
         AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, MF_CHECKED, MF_SEPARATOR,
         MF_STRING, SetForegroundWindow, TPM_BOTTOMALIGN, TPM_CENTERALIGN, TPM_RETURNCMD,
         TPM_RIGHTBUTTON, TPM_TOPALIGN, TrackPopupMenu, WM_NULL,
     };
-    let items = dock_menu_items();
     unsafe {
         let menu = CreatePopupMenu().ok()?;
         for (index, item) in items.iter().enumerate() {
             // The command of an item is its place plus one: 0 is no choice.
             let added = match item {
-                Some((choice, label)) => AppendMenuW(
+                Some(entry) => AppendMenuW(
                     menu,
-                    if *choice == MenuChoice::AutoHide && auto_hide {
+                    if entry.checked {
                         MF_STRING | MF_CHECKED
                     } else {
                         MF_STRING
                     },
                     index + 1,
-                    &windows::core::HSTRING::from(*label),
+                    &windows::core::HSTRING::from(entry.label.as_str()),
                 ),
                 None => AppendMenuW(menu, MF_SEPARATOR, 0, None),
             };
@@ -2151,9 +2376,8 @@ fn show_dock_menu(hwnd: HWND, edge: DockEdge, auto_hide: bool) -> Option<MenuCho
         let chosen = usize::try_from(chosen.0).ok()?.checked_sub(1)?;
         items
             .get(chosen)
-            .copied()
-            .flatten()
-            .map(|(choice, _)| choice)
+            .and_then(Option::as_ref)
+            .map(|entry| entry.choice)
     }
 }
 
@@ -2165,6 +2389,12 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
     let mut handled = true;
     match message {
         WM_RUN => run_queue(),
+        WM_MOUSEWHEEL => with_dock(hwnd, |dock| {
+            // The high word of `wparam`: notches of 120, negative toward the
+            // user.
+            dock.wheel((wparam.0 >> 16) as u16 as i16);
+        }),
+        WM_HOTKEY => hotkey(wparam.0),
         WM_MOUSEMOVE => with_dock(hwnd, |dock| {
             let (x, y) = dock.point(lparam);
             dock.mouse_move(x, y);
@@ -2189,6 +2419,7 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
         }),
         WM_RBUTTONUP => with_dock(hwnd, |dock| {
             shared().clicked = Some(Instant::now());
+            dock.use_here();
             let (x, y) = dock.point(lparam);
             if let Some(cell) = dock.strip_hit(x, y) {
                 dock.strip_click(cell, true);
@@ -2445,7 +2676,7 @@ pub fn settings_moved(app: &AppHandle) {
     let app = app.clone();
     queue(Box::new(move |docks| {
         for dock in docks.iter_mut() {
-            dock.data = read_data(&dock.app);
+            dock.data = read_data(&dock.app, &dock.monitor.key);
         }
         sync(docks);
         let reopen = super::panel::lock(&app).dock_settled(false, Instant::now());
@@ -2465,6 +2696,15 @@ pub fn settings_moved(app: &AppHandle) {
 /// Whether Windows shows apps dark (the launcher follows it too).
 pub fn system_dark() -> bool {
     theme::system_dark()
+}
+
+/// The monitor (its device name) of the dock whose window is `hwnd`.
+pub fn monitor_of(hwnd: isize) -> Option<String> {
+    shared()
+        .docks
+        .iter()
+        .find(|placed| placed.hwnd == hwnd)
+        .map(|placed| placed.monitor.clone())
 }
 
 /// Whether a dock is on screen.
@@ -2558,24 +2798,48 @@ mod tests {
         assert_eq!(tuck_step(1.0, 0.0), 0.75);
     }
 
+    fn labels(items: &[Option<MenuEntry>]) -> Vec<Option<(&str, bool)>> {
+        items
+            .iter()
+            .map(|item| item.as_ref().map(|e| (e.label.as_str(), e.checked)))
+            .collect()
+    }
+
     #[test]
     fn the_dock_menu_has_what_the_tray_menu_has() {
-        let labels: Vec<Option<&str>> = dock_menu_items()
-            .iter()
-            .map(|item| item.map(|(_, label)| label))
-            .collect();
-
+        // One workspace: no list to switch, "Novo espaço" to make the second.
+        let one = [("Principal".to_owned(), true)];
         assert_eq!(
-            labels,
+            labels(&dock_menu_items(true, &one, true)),
             [
-                Some("Buscar apps…"),
-                Some("Gerenciador de Tarefas"),
+                Some(("Buscar apps…", false)),
+                Some(("Gerenciador de Tarefas", false)),
                 None,
-                Some("Configurações"),
-                Some("Ocultar automaticamente"),
+                Some(("Novo espaço", false)),
                 None,
-                Some("Sair"),
+                Some(("Configurações", false)),
+                Some(("Ocultar automaticamente", true)),
+                None,
+                Some(("Sair", false)),
             ]
+        );
+    }
+
+    #[test]
+    fn the_dock_menu_switches_workspaces_with_their_shortcuts() {
+        let two = [("Principal".to_owned(), false), ("Foco".to_owned(), true)];
+        let items = dock_menu_items(false, &two, false);
+        assert_eq!(
+            labels(&items)[3..6],
+            [
+                Some(("Principal\tCtrl+Alt+1", false)),
+                Some(("Foco\tCtrl+Alt+2", true)),
+                None,
+            ]
+        );
+        assert_eq!(
+            items[4].as_ref().map(|e| e.choice),
+            Some(MenuChoice::Workspace(1))
         );
     }
 

@@ -1,9 +1,11 @@
 /** The sections of the Configurações app, in the order of its side bar; must
  * match `Section` in `src-tauri/src/domain/launcher_pages.rs`. */
-export type Section = "general" | "look" | "apps" | "items" | "about";
+export type Section =
+  "general" | "workspaces" | "look" | "apps" | "items" | "about";
 
 export const SECTIONS: readonly Section[] = [
   "general",
+  "workspaces",
   "look",
   "apps",
   "items",

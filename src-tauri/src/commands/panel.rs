@@ -200,7 +200,7 @@ mod tests {
             .into_iter()
             .find(|instance| instance.config.kind() == WidgetKind::Note)
             .unwrap();
-        widgets::remove(&mut storage, note.id.as_str()).unwrap();
+        widgets::remove(&mut storage, note.id.as_str(), None).unwrap();
 
         assert_eq!(
             resolve(&storage, PanelId::Widget(note.id)),
@@ -216,7 +216,8 @@ mod tests {
     fn an_app_panel_opens_only_for_a_pinned_program() {
         let dir = tempdir().unwrap();
         let mut storage = widgets::open_storage::<String>(Ok(dir.path().to_path_buf()));
-        let pinned = crate::commands::apps::pin(&mut storage, "Some.App!App", "Some App").unwrap();
+        let pinned =
+            crate::commands::apps::pin(&mut storage, "Some.App!App", "Some App", None).unwrap();
 
         assert_eq!(
             resolve(&storage, PanelId::App(pinned.id.clone())),
@@ -234,7 +235,7 @@ mod tests {
             resolve(&storage, PanelId::Widget(pinned.id.clone())),
             Err(WidgetError::NotFound)
         );
-        crate::commands::apps::unpin(&mut storage, pinned.id.as_str()).unwrap();
+        crate::commands::apps::unpin(&mut storage, pinned.id.as_str(), None).unwrap();
         assert_eq!(
             resolve(&storage, PanelId::App(pinned.id)),
             Err(WidgetError::NotFound)

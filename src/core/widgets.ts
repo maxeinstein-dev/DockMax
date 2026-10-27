@@ -282,11 +282,16 @@ export const WIDGETS_CHANGED_EVENT = "widgets-changed";
 /** Arguments of `add_widget`: the kind must be in `CREATABLE_KINDS`. */
 export interface AddWidgetArgs {
   kind: WidgetKind;
+  /** The workspace it goes to (spec 0013); without it, the one in use. */
+  workspace?: string;
 }
 
 /** Arguments of `remove_widget`. A note's text goes with it. */
 export interface RemoveWidgetArgs {
   id: WidgetId;
+  /** The workspace it leaves; with no other one showing it, it is removed
+   * for good. Without it, the one in use. */
+  workspace?: string;
 }
 
 /** Arguments of `move_widget`. Moving the first up or the last down does
@@ -294,6 +299,8 @@ export interface RemoveWidgetArgs {
 export interface MoveWidgetArgs {
   id: WidgetId;
   direction: MoveDirection;
+  /** The workspace whose order changes; without it, the one in use. */
+  workspace?: string;
 }
 
 /** Arguments of `update_widget`: the full label and config. `config.kind`

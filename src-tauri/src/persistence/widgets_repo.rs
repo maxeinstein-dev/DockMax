@@ -18,9 +18,11 @@ use rusqlite::types::ValueRef;
 use rusqlite::{Connection, OptionalExtension, Row, Transaction, params};
 
 use super::database::{begin, now_ms, read_failed, write_failed};
+#[cfg(test)]
+use crate::domain::widgets::MoveDirection;
 use crate::domain::widgets::{
-    MAX_WIDGETS, MoveDirection, WidgetConfig, WidgetError, WidgetId, WidgetInstance, WidgetKind,
-    decode_config, encode_config, validate_label,
+    MAX_WIDGETS, WidgetConfig, WidgetError, WidgetId, WidgetInstance, WidgetKind, decode_config,
+    encode_config, validate_label,
 };
 
 /// Every instance the interface can see, in dock order.
@@ -88,6 +90,7 @@ pub fn remove(conn: &mut Connection, id: &WidgetId) -> Result<(), WidgetError> {
 
 /// Moves an instance one place up or down the dock, past the next instance
 /// the interface sees. At the start or the end, nothing changes.
+#[cfg(test)]
 pub fn move_widget(
     conn: &mut Connection,
     id: &WidgetId,

@@ -11,7 +11,9 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 
 use super::database::{begin, now_ms, read_failed, write_failed};
 use crate::domain::apps::{AppError, MAX_APPS, PinnedApp, is_valid_app_id, is_valid_app_name};
-use crate::domain::widgets::{MoveDirection, WidgetId};
+#[cfg(test)]
+use crate::domain::widgets::MoveDirection;
+use crate::domain::widgets::WidgetId;
 
 /// Every pinned program the interface can see, in dock order.
 pub fn list(conn: &Connection) -> Result<Vec<PinnedApp>, AppError> {
@@ -115,6 +117,7 @@ pub fn unpin(conn: &mut Connection, id: &WidgetId) -> Result<(), AppError> {
 
 /// Moves a program one place towards the start (`up`) or the end (`down`)
 /// of the dock. At either end nothing changes.
+#[cfg(test)]
 pub fn shift(
     conn: &mut Connection,
     id: &WidgetId,

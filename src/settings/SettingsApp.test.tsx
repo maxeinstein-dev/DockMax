@@ -80,6 +80,7 @@ describe("SettingsApp", () => {
         .map((button) => button.textContent),
     ).toEqual([
       "Geral",
+      "Espaços de trabalho",
       "Aparência do dock",
       "Apps do dock",
       "Itens do dock",

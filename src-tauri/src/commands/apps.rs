@@ -58,20 +58,74 @@ pub fn snapshot(storage: &Storage) -> Result<AppsSnapshot, AppError> {
     storage.apps_snapshot()
 }
 
+/// The key a workspace knows a pinned program by.
+fn key_of(id: &WidgetId) -> String {
+    format!("app:{}", id.as_str())
+}
+
 /// Pins the program `app_id`, named `name` (read from the shell by the
-/// command, never taken from the page).
-pub fn pin(storage: &mut Storage, app_id: &str, name: &str) -> Result<PinnedApp, AppError> {
-    apps_repo::pin(storage.connection()?, app_id, name)
+/// command, never taken from the page), at the end of the workspace
+/// `workspace` (or the one in use). A program pinned in another workspace
+/// is only put in this one; `alreadyPinned` when this one has it.
+pub fn pin(
+    storage: &mut Storage,
+    app_id: &str,
+    name: &str,
+    workspace: Option<&str>,
+) -> Result<PinnedApp, AppError> {
+    let workspace = crate::commands::widgets::workspace_of(storage, workspace)?;
+    let app = match apps_repo::pin(storage.connection()?, app_id, name) {
+        Err(AppError::AlreadyPinned) => {
+            let known = storage
+                .apps_snapshot()?
+                .apps
+                .into_iter()
+                .find(|app| app.app_id.eq_ignore_ascii_case(app_id))
+                .ok_or(AppError::AlreadyPinned)?;
+            let has = storage
+                .workspaces()?
+                .iter()
+                .any(|w| w.id == workspace && w.items.contains(&key_of(&known.id)));
+            if has {
+                return Err(AppError::AlreadyPinned);
+            }
+            known
+        }
+        other => other?,
+    };
+    storage.add_to_workspace(&workspace, &key_of(&app.id))?;
+    Ok(app)
 }
 
-/// Unpins the program `id`.
-pub fn unpin(storage: &mut Storage, id: &str) -> Result<(), AppError> {
-    apps_repo::unpin(storage.connection()?, &WidgetId::parse(id)?)
+/// Takes the program `id` out of the workspace `workspace` (or the one in
+/// use); with no other workspace showing it, it is unpinned for good.
+pub fn unpin(storage: &mut Storage, id: &str, workspace: Option<&str>) -> Result<(), AppError> {
+    let id = WidgetId::parse(id)?;
+    let workspace = crate::commands::widgets::workspace_of(storage, workspace)?;
+    let key = key_of(&id);
+    crate::commands::widgets::in_workspace(storage, &workspace, &key)?;
+    if storage.remove_from_workspace(&workspace, &key)? {
+        return Ok(());
+    }
+    apps_repo::unpin(storage.connection()?, &id)?;
+    storage.forget_item(&key)?;
+    Ok(())
 }
 
-/// Moves the program `id` one place up or down.
-pub fn shift(storage: &mut Storage, id: &str, direction: MoveDirection) -> Result<(), AppError> {
-    apps_repo::shift(storage.connection()?, &WidgetId::parse(id)?, direction)
+/// Moves the program `id` one place up or down among the programs of the
+/// workspace `workspace` (or the one in use).
+pub fn shift(
+    storage: &mut Storage,
+    id: &str,
+    direction: MoveDirection,
+    workspace: Option<&str>,
+) -> Result<(), AppError> {
+    let id = WidgetId::parse(id)?;
+    let workspace = crate::commands::widgets::workspace_of(storage, workspace)?;
+    let key = key_of(&id);
+    crate::commands::widgets::in_workspace(storage, &workspace, &key)?;
+    storage.shift_in_workspace(&workspace, &key, direction == MoveDirection::Up)?;
+    Ok(())
 }
 
 /// Puts the program `id` at `index` among the pinned ones.
@@ -129,6 +183,8 @@ fn change<T>(
     {
         log::warn!("apps: {what} saved, but failed to notify the windows: {error}");
     }
+    // What each workspace shows may have changed with it.
+    crate::commands::workspaces::notify(app);
     crate::windows::dock::refresh();
     Ok(value)
 }
@@ -313,6 +369,7 @@ pub async fn pin_app(
     app: AppHandle,
     state: State<'_, Mutex<Storage>>,
     app_id: String,
+    workspace: Option<String>,
 ) -> Result<PinnedApp, AppCommandError> {
     if !is_valid_app_id(&app_id) {
         return Err(AppError::InvalidApp.into());
@@ -324,7 +381,9 @@ pub async fn pin_app(
         .flatten()
         .filter(|name| is_valid_app_name(name))
         .ok_or(AppError::InvalidApp)?;
-    change(&app, &state, "pin", |storage| pin(storage, &app_id, &name))
+    change(&app, &state, "pin", |storage| {
+        pin(storage, &app_id, &name, workspace.as_deref())
+    })
 }
 
 #[tauri::command]
@@ -332,8 +391,11 @@ pub fn unpin_app(
     app: AppHandle,
     state: State<'_, Mutex<Storage>>,
     id: String,
+    workspace: Option<String>,
 ) -> Result<(), AppCommandError> {
-    change(&app, &state, "unpin", |storage| unpin(storage, &id))
+    change(&app, &state, "unpin", |storage| {
+        unpin(storage, &id, workspace.as_deref())
+    })
 }
 
 /// Puts a program where the user dropped it among the others (the dock's
@@ -348,11 +410,12 @@ pub fn place_app(
     change(&app, &state, "place", |storage| place(storage, &id, index))
 }
 
-/// Pins what was dropped on the dock, at the end of the programs. Comes from
-/// the dock's own drop target (`windows::drop_target`), not from the page, so only
-/// what the user really dropped can be pinned. Reading the names takes the
-/// shell's time: off the event loop.
-pub fn pin_dropped(app: &AppHandle, paths: Vec<std::path::PathBuf>) {
+/// Pins what was dropped on the dock, at the end of the workspace its
+/// monitor (`monitor`, its device name) shows. Comes from the dock's own drop
+/// target (`windows::drop_target`), not from the page, so only what the user
+/// really dropped can be pinned. Reading the names takes the shell's time:
+/// off the event loop.
+pub fn pin_dropped(app: &AppHandle, paths: Vec<std::path::PathBuf>, monitor: Option<String>) {
     let wanted = droppable(&paths);
     if wanted.is_empty() {
         return;
@@ -368,7 +431,13 @@ pub fn pin_dropped(app: &AppHandle, paths: Vec<std::path::PathBuf>) {
                     continue;
                 };
                 // An error is already in the log; the rest still go in.
-                let _ = change(&app, &state, "drop", |storage| pin(storage, &id, &name));
+                let _ = change(&app, &state, "drop", |storage| {
+                    let workspace = match &monitor {
+                        Some(monitor) => Some(storage.shown_on(monitor)?.id),
+                        None => None,
+                    };
+                    pin(storage, &id, &name, workspace.as_deref())
+                });
             }
         });
     if let Err(error) = spawned {
@@ -382,9 +451,10 @@ pub fn move_app(
     state: State<'_, Mutex<Storage>>,
     id: String,
     direction: MoveDirection,
+    workspace: Option<String>,
 ) -> Result<(), AppCommandError> {
     change(&app, &state, "move", |storage| {
-        shift(storage, &id, direction)
+        shift(storage, &id, direction, workspace.as_deref())
     })
 }
 
@@ -566,7 +636,7 @@ pub fn pin_open(
             return Err(AppError::InvalidApp.into());
         }
         let pinned = change(&app, &state, "pin open", |storage| {
-            pin(storage, &app_id, &name)
+            pin(storage, &app_id, &name, None)
         })?;
         // It is pinned now: the dock shows it with the pinned ones.
         crate::windows::open_apps::wake(&app);
@@ -732,7 +802,7 @@ mod tests {
     fn a_pinned_program_is_in_the_snapshot_and_can_be_opened_by_its_id() {
         let (_dir, mut storage) = open();
 
-        let pinned = pin(&mut storage, "Some.App!App", "Some App").unwrap();
+        let pinned = pin(&mut storage, "Some.App!App", "Some App", None).unwrap();
 
         let snapshot = snapshot(&storage).unwrap();
         assert_eq!(snapshot.apps, vec![pinned.clone()]);
@@ -745,9 +815,9 @@ mod tests {
     #[test]
     fn a_program_is_placed_where_it_was_dropped() {
         let (_dir, mut storage) = open();
-        let a = pin(&mut storage, "a!App", "A").unwrap();
-        pin(&mut storage, "b!App", "B").unwrap();
-        pin(&mut storage, "c!App", "C").unwrap();
+        let a = pin(&mut storage, "a!App", "A", None).unwrap();
+        pin(&mut storage, "b!App", "B", None).unwrap();
+        pin(&mut storage, "c!App", "C", None).unwrap();
 
         place(&mut storage, a.id.as_str(), 2).unwrap();
 
@@ -789,11 +859,11 @@ mod tests {
     #[test]
     fn an_id_that_is_not_one_rust_made_is_not_found() {
         let (_dir, mut storage) = open();
-        pin(&mut storage, "Some.App!App", "Some App").unwrap();
+        pin(&mut storage, "Some.App!App", "Some App", None).unwrap();
 
-        assert_eq!(unpin(&mut storage, "1"), Err(AppError::NotFound));
+        assert_eq!(unpin(&mut storage, "1", None), Err(AppError::NotFound));
         assert_eq!(
-            shift(&mut storage, "../x", MoveDirection::Up),
+            shift(&mut storage, "../x", MoveDirection::Up, None),
             Err(AppError::NotFound)
         );
         assert_eq!(
@@ -805,9 +875,9 @@ mod tests {
     #[test]
     fn a_removed_program_cannot_be_opened() {
         let (_dir, mut storage) = open();
-        let pinned = pin(&mut storage, "Some.App!App", "Some App").unwrap();
+        let pinned = pin(&mut storage, "Some.App!App", "Some App", None).unwrap();
 
-        unpin(&mut storage, pinned.id.as_str()).unwrap();
+        unpin(&mut storage, pinned.id.as_str(), None).unwrap();
 
         assert_eq!(
             target_of(&mut storage, pinned.id.as_str()),
@@ -822,7 +892,7 @@ mod tests {
 
         assert_eq!(snapshot(&storage).unwrap().apps, []);
         assert_eq!(
-            pin(&mut storage, "Some.App!App", "Some App"),
+            pin(&mut storage, "Some.App!App", "Some App", None),
             Err(AppError::Unavailable)
         );
     }

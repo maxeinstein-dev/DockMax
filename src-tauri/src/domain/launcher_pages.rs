@@ -8,6 +8,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Section {
     General,
+    Workspaces,
     Look,
     Apps,
     Items,
@@ -19,6 +20,7 @@ impl Section {
     pub fn as_str(self) -> &'static str {
         match self {
             Section::General => "general",
+            Section::Workspaces => "workspaces",
             Section::Look => "look",
             Section::Apps => "apps",
             Section::Items => "items",
@@ -268,6 +270,12 @@ pub const PAGES: &[Page] = &[
         Section::General,
     ),
     dockmax(
+        "dockmax-workspaces",
+        "Espaços de trabalho",
+        &["espacos", "workspaces", "novo espaco"],
+        Section::Workspaces,
+    ),
+    dockmax(
         "dockmax-look",
         "Aparência do dock",
         &["estilo do dock", "tema do dock", "pacote de icones"],
@@ -353,6 +361,7 @@ mod tests {
     fn every_section_of_configuracoes_is_listed() {
         for section in [
             Section::General,
+            Section::Workspaces,
             Section::Look,
             Section::Apps,
             Section::Items,

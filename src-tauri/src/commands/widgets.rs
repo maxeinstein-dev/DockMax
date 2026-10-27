@@ -105,51 +105,90 @@ pub fn snapshot(storage: &Storage) -> Result<WidgetsSnapshot, WidgetError> {
     storage.snapshot()
 }
 
-/// Adds an instance of `kind` at the end of the dock. A name that is not a
-/// kind can't be created either: `notCreatable`.
-pub fn add(storage: &mut Storage, kind: &str) -> Result<WidgetInstance, WidgetError> {
-    let conn = storage.connection()?;
-    let kind = WidgetKind::from_name(kind).ok_or(WidgetError::NotCreatable)?;
-    widgets_repo::add(conn, kind)
-}
-
-/// Removes an instance; a note's text goes with it.
-pub fn remove(storage: &mut Storage, id: &str) -> Result<(), WidgetError> {
-    let conn = storage.connection()?;
-    widgets_repo::remove(conn, &parse_id(id)?)
-}
-
-/// Moves an instance one place up or down; at either end nothing changes.
-pub fn shift(storage: &mut Storage, id: &str, direction: MoveDirection) -> Result<(), WidgetError> {
-    let conn = storage.connection()?;
-    widgets_repo::move_widget(conn, &parse_id(id)?, direction)
-}
-
-/// Puts an instance at `index` among the widgets (the dock's drag), one place
-/// at a time; an index past the end means the end.
-pub fn place(storage: &mut Storage, id: &str, index: usize) -> Result<(), WidgetError> {
-    let widgets = storage.snapshot()?.widgets;
-    let from = widgets
-        .iter()
-        .position(|widget| widget.id.as_str() == id)
-        .ok_or(WidgetError::NotFound)?;
-    let target = index.min(widgets.len().saturating_sub(1));
-    let direction = if target > from {
-        MoveDirection::Down
-    } else {
-        MoveDirection::Up
-    };
-    for _ in 0..target.abs_diff(from) {
-        shift(storage, id, direction)?;
+/// The workspace a change goes to (spec 0013): the one named, which must
+/// exist, or the one in use (the dock used last).
+pub(crate) fn workspace_of(
+    storage: &mut Storage,
+    workspace: Option<&str>,
+) -> Result<String, WidgetError> {
+    match workspace {
+        Some(id) => storage
+            .workspaces()?
+            .into_iter()
+            .find(|known| known.id == id)
+            .map(|known| known.id)
+            .ok_or(WidgetError::NotFound),
+        None => Ok(storage.in_use()?.id),
     }
+}
+
+/// `notFound` unless the workspace `workspace` has the item `key`.
+pub(crate) fn in_workspace(
+    storage: &mut Storage,
+    workspace: &str,
+    key: &str,
+) -> Result<(), WidgetError> {
+    let has = storage
+        .workspaces()?
+        .iter()
+        .any(|known| known.id == workspace && known.items.iter().any(|item| item == key));
+    if has {
+        Ok(())
+    } else {
+        Err(WidgetError::NotFound)
+    }
+}
+
+/// The key a workspace knows a widget by.
+fn key_of(id: &WidgetId) -> String {
+    format!("widget:{}", id.as_str())
+}
+
+/// Adds an instance of `kind` at the end of the workspace `workspace` (or
+/// the one in use). A name that is not a kind can't be created either:
+/// `notCreatable`.
+pub fn add(
+    storage: &mut Storage,
+    kind: &str,
+    workspace: Option<&str>,
+) -> Result<WidgetInstance, WidgetError> {
+    let kind = WidgetKind::from_name(kind).ok_or(WidgetError::NotCreatable)?;
+    let workspace = workspace_of(storage, workspace)?;
+    let instance = widgets_repo::add(storage.connection()?, kind)?;
+    storage.add_to_workspace(&workspace, &key_of(&instance.id))?;
+    Ok(instance)
+}
+
+/// Takes an instance out of the workspace `workspace` (or the one in use);
+/// with no other workspace showing it, it is removed for good, a note's text
+/// with it.
+pub fn remove(storage: &mut Storage, id: &str, workspace: Option<&str>) -> Result<(), WidgetError> {
+    let id = parse_id(id)?;
+    let workspace = workspace_of(storage, workspace)?;
+    let key = key_of(&id);
+    in_workspace(storage, &workspace, &key)?;
+    if storage.remove_from_workspace(&workspace, &key)? {
+        return Ok(());
+    }
+    widgets_repo::remove(storage.connection()?, &id)?;
+    storage.forget_item(&key)?;
     Ok(())
 }
 
-/// The dock's drag of a widget: puts it at `index` and tells the windows.
-pub fn place_widget(app: &AppHandle, id: &str, index: usize) {
-    let state = app.state::<Mutex<Storage>>();
-    // A refusal is already in the log.
-    let _ = change(app, &state, "place", |storage| place(storage, id, index));
+/// Moves an instance one place up or down among the widgets of the
+/// workspace `workspace` (or the one in use); at either end nothing changes.
+pub fn shift(
+    storage: &mut Storage,
+    id: &str,
+    direction: MoveDirection,
+    workspace: Option<&str>,
+) -> Result<(), WidgetError> {
+    let id = parse_id(id)?;
+    let workspace = workspace_of(storage, workspace)?;
+    let key = key_of(&id);
+    in_workspace(storage, &workspace, &key)?;
+    storage.shift_in_workspace(&workspace, &key, direction == MoveDirection::Up)?;
+    Ok(())
 }
 
 /// Replaces an instance's label and config, both given in full.
@@ -252,6 +291,8 @@ fn change<T>(
     {
         log::warn!("widgets: {what} saved, but failed to notify the windows: {error}");
     }
+    // What each workspace shows may have changed with it.
+    crate::commands::workspaces::notify(app);
     crate::windows::dock::refresh();
     Ok(changed.value)
 }
@@ -275,8 +316,11 @@ pub fn add_widget(
     app: AppHandle,
     state: State<'_, Mutex<Storage>>,
     kind: String,
+    workspace: Option<String>,
 ) -> Result<WidgetInstance, WidgetCommandError> {
-    change(&app, &state, "add", |storage| add(storage, &kind))
+    change(&app, &state, "add", |storage| {
+        add(storage, &kind, workspace.as_deref())
+    })
 }
 
 #[tauri::command]
@@ -284,8 +328,11 @@ pub fn remove_widget(
     app: AppHandle,
     state: State<'_, Mutex<Storage>>,
     id: String,
+    workspace: Option<String>,
 ) -> Result<(), WidgetCommandError> {
-    change(&app, &state, "remove", |storage| remove(storage, &id))
+    change(&app, &state, "remove", |storage| {
+        remove(storage, &id, workspace.as_deref())
+    })
 }
 
 #[tauri::command]
@@ -294,9 +341,10 @@ pub fn move_widget(
     state: State<'_, Mutex<Storage>>,
     id: String,
     direction: MoveDirection,
+    workspace: Option<String>,
 ) -> Result<(), WidgetCommandError> {
     change(&app, &state, "move", |storage| {
-        shift(storage, &id, direction)
+        shift(storage, &id, direction, workspace.as_deref())
     })
 }
 
@@ -362,18 +410,25 @@ mod tests {
     // `get_note` take no `AppHandle`: they can't emit.
     type ListCommand =
         fn(State<'static, Mutex<Storage>>) -> Result<WidgetsSnapshot, WidgetCommandError>;
+    // The workspace (spec 0013) is optional: without it, the one in use.
     type AddCommand = fn(
         AppHandle,
         State<'static, Mutex<Storage>>,
         String,
+        Option<String>,
     ) -> Result<WidgetInstance, WidgetCommandError>;
-    type IdCommand =
-        fn(AppHandle, State<'static, Mutex<Storage>>, String) -> Result<(), WidgetCommandError>;
+    type IdCommand = fn(
+        AppHandle,
+        State<'static, Mutex<Storage>>,
+        String,
+        Option<String>,
+    ) -> Result<(), WidgetCommandError>;
     type MoveCommand = fn(
         AppHandle,
         State<'static, Mutex<Storage>>,
         String,
         MoveDirection,
+        Option<String>,
     ) -> Result<(), WidgetCommandError>;
     type UpdateCommand = fn(
         AppHandle,
@@ -425,12 +480,14 @@ mod tests {
         (storage, ids)
     }
 
-    fn ids(storage: &Storage) -> Vec<String> {
-        snapshot(storage)
+    /// The widgets of the workspace in use, in its order (spec 0013).
+    fn ids(storage: &mut Storage) -> Vec<String> {
+        storage
+            .in_use()
             .unwrap()
-            .widgets
+            .items
             .iter()
-            .map(|instance| instance.id.to_string())
+            .filter_map(|key| key.strip_prefix("widget:").map(str::to_owned))
             .collect()
     }
 
@@ -505,9 +562,12 @@ mod tests {
         let mut storage = unavailable();
         let expected = Err(WidgetError::Unavailable);
 
-        assert_eq!(add(&mut storage, "clock").map(|_| ()), expected);
-        assert_eq!(remove(&mut storage, STRANGER), expected);
-        assert_eq!(shift(&mut storage, STRANGER, MoveDirection::Up), expected);
+        assert_eq!(add(&mut storage, "clock", None).map(|_| ()), expected);
+        assert_eq!(remove(&mut storage, STRANGER, None), expected);
+        assert_eq!(
+            shift(&mut storage, STRANGER, MoveDirection::Up, None),
+            expected
+        );
         assert_eq!(
             update(&mut storage, STRANGER, Value::Null, clock_config()).map(|_| ()),
             expected
@@ -527,51 +587,15 @@ mod tests {
     }
 
     #[test]
-    fn placing_a_widget_puts_it_at_the_index_the_drag_left_it() {
-        let dir = tempdir().unwrap();
-        let (mut storage, _) = open(&dir);
-        let ids = |storage: &Storage| -> Vec<String> {
-            snapshot(storage)
-                .unwrap()
-                .widgets
-                .iter()
-                .map(|widget| widget.id.as_str().to_string())
-                .collect()
-        };
-        let seed = ids(&storage);
-        assert_eq!(seed.len(), 3);
-
-        place(&mut storage, &seed[0], 2).unwrap();
-        assert_eq!(
-            ids(&storage),
-            [seed[1].clone(), seed[2].clone(), seed[0].clone()]
-        );
-        place(&mut storage, &seed[0], 0).unwrap();
-        assert_eq!(ids(&storage), seed);
-        // Past the end means the end; where it is changes nothing.
-        place(&mut storage, &seed[1], 99).unwrap();
-        assert_eq!(
-            ids(&storage),
-            [seed[0].clone(), seed[2].clone(), seed[1].clone()]
-        );
-        place(&mut storage, &seed[2], 1).unwrap();
-        assert_eq!(
-            ids(&storage),
-            [seed[0].clone(), seed[2].clone(), seed[1].clone()]
-        );
-        assert_eq!(place(&mut storage, STRANGER, 0), Err(WidgetError::NotFound));
-    }
-
-    #[test]
     fn malformed_ids_are_not_found() {
         let dir = tempdir().unwrap();
         let (mut storage, _) = open(&dir);
         let not_found = Err(WidgetError::NotFound);
 
         for id in MALFORMED_IDS.into_iter().chain([STRANGER]) {
-            assert_eq!(remove(&mut storage, id), not_found, "{id:?}");
+            assert_eq!(remove(&mut storage, id, None), not_found, "{id:?}");
             assert_eq!(
-                shift(&mut storage, id, MoveDirection::Down),
+                shift(&mut storage, id, MoveDirection::Down, None),
                 not_found,
                 "{id:?}"
             );
@@ -593,7 +617,7 @@ mod tests {
 
         for kind in ["shortcut", "files", "weather", "Clock", "timeProgress", ""] {
             assert_eq!(
-                add(&mut storage, kind).map(|_| ()),
+                add(&mut storage, kind, None).map(|_| ()),
                 Err(WidgetError::NotCreatable),
                 "{kind:?}"
             );
@@ -606,9 +630,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let (mut storage, [clock, progress, note]) = open(&dir);
 
-        let added = add(&mut storage, "clock").unwrap().id.to_string();
+        let added = add(&mut storage, "clock", None).unwrap().id.to_string();
         assert_eq!(
-            ids(&storage),
+            ids(&mut storage),
             [
                 clock.as_str(),
                 progress.as_str(),
@@ -617,10 +641,10 @@ mod tests {
             ]
         );
 
-        shift(&mut storage, &added, MoveDirection::Up).unwrap();
-        shift(&mut storage, &clock, MoveDirection::Down).unwrap();
+        shift(&mut storage, &added, MoveDirection::Up, None).unwrap();
+        shift(&mut storage, &clock, MoveDirection::Down, None).unwrap();
         assert_eq!(
-            ids(&storage),
+            ids(&mut storage),
             [
                 progress.as_str(),
                 clock.as_str(),
@@ -633,7 +657,7 @@ mod tests {
         assert_eq!(updated.id.as_str(), added);
         assert_eq!(updated.label.as_deref(), Some("São Paulo"));
         assert_eq!(
-            ids(&storage),
+            ids(&mut storage),
             [
                 progress.as_str(),
                 clock.as_str(),
@@ -642,21 +666,24 @@ mod tests {
             ]
         );
 
-        remove(&mut storage, &progress).unwrap();
+        remove(&mut storage, &progress, None).unwrap();
         assert_eq!(
-            ids(&storage),
+            ids(&mut storage),
             [clock.as_str(), added.as_str(), note.as_str()]
         );
 
         // The order and the change survive reopening.
         drop(storage);
-        let reopened = open_storage::<String>(Ok(dir.path().to_path_buf()));
+        let mut reopened = open_storage::<String>(Ok(dir.path().to_path_buf()));
         assert_eq!(
-            ids(&reopened),
+            ids(&mut reopened),
             [clock.as_str(), added.as_str(), note.as_str()]
         );
         let listed = snapshot(&reopened).unwrap().widgets;
-        assert_eq!(listed[1], updated);
+        assert_eq!(
+            listed.iter().find(|widget| widget.id == updated.id),
+            Some(&updated)
+        );
     }
 
     #[test]
@@ -789,7 +816,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let (mut storage, _) = open(&dir);
 
-        let changed = apply(&mut storage, "add", |storage| add(storage, "note")).unwrap();
+        let changed = apply(&mut storage, "add", |storage| add(storage, "note", None)).unwrap();
 
         let snapshot = changed.snapshot.expect("a snapshot to emit");
         assert_eq!(snapshot.storage, StorageStatus::Ok);
@@ -802,7 +829,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let (mut storage, _) = open(&dir);
 
-        let result = apply(&mut storage, "remove", |storage| remove(storage, STRANGER));
+        let result = apply(&mut storage, "remove", |storage| {
+            remove(storage, STRANGER, None)
+        });
 
         assert_eq!(
             result.map(|changed| changed.value),
@@ -823,7 +852,7 @@ mod tests {
         );
         assert_eq!(panel_kind(&storage, &parse(&note)), Ok(WidgetKind::Note));
 
-        remove(&mut storage, &note).unwrap();
+        remove(&mut storage, &note, None).unwrap();
         assert_eq!(
             panel_kind(&storage, &parse(&note)),
             Err(WidgetError::NotFound)
