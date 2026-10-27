@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { listen } from "@tauri-apps/api/event";
 import {
   DEFAULT_HOTKEY,
+  HOTKEY_PRESSED_EVENT,
   captureLauncherHotkey,
   hotkeyFromEvent,
   hotkeyLabel,
@@ -77,6 +79,25 @@ function HotkeyField({ hotkey, disabled = false }: HotkeyFieldProps) {
       );
     });
   }
+
+  // Windows turns Alt+Space into the window's menu before the page sees
+  // it: while the capture runs, Rust hands it here instead.
+  const capturingNow = state.kind === "capturing";
+  const saveRef = useRef(save);
+  useEffect(() => {
+    saveRef.current = save;
+  });
+  useEffect(() => {
+    if (!capturingNow) return;
+    let active = true;
+    const unlisten = listen<string>(HOTKEY_PRESSED_EVENT, (event) => {
+      if (active) saveRef.current(event.payload);
+    });
+    return () => {
+      active = false;
+      void unlisten.then((stop) => stop());
+    };
+  }, [capturingNow]);
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (state.kind !== "capturing") return;

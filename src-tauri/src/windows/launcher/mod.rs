@@ -516,6 +516,11 @@ fn register(on: bool) {
     set_taken(taken);
 }
 
+/// Whether Configurações is capturing a new hotkey.
+pub fn capturing() -> bool {
+    CAPTURING.load(Ordering::SeqCst)
+}
+
 /// Configurações captures a new hotkey (`on`): the current one is let go,
 /// or the combination would open the launcher. It comes back when the
 /// capture ends, or on its own after `CAPTURE_FOR`, should Configurações

@@ -23,6 +23,10 @@ export const CLEAR_LAUNCHER_HISTORY_COMMAND = "clear_launcher_history";
 export const SET_LAUNCHER_HOTKEY_COMMAND = "set_launcher_hotkey";
 export const CAPTURE_LAUNCHER_HOTKEY_COMMAND = "capture_launcher_hotkey";
 
+/** Rust's word that Alt+Space was pressed while the hotkey is captured:
+ * Windows opens the window's menu with it before the page sees the key. */
+export const HOTKEY_PRESSED_EVENT = "launcher-hotkey-pressed";
+
 /** The hotkey unless the user changes it. */
 export const DEFAULT_HOTKEY = "Alt+Space";
 

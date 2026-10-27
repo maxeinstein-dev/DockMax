@@ -6,8 +6,19 @@ import HotkeyField from "./HotkeyField";
 
 const text = ptBR.settings.launcher.hotkey;
 
-const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
+type Listener = (event: { payload: string }) => void;
+
+const { invoke, listeners } = vi.hoisted(() => ({
+  invoke: vi.fn(),
+  listeners: new Map<string, Listener>(),
+}));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn((event: string, handler: Listener) => {
+    listeners.set(event, handler);
+    return Promise.resolve(() => listeners.delete(event));
+  }),
+}));
 vi.mock("../core/log", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../core/log")>()),
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
@@ -130,6 +141,25 @@ describe("HotkeyField", () => {
     expect(invoke).toHaveBeenCalledWith("capture_launcher_hotkey", {
       on: false,
     });
+  });
+
+  it("takes Alt+Space from Rust, where Windows would open the menu", async () => {
+    render(<HotkeyField hotkey="Ctrl+Shift+K" />);
+
+    expect(listeners.has("launcher-hotkey-pressed")).toBe(false);
+    fireEvent.click(button());
+    await act(async () => {});
+    act(() =>
+      listeners.get("launcher-hotkey-pressed")?.({
+        payload: "Alt+Shift+Space",
+      }),
+    );
+    await act(async () => {});
+
+    expect(invoke).toHaveBeenCalledWith("set_launcher_hotkey", {
+      hotkey: "Alt+Shift+Space",
+    });
+    expect(listeners.has("launcher-hotkey-pressed")).toBe(false);
   });
 
   it("goes back to Alt+Space", async () => {
