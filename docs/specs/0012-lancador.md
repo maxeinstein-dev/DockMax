@@ -202,7 +202,9 @@ No build de teste em release, na máquina do autor, com entrada de teclado simul
 | Aberto, depois das buscas | **+7,0 MB**, mais o auxiliar de ícones com **8 MB** | +10 MB |
 | 50 s depois de fechar | **+2,2 MB** e **+3,4 MB** em duas rodadas, as duas com a janela de Configurações do teste ainda aberta; o auxiliar já saiu | +3 MB |
 
-**Não verificado:** o Enter na conta (a área de transferência do autor tinha HTML, e o teste não a sobrescreve), o Enter em `g dockmax` e em `wifi` (abririam o navegador e as Configurações do Windows), o Narrador e o editor de palavras-chave pelo teclado. Esses itens estão no [roadmap](../roadmap.md).
+**Verificado pelo autor** (2026-10-27): o Enter na conta copia o resultado, e o Enter em `g dockmax` e em `wifi` abre o navegador na busca e a página do Wi-Fi.
+
+**Não verificado:** o Narrador e o editor de palavras-chave pelo teclado. Esses itens estão no [roadmap](../roadmap.md).
 
 ## 9. Extensões (depois)
 
