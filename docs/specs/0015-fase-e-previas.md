@@ -68,5 +68,12 @@ Valem as propostas até o autor decidir:
   - memória privada: 84,2 MB ao abrir, 87,3 MB depois de usar o cartão.
 - **Não verificado (E1):** trazer para a frente uma janela que estava atrás (a clicada já era a da frente), uma janela minimizada, o segundo monitor e o dock no topo.
 - **Verificado (E2, 2026-10-27):** testes do deslize (do lado do dock, desacelerando, parado no fim) e do código de cada botão do leitor de tela.
+- **Verificado no app real (E2, 2026-10-27),** com o release, os dados do autor, o ponteiro de verdade, duas janelas de teste e a UI Automation (a mesma que o Narrador usa):
+  - o cartão entrou deslizando: o topo foi de 866 a 858 px nos primeiros quadros;
+  - o leitor de tela viu "Janelas de Windows PowerShell" com 4 botões ("DockMax previa B", "Fechar DockMax previa B" e os de A);
+  - com B na frente, acionar o botão de A trouxe A para a frente (o que o E1 não tinha verificado) e fechou o cartão;
+  - acionar "Fechar DockMax previa B" fechou B, e o cartão continuou com os 2 botões de A;
+  - memória privada: 86,8 MB ao abrir e 90,1 MB no fim.
+- **Não verificado (E2):** com o próprio Narrador ligado (a leitura em voz); janela minimizada; segundo monitor e dock no topo.
 - **Testes:** a geometria (cartão acima, abaixo e ao lado conforme a borda; dentro da tela; células encolhendo; "+N"), as opções no arquivo e no comando de configurações, e quando a prévia abre (atraso, "só com 2 ou mais", sem janelas no espaço).
 - **App real:** passar o mouse num programa com uma e com várias janelas, nos dois monitores e com o dock em cada borda; clicar numa miniatura (inclusive minimizada); fechar pelo X; sair do ícone para o cartão sem ele sumir; medir a memória antes e depois.
