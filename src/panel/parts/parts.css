@@ -472,3 +472,31 @@
   font-size: 12.5px;
   color: var(--danger);
 }
+
+/* The launcher's hotkey (HotkeyField). */
+.hotkey-field {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+
+.hotkey-field .toggle-row {
+  justify-self: stretch;
+}
+
+.hotkey-button {
+  min-width: 9em;
+  font-variant-numeric: tabular-nums;
+}
+
+.hotkey-button[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.hotkey-field p {
+  margin: 0;
+}
+
+.hotkey-field p:empty {
+  display: none;
+}

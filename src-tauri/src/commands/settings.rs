@@ -37,6 +37,7 @@ pub struct SettingsInput {
     launch_at_login: bool,
     launcher: bool,
     launcher_keywords: Vec<WebKeywordInput>,
+    launcher_hotkey: String,
 }
 
 /// A keyword of [`SettingsInput`], as strict.
@@ -90,6 +91,7 @@ impl From<SettingsInput> for Settings {
             launch_at_login,
             launcher,
             launcher_keywords,
+            launcher_hotkey,
         } = input;
         Settings {
             version,
@@ -104,6 +106,7 @@ impl From<SettingsInput> for Settings {
                     template: input.template,
                 })
                 .collect(),
+            launcher_hotkey,
             dock: DockSettings {
                 edge: dock.edge,
                 icon_size: dock.icon_size,
@@ -290,7 +293,10 @@ fn apply(
         let mut state = lock(state);
         let before = state.settings.dock.clone();
         let launch_before = state.settings.launch_at_login;
-        let launcher_before = state.settings.launcher;
+        let launcher_before = (
+            state.settings.launcher,
+            state.settings.launcher_hotkey.clone(),
+        );
         let updated = state
             .update(wanted)
             .inspect_err(|error| log::warn!("settings: change rejected: {error}"))?
@@ -308,8 +314,9 @@ fn apply(
     if updated.launch_at_login != launch_before {
         apply_launch_at_login(updated.launch_at_login);
     }
+    // The hotkey is taken again when it changes, too.
     #[cfg(windows)]
-    if updated.launcher != launcher_before {
+    if (updated.launcher, &updated.launcher_hotkey) != (launcher_before.0, &launcher_before.1) {
         crate::windows::launcher::set_enabled(updated.launcher);
     }
     #[cfg(not(windows))]
@@ -428,7 +435,7 @@ mod tests {
 
     fn full() -> String {
         format!(
-            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}},"launchAtLogin":true,"launcher":false,"launcherKeywords":[{{"keyword":"d","name":"Duck","template":"https://duckduckgo.com/?q=%s"}}]}}"#
+            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}},"launchAtLogin":true,"launcher":false,"launcherKeywords":[{{"keyword":"d","name":"Duck","template":"https://duckduckgo.com/?q=%s"}}],"launcherHotkey":"Ctrl+Shift+K"}}"#
         )
     }
 
@@ -448,6 +455,7 @@ mod tests {
                     name: "Duck".into(),
                     template: "https://duckduckgo.com/?q=%s".into(),
                 }],
+                launcher_hotkey: "Ctrl+Shift+K".into(),
                 dock: DockSettings {
                     edge: DockEdge::Top,
                     icon_size: 64,
