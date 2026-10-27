@@ -86,6 +86,32 @@ const messages = {
         items: "Itens do dock",
         about: "Sobre",
       },
+      /** The top of the side bar (spec 0014 R1). */
+      brand: "Configurações",
+      /** The line under each section's title. */
+      leads: {
+        general: "Como o DockMax se encaixa no Windows.",
+        workspaces:
+          "Cada espaço tem os seus apps e widgets e guarda as suas janelas.",
+        look: "Deixe o dock com a sua cara.",
+        apps: "Os programas fixados no dock de cada espaço.",
+        items: "Os widgets do dock de cada espaço.",
+        about: "Versão, licença e onde ficam os seus dados.",
+      },
+      /** The titles of the groups of Geral and Aparência. */
+      groups: {
+        dock: "Dock",
+        taskbar: "Windows",
+        behavior: "Comportamento",
+        launcher: "Lançador",
+        startup: "Inicialização",
+        style: "Tema",
+        tweaks: "Personalizar este tema",
+        hover: "Ao passar o mouse",
+        indicator: "Indicador",
+        icons: "Ícones",
+        openAnimation: "Animação de abertura",
+      },
     },
     /** The switch that opens the DockMax when the user signs in. */
     showOpenApps: "Mostrar apps abertos",

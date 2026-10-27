@@ -64,9 +64,10 @@ const GLYPHS: Readonly<Record<CreatableKind, readonly string[]>> = {
   ],
 };
 
-/** The kind's tile, static: 26 px in the list, 18 px on an add button.
+/** The kind's tile, static: 26 px in the list, 18 px on an add button and
+ * in the miniatures of the themes (`StyleGallery`).
  * Decorative: the name is next to it. */
-function MiniTile({
+export function MiniTile({
   kind,
   small = false,
 }: {
