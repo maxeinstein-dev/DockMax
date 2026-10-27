@@ -6,7 +6,7 @@ Fase E da [spec 0004](0004-paridade-primodock.md) (§3.7a e §5). A bandeja dess
 
 Parar o ponteiro sobre um programa aberto no dock mostra, depois de um atraso curto, um **cartão acima do ícone** com uma miniatura ao vivo de cada janela dele, o título e um botão de fechar. Como a barra do Windows e o PrimoDock.
 
-- **As janelas** são as do programa no espaço de trabalho daquele dock (spec 0013 C2), na ordem em que o DockMax as vê (a da frente primeiro).
+- **As janelas** são as do programa no espaço de trabalho daquele dock (spec 0013 C2), na ordem em que o DockMax as encontrou (a mesma dos outros cálculos dele, não a da frente primeiro).
 - **Cada janela** ocupa uma célula: o título no alto (uma linha, com reticências), o botão de fechar à direita dele e a miniatura embaixo, ao vivo, na proporção da janela.
 - **Clicar numa célula** traz aquela janela para a frente (restaura se estiver minimizada) e fecha o cartão. **Clicar no X** pede à janela que feche, como o "Fechar janela" do menu; o cartão continua com as outras e some quando não sobra nenhuma.
 - **O cartão some** quando o ponteiro sai do ícone e do cartão (com uma tolerância curta para atravessar o vão), num clique no ícone, ao começar um arrasto, ao abrir um menu ou um painel, e quando o dock se recolhe (ocultar automaticamente).
@@ -53,5 +53,12 @@ Valem as propostas até o autor decidir:
 
 ## 7. Verificação
 
+- **Verificado (E1, 2026-10-27),** testes da geometria e das opções, e no app real (release, os dados do autor, o ponteiro de verdade, duas janelas de teste de um mesmo programa):
+  - parado sobre o ícone, o cartão apareceu acima dele com as duas miniaturas ao vivo, os títulos e os X (422 × 164 px a 100 %);
+  - atravessar do ícone para o cartão não o fechou; longe, ele sumiu;
+  - o clique numa miniatura levou à janela dela e fechou o cartão;
+  - o X sob o ponteiro ficou vermelho; o clique fechou aquela janela, e o cartão continuou só com a outra;
+  - memória privada: 84,2 MB ao abrir, 87,3 MB depois de usar o cartão.
+- **Não verificado (E1):** trazer para a frente uma janela que estava atrás (a clicada já era a da frente), uma janela minimizada, o segundo monitor e o dock no topo.
 - **Testes:** a geometria (cartão acima, abaixo e ao lado conforme a borda; dentro da tela; células encolhendo; "+N"), as opções no arquivo e no comando de configurações, e quando a prévia abre (atraso, "só com 2 ou mais", sem janelas no espaço).
 - **App real:** passar o mouse num programa com uma e com várias janelas, nos dois monitores e com o dock em cada borda; clicar numa miniatura (inclusive minimizada); fechar pelo X; sair do ícone para o cartão sem ele sumir; medir a memória antes e depois.
