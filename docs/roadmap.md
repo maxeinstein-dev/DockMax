@@ -30,7 +30,7 @@ Ordem decidida pelo autor em 2026-10-26, depois da fase D: **C → E → F → G
 | **F. Widgets** | Depois da E. |
 | **G. Extras** | Depois da F. |
 
-Fora das fases: o **lançador** no estilo do Ulauncher (spec 0012, em revisão no [PR #30](https://github.com/maxeinstein-dev/DockMax/pull/30)).
+Fora das fases: o **lançador** no estilo do Ulauncher (spec 0012): L1 entregue no [PR #33](https://github.com/maxeinstein-dev/DockMax/pull/33); L2 (calculadora, busca na web e páginas de configurações) no PR seguinte; L3 (personalizar o atalho) depois.
 
 ## Visão do produto
 
@@ -183,6 +183,7 @@ A fase D acabou: a rodada única está no **[roteiro de verificação](roteiro-d
 - [ ] O dock nativo (spec 0011 H3) com o **mouse de verdade**: os três efeitos ao passar o mouse; os nove estilos e os reflexos na tela; a borda de cima; escala de 150 %. (Arrastar para reordenar: confirmado pelo autor em 2026-10-26.)
 - [ ] Um dock por monitor (spec 0010 D4b): o mouse no segundo dock, ligar e desligar um monitor com o DockMax aberto, mudar "Dock em todos os monitores" com ele aberto, tela cheia de verdade no segundo monitor. (Um dock em cada monitor: confirmado pelo autor em 2026-10-26.)
 - [ ] O lançador (spec 0012 L1): o Alt+Espaço com o teclado físico, o Narrador lendo a lista e a seleção, o IME de outro idioma na caixa de busca, o alto contraste, escala de 150 % e dois monitores.
+- [ ] O lançador (spec 0012 L2): Enter em `g dockmax` abre o navegador na busca e Enter em `wifi` abre a página do Wi-Fi (o teste automático não abre o navegador nem as Configurações do Windows na máquina do autor); o Narrador lendo "Resultado copiado"; o editor de palavras-chave em Configurações com o teclado e o leitor de tela.
 
 ### Medição de recursos (build de release 0.3.0, 2026-10-26)
 

@@ -12,7 +12,8 @@ O que o DockMax **não** faz hoje, e o que pode surpreender. Vale para o MVP (ve
 - **Leitor de tela nunca foi testado.** Os controles têm nomes e papéis acessíveis e há testes de acessibilidade por código, mas ninguém usou o aplicativo com um leitor de tela. O dock, desenhado sem navegador ([spec 0011](specs/0011-arquitetura-hibrida.md)), se apresenta à UI Automation como uma barra de ferramentas com um botão por item, que o leitor de tela pode acionar.
 - **O dock não recebe o teclado.** Ele nunca é ativado (o programa em uso continua na frente); os painéis e o app de Configurações recebem.
 - **Alt+Espaço abre o lançador** (spec 0012), não o menu de sistema da janela em foco (Restaurar, Mover, Fechar), que continua no clique direito da barra de título. Em Configurações › Geral dá para desligar a chave "Lançador" e devolver o Alt+Espaço ao Windows. Se outro programa já tiver o atalho (o PowerToys Run, por exemplo), o DockMax avisa ali e o lançador abre por "Buscar apps…", no menu do dock ou da bandeja.
-- **O lançador acha só os apps** da pasta Aplicativos (os do menu Iniciar): arquivos, contas, busca na web e extensões ficam para os próximos recortes da [spec 0012](specs/0012-lancador.md).
+- **O lançador acha os apps** da pasta Aplicativos (os do menu Iniciar), **contas**, **buscas na web por palavra-chave** e uma **lista fixa de páginas de configurações** (34 do Windows e as seções do DockMax): uma página do Windows fora da lista não aparece. Arquivos, janelas abertas e extensões ficam para depois ([spec 0012](specs/0012-lancador.md)).
+- **A busca na web abre só endereços `https://`**: uma palavra-chave com `http://` ou outro esquema não é aceita em Configurações.
 
 ## A barra de tarefas
 
