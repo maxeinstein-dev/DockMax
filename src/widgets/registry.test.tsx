@@ -12,6 +12,8 @@ const INSTANCES = {
   clock: WIDGET_FIXTURES["clock-sample"],
   "time-progress": WIDGET_FIXTURES["time-progress-default"],
   note: WIDGET_FIXTURES["note-default"],
+  activity: WIDGET_FIXTURES["activity-default"],
+  network: WIDGET_FIXTURES["network-default"],
 } as const;
 
 // 2026-10-15 18:07:05 UTC, a Thursday.

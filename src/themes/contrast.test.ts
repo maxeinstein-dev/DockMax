@@ -323,7 +323,7 @@ describe("contrast (WCAG AA)", () => {
   // The live icons write text on the glaze: the clock's time, the
   // progress's percentage.
   it.each(
-    ["t-clock", "t-progress"].map((name) =>
+    ["t-clock", "t-progress", "t-activity", "t-network"].map((name) =>
       shown({ name, ratio: contrast(glyph, glazeMiddle(name)), min: TEXT }),
     ),
   )(

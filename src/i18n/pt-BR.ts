@@ -18,6 +18,8 @@ import type {
   Theme,
 } from "../core/settings";
 import type {
+  ActivityShow,
+  ActivityStyle,
   ClockIconStyle,
   CreatableKind,
   HourCycle,
@@ -83,7 +85,7 @@ const messages = {
         workspaces: "Espaços de trabalho",
         look: "Aparência do dock",
         apps: "Apps do dock",
-        items: "Itens do dock",
+        items: "Widgets",
         about: "Sobre",
       },
       /** The top of the side bar (spec 0014 R1). */
@@ -94,7 +96,7 @@ const messages = {
         workspaces: "Um dock para cada coisa que você faz.",
         look: "Deixe o dock com a sua cara.",
         apps: "Os programas fixados no dock de cada espaço.",
-        items: "Os widgets do dock de cada espaço.",
+        items: "Escolha no catálogo e arrume os do dock de cada espaço.",
         about: "Versão, licença e onde ficam os seus dados.",
       },
       /** The titles of the groups of Geral and Aparência. */
@@ -524,12 +526,16 @@ const messages = {
       note: "Nota",
       shortcut: "Atalho",
       files: "Arquivos",
+      activity: "Atividade",
+      network: "Atividade de rede",
     } satisfies Record<WidgetKind, string>,
     /** Short name of each kind on the add buttons of Itens do dock. */
     addNames: {
       clock: "Relógio",
       "time-progress": "Progresso",
       note: "Nota",
+      activity: "Atividade",
+      network: "Rede",
     } satisfies Record<CreatableKind, string>,
     /** Parts every widget panel shares. */
     common: {
@@ -663,6 +669,73 @@ const messages = {
       lines: { one: "{n} linha", other: "{n} linhas" },
       empty: "vazia",
     },
+    /** The system widgets (spec 0017 F1): what they share. */
+    system: {
+      /** The tile's width in icons. */
+      width: "Largura no dock",
+      widths: { one: "1 ícone", two: "2 ícones" },
+      /** While the first reading is not in. */
+      reading: "Lendo…",
+      /** A share: `42%`. */
+      percent: "{n}%",
+    },
+    activity: {
+      settingsTitle: "Ajustes da atividade",
+      cpu: "Processador",
+      memory: "Memória",
+      /** The memory in use: `9,1 de 16 GB`. */
+      memoryUse: "{used} de {total}",
+      /** The last minute of the processor, under its bar. */
+      cpuHistory: "Processador no último minuto",
+      show: "Mostrar",
+      shows: {
+        both: "Os dois",
+        cpu: "Processador",
+        memory: "Memória",
+      } satisfies Record<ActivityShow, string>,
+      style: "Estilo no dock",
+      styles: {
+        bars: "Barras",
+        rings: "Anéis",
+        numbers: "Números",
+      } satisfies Record<ActivityStyle, string>,
+      footer: "Atualiza a cada 2 segundos",
+    },
+    network: {
+      settingsTitle: "Ajustes da rede",
+      down: "Download",
+      up: "Upload",
+      /** The graph of the last minute. */
+      history: "Rede no último minuto",
+      widthHint: "Com 2 ícones, o dock mostra o gráfico do último minuto.",
+      footer: "Placas de rede ligadas · a cada 2 segundos",
+    },
+    /** Configurações › Widgets (spec 0017): the catalog of every kind. */
+    catalog: {
+      title: "Catálogo",
+      /** The list of the widgets in the dock, above the catalog. */
+      inUse: "Em uso",
+      search: "Buscar widgets",
+      /** No kind matches the search. */
+      none: "Nenhum widget com esse nome.",
+      categories: {
+        system: "Sistema",
+        time: "Tempo",
+        productivity: "Produtividade",
+      },
+      descriptions: {
+        clock: "A hora no ícone, digital ou de ponteiros, em qualquer fuso.",
+        "time-progress": "Quanto já passou do dia, da semana, do mês e do ano.",
+        note: "Um bloco de notas a um clique, que salva sozinho.",
+        activity: "Processador e memória em barras, anéis ou números.",
+        network: "Download e upload agora, com o gráfico do último minuto.",
+      } satisfies Record<CreatableKind, string>,
+      /** The add button of a card, and its accessible name. */
+      add: "Adicionar",
+      addNamed: "Adicionar {name}",
+      /** Said once a widget went to the dock. */
+      added: "{name} foi para o dock.",
+    },
     items: {
       /** The navigation row in Configurações, and the subview's title. */
       title: "Itens do dock",
@@ -718,6 +791,7 @@ const messages = {
         "Esse destino não é aceito. Use um caminho do Windows ou um endereço http(s).",
       invalidFolder:
         "Essa pasta não é aceita. Use o caminho completo de uma pasta do Windows.",
+      invalidWidth: "Essa largura não vale para este widget.",
       noteTooLarge: "Passou de 64 KB e não foi salvo. Encurte o texto.",
       invalidConfig:
         "Não foi possível aplicar este ajuste. Feche o painel e tente de novo.",

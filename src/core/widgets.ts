@@ -33,7 +33,13 @@ export function labelLength(label: string): number {
 
 /** The kinds of widget: a closed set, no third-party widgets. */
 export type WidgetKind =
-  "clock" | "time-progress" | "note" | "shortcut" | "files";
+  | "clock"
+  | "time-progress"
+  | "note"
+  | "shortcut"
+  | "files"
+  | "activity"
+  | "network";
 
 /* Each closed set below has a tuple with every value, in the order of the
  * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
@@ -47,13 +53,12 @@ export const WIDGET_KINDS = [
   "note",
   "shortcut",
   "files",
+  "activity",
+  "network",
 ] as const;
 
 /** The kinds `add_widget` accepts in this phase. */
-export type CreatableKind = Extract<
-  WidgetKind,
-  "clock" | "time-progress" | "note"
->;
+export type CreatableKind = Exclude<WidgetKind, "shortcut" | "files">;
 
 /** The kinds `add_widget` accepts in this phase, in the order of the add
  * buttons; Shortcut and Files exist only in the domain until phase 3. Must
@@ -62,6 +67,8 @@ export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "clock",
   "time-progress",
   "note",
+  "activity",
+  "network",
 ];
 
 /** Stable ID of an instance: a UUID v7 made in Rust, never reused and never
@@ -135,6 +142,34 @@ export interface FilesConfig {
   folder: string;
 }
 
+/** What the Atividade shows (spec 0017 F1). */
+export type ActivityShow = "both" | "cpu" | "memory";
+
+export const ACTIVITY_SHOWS = ["both", "cpu", "memory"] as const;
+
+/** How the Atividade draws its values in the dock. */
+export type ActivityStyle = "bars" | "rings" | "numbers";
+
+export const ACTIVITY_STYLES = ["bars", "rings", "numbers"] as const;
+
+/** The widths, in icons, the system widgets accept; checked in Rust. */
+export const SYSTEM_WIDTHS = [1, 2] as const;
+
+export type SystemWidth = (typeof SYSTEM_WIDTHS)[number];
+
+export interface ActivityConfig {
+  show: ActivityShow;
+  style: ActivityStyle;
+  /** In icons. */
+  width: SystemWidth;
+}
+
+/** Atividade de rede: one icon shows the two rates, two add the graph. */
+export interface NetworkConfig {
+  /** In icons. */
+  width: SystemWidth;
+}
+
 /** The config of each kind. */
 export interface WidgetConfigs {
   clock: ClockConfig;
@@ -142,6 +177,8 @@ export interface WidgetConfigs {
   note: NoteConfig;
   shortcut: ShortcutConfig;
   files: FilesConfig;
+  activity: ActivityConfig;
+  network: NetworkConfig;
 }
 
 /** A kind's config tagged with the kind, as `update_widget` takes it:
@@ -209,6 +246,8 @@ export type WidgetErrorCode =
   | "invalidWorkday"
   | "invalidTarget"
   | "invalidFolder"
+  /** A width the kind doesn't accept. */
+  | "invalidWidth"
   | "noteTooLarge"
   /** A stored config has another version or is not valid JSON, or the
    * config given to `update_widget` is not exactly the canonical one (a
@@ -233,6 +272,7 @@ export const WIDGET_ERROR_CODES: readonly WidgetErrorCode[] = Object.keys({
   invalidWorkday: true,
   invalidTarget: true,
   invalidFolder: true,
+  invalidWidth: true,
   noteTooLarge: true,
   invalidConfig: true,
   unavailable: true,

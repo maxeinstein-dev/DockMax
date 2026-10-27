@@ -33,6 +33,7 @@ pub mod files;
 pub mod note;
 mod path;
 pub mod shortcut;
+pub mod system;
 pub mod time_progress;
 
 use std::fmt;
@@ -45,6 +46,7 @@ pub use clock::ClockConfig;
 pub use files::FilesConfig;
 pub use note::NoteConfig;
 pub use shortcut::ShortcutConfig;
+pub use system::{ActivityConfig, NetworkConfig};
 pub use time_progress::TimeProgressConfig;
 
 /// Most widget instances the dock holds (spec 0003 §2.1 item 3).
@@ -77,6 +79,8 @@ pub enum WidgetKind {
     Note,
     Shortcut,
     Files,
+    Activity,
+    Network,
 }
 
 closed_set!(WidgetKind {
@@ -85,6 +89,8 @@ closed_set!(WidgetKind {
     Note,
     Shortcut,
     Files,
+    Activity,
+    Network,
 });
 
 impl WidgetKind {
@@ -92,7 +98,11 @@ impl WidgetKind {
     /// Files exist only in the domain until phase 3 (spec 0003 §2.5).
     pub const fn creatable(self) -> bool {
         match self {
-            WidgetKind::Clock | WidgetKind::TimeProgress | WidgetKind::Note => true,
+            WidgetKind::Clock
+            | WidgetKind::TimeProgress
+            | WidgetKind::Note
+            | WidgetKind::Activity
+            | WidgetKind::Network => true,
             WidgetKind::Shortcut | WidgetKind::Files => false,
         }
     }
@@ -105,7 +115,9 @@ impl WidgetKind {
             | WidgetKind::TimeProgress
             | WidgetKind::Note
             | WidgetKind::Shortcut
-            | WidgetKind::Files => 1,
+            | WidgetKind::Files
+            | WidgetKind::Activity
+            | WidgetKind::Network => 1,
         }
     }
 
@@ -117,6 +129,8 @@ impl WidgetKind {
             WidgetKind::Note => "note",
             WidgetKind::Shortcut => "shortcut",
             WidgetKind::Files => "files",
+            WidgetKind::Activity => "activity",
+            WidgetKind::Network => "network",
         }
     }
 
@@ -202,6 +216,8 @@ pub enum WidgetConfig {
     Note(NoteConfig),
     Shortcut(ShortcutConfig),
     Files(FilesConfig),
+    Activity(ActivityConfig),
+    Network(NetworkConfig),
 }
 
 impl WidgetConfig {
@@ -212,6 +228,22 @@ impl WidgetConfig {
             WidgetConfig::Note(_) => WidgetKind::Note,
             WidgetConfig::Shortcut(_) => WidgetKind::Shortcut,
             WidgetConfig::Files(_) => WidgetKind::Files,
+            WidgetConfig::Activity(_) => WidgetKind::Activity,
+            WidgetConfig::Network(_) => WidgetKind::Network,
+        }
+    }
+
+    /// How many icons wide the widget is in the dock (spec 0017: 1 to 4).
+    /// The widgets of the first phases are all one icon wide.
+    pub fn span(&self) -> usize {
+        match self {
+            WidgetConfig::Clock(_)
+            | WidgetConfig::TimeProgress(_)
+            | WidgetConfig::Note(_)
+            | WidgetConfig::Shortcut(_)
+            | WidgetConfig::Files(_) => 1,
+            WidgetConfig::Activity(config) => usize::from(config.width),
+            WidgetConfig::Network(config) => usize::from(config.width),
         }
     }
 
@@ -224,6 +256,8 @@ impl WidgetConfig {
             WidgetKind::Note => WidgetConfig::Note(NoteConfig::default()),
             WidgetKind::Shortcut => WidgetConfig::Shortcut(ShortcutConfig::default()),
             WidgetKind::Files => WidgetConfig::Files(FilesConfig::default()),
+            WidgetKind::Activity => WidgetConfig::Activity(ActivityConfig::default()),
+            WidgetKind::Network => WidgetConfig::Network(NetworkConfig::default()),
         }
     }
 
@@ -235,6 +269,8 @@ impl WidgetConfig {
             WidgetConfig::Note(config) => config.validate(),
             WidgetConfig::Shortcut(config) => config.validate(),
             WidgetConfig::Files(config) => config.validate(),
+            WidgetConfig::Activity(config) => config.validate(),
+            WidgetConfig::Network(config) => config.validate(),
         }
     }
 }
@@ -336,6 +372,8 @@ pub fn encode_config(config: &WidgetConfig) -> String {
         WidgetConfig::Note(config) => serde_json::to_string(config),
         WidgetConfig::Shortcut(config) => serde_json::to_string(config),
         WidgetConfig::Files(config) => serde_json::to_string(config),
+        WidgetConfig::Activity(config) => serde_json::to_string(config),
+        WidgetConfig::Network(config) => serde_json::to_string(config),
     };
     // Plain structs with string keys: serializing them can't fail.
     json.expect("widget configs always serialize")
@@ -364,6 +402,8 @@ pub fn decode_config(
         WidgetKind::Note => serde_json::from_str(json).map(WidgetConfig::Note),
         WidgetKind::Shortcut => serde_json::from_str(json).map(WidgetConfig::Shortcut),
         WidgetKind::Files => serde_json::from_str(json).map(WidgetConfig::Files),
+        WidgetKind::Activity => serde_json::from_str(json).map(WidgetConfig::Activity),
+        WidgetKind::Network => serde_json::from_str(json).map(WidgetConfig::Network),
     }
     .map_err(|_| WidgetError::InvalidConfig)?;
     config.validate()?;
@@ -473,6 +513,8 @@ pub enum WidgetError {
     InvalidTarget,
     #[error("invalid folder")]
     InvalidFolder,
+    #[error("invalid widget width")]
+    InvalidWidth,
     #[error("note too large")]
     NoteTooLarge,
     #[error("widget config could not be read")]
@@ -498,6 +540,7 @@ impl WidgetError {
             WidgetError::InvalidWorkday => WidgetErrorCode::InvalidWorkday,
             WidgetError::InvalidTarget => WidgetErrorCode::InvalidTarget,
             WidgetError::InvalidFolder => WidgetErrorCode::InvalidFolder,
+            WidgetError::InvalidWidth => WidgetErrorCode::InvalidWidth,
             WidgetError::NoteTooLarge => WidgetErrorCode::NoteTooLarge,
             WidgetError::InvalidConfig => WidgetErrorCode::InvalidConfig,
             WidgetError::Unavailable => WidgetErrorCode::Unavailable,
@@ -533,6 +576,8 @@ pub enum WidgetErrorCode {
     InvalidTarget,
     /// The folder is not an absolute path.
     InvalidFolder,
+    /// A width the kind doesn't accept.
+    InvalidWidth,
     /// The note is over [`MAX_NOTE_BYTES`].
     NoteTooLarge,
     /// A stored config has another version or is not valid JSON, or the
@@ -556,6 +601,7 @@ closed_set!(WidgetErrorCode {
     InvalidWorkday,
     InvalidTarget,
     InvalidFolder,
+    InvalidWidth,
     NoteTooLarge,
     InvalidConfig,
     Unavailable,
@@ -586,7 +632,7 @@ mod tests {
     }
 
     #[test]
-    fn only_clock_time_progress_and_note_are_creatable() {
+    fn only_shortcut_and_files_are_not_creatable() {
         let creatable: Vec<_> = WidgetKind::ALL
             .into_iter()
             .filter(|kind| kind.creatable())
@@ -597,7 +643,9 @@ mod tests {
             [
                 WidgetKind::Clock,
                 WidgetKind::TimeProgress,
-                WidgetKind::Note
+                WidgetKind::Note,
+                WidgetKind::Activity,
+                WidgetKind::Network
             ]
         );
     }
@@ -611,7 +659,15 @@ mod tests {
 
     #[test]
     fn kind_names_are_kebab_case_in_json_and_in_the_column() {
-        let names = ["clock", "time-progress", "note", "shortcut", "files"];
+        let names = [
+            "clock",
+            "time-progress",
+            "note",
+            "shortcut",
+            "files",
+            "activity",
+            "network",
+        ];
         for (kind, name) in WidgetKind::ALL.into_iter().zip(names) {
             assert_eq!(to_json(&kind), name);
             assert_eq!(kind.as_str(), name);
@@ -712,6 +768,11 @@ mod tests {
                 json!({ "target": { "type": "path", "path": "C:\\" } }),
             ),
             (WidgetKind::Files, json!({ "folder": "C:\\" })),
+            (
+                WidgetKind::Activity,
+                json!({ "show": "both", "style": "bars", "width": 1 }),
+            ),
+            (WidgetKind::Network, json!({ "width": 2 })),
         ];
         for (kind, config) in cases {
             let instance = instance(WidgetConfig::default_for(kind));
@@ -938,6 +999,7 @@ mod tests {
             WidgetError::InvalidWorkday,
             WidgetError::InvalidTarget,
             WidgetError::InvalidFolder,
+            WidgetError::InvalidWidth,
             WidgetError::NoteTooLarge,
             WidgetError::InvalidConfig,
             WidgetError::Unavailable,
@@ -1203,6 +1265,7 @@ mod tests {
             "invalidWorkday",
             "invalidTarget",
             "invalidFolder",
+            "invalidWidth",
             "noteTooLarge",
             "invalidConfig",
             "unavailable",

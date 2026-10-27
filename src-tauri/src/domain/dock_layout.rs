@@ -289,6 +289,16 @@ pub struct Shape {
     /// The workspaces (spec 0013): with two or more, a column of dots starts
     /// the bar.
     pub switcher: usize,
+    /// How many icons wide each item is, in order (spec 0017: a widget
+    /// takes 1 to 4); an item past the list is one icon wide.
+    pub spans: Vec<usize>,
+}
+
+/// The width of an item `span` icons wide, at rest: the icons and the gaps
+/// between them, so a wide item lines up with the icons it replaces.
+pub fn span_width(icon: f64, gap: f64, span: usize) -> f64 {
+    let span = span.clamp(1, 4) as f64;
+    icon * span + gap * (span - 1.0)
 }
 
 /// One item along the bar: its left edge from the bar's outer left edge,
@@ -332,8 +342,10 @@ fn row(shape: &Shape, growth: &dyn Fn(usize) -> Magnification) -> Row {
             x += separator_width(gap) + gap;
         }
         for _ in 0..count {
-            let magnification = growth(items.len());
-            let width = icon * magnification.scale;
+            let index = items.len();
+            let magnification = growth(index);
+            let span = shape.spans.get(index).copied().unwrap_or(1);
+            let width = span_width(icon, gap, span) * magnification.scale;
             items.push(RowItem {
                 x,
                 width,
@@ -469,14 +481,18 @@ pub fn place_with(
         tiles: row
             .items
             .iter()
-            .map(|item| Area {
-                x: bar.x + item.x,
-                y: match edge {
-                    DockEdge::Bottom => top + icon - item.magnification.lift - item.width,
-                    DockEdge::Top => top + item.magnification.lift,
-                },
-                width: item.width,
-                height: item.width,
+            .map(|item| {
+                // A wide tile grows as tall as a square one does.
+                let tall = icon * item.magnification.scale;
+                Area {
+                    x: bar.x + item.x,
+                    y: match edge {
+                        DockEdge::Bottom => top + icon - item.magnification.lift - tall,
+                        DockEdge::Top => top + item.magnification.lift,
+                    },
+                    width: item.width,
+                    height: tall,
+                }
             })
             .collect(),
         scales: row
@@ -619,6 +635,7 @@ mod tests {
             status: false,
             tray: 0,
             switcher: 0,
+            spans: vec![],
         }
     }
 
@@ -642,6 +659,39 @@ mod tests {
         ] {
             assert!((a - e).abs() < 1e-6, "{actual:?} != {expected:?}");
         }
+    }
+
+    #[test]
+    fn a_wide_item_takes_its_icons_and_the_gaps_between_them() {
+        assert_eq!(span_width(48.0, 7.0, 1), 48.0);
+        assert_eq!(span_width(48.0, 7.0, 2), 103.0);
+        assert_eq!(span_width(48.0, 7.0, 4), 213.0);
+        // Out of range: one to four.
+        assert_eq!(span_width(48.0, 7.0, 0), 48.0);
+        assert_eq!(span_width(48.0, 7.0, 9), 213.0);
+        let shape = Shape {
+            groups: vec![3],
+            hover: Hover::of(HoverEffect::None, 100),
+            spans: vec![1, 2],
+            ..shape(DockSize::Medium)
+        };
+        let wide = place(&shape, DockEdge::Bottom, (500.0, 123.0), None);
+        let square = place(
+            &Shape {
+                spans: vec![],
+                ..shape.clone()
+            },
+            DockEdge::Bottom,
+            (500.0, 123.0),
+            None,
+        );
+        // The bar grows by one icon and one gap; the wide tile is as tall as
+        // the others, and the third item moves over.
+        assert!((wide.bar.width - (square.bar.width + 55.0)).abs() < 1e-9);
+        assert!((wide.items[1].width - 103.0).abs() < 1e-9);
+        assert!((wide.tiles[1].height - 48.0).abs() < 1e-9);
+        assert!((wide.tiles[1].width - 103.0).abs() < 1e-9);
+        assert!((wide.items[2].x - (wide.items[1].x + 103.0 + 7.0)).abs() < 1e-9);
     }
 
     #[test]

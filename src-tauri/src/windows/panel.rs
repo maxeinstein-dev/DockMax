@@ -143,6 +143,10 @@ impl Panel {
                 WidgetKind::TimeProgress => (320.0, 284.0),
                 // Title, the 210 px text field, footer.
                 WidgetKind::Note => (340.0, 318.0),
+                // Title, the two meters with their figures, footer.
+                WidgetKind::Activity => (320.0, 300.0),
+                // Title, the graph, the two rates, footer.
+                WidgetKind::Network => (320.0, 300.0),
                 // Never opened in this phase: `toggle_panel` refuses kinds
                 // that can't be created. The Settings card, if one ever is.
                 WidgetKind::Shortcut | WidgetKind::Files => (320.0, 390.0),

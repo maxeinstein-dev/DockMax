@@ -1,4 +1,6 @@
 import {
+  ACTIVITY_SHOWS,
+  ACTIVITY_STYLES,
   CLOCK_ICON_STYLES,
   HOUR_CYCLES,
   MOVE_DIRECTIONS,
@@ -133,6 +135,34 @@ export const WIDGET_FIXTURES = {
     config: { folder: "\\\\server\\share\\Downloads" },
   } satisfies WidgetInstance<"files">,
 
+  "activity-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6080",
+    label: null,
+    kind: "activity",
+    config: { show: "both", style: "bars", width: 1 },
+  } satisfies WidgetInstance<"activity">,
+
+  "activity-sample": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6081",
+    label: null,
+    kind: "activity",
+    config: { show: "cpu", style: "rings", width: 2 },
+  } satisfies WidgetInstance<"activity">,
+
+  "network-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6082",
+    label: null,
+    kind: "network",
+    config: { width: 2 },
+  } satisfies WidgetInstance<"network">,
+
+  "network-sample": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6083",
+    label: null,
+    kind: "network",
+    config: { width: 1 },
+  } satisfies WidgetInstance<"network">,
+
   "snapshot-sample": {
     storage: { state: "ok" },
     widgets: [CLOCK_DEFAULT, { ...NOTE_DEFAULT, label: "Mercado" }],
@@ -158,6 +188,8 @@ export const WIDGET_FIXTURES = {
     UnavailableReason: UNAVAILABLE_REASONS,
     StorageState: STORAGE_STATES,
     ShortcutTargetType: SHORTCUT_TARGET_TYPES,
+    ActivityShow: ACTIVITY_SHOWS,
+    ActivityStyle: ACTIVITY_STYLES,
     WidgetErrorCode: WIDGET_ERROR_CODES.filter((code) => code !== "notReady"),
   },
 

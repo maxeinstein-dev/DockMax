@@ -289,8 +289,15 @@ pub const PAGES: &[Page] = &[
     ),
     dockmax(
         "dockmax-items",
-        "Itens do dock",
-        &["widgets", "relogio", "nota"],
+        "Widgets do dock",
+        &[
+            "itens do dock",
+            "catalogo de widgets",
+            "relogio",
+            "nota",
+            "atividade",
+            "rede",
+        ],
         Section::Items,
     ),
     dockmax(

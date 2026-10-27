@@ -39,6 +39,9 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // icons (ADR 0009, Fase E); a click names an icon the list gave.
             "allow-list-tray",
             "allow-tray-click",
+            // The panels of the system widgets read the processor, the
+            // memory and the network (spec 0017 F1); nothing is sent.
+            "allow-read-system-activity",
             // Dragging a tray icon onto the dock keeps it there; the command
             // names an icon the list gave and a point on the screen.
             "allow-tray-to-dock",

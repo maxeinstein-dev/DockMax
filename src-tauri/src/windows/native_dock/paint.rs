@@ -55,6 +55,8 @@ use super::theme::{APP_INK, Color, Glaze, Palette};
 use crate::domain::badges::Badge;
 use crate::domain::dock_layout::{self, Area};
 use crate::domain::settings::{DockEdge, IconShape, Indicator};
+use crate::domain::system_activity::HISTORY;
+use crate::domain::widgets::system::ActivityStyle;
 
 /// The superellipse every tile is cut to, in a 100 × 100 box.
 const SQUIRCLE: &str = "M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z";
@@ -100,6 +102,38 @@ pub enum Face {
         fraction: Option<f32>,
         text: Option<String>,
     },
+    /// The Atividade: one or two meters as bars, rings or figures.
+    Meters {
+        glaze: Glaze,
+        style: ActivityStyle,
+        meters: Vec<Meter>,
+    },
+    /// The Atividade de rede: the rates and, on a wide tile, the graph.
+    Rates {
+        glaze: Glaze,
+        down: String,
+        up: String,
+        graph: Option<Graph>,
+    },
+}
+
+/// One value of the Atividade: the processor's or the memory's.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Meter {
+    /// Its name, and the short one a narrow tile has room for.
+    pub label: &'static str,
+    pub short: &'static str,
+    /// 0–1; `None` while there is no reading.
+    pub fraction: Option<f32>,
+    /// The figure, as `42%`.
+    pub text: String,
+}
+
+/// The network's last minute, each value 0–1 of the graph's height.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Graph {
+    pub down: Vec<f32>,
+    pub up: Vec<f32>,
 }
 
 /// One item as it is drawn now.
@@ -948,6 +982,10 @@ impl Painter {
 
     /// The tile's shadow and glaze, cut to the superellipse.
     fn glaze(&mut self, area: Area, glaze: Glaze, pressed: bool) {
+        if area.width > area.height * 1.05 {
+            self.wide_glaze(area, glaze, pressed);
+            return;
+        }
         let s = area.width / 100.0;
         // The drop shadow: two soft copies below the tile.
         for (dy, alpha, grow) in [(1.0, 0.12, 0.0), (3.5, 0.07, 1.5)] {
@@ -1127,6 +1165,26 @@ impl Painter {
                     fraction: *fraction,
                     text: text.clone(),
                 },
+                Face::Meters {
+                    glaze,
+                    style,
+                    meters,
+                } => Face::Meters {
+                    glaze: *glaze,
+                    style: *style,
+                    meters: meters.clone(),
+                },
+                Face::Rates {
+                    glaze,
+                    down,
+                    up,
+                    graph,
+                } => Face::Rates {
+                    glaze: *glaze,
+                    down: down.clone(),
+                    up: up.clone(),
+                    graph: graph.clone(),
+                },
             },
             pressed: false,
             attention: false,
@@ -1222,7 +1280,333 @@ impl Painter {
                     self.percent(text, area);
                 }
             }
+            Face::Meters {
+                glaze,
+                style,
+                meters,
+            } => {
+                self.glaze(area, *glaze, tile.pressed);
+                self.meters(area, *style, meters);
+            }
+            Face::Rates {
+                glaze,
+                down,
+                up,
+                graph,
+            } => {
+                self.glaze(area, *glaze, tile.pressed);
+                self.rates(area, down, up, graph.as_ref());
+            }
         }
+    }
+
+    /// `text` with its left edge at `x`, centered on `cy`; its width.
+    fn text_from(&mut self, text: &str, x: f64, cy: f64, size: f64, ink: Color) -> f64 {
+        let width = self.text_width(text, size, 600, true);
+        let area = Area {
+            x,
+            y: cy - size,
+            width,
+            height: size * 2.0,
+        };
+        self.text(text, area, size, 600, true, ink);
+        width
+    }
+
+    /// `text` with its right edge at `right`, centered on `cy`.
+    fn text_to(&mut self, text: &str, right: f64, cy: f64, size: f64, ink: Color) {
+        let width = self.text_width(text, size, 600, true);
+        self.text_from(text, right - width, cy, size, ink);
+    }
+
+    /// A rounded bar: the faint track and, over it, `fraction` of it in
+    /// white, from the bottom when it stands, from the left when it lies.
+    fn meter_bar(&mut self, bar: Area, fraction: Option<f32>) {
+        let radius = (bar.width.min(bar.height) / 2.0) as f32;
+        let rounded = |area: Area| D2D1_ROUNDED_RECT {
+            rect: rect(area),
+            radiusX: radius,
+            radiusY: radius,
+        };
+        let track = self.solid(Color::WHITE.with_alpha(0.28)).clone();
+        unsafe { self.target.FillRoundedRectangle(&rounded(bar), &track) };
+        let Some(fraction) = fraction
+            .map(|f| f64::from(f.clamp(0.0, 1.0)))
+            .filter(|f| *f > 0.0)
+        else {
+            return;
+        };
+        let filled = if bar.height > bar.width {
+            let height = (bar.height * fraction).max(bar.width);
+            Area {
+                y: bar.y + bar.height - height,
+                height,
+                ..bar
+            }
+        } else {
+            Area {
+                width: (bar.width * fraction).max(bar.height),
+                ..bar
+            }
+        };
+        let white = self.solid(Color::WHITE).clone();
+        unsafe { self.target.FillRoundedRectangle(&rounded(filled), &white) };
+    }
+
+    /// The Atividade's meters (spec 0017 F1), in a tile one or two icons
+    /// wide.
+    fn meters(&mut self, area: Area, style: ActivityStyle, meters: &[Meter]) {
+        let u = area.height;
+        let wide = area.width > u * 1.2;
+        let faint = Color::WHITE.with_alpha(0.75);
+        let count = meters.len().max(1) as f64;
+        match style {
+            ActivityStyle::Bars if wide => {
+                // A row per meter: the name, the bar, the figure.
+                let size = u * 0.15;
+                let row = u * 0.3;
+                let top = area.y + (u - row * count) / 2.0;
+                let left = area.x + u * 0.14;
+                let right = area.x + area.width - u * 0.14;
+                for (index, meter) in meters.iter().enumerate() {
+                    let cy = top + row * (index as f64 + 0.5);
+                    self.text_from(meter.label, left, cy, size, faint);
+                    self.text_to(&meter.text, right, cy, size, Color::WHITE);
+                    let start = left + u * 0.42;
+                    let end = right - u * 0.42;
+                    let bar = Area {
+                        x: start,
+                        y: cy - u * 0.04,
+                        width: (end - start).max(u * 0.1),
+                        height: u * 0.08,
+                    };
+                    self.meter_bar(bar, meter.fraction);
+                }
+            }
+            ActivityStyle::Bars => {
+                // Standing bars, side by side, the short name under each.
+                let bar_width = u * 0.13;
+                let gap = u * 0.16;
+                let total = bar_width * count + gap * (count - 1.0);
+                let height = u * 0.48;
+                let top = area.y + u * 0.14;
+                for (index, meter) in meters.iter().enumerate() {
+                    let x = area.x + (area.width - total) / 2.0 + (bar_width + gap) * index as f64;
+                    let bar = Area {
+                        x,
+                        y: top,
+                        width: bar_width,
+                        height,
+                    };
+                    self.meter_bar(bar, meter.fraction);
+                    let label = Area {
+                        x: x + bar_width / 2.0 - u * 0.25,
+                        y: top + height + u * 0.04,
+                        width: u * 0.5,
+                        height: u * 0.18,
+                    };
+                    self.text(meter.short, label, u * 0.13, 600, true, faint);
+                }
+            }
+            ActivityStyle::Rings if wide || meters.len() == 1 => {
+                // A ring per meter, each in an icon's square, its figure in it.
+                let side = area.width / count;
+                for (index, meter) in meters.iter().enumerate() {
+                    let square = Area {
+                        x: area.x + side * index as f64 + (side - u) / 2.0,
+                        y: area.y,
+                        width: u,
+                        height: u,
+                    };
+                    self.ring(square, meter.fraction);
+                    self.percent(&meter.text, square);
+                }
+            }
+            ActivityStyle::Rings => {
+                // Two rings, one inside the other: the processor outside.
+                for (index, meter) in meters.iter().enumerate() {
+                    let side = u * (1.0 - 0.32 * index as f64);
+                    let square = Area {
+                        x: area.x + (area.width - side) / 2.0,
+                        y: area.y + (u - side) / 2.0,
+                        width: side,
+                        height: side,
+                    };
+                    self.ring(square, meter.fraction);
+                }
+            }
+            ActivityStyle::Numbers if meters.len() == 1 && !wide => {
+                // The name above, the figure large.
+                let meter = &meters[0];
+                let label = Area {
+                    y: area.y + u * 0.1,
+                    height: u * 0.22,
+                    ..area
+                };
+                self.text(meter.label, label, u * 0.15, 600, true, faint);
+                let figure = Area {
+                    y: area.y + u * 0.12,
+                    height: u * 0.88,
+                    ..area
+                };
+                self.percent(&meter.text, figure);
+            }
+            ActivityStyle::Numbers => {
+                // A row per meter: the name, then the figure.
+                let size = if wide { u * 0.2 } else { u * 0.16 };
+                let row = u * 0.3;
+                let top = area.y + (u - row * count) / 2.0;
+                let inset = u * if wide { 0.18 } else { 0.1 };
+                for (index, meter) in meters.iter().enumerate() {
+                    let cy = top + row * (index as f64 + 0.5);
+                    let label = if wide { meter.label } else { meter.short };
+                    self.text_from(label, area.x + inset, cy, size * 0.85, faint);
+                    self.text_to(
+                        &meter.text,
+                        area.x + area.width - inset,
+                        cy,
+                        size,
+                        Color::WHITE,
+                    );
+                }
+            }
+        }
+    }
+
+    /// The Atividade de rede: the two rates and, on a wide tile, the graph
+    /// of the last minute under them.
+    fn rates(&mut self, area: Area, down: &str, up: &str, graph: Option<&Graph>) {
+        let u = area.height;
+        let faint = Color::WHITE.with_alpha(0.75);
+        let rows = [("\u{2193}", down), ("\u{2191}", up)];
+        let Some(graph) = graph else {
+            // One icon: a row per rate, the arrow on the left.
+            let size = u * 0.16;
+            for (index, (arrow, rate)) in rows.into_iter().enumerate() {
+                let cy = area.y + u * (0.33 + 0.34 * index as f64);
+                self.text_from(arrow, area.x + u * 0.1, cy, size, faint);
+                self.text_to(rate, area.x + area.width - u * 0.1, cy, size, Color::WHITE);
+            }
+            return;
+        };
+        let plot = Area {
+            x: area.x + u * 0.12,
+            y: area.y + u * 0.46,
+            width: area.width - u * 0.24,
+            height: u * 0.38,
+        };
+        self.graph_line(plot, &graph.down, true);
+        self.graph_line(plot, &graph.up, false);
+        // The two rates side by side above it, down on the left.
+        let size = u * 0.17;
+        let cy = area.y + u * 0.26;
+        for (index, (arrow, rate)) in rows.into_iter().enumerate() {
+            let x = area.x + area.width / 2.0 * index as f64 + u * 0.12;
+            let width = self.text_from(arrow, x, cy, size, faint);
+            self.text_from(rate, x + width + u * 0.03, cy, size, Color::WHITE);
+        }
+    }
+
+    /// One series of the network graph in `plot`: values 0–1, the newest
+    /// on the right; the rate down filled, the rate up as a line.
+    fn graph_line(&mut self, plot: Area, values: &[f32], filled: bool) {
+        if values.len() < 2 {
+            return;
+        }
+        let step = plot.width / (HISTORY - 1) as f64;
+        let start = plot.x + plot.width - step * (values.len() - 1) as f64;
+        let bottom = plot.y + plot.height;
+        let at = |index: usize, value: f32| {
+            v(
+                start + step * index as f64,
+                bottom - plot.height * f64::from(value.clamp(0.0, 1.0)),
+            )
+        };
+        let Ok(path) = (unsafe { self.factory.CreatePathGeometry() }) else {
+            return;
+        };
+        let built = unsafe {
+            path.Open().and_then(|sink| {
+                if filled {
+                    sink.BeginFigure(v(start, bottom), D2D1_FIGURE_BEGIN_FILLED);
+                    for (index, value) in values.iter().enumerate() {
+                        sink.AddLine(at(index, *value));
+                    }
+                    sink.AddLine(v(plot.x + plot.width, bottom));
+                    sink.EndFigure(D2D1_FIGURE_END_CLOSED);
+                } else {
+                    sink.BeginFigure(at(0, values[0]), D2D1_FIGURE_BEGIN_HOLLOW);
+                    for (index, value) in values.iter().enumerate().skip(1) {
+                        sink.AddLine(at(index, *value));
+                    }
+                    sink.EndFigure(D2D1_FIGURE_END_OPEN);
+                }
+                sink.Close()
+            })
+        };
+        if built.is_err() {
+            return;
+        }
+        if filled {
+            let fill = self.solid(Color::WHITE.with_alpha(0.32)).clone();
+            unsafe { self.target.FillGeometry(&path, &fill, None::<&ID2D1Brush>) };
+        } else {
+            let line = self.solid(Color::WHITE.with_alpha(0.9)).clone();
+            unsafe { self.target.DrawGeometry(&path, &line, 1.4, &self.round) };
+        }
+    }
+
+    /// The glaze of a tile wider than tall (spec 0017): a rounded
+    /// rectangle with corners about as round as the squircle's, the same
+    /// fill, sheen and rim stretched across it.
+    fn wide_glaze(&mut self, area: Area, glaze: Glaze, pressed: bool) {
+        let radius = area.height * 0.3;
+        // Drawn in a 100 × 100 box stretched over the tile, so the brushes
+        // made for that box fit; the corners are set back to round.
+        let shape = |width: f64, height: f64| D2D1_ROUNDED_RECT {
+            rect: D2D_RECT_F {
+                left: 0.0,
+                top: 0.0,
+                right: 100.0,
+                bottom: 100.0,
+            },
+            radiusX: (radius * 100.0 / width) as f32,
+            radiusY: (radius * 100.0 / height) as f32,
+        };
+        let stretch = |x: f64, y: f64, width: f64, height: f64| Matrix3x2 {
+            M11: (width / 100.0) as f32,
+            M12: 0.0,
+            M21: 0.0,
+            M22: (height / 100.0) as f32,
+            M31: x as f32,
+            M32: y as f32,
+        };
+        for (dy, alpha, grow) in [(1.0, 0.12, 0.0), (3.5, 0.07, 1.5)] {
+            let shadow = self.solid(Color::BLACK.with_alpha(alpha)).clone();
+            let (width, height) = (area.width + 2.0 * grow, area.height + 2.0 * grow);
+            self.transform(&stretch(area.x - grow, area.y - grow + dy, width, height));
+            unsafe {
+                self.target
+                    .FillRoundedRectangle(&shape(width, height), &shadow)
+            };
+        }
+        let Some(fill) = self.glaze_brush(glaze, pressed) else {
+            self.transform(&IDENTITY);
+            return;
+        };
+        let tile = shape(area.width, area.height);
+        self.transform(&stretch(area.x, area.y, area.width, area.height));
+        unsafe {
+            self.target.FillRoundedRectangle(&tile, &fill);
+            self.target.FillRoundedRectangle(&tile, &self.sheen);
+            self.target.DrawRoundedRectangle(
+                &tile,
+                &self.rim,
+                (100.0 / area.height) as f32,
+                None::<&ID2D1StrokeStyle>,
+            );
+        }
+        self.transform(&IDENTITY);
     }
 
     /// The progress in the ring: the number, and a smaller, fainter `%`.

@@ -48,6 +48,15 @@ impl Item {
         }
     }
 
+    /// How many icons wide the item is in the dock: a widget says; the rest
+    /// are one.
+    pub fn span(&self) -> usize {
+        match self {
+            Item::Widget(widget) => widget.config.span(),
+            _ => 1,
+        }
+    }
+
     /// Whether the item stands for a program (pinned or open).
     pub fn is_program(&self) -> bool {
         matches!(self, Item::App(_) | Item::Other(_))
@@ -63,6 +72,8 @@ pub struct Names {
     pub note: &'static str,
     pub shortcut: &'static str,
     pub files: &'static str,
+    pub activity: &'static str,
+    pub network: &'static str,
 }
 
 impl Names {
@@ -78,6 +89,8 @@ impl Names {
                     WidgetKind::Note => self.note,
                     WidgetKind::Shortcut => self.shortcut,
                     WidgetKind::Files => self.files,
+                    WidgetKind::Activity => self.activity,
+                    WidgetKind::Network => self.network,
                 }
                 .to_string()
             }),
@@ -228,6 +241,8 @@ mod tests {
         note: "Nota",
         shortcut: "Atalho",
         files: "Arquivos",
+        activity: "Atividade",
+        network: "Atividade de rede",
     };
 
     fn id(n: u8) -> WidgetId {

@@ -21,6 +21,7 @@
     "allow-dismiss-storage-notice",
     "allow-list-tray",
     "allow-tray-click",
+    "allow-read-system-activity",
     "allow-tray-to-dock",
     "allow-list-apps",
     "allow-list-catalog",

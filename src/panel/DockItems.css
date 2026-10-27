@@ -139,6 +139,22 @@
   opacity: 0.4;
 }
 
+/* Two icons wide (spec 0017): a rounded bar, the glyph at the tile's
+   height. */
+.mini-tile.wide {
+  width: 56px;
+}
+
+.mini-tile.wide::before {
+  mask: none;
+  border-radius: 8px;
+}
+
+.mini-tile.wide svg {
+  width: auto;
+  aspect-ratio: 1;
+}
+
 /* On an add button: 18 px, no shadow. */
 .mini-tile.small {
   width: 18px;
