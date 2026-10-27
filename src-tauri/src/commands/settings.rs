@@ -546,6 +546,7 @@ mod tests {
             "hover",
             "hoverScale",
             "indicator",
+            "showBadges",
             "taskbar",
             "everyMonitor",
             "autoHide",
