@@ -1,14 +1,21 @@
 //! The launcher's search (spec 0012 §5): which entries match what the user
 //! typed, and in what order. Pure: no Windows, no clock, no database.
 //!
-//! A name matches in one of six bands, best first; within a band, what the
-//! user opened more often (and more lately) through the launcher comes
-//! first, then the shorter name, then the alphabet. Use never lifts an entry
-//! over a better band: typing an app's exact name never loses to an app used
-//! a lot.
+//! A name matches in one of six bands, best first; within a band, the apps
+//! come before the settings pages, then what the user opened more often (and
+//! more lately) through the launcher, then the shorter name, then the
+//! alphabet. Use never lifts an entry over a better band: typing an app's
+//! exact name never loses to an app used a lot.
+//!
+//! What a result does is one of a closed list of actions (`Action`), each
+//! checked by `is_allowed` before it runs: nothing found by the launcher runs
+//! anything else.
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
+
+use super::apps::is_valid_app_id;
+use super::launcher_pages::{self, Section};
 
 /// How many results the launcher shows.
 pub const MAX_RESULTS: usize = 8;
@@ -58,6 +65,35 @@ pub struct Candidate {
     /// The program's file name without its extension, for the classic
     /// programs (whose id is a path); `None` for the others.
     pub file: Option<String>,
+    /// Other words that find it, normalized (a settings page's).
+    pub aliases: Vec<&'static str>,
+    /// Its kind's place within a band: the apps (0) before the settings
+    /// pages (1).
+    pub rank: u8,
+}
+
+impl Candidate {
+    /// A program of the Apps folder.
+    pub fn app(id: &str, name: &str) -> Candidate {
+        Candidate {
+            key: app_key(id),
+            name: name.to_owned(),
+            file: file_of(id),
+            aliases: Vec::new(),
+            rank: 0,
+        }
+    }
+
+    /// A settings page of the fixed list.
+    pub fn page(page: &launcher_pages::Page) -> Candidate {
+        Candidate {
+            key: launcher_pages::page_key(page.id),
+            name: page.name.to_owned(),
+            file: None,
+            aliases: page.aliases.to_vec(),
+            rank: 1,
+        }
+    }
 }
 
 /// Lowercase, without accents, the runs of spaces made one, and no spaces
@@ -200,13 +236,22 @@ pub fn search(
         .filter_map(|(index, candidate)| {
             let name = normalize(&candidate.name);
             let file = candidate.file.as_deref().map(normalize);
-            let band = band(&query, &name, file.as_deref())?;
+            let band = std::iter::once(band(&query, &name, file.as_deref()))
+                .chain(
+                    candidate
+                        .aliases
+                        .iter()
+                        .map(|alias| band(&query, alias, None)),
+                )
+                .flatten()
+                .min()?;
             let used = usage.get(&candidate.key).copied().unwrap_or(0.0);
             Some((band, used, name.chars().count(), name, index))
         })
         .collect();
     found.sort_by(|a, b| {
         a.0.cmp(&b.0)
+            .then_with(|| candidates[a.4].rank.cmp(&candidates[b.4].rank))
             .then_with(|| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal))
             .then_with(|| a.2.cmp(&b.2))
             .then_with(|| a.3.cmp(&b.3))
@@ -257,6 +302,52 @@ pub fn file_of(id: &str) -> Option<String> {
     (!stem.is_empty()).then(|| stem.to_owned())
 }
 
+/// The longest text a result copies (a calculator's result).
+pub const MAX_COPY: usize = 64;
+/// The longest address a result opens.
+pub const MAX_URI: usize = 2048;
+
+/// What a result does: the closed list of spec 0012 §5. A new kind of
+/// action is added here, and to `is_allowed`, or not at all.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Action {
+    /// Opens a program of the Apps folder, by its id.
+    OpenApp(String),
+    /// Opens a section of the DockMax's Configurações.
+    OpenSection(Section),
+    /// Opens an address: a Windows settings page of the fixed list, or an
+    /// `https://` search of a keyword.
+    OpenUri(String),
+    /// Copies a text (a calculator's result).
+    Copy(String),
+}
+
+/// Whether `action` may run: every result's action is checked here first.
+pub fn is_allowed(action: &Action) -> bool {
+    match action {
+        Action::OpenApp(id) => is_valid_app_id(id),
+        Action::OpenSection(_) => true,
+        Action::OpenUri(uri) => launcher_pages::is_listed_uri(uri) || is_web_uri(uri),
+        Action::Copy(text) => {
+            !text.is_empty()
+                && text.chars().count() <= MAX_COPY
+                && !text.chars().any(char::is_control)
+        }
+    }
+}
+
+/// An `https://` address with a host, without spaces or control characters:
+/// what a keyword's search makes (`launcher_web::url`).
+fn is_web_uri(uri: &str) -> bool {
+    let Some(rest) = uri.strip_prefix("https://") else {
+        return false;
+    };
+    let host = rest.split(['/', '?', '#']).next().unwrap_or("");
+    uri.len() <= MAX_URI
+        && !host.is_empty()
+        && !uri.chars().any(|c| c.is_whitespace() || c.is_control())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266,6 +357,8 @@ mod tests {
             key: app_key(name),
             name: name.to_owned(),
             file: None,
+            aliases: Vec::new(),
+            rank: 0,
         }
     }
 
@@ -288,11 +381,10 @@ mod tests {
         .into_iter()
         .map(app)
         .collect();
-        apps.push(Candidate {
-            key: app_key(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
-            name: "Microsoft Edge".into(),
-            file: file_of(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
-        });
+        apps.push(Candidate::app(
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            "Microsoft Edge",
+        ));
         apps
     }
 
@@ -454,5 +546,79 @@ mod tests {
             ["Calculadora", "Paint"]
         );
         assert_eq!(recents(&apps, &usage, 1).len(), 1);
+    }
+
+    fn with_pages() -> Vec<Candidate> {
+        let mut all = catalog();
+        all.extend(launcher_pages::PAGES.iter().map(Candidate::page));
+        all
+    }
+
+    fn find_all(query: &str) -> Vec<String> {
+        let all = with_pages();
+        names(&all, &search(&all, &HashMap::new(), query, MAX_RESULTS))
+    }
+
+    #[test]
+    fn a_page_is_found_by_its_other_words() {
+        for query in ["wifi", "internet", "rede sem fio", "wi-fi"] {
+            assert!(find_all(query).contains(&"Wi-Fi".to_owned()), "{query}");
+        }
+        assert_eq!(find_all("papel de parede")[0], "Plano de fundo");
+        assert_eq!(find_all("bateria")[0], "Energia e bateria");
+    }
+
+    #[test]
+    fn in_the_same_band_the_apps_come_before_the_pages() {
+        // The app "Configurações" is the exact name; the page "Configurações
+        // do DockMax" only starts with it.
+        assert_eq!(
+            find_all("configuracoes")[..2],
+            ["Configurações", "Configurações do DockMax"]
+        );
+        // "Paint" (an app) and "Plano de fundo" (a page) both start with p:
+        // the app first, even with the page used a lot.
+        let all = with_pages();
+        let mut usage = HashMap::new();
+        usage.insert(launcher_pages::page_key("background"), 99.0);
+        let found = names(&all, &search(&all, &usage, "p", 50));
+        let paint = found.iter().position(|name| name == "Paint").unwrap();
+        let page = found
+            .iter()
+            .position(|name| name == "Plano de fundo")
+            .unwrap();
+        assert!(paint < page, "{found:?}");
+    }
+
+    #[test]
+    fn every_action_is_checked() {
+        assert!(is_allowed(&Action::OpenApp(
+            "Microsoft.Paint_8wekyb3d8bbwe!App".into()
+        )));
+        assert!(!is_allowed(&Action::OpenApp(String::new())));
+        assert!(is_allowed(&Action::OpenSection(Section::Look)));
+        assert!(is_allowed(&Action::OpenUri(
+            "ms-settings:network-wifi".into()
+        )));
+        assert!(is_allowed(&Action::OpenUri(
+            "https://www.google.com/search?q=dock%20max".into()
+        )));
+        for uri in [
+            "ms-settings:developers",
+            "http://example.com/",
+            "https://",
+            "https://example.com/a b",
+            "file:///C:/Windows/System32/cmd.exe",
+            "shell:AppsFolder",
+            r"C:\Windows\System32\cmd.exe",
+        ] {
+            assert!(!is_allowed(&Action::OpenUri(uri.into())), "{uri}");
+        }
+        let long = format!("https://example.com/?q={}", "a".repeat(MAX_URI));
+        assert!(!is_allowed(&Action::OpenUri(long)));
+        assert!(is_allowed(&Action::Copy("3,5".into())));
+        assert!(!is_allowed(&Action::Copy(String::new())));
+        assert!(!is_allowed(&Action::Copy("a\nb".into())));
+        assert!(!is_allowed(&Action::Copy("1".repeat(MAX_COPY + 1))));
     }
 }

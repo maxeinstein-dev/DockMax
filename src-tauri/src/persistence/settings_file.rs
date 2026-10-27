@@ -167,6 +167,7 @@ mod tests {
             theme: Theme::Dark,
             launch_at_login: false,
             launcher: true,
+            launcher_keywords: crate::domain::launcher_web::defaults(),
             dock: DockSettings {
                 edge: DockEdge::Top,
                 icon_size: 64,
@@ -365,7 +366,13 @@ mod tests {
                     "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2
                 },
                 "launchAtLogin": false,
-                "launcher": true
+                "launcher": true,
+                "launcherKeywords": [
+                {"keyword": "g", "name": "Google", "template": "https://www.google.com/search?q=%s"},
+                {"keyword": "yt", "name": "YouTube", "template": "https://www.youtube.com/results?search_query=%s"},
+                {"keyword": "w", "name": "Wikipédia", "template": "https://pt.wikipedia.org/w/index.php?search=%s"},
+                {"keyword": "gh", "name": "GitHub", "template": "https://github.com/search?q=%s"}
+              ]
             })
         );
     }

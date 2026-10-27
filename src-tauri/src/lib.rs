@@ -284,6 +284,10 @@ pub fn run() {
                     windows::tray_host::stop();
                     windows::appbar::remove();
                     windows::taskbar::release();
+                    // Direct2D is let go while DXGI still answers: at the
+                    // end of the process, it crashed every exit.
+                    windows::launcher::shutdown();
+                    windows::native_dock::shutdown();
                 }
                 // The process ends without closing the widget database:
                 // leave the file complete on its own, `-wal` applied.

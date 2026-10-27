@@ -23,6 +23,17 @@ pub struct LauncherMessages {
     pub placeholder: &'static str,
     /// What a program is, under its name.
     pub app: &'static str,
+    /// What the other results are, under their names (spec 0012 L2).
+    pub windows_page: &'static str,
+    pub dockmax_page: &'static str,
+    pub calculator: &'static str,
+    pub web: &'static str,
+    /// A web search's name and what is under it; `{term}` and `{name}` are
+    /// replaced.
+    pub search_for: &'static str,
+    pub search_with: &'static str,
+    /// Said once a sum's result is in the clipboard.
+    pub copied: &'static str,
     /// The title above the most used, with nothing typed.
     pub recent: &'static str,
     pub reading: &'static str,
@@ -125,10 +136,17 @@ const PT_BR: Messages = Messages {
         title: "Lançador do DockMax",
         placeholder: "Buscar apps",
         app: "App",
+        windows_page: "Configurações do Windows",
+        dockmax_page: "Configurações do DockMax",
+        calculator: "Calculadora · Enter copia o resultado",
+        web: "Busca na web",
+        search_for: "Buscar “{term}”",
+        search_with: "{name} · busca na web",
+        copied: "Resultado copiado",
         recent: "Recentes",
         reading: "Lendo os apps…",
-        hint: "Digite para buscar apps",
-        nothing_found: "Nenhum app encontrado",
+        hint: "Digite para buscar apps e configurações ou fazer uma conta",
+        nothing_found: "Nenhum resultado",
         failed: "Não foi possível abrir",
         results: "{n} resultados",
         one_result: "1 resultado",

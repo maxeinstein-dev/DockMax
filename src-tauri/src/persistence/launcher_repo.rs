@@ -13,15 +13,19 @@ use rusqlite::{Connection, params};
 use super::database::{begin, read_failed, write_failed};
 use crate::domain::apps::is_valid_app_id;
 use crate::domain::launcher::{decay, opened};
+use crate::domain::launcher_pages::page;
 use crate::domain::widgets::WidgetError;
 
 /// Most entries kept: the ones opened longest ago go first.
 pub const MAX_ENTRIES: usize = 500;
 
 /// Whether `key` is one the launcher keeps the use of: `app:` and a program
-/// of the Apps folder.
+/// of the Apps folder, or `setting:` and a page of the fixed list.
 pub fn is_valid_key(key: &str) -> bool {
     key.strip_prefix("app:").is_some_and(is_valid_app_id)
+        || key
+            .strip_prefix("setting:")
+            .is_some_and(|id| page(id).is_some())
 }
 
 /// Each entry's weight at `now_ms`, by key.
@@ -121,10 +125,20 @@ mod tests {
     #[test]
     fn a_key_the_launcher_does_not_make_is_refused() {
         let mut conn = database();
-        for key in ["Paint", "app:", "app: Paint", "widget:1", "app:a\nb"] {
+        for key in [
+            "Paint",
+            "app:",
+            "app: Paint",
+            "widget:1",
+            "app:a\nb",
+            "setting:",
+            "setting:developers",
+        ] {
             assert!(record(&mut conn, key, 0).is_err(), "{key:?}");
         }
         assert!(usage(&conn, 0).unwrap().is_empty());
+        record(&mut conn, "setting:wifi", 0).unwrap();
+        assert!(usage(&conn, 0).unwrap().contains_key("setting:wifi"));
     }
 
     #[test]

@@ -33,6 +33,7 @@ const SETTINGS: Settings = {
   theme: "system",
   launchAtLogin: false,
   launcher: true,
+  launcherKeywords: [],
   dock: {
     edge: "bottom",
     iconSize: 48,

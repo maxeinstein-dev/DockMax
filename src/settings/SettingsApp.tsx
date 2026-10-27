@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useApps } from "../core/apps";
 import { errorKind, log } from "../core/log";
@@ -13,7 +14,13 @@ import LookPanel from "../panel/LookPanel";
 import SettingsPanel from "../panel/SettingsPanel";
 import WorkspacePicker from "../panel/WorkspacePicker";
 import WorkspacesPanel from "../panel/WorkspacesPanel";
-import { SECTIONS, type Section } from "./sections";
+import {
+  SECTIONS,
+  SECTION_EVENT,
+  isSection,
+  startSection,
+  type Section,
+} from "./sections";
 import "./SettingsApp.css";
 
 function closeWindow() {
@@ -38,7 +45,7 @@ function SettingsApp() {
   const widgets = useWidgets();
   const apps = useApps();
   const spaces = useWorkspaces();
-  const [section, setSection] = useState<Section>("general");
+  const [section, setSection] = useState<Section>(startSection);
   /** The workspace being edited (spec 0013): chosen here, whichever the
    * docks show; at first the one in use. */
   const [chosen, setChosen] = useState<string | null>(null);
@@ -48,6 +55,18 @@ function SettingsApp() {
     all.find((each) => each.id === spaces?.inUse) ??
     all[0] ??
     null;
+
+  // The launcher found a section with the window already open.
+  useEffect(() => {
+    let active = true;
+    const unlisten = listen<unknown>(SECTION_EVENT, (event) => {
+      if (active && isSection(event.payload)) setSection(event.payload);
+    });
+    return () => {
+      active = false;
+      void unlisten.then((stop) => stop());
+    };
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

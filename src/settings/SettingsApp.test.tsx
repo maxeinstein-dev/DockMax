@@ -6,13 +6,19 @@ import SettingsApp from "./SettingsApp";
 
 const text = ptBR.settings.app;
 
-const { invoke, close } = vi.hoisted(() => ({
+type Listener = (event: { payload: unknown }) => void;
+
+const { invoke, close, listeners } = vi.hoisted(() => ({
   invoke: vi.fn(),
   close: vi.fn(() => Promise.resolve()),
+  listeners: new Map<string, Listener>(),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn(() => Promise.resolve(() => {})),
+  listen: vi.fn((event: string, handler: Listener) => {
+    listeners.set(event, handler);
+    return Promise.resolve(() => {});
+  }),
 }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({ close }),
@@ -27,6 +33,7 @@ const SETTINGS: Settings = {
   theme: "system",
   launchAtLogin: false,
   launcher: true,
+  launcherKeywords: [],
   dock: {
     edge: "bottom",
     iconSize: 48,
@@ -47,6 +54,8 @@ const sectionButton = (name: string) =>
 
 describe("SettingsApp", () => {
   beforeEach(() => {
+    delete window.__DOCKMAX_SECTION__;
+    listeners.clear();
     close.mockClear();
     invoke.mockReset();
     invoke.mockImplementation((command: string) => {
@@ -122,6 +131,32 @@ describe("SettingsApp", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: title }),
     ).toBeInTheDocument();
+  });
+
+  it("starts on the section the launcher asked for", async () => {
+    window.__DOCKMAX_SECTION__ = "items";
+    await renderApp();
+
+    expect(sectionButton("Itens do dock")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("starts on Geral when asked for a section it does not have", async () => {
+    window.__DOCKMAX_SECTION__ = "developer";
+    await renderApp();
+
+    expect(sectionButton("Geral")).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows the section the launcher found while open", async () => {
+    await renderApp();
+
+    act(() => listeners.get("settings-section")?.({ payload: "about" }));
+    expect(sectionButton("Sobre")).toHaveAttribute("aria-current", "page");
+    act(() => listeners.get("settings-section")?.({ payload: "nope" }));
+    expect(sectionButton("Sobre")).toHaveAttribute("aria-current", "page");
   });
 
   it("closes its window with Esc", async () => {

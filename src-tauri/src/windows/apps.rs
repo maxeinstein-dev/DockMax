@@ -274,6 +274,37 @@ pub fn open_folder(_path: &std::path::Path) -> Result<(), String> {
     Err("not Windows".to_owned())
 }
 
+/// Opens an address of the launcher's closed list (a Windows settings page,
+/// a keyword's `https://` search) with the program Windows has for it.
+/// Checked again here: nothing else is opened.
+#[cfg(windows)]
+pub fn open_uri(uri: &str) -> Result<(), String> {
+    use crate::domain::launcher::{Action, is_allowed};
+    if !is_allowed(&Action::OpenUri(uri.to_owned())) {
+        return Err("the address is not one the launcher opens".to_owned());
+    }
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            &HSTRING::from("open"),
+            &HSTRING::from(uri),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    if result.0 as usize > 32 {
+        Ok(())
+    } else {
+        Err(format!("ShellExecute answered {}", result.0 as usize))
+    }
+}
+
+#[cfg(not(windows))]
+pub fn open_uri(_uri: &str) -> Result<(), String> {
+    Err("not Windows".to_owned())
+}
+
 /// Opens the Windows Task Manager, as the taskbar's menu does: through the
 /// shell, which raises it to administrator when Windows asks for that.
 #[cfg(windows)]

@@ -20,6 +20,7 @@ import RangeField from "./parts/RangeField";
 import ToggleField from "./parts/ToggleField";
 import LauncherField from "./LauncherField";
 import TrayInDockField from "./TrayInDockField";
+import WebKeywordsField from "./WebKeywordsField";
 import { useSettingsEditor } from "./useSettingsEditor";
 
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
@@ -257,6 +258,14 @@ function SettingsPanel({
         <LauncherField
           on={shown?.launcher ?? null}
           onChange={(launcher) => change((s) => ({ ...s, launcher }))}
+        />
+      ) : null}
+      {withLauncher && shown !== null ? (
+        <WebKeywordsField
+          keywords={shown.launcherKeywords}
+          onChange={(launcherKeywords) =>
+            change((s) => ({ ...s, launcherKeywords }))
+          }
         />
       ) : null}
       <OptionGroup
