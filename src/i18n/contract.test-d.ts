@@ -60,7 +60,7 @@ export const otherText: Messages = {
       brand: "Settings",
       leads: {
         general: "How DockMax fits into Windows.",
-        workspaces: "Each workspace has its own apps, widgets and windows.",
+        workspaces: "A dock for each thing you do.",
         look: "Make the dock yours.",
         apps: "The programs pinned to each workspace's dock.",
         items: "The widgets of each workspace's dock.",
