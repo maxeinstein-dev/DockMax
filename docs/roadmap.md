@@ -30,7 +30,7 @@ Ordem decidida pelo autor em 2026-10-26, depois da fase D: **C → E → F → G
 | **F. Widgets** | Depois da E. |
 | **G. Extras** | Depois da F. |
 
-Fora das fases: o **lançador** no estilo do Ulauncher (spec 0012, em revisão no [PR #30](https://github.com/maxeinstein-dev/DockMax/pull/30)).
+Fora das fases: o **lançador** no estilo do Ulauncher ([spec 0012](specs/0012-lancador.md)). O L1 entrou em 2026-10-27 (Alt+Espaço, busca nos apps, recentes). Faltam o L2 (calculadora, busca na web por palavra-chave, Configurações do DockMax e do Windows) e, depois, o L3 (personalizar o atalho).
 
 ## Visão do produto
 
