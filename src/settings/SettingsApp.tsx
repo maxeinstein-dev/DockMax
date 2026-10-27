@@ -9,6 +9,7 @@ import { useWorkspaces } from "../core/workspaces";
 import { useT } from "../i18n";
 import AboutPanel from "../panel/AboutPanel";
 import AppsPanel from "../panel/AppsPanel";
+import WidgetCatalog from "./WidgetCatalog";
 import DockItems from "../panel/DockItems";
 import LookPanel from "../panel/LookPanel";
 import SettingsPanel from "../panel/SettingsPanel";
@@ -189,7 +190,8 @@ function SettingsApp() {
                   selected={editing}
                   onSelect={setChosen}
                 />
-                <DockItems snapshot={widgets} workspace={editing} />
+                <DockItems snapshot={widgets} workspace={editing} catalog />
+                <WidgetCatalog snapshot={widgets} workspace={editing} />
               </>
             ) : null}
             {section === "about" ? <AboutPanel /> : null}

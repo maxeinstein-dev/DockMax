@@ -48,6 +48,9 @@ export interface DockItemsProps {
   /** Back to the main view of the panel; none in the Configurações app,
    * where the views are sections. */
   onBack?: () => void;
+  /** In Configurações › Widgets, where the catalog adds: the list is "Em
+   * uso", without the add buttons. */
+  catalog?: boolean;
 }
 
 /** The glyph of each kind on its mini tile (DESIGN.md "Dock item": Mini;
@@ -72,14 +75,17 @@ const GLYPHS: Readonly<Record<CreatableKind, readonly string[]>> = {
 export function MiniTile({
   kind,
   small = false,
+  wide = false,
 }: {
   kind: CreatableKind;
   small?: boolean;
+  /** Two icons wide, as a wide tile in the dock (spec 0017). */
+  wide?: boolean;
 }) {
   const glaze = WIDGET_REGISTRY[kind].glaze;
   return (
     <span
-      className={`mini-tile ${glaze}${small ? " small" : ""}`}
+      className={`mini-tile ${glaze}${small ? " small" : ""}${wide ? " wide" : ""}`}
       aria-hidden="true"
     >
       <svg viewBox="0 0 24 24">
@@ -199,7 +205,7 @@ function focusLost(): boolean {
  * notice of a recovered or unavailable storage. Rust is the source of
  * truth: nothing here changes before `widgets-changed` says so.
  */
-function DockItems({ snapshot, workspace, onBack }: DockItemsProps) {
+function DockItems({ snapshot, workspace, onBack, catalog }: DockItemsProps) {
   const t = useT();
   const [error, setError] = useState<WidgetErrorCode | null>(null);
   const [dismissing, setDismissing] = useState(false);
@@ -430,7 +436,9 @@ function DockItems({ snapshot, workspace, onBack }: DockItemsProps) {
           focusAction
         />
       ) : (
-        <PanelHeader title={t.widgets.items.title} />
+        <PanelHeader
+          title={catalog ? t.widgets.catalog.inUse : t.widgets.items.title}
+        />
       )}
       {storage === "recovered" ? (
         <InlineNotice
@@ -560,40 +568,45 @@ function DockItems({ snapshot, workspace, onBack }: DockItemsProps) {
               </div>
             </div>
           ) : null}
-          <div
-            className="dock-items-add"
-            role="group"
-            aria-labelledby="dock-items-add-label"
-          >
-            <div className="dock-items-add-head">
-              <span id="dock-items-add-label" className="dock-items-add-label">
-                {t.widgets.items.add}
-              </span>
-              <span className="dock-items-count">
-                {full
-                  ? format(t.widgets.items.limit, { max: MAX_WIDGETS })
-                  : format(t.widgets.items.count, {
-                      count: widgets.length,
-                      max: MAX_WIDGETS,
-                    })}
-              </span>
-            </div>
-            <div className="dock-items-add-buttons">
-              {CREATABLE_KINDS.map((kind, index) => (
-                <button
-                  key={kind}
-                  ref={index === 0 ? addButton : undefined}
-                  type="button"
-                  className="secondary-button"
-                  disabled={full}
-                  onClick={() => add(kind)}
+          {catalog ? null : (
+            <div
+              className="dock-items-add"
+              role="group"
+              aria-labelledby="dock-items-add-label"
+            >
+              <div className="dock-items-add-head">
+                <span
+                  id="dock-items-add-label"
+                  className="dock-items-add-label"
                 >
-                  <MiniTile kind={kind} small />
-                  {t.widgets.addNames[kind]}
-                </button>
-              ))}
+                  {t.widgets.items.add}
+                </span>
+                <span className="dock-items-count">
+                  {full
+                    ? format(t.widgets.items.limit, { max: MAX_WIDGETS })
+                    : format(t.widgets.items.count, {
+                        count: widgets.length,
+                        max: MAX_WIDGETS,
+                      })}
+                </span>
+              </div>
+              <div className="dock-items-add-buttons">
+                {CREATABLE_KINDS.map((kind, index) => (
+                  <button
+                    key={kind}
+                    ref={index === 0 ? addButton : undefined}
+                    type="button"
+                    className="secondary-button"
+                    disabled={full}
+                    onClick={() => add(kind)}
+                  >
+                    <MiniTile kind={kind} small />
+                    {t.widgets.addNames[kind]}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </>
       ) : null}
       <PanelFooter alert={error && t.widgets.errors[error]}>

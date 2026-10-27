@@ -83,7 +83,7 @@ describe("SettingsApp", () => {
       "Espaços de trabalho",
       "Aparência do dock",
       "Apps do dock",
-      "Itens do dock",
+      "Widgets",
       "Sobre",
     ]);
     expect(sectionButton("Geral")).toHaveAttribute("aria-current", "page");
@@ -261,7 +261,7 @@ describe("SettingsApp", () => {
 
   it.each([
     ["Apps do dock", ptBR.apps.title],
-    ["Itens do dock", ptBR.widgets.items.title],
+    ["Widgets", ptBR.settings.app.sections.items],
     ["Sobre", ptBR.panel.titles.about],
   ])("shows %s under its own title", async (section, title) => {
     await renderApp();
@@ -277,10 +277,7 @@ describe("SettingsApp", () => {
     window.__DOCKMAX_SECTION__ = "items";
     await renderApp();
 
-    expect(sectionButton("Itens do dock")).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(sectionButton("Widgets")).toHaveAttribute("aria-current", "page");
   });
 
   it("starts on Geral when asked for a section it does not have", async () => {

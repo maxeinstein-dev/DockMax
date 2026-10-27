@@ -85,7 +85,7 @@ const messages = {
         workspaces: "Espaços de trabalho",
         look: "Aparência do dock",
         apps: "Apps do dock",
-        items: "Itens do dock",
+        items: "Widgets",
         about: "Sobre",
       },
       /** The top of the side bar (spec 0014 R1). */
@@ -96,7 +96,7 @@ const messages = {
         workspaces: "Um dock para cada coisa que você faz.",
         look: "Deixe o dock com a sua cara.",
         apps: "Os programas fixados no dock de cada espaço.",
-        items: "Os widgets do dock de cada espaço.",
+        items: "Escolha no catálogo e arrume os do dock de cada espaço.",
         about: "Versão, licença e onde ficam os seus dados.",
       },
       /** The titles of the groups of Geral and Aparência. */
@@ -709,6 +709,32 @@ const messages = {
       history: "Rede no último minuto",
       widthHint: "Com 2 ícones, o dock mostra o gráfico do último minuto.",
       footer: "Placas de rede ligadas · a cada 2 segundos",
+    },
+    /** Configurações › Widgets (spec 0017): the catalog of every kind. */
+    catalog: {
+      title: "Catálogo",
+      /** The list of the widgets in the dock, above the catalog. */
+      inUse: "Em uso",
+      search: "Buscar widgets",
+      /** No kind matches the search. */
+      none: "Nenhum widget com esse nome.",
+      categories: {
+        system: "Sistema",
+        time: "Tempo",
+        productivity: "Produtividade",
+      },
+      descriptions: {
+        clock: "A hora no ícone, digital ou de ponteiros, em qualquer fuso.",
+        "time-progress": "Quanto já passou do dia, da semana, do mês e do ano.",
+        note: "Um bloco de notas a um clique, que salva sozinho.",
+        activity: "Processador e memória em barras, anéis ou números.",
+        network: "Download e upload agora, com o gráfico do último minuto.",
+      } satisfies Record<CreatableKind, string>,
+      /** The add button of a card, and its accessible name. */
+      add: "Adicionar",
+      addNamed: "Adicionar {name}",
+      /** Said once a widget went to the dock. */
+      added: "{name} foi para o dock.",
     },
     items: {
       /** The navigation row in Configurações, and the subview's title. */
