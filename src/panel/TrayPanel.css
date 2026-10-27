@@ -16,13 +16,20 @@
   height: 36px;
   padding: 0;
   border: 0;
-  border-radius: var(--r-segment);
+  border-radius: var(--r-track);
   background: var(--track);
   cursor: pointer;
 }
 
 .tray-icon:hover:not(:disabled) {
   background: color-mix(in srgb, var(--ink) 11%, transparent);
+}
+
+/* The keyboard's icon, as every control of the app (spec 0014 R4: the
+   panel had none). */
+.tray-icon:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .tray-icon:disabled {
