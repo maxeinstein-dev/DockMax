@@ -58,6 +58,7 @@ export const COMMAND_ARGS_SAMPLES = {
     direction: "up",
     workspace: WORKSPACE_ID,
   },
+  share_widget: { id: CLOCK_DEFAULT.id, workspace: WORKSPACE_ID },
   update_widget: {
     id: NOTE_DEFAULT.id,
     label: null,

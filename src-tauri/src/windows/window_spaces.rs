@@ -390,6 +390,24 @@ pub fn switch(monitor: &str, from: &str, target: &str) -> Option<isize> {
     back.iter().find(|p| !p.minimized).map(|p| p.hwnd)
 }
 
+/// The windows `hwnds` go to the workspace `target` (spec 0013 C3): a parked
+/// one waits for `target` now. Each monitor is then switched to what it shows
+/// (`settle`), which parks the ones on the screen and brings back those of
+/// `target` where it is shown.
+pub fn give(hwnds: &[isize], target: &str) {
+    with_state(|inner| {
+        for value in hwnds {
+            if let Some(tracked) = inner.known.get_mut(value) {
+                tracked.workspace = target.to_owned();
+            }
+            for parked in inner.parked.iter_mut().filter(|p| p.hwnd == *value) {
+                parked.workspace = target.to_owned();
+            }
+        }
+        keep_session(inner);
+    });
+}
+
 /// The workspace `id` was deleted: its parked windows come back, and its
 /// windows get the workspace of their monitor at the next look.
 pub fn forget_workspace(id: &str) {

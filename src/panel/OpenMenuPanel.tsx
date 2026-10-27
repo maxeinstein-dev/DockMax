@@ -6,15 +6,20 @@ import {
   pinOpen,
   type OpenOther,
 } from "../core/openApps";
+import { moveOpenWindows, type WorkspacesSnapshot } from "../core/workspaces";
 import { format, useT } from "../i18n";
 import PanelFooter from "./PanelFooter";
 import PanelHeader from "./parts/PanelHeader";
 import { menuItems, moveInMenu } from "./parts/menu";
+import MoveToWorkspace from "./parts/MoveToWorkspace";
 import "./AppMenuPanel.css";
 
 /** Props of the menu of an open program that is not pinned (spec 0009 D3). */
 export interface OpenMenuPanelProps {
   other: OpenOther;
+  /** The workspaces: with two or more, the menu offers to move the windows
+   * to another (spec 0013 C3). */
+  workspaces?: WorkspacesSnapshot | null;
   /** An action was done: the host closes the panel. */
   onDone: () => void;
 }
@@ -25,7 +30,11 @@ export interface OpenMenuPanelProps {
  * The program is named by the opaque key Rust gave it; the page never holds a
  * path or a window.
  */
-function OpenMenuPanel({ other, onDone }: OpenMenuPanelProps) {
+function OpenMenuPanel({
+  other,
+  workspaces = null,
+  onDone,
+}: OpenMenuPanelProps) {
   const t = useT();
   const text = t.apps.menu;
   const [error, setError] = useState<AppErrorCode | null>(null);
@@ -36,7 +45,7 @@ function OpenMenuPanel({ other, onDone }: OpenMenuPanelProps) {
     menuItems(root.current)[0]?.focus();
   }, []);
 
-  function done(action: Promise<void>) {
+  function done(action: Promise<unknown>) {
     setError(null);
     action.then(onDone, (reason: unknown) =>
       setError(isAppCommandError(reason) ? reason.code : "notReady"),
@@ -82,6 +91,10 @@ function OpenMenuPanel({ other, onDone }: OpenMenuPanelProps) {
             {text.pin}
           </button>
         </div>
+        <MoveToWorkspace
+          workspaces={workspaces}
+          onMove={(workspace) => done(moveOpenWindows(other.key, workspace))}
+        />
       </div>
       <PanelFooter alert={error && t.apps.errors[error]}>
         {text.openFooter}

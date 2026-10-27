@@ -603,6 +603,54 @@ describe("DockItems", () => {
   });
 });
 
+describe("DockItems in a workspace (spec 0013 C3)", () => {
+  const SPACE = {
+    id: "w-work",
+    name: "Trabalho",
+    color: "#FF9F0A",
+    items: ["widget:c1"],
+  };
+
+  beforeEach(() => {
+    invoke.mockReset();
+    answer();
+  });
+
+  it("lists only its widgets, and offers the other workspaces' ones", async () => {
+    render(<DockItems snapshot={THREE} workspace={SPACE} />);
+
+    expect(rows()).toHaveLength(1);
+    const others = screen.getByRole("group", { name: text.items.fromOthers });
+    const offered = within(others).getAllByRole("button");
+    expect(offered).toHaveLength(2);
+
+    fireEvent.click(offered[1]!);
+    await flush();
+
+    expect(invoke).toHaveBeenCalledWith("share_widget", {
+      id: "n1",
+      workspace: "w-work",
+    });
+  });
+
+  it("offers nothing when it shows every widget, or with no workspace", () => {
+    const { rerender } = render(
+      <DockItems
+        snapshot={THREE}
+        workspace={{ ...SPACE, items: ["widget:c1", "widget:p1", "widget:n1"] }}
+      />,
+    );
+    expect(
+      screen.queryByRole("group", { name: text.items.fromOthers }),
+    ).toBeNull();
+
+    rerender(<DockItems snapshot={THREE} />);
+    expect(
+      screen.queryByRole("group", { name: text.items.fromOthers }),
+    ).toBeNull();
+  });
+});
+
 describe("DockItems.css", () => {
   it("scrolls the list above 268 px", () => {
     expect(css).toMatch(/\.dock-items-list\s*\{[^}]*max-height:\s*268px/);

@@ -267,6 +267,7 @@ export const WIDGET_COMMANDS = {
   add: "add_widget",
   remove: "remove_widget",
   move: "move_widget",
+  share: "share_widget",
   update: "update_widget",
   getNote: "get_note",
   saveNote: "save_note",
@@ -292,6 +293,13 @@ export interface RemoveWidgetArgs {
   /** The workspace it leaves; with no other one showing it, it is removed
    * for good. Without it, the one in use. */
   workspace?: string;
+}
+
+/** Arguments of `share_widget` (spec 0013 C3): the instance shows in
+ * `workspace` too, still one instance. */
+export interface ShareWidgetArgs {
+  id: WidgetId;
+  workspace: string;
 }
 
 /** Arguments of `move_widget`. Moving the first up or the last down does
@@ -328,6 +336,7 @@ export interface WidgetCommandSignatures {
   add_widget: { args: AddWidgetArgs; result: WidgetInstance };
   remove_widget: { args: RemoveWidgetArgs; result: void };
   move_widget: { args: MoveWidgetArgs; result: void };
+  share_widget: { args: ShareWidgetArgs; result: void };
   update_widget: { args: UpdateWidgetArgs; result: WidgetInstance };
   get_note: { args: GetNoteArgs; result: string };
   save_note: { args: SaveNoteArgs; result: void };
@@ -386,6 +395,13 @@ export function removeWidget(args: RemoveWidgetArgs): Promise<void> {
 export function moveWidget(args: MoveWidgetArgs): Promise<void> {
   return run(WIDGET_COMMANDS.move, args, (error) =>
     log.warn(`widgets: move failed: ${errorKind(error)}`),
+  );
+}
+
+/** Shows an instance in another workspace too, at its end. */
+export function shareWidget(args: ShareWidgetArgs): Promise<void> {
+  return run(WIDGET_COMMANDS.share, args, (error) =>
+    log.warn(`widgets: share failed: ${errorKind(error)}`),
   );
 }
 

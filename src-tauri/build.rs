@@ -62,6 +62,9 @@ fn main() {
             "recolor_workspace",
             "move_workspace",
             "delete_workspace",
+            "move_app_windows",
+            "move_open_windows",
+            "share_widget",
             // The E2E suite's, registered only in the test build (`e2e.rs`).
             "e2e_dock_view",
             "e2e_press_dock",

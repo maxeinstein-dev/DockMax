@@ -63,6 +63,11 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-close-app",
             "allow-close-open",
             "allow-pin-open",
+            // "Mover para <espaço>" in a program's menu (spec 0013 C3): the
+            // workspaces read, and its windows given to another.
+            "allow-list-workspaces",
+            "allow-move-app-windows",
+            "allow-move-open-windows",
             "allow-list-icon-packs",
             "allow-reload-icon-packs",
             "allow-open-icon-packs-folder",
@@ -114,6 +119,8 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-recolor-workspace",
             "allow-move-workspace",
             "allow-delete-workspace",
+            // A widget shown in another workspace too (spec 0013 C3).
+            "allow-share-widget",
             "log:allow-log",
         ],
     ),

@@ -364,7 +364,8 @@ mod tests {
                     "indicator": "dot", "indicatorColor": null,
                     "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
                     "showOpenApps": true, "middleClick": "newInstance",
-                    "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2
+                    "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2,
+                "switchEveryMonitor": false, "indicatorFollowsWorkspace": false
                 },
                 "launchAtLogin": false,
                 "launcher": true,
