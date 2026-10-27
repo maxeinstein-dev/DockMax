@@ -46,7 +46,10 @@ pub struct Row<'a> {
     pub name: &'a str,
     pub subtitle: &'a str,
     pub icon: Option<&'a ID2D1Bitmap>,
-    /// The first letter, while there is no icon.
+    /// The glyph of Windows' icon font drawn instead of an icon (a settings
+    /// page, the calculator, the web).
+    pub glyph: Option<char>,
+    /// The first letter, while there is no icon nor glyph.
     pub letter: char,
     pub selected: bool,
     /// What Alt and a number opens it with (`Alt+1`), for the first nine.
@@ -63,11 +66,13 @@ pub struct Scene<'a> {
     pub message: Option<&'a str>,
 }
 
-/// Text styles, by size (hundredths of a pixel), weight and alignment.
-type FormatKey = (u32, i32, i32);
+/// Text styles, by size (hundredths of a pixel), weight, alignment and
+/// font (Windows' icon font or not).
+type FormatKey = (u32, i32, i32, bool);
 
-/// A text's size in logical pixels, its weight and its alignment.
-type TextStyle = (f64, DWRITE_FONT_WEIGHT, DWRITE_TEXT_ALIGNMENT);
+/// A text's size in logical pixels, its weight, its alignment and whether
+/// it is a glyph of Windows' icon font.
+type TextStyle = (f64, DWRITE_FONT_WEIGHT, DWRITE_TEXT_ALIGNMENT, bool);
 
 pub struct Painter {
     factory: ID2D1Factory,
@@ -191,17 +196,16 @@ impl Painter {
         self.brush = None;
     }
 
-    fn format(
-        &mut self,
-        size: f64,
-        weight: DWRITE_FONT_WEIGHT,
-        align: DWRITE_TEXT_ALIGNMENT,
-    ) -> Option<IDWriteTextFormat> {
-        let key = ((size * 100.0).round() as u32, weight.0, align.0);
+    fn format(&mut self, (size, weight, align, glyph): TextStyle) -> Option<IDWriteTextFormat> {
+        let key = ((size * 100.0).round() as u32, weight.0, align.0, glyph);
         if let Some(found) = self.formats.get(&key) {
             return Some(found.clone());
         }
-        let family: PCWSTR = w!("Segoe UI Variable Text");
+        let family: PCWSTR = if glyph {
+            w!("Segoe Fluent Icons")
+        } else {
+            w!("Segoe UI Variable Text")
+        };
         let format = unsafe {
             self.write.CreateTextFormat(
                 family,
@@ -263,11 +267,11 @@ impl Painter {
         &mut self,
         target: &ID2D1HwndRenderTarget,
         text: &str,
-        (size, weight, align): TextStyle,
+        style: TextStyle,
         area: D2D_RECT_F,
         ink: D2D1_COLOR_F,
     ) {
-        let Some(format) = self.format(size, weight, align) else {
+        let Some(format) = self.format(style) else {
             return;
         };
         let Some(brush) = &self.brush else {
@@ -360,6 +364,7 @@ impl Painter {
                     12.0,
                     DWRITE_FONT_WEIGHT_SEMI_BOLD,
                     DWRITE_TEXT_ALIGNMENT_LEADING,
+                    false,
                 ),
                 rect(
                     layout::SIDE + 4.0,
@@ -379,6 +384,7 @@ impl Painter {
                     14.0,
                     DWRITE_FONT_WEIGHT_NORMAL,
                     DWRITE_TEXT_ALIGNMENT_LEADING,
+                    false,
                 ),
                 rect(layout::SIDE + 4.0, y, width - 2.0 * layout::SIDE, ROW),
                 color(c.dim, 1.0),
@@ -415,14 +421,18 @@ impl Painter {
                         8.0,
                         color(c.dim, 0.25),
                     );
-                    let letter = row.letter.to_string();
+                    let (letter, size, glyph) = match row.glyph {
+                        Some(glyph) => (glyph.to_string(), 18.0, true),
+                        None => (row.letter.to_string(), 15.0, false),
+                    };
                     self.text(
                         &target,
                         &letter,
                         (
-                            15.0,
+                            size,
                             DWRITE_FONT_WEIGHT_SEMI_BOLD,
                             windows::Win32::Graphics::DirectWrite::DWRITE_TEXT_ALIGNMENT_CENTER,
+                            glyph,
                         ),
                         rect(icon_x, icon_y, icon, icon),
                         ink,
@@ -439,6 +449,7 @@ impl Painter {
                     15.0,
                     DWRITE_FONT_WEIGHT_SEMI_BOLD,
                     DWRITE_TEXT_ALIGNMENT_LEADING,
+                    false,
                 ),
                 rect(text_x, y + 5.0, text_width, 22.0),
                 ink,
@@ -450,6 +461,7 @@ impl Painter {
                     12.0,
                     DWRITE_FONT_WEIGHT_NORMAL,
                     DWRITE_TEXT_ALIGNMENT_LEADING,
+                    false,
                 ),
                 rect(text_x, y + 25.0, text_width, 18.0),
                 dim,
@@ -462,6 +474,7 @@ impl Painter {
                         12.0,
                         DWRITE_FONT_WEIGHT_NORMAL,
                         DWRITE_TEXT_ALIGNMENT_TRAILING,
+                        false,
                     ),
                     rect(
                         width - layout::SIDE - 12.0 - shortcut_width,
