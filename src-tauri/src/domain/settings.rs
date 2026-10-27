@@ -221,6 +221,9 @@ pub struct DockSettings {
     /// Whether the open programs that are not pinned show on the dock, after
     /// the widgets (spec 0009 D2).
     pub show_open_apps: bool,
+    /// Whether a program's icon wears the notification badge its button of
+    /// the Windows taskbar has (spec 0016).
+    pub show_badges: bool,
     /// The icons of the notification area the dock shows itself, at its end
     /// beside the battery, the network and the volume, by `is_tray_key`
     /// name; the others are behind the arrow. Left out of the file while
@@ -278,6 +281,7 @@ impl Default for DockSettings {
             icon_pack: None,
             open_animation: OpenAnimation::default(),
             show_open_apps: true,
+            show_badges: true,
             tray_in_dock: Vec::new(),
             middle_click: MiddleClick::default(),
             taskbar: TaskbarMode::default(),
@@ -661,7 +665,7 @@ mod tests {
                 "style": "native", "tweaks": {}, "hover": "scale", "hoverScale": 110,
                 "indicator": "dot", "indicatorColor": null,
                 "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
-                "showOpenApps": true, "middleClick": "newInstance",
+                "showOpenApps": true, "showBadges": true, "middleClick": "newInstance",
                 "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2,
                 "switchEveryMonitor": false, "indicatorFollowsWorkspace": false,
                 "previews": true, "previewDelay": 200, "previewsOnlySeveral": false

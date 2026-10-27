@@ -115,6 +115,8 @@ const messages = {
     /** The switch that opens the DockMax when the user signs in. */
     showOpenApps: "Mostrar apps abertos",
     showOpenAppsHint: "Os que não estão fixados, depois dos widgets",
+    showBadges: "Mostrar selos de notificação",
+    showBadgesHint: "O número de não lidas que o app põe na barra do Windows",
     autoHide: "Ocultar automaticamente",
     autoHideHint:
       "O dock desce quando o ponteiro sai e sobe ao encostar na borda da tela",
