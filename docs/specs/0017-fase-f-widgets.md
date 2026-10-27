@@ -33,7 +33,7 @@ Fase F da [spec 0004](0004-paridade-primodock.md) (§3.5), depois da fase E. Ref
 | Recorte | Entrega |
 |---|---|
 | **F1. Base, catálogo e sistema** | A largura do tile; o provedor de sistema; **Atividade** (CPU e memória, em barras, anéis ou números; 1 ou 2 ícones) e **Atividade de rede** (descida e subida; com gráfico em 2 ícones); a **aba Widgets** de Configurações (catálogo por categoria com miniatura, busca, adicionar ao espaço em uso; "Em uso" com largura, estilo e espaços), no lugar dos botões de Itens do dock. |
-| **F2. Tempo** | **Calendário** (o mês, e a variante "Dia" com a data grande; o dia de hoje marcado), **Contagem regressiva** (dias até uma data, com nome) e **Pomodoro / timer de foco** (foco e pausa, com o tempo restante no ícone; o estado fica em Rust, então continua contando com o painel fechado; aviso do Windows no fim). |
+| **F2. Tempo** | **Calendário** (as próximas reuniões do Google Agenda, como o widget do celular; ver §6.5), **Contagem regressiva** (dias até uma data, com nome) e **Pomodoro / timer de foco** (foco e pausa, com o tempo restante no ícone; o estado fica em Rust, então continua contando com o painel fechado; aviso do Windows no fim). |
 | **F3. Produtividade** | **Lista de tarefas** (tarefas com marca, guardadas no banco, o número de abertas no ícone) e **Beber água** (copos do dia, meta, lembrete opcional a cada N minutos, zera à meia-noite). |
 | **F4. Mídia** | **Tocando agora**: a sessão de mídia do Windows (`GlobalSystemMediaTransportControlsSessionManager`), com capa, título e artista; tocar/pausar, anterior e próxima no painel e no ícone largo. |
 | **F5. Fontes externas** | **Clima** (Open-Meteo, cidade digitada) e **Uso do Claude** (o Claude Code, pelos registros locais), como decidido na §6. |
@@ -50,6 +50,7 @@ Pilhas de widgets (vários num lugar, trocados pela roda), espaçadores, "Widget
 2. **Uso do Claude:** o uso do **Claude Code** lido dos registros locais (`~/.claude/projects/*.jsonl`: tokens e mensagens do dia e da semana), sem rede e sem credenciais. A conta pessoal não expõe o consumo do plano por uma API pública.
 3. **Pomodoro:** 25 min de foco e 5 de pausa, com uma pausa longa de 15 min a cada 4 focos, e um aviso do Windows ao fim de cada etapa; os tempos mudam nos ajustes do widget.
 4. **Catálogo:** uma aba **Widgets** em Configurações, no lugar de "Itens do dock", com o catálogo e o "Em uso"; a ordem dos widgets no dock continua em Espaços › Editar widgets.
+5. **Calendário (2026-10-27):** ligado ao **Google Agenda** do autor, mostra as **próximas reuniões** e avança sozinho conforme o tempo passa, como o widget do celular. **Sem a data**, que o fim do dock já mostra. O ícone traz a próxima reunião (hora e começo do título, ou "em 10 min"); o painel lista as seguintes do dia e de amanhã. Como ligar à conta fica para o plano do F2: o **endereço secreto no formato iCal** (só leitura, sem login, colado nos ajustes; o endereço é um segredo e fica fora dos registros) ou o **OAuth do Google** (exige um projeto no Google Cloud e a tela de consentimento). A recomendação é começar pelo endereço iCal.
 
 ## 7. Verificação
 
