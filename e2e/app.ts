@@ -59,6 +59,8 @@ export interface LauncherView {
   query: string;
   /** The names of the results, in order. */
   results: string[];
+  /** What each result shows under its name ("App", "Calculadora…"). */
+  subtitles: string[];
   selected: number | null;
   /** What the list says besides the rows: `none`, `reading`, `hint` or
    * `nothingFound`. */

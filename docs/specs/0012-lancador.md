@@ -1,6 +1,6 @@
 # Spec 0012 — Lançador: buscar e abrir pelo teclado
 
-**Status:** rascunho para aprovação. Nenhum código foi escrito.
+**Status:** L1 entregue (PR #33); L2 implementado (calculadora, busca na web, páginas de configurações). L3 não começou.
 **Origem:** pedido do autor (2026-10-26) de um lançador no estilo do [Ulauncher](https://ulauncher.io/): uma caixa de busca aberta por um atalho de teclado global, que acha e abre apps e, no futuro, arquivos e extensões. O PrimoDock tem algo parecido ("O botão Iniciar abre: Apps do PrimoDock", [interface](../reference/primodock/interface.md)), mas só pelo mouse e sem busca por teclado.
 
 ## 1. Decisões do autor (2026-10-26)
@@ -98,11 +98,11 @@ O Windows dá ao processo que recebe um atalho registrado o direito de trazer um
 
 **Os provedores do L2**, misturados na mesma lista:
 
-- **Calculadora:** quando a consulta é uma conta (números, `+ - * / ^ %`, parênteses, a vírgula ou o ponto decimal, pelo menos um operador), o resultado vem **primeiro**, no formato regional ("= 3,5"). Enter copia o número para a área de transferência. O analisador é próprio e só faz contas: nada é executado. Divisão por zero e conta incompleta não geram resultado.
-- **Busca na web:** uma consulta que começa com uma palavra-chave e um espaço (`g dockmax`) dá um resultado só: "Buscar 'dockmax' no Google". As palavras-chave vêm prontas (`g` Google, `yt` YouTube, `w` Wikipédia, `gh` GitHub) e são editáveis em Configurações: palavra, nome e um modelo com `%s`. O modelo **precisa** começar com `https://`, e o termo é codificado para URL. Quando nada casa, o último resultado é "Buscar 'consulta' na web" no buscador padrão (o primeiro da lista).
-- **Configurações:** uma lista fixa, no código, com as páginas `ms-settings:` mais usadas (Wi-Fi, Bluetooth, Som, Vídeo, Energia, Atualizações, Aplicativos, Padrões…) e as seções das Configurações do DockMax, cada uma com o nome em português e sinônimos (`wifi`, `internet` e `rede` acham "Wi-Fi"). Elas casam pelas mesmas faixas que os apps e, numa mesma faixa, vêm depois deles.
+- **Calculadora** (`domain/launcher_calc.rs`): quando a consulta é uma conta (números, `+ - * / ^ %`, parênteses, a vírgula ou o ponto decimal, pelo menos um operador), o resultado vem **primeiro**, com a marca decimal da região do Windows ("= 3,5", até 10 casas, sem zeros no fim). Enter copia o número (sem o "=") para a área de transferência e o lançador fecha. O analisador é próprio e só faz contas: nada é executado. Divisão por zero e conta incompleta não geram resultado. **No L2:** `%` depois de um número é um centésimo (`200*10%` dá 20; `50%` dá 0,5), `^` vale da direita para a esquerda, `-2^2` dá -4, `×` e `÷` também valem; `-5` e `(5)` sozinhos não são contas; até 32 níveis de parênteses.
+- **Busca na web** (`domain/launcher_web.rs`): uma consulta que começa com uma palavra-chave e um espaço (`g dockmax`) dá um resultado só. **No L2,** o resultado se chama "Buscar “dockmax”" com o subtítulo "Google · busca na web" (em vez de "no Google": "no Wikipédia" sairia errado). As palavras-chave vêm prontas (`g` Google, `yt` YouTube, `w` Wikipédia, `gh` GitHub) e são editáveis em Configurações › Geral: palavra (até 16 caracteres, sem espaço, sem repetir), nome (até 40) e um modelo com `%s` (até 500), no máximo 20. O modelo **precisa** começar com `https://` e ter um site antes de qualquer `/`, `?` ou `#`; o termo é codificado para URL (tudo fora de letras, números e `-_.~` vira `%XX`). Uma palavra-chave sem termo (`g ` ou `g`) não busca: a consulta segue para os apps. **Quando nada casa** (nem app, nem página, nem conta), o único resultado é a busca na web com o buscador padrão (o primeiro da lista); sem palavras-chave, "Nenhum resultado". Em Configurações, "Tornar padrão" leva uma palavra-chave para o topo.
+- **Configurações** (`domain/launcher_pages.rs`): uma lista fixa, no código, com 34 páginas `ms-settings:` (Wi-Fi, Rede, Bluetooth, Som, Vídeo, Energia, Armazenamento, Atualizações, Aplicativos instalados e padrão, Plano de fundo, Cores…) e as cinco seções das Configurações do DockMax, cada uma com o nome em português e sinônimos (`wifi`, `internet` e `rede sem fio` acham "Wi-Fi"). Elas casam pelas mesmas faixas que os apps (o nome ou qualquer sinônimo, a melhor faixa) e, numa mesma faixa, vêm depois deles, antes do uso. Abrir uma página conta no uso (`setting:<id>`) e ela aparece nos recentes; a conta e a busca na web não contam. Uma seção do DockMax abre a janela de Configurações já nela (um script de início, com o nome da seção de uma lista fechada, numa janela nova; um evento, com a janela aberta).
 
-**Os provedores por dentro:** cada fonte é um provedor que recebe a consulta e devolve resultados com título, subtítulo, ícone, faixa e **uma ação de uma lista fechada**: abrir um app do catálogo (pelo id, validado por `is_valid_app_id`), abrir uma página das Configurações do DockMax, abrir uma URI de uma lista permitida (`ms-settings:` da lista fixa, `https://` das palavras-chave) ou copiar um texto. Nenhum provedor executa outra coisa, o que mantém a regra do roadmap ("Nenhum comando arbitrário pode ser executado diretamente a partir de conteúdo não confiável") e é a porta das extensões (seção 9).
+**Os provedores por dentro:** cada fonte é um provedor que recebe a consulta e devolve resultados com título, subtítulo, ícone, faixa e **uma ação de uma lista fechada** (`launcher::Action`, checada por `launcher::is_allowed` antes de rodar e de novo em `apps::open_uri`): abrir um app do catálogo (pelo id, validado por `is_valid_app_id`), abrir uma página das Configurações do DockMax, abrir uma URI de uma lista permitida (`ms-settings:` da lista fixa, `https://` com site e sem espaços, até 2048 caracteres) ou copiar um texto (até 64 caracteres, sem controle). Os resultados que não são apps mostram um glifo da fonte de ícones do Windows no lugar do ícone (engrenagem, calculadora, globo). Nenhum provedor executa outra coisa, o que mantém a regra do roadmap ("Nenhum comando arbitrário pode ser executado diretamente a partir de conteúdo não confiável") e é a porta das extensões (seção 9).
 
 **Abrir** um app usa o mesmo caminho do dock (`apps::launch`, fora da thread principal); se falhar, o lançador fica aberto e o resultado mostra "Não foi possível abrir" no subtítulo.
 
@@ -186,6 +186,25 @@ No build de teste em release (`dockmax-e2e.exe`, dados numa pasta temporária, b
 Com o auxiliar, o total aberto passa da meta de 10 MB, mas só enquanto o lançador está na tela.
 
 **Não verificado:** o Narrador de verdade, o IME de outro idioma, o Alt+Espaço com o teclado físico, outro programa segurando o Alt+Espaço, alto contraste, escala de 150 % e dois monitores; a suíte de ponta a ponta (a CI roda).
+
+## 8b. Verificado (L2, 2026-10-27)
+
+No build de teste em release, na máquina do autor, com entrada de teclado simulada e a barra do Windows visível:
+
+- `2+2*3` → "= 8", `7/2` → "= 3,5", `200*10%` → "= 20", sempre em primeiro e selecionados, com o subtítulo "Calculadora · Enter copia o resultado".
+- `g dockmax` → um resultado só, "Buscar “dockmax”" (Google · busca na web); `yt lo-fi` → "Buscar “lo-fi”" (YouTube); `zqxjzqxj` → a busca padrão do Google, sozinha; `g ` (sem termo) → os apps com "g".
+- `wifi` → "Wi-Fi" e `papel de parede` → "Plano de fundo", com o subtítulo "Configurações do Windows".
+- Enter em `aparencia` ("Aparência do dock", Configurações do DockMax): o lançador fecha e a janela de Configurações abre já na seção Aparência do dock (conferido pela captura da janela). Reaberto, o lançador mostra a página em "Recentes".
+- A barra do Windows ficou igual antes e depois; nenhum processo sobrou.
+
+| Medida (memória privada, processo principal) | Resultado | Meta |
+|---|---|---|
+| Aberto, depois das buscas | **+7,0 MB**, mais o auxiliar de ícones com **8 MB** | +10 MB |
+| 50 s depois de fechar | **+2,2 MB** e **+3,4 MB** em duas rodadas, as duas com a janela de Configurações do teste ainda aberta; o auxiliar já saiu | +3 MB |
+
+**Verificado pelo autor** (2026-10-27): o Enter na conta copia o resultado, e o Enter em `g dockmax` e em `wifi` abre o navegador na busca e a página do Wi-Fi.
+
+**Não verificado:** o Narrador e o editor de palavras-chave pelo teclado. Esses itens estão no [roadmap](../roadmap.md).
 
 ## 9. Extensões (depois)
 

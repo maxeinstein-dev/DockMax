@@ -9,6 +9,7 @@ import type {
   Indicator,
   MiddleClick,
   IndicatorColor,
+  KeywordProblem,
   OpenAnimation,
   SettingsErrorCode,
   SizePreset,
@@ -112,6 +113,37 @@ const messages = {
       historyHint: "Os apps que você mais abre por ele aparecem primeiro",
       clear: "Limpar o histórico",
       cleared: "Histórico limpo",
+      keywords: {
+        label: "Busca na web",
+        hint: "No lançador, digite a palavra-chave, um espaço e o que buscar: g dockmax. A primeira da lista é a busca padrão, usada quando nada mais é encontrado.",
+        list: "Palavras-chave da busca na web",
+        add: "Adicionar palavra-chave",
+        edit: "Editar",
+        remove: "Remover",
+        makeDefault: "Tornar padrão",
+        isDefault: "Padrão",
+        save: "Salvar",
+        cancel: "Cancelar",
+        keyword: "Palavra-chave",
+        name: "Nome",
+        template: "Endereço (com %s no lugar do termo)",
+        templatePlaceholder: "https://exemplo.com/busca?q=%s",
+        full: "A lista já tem {max} palavras-chave. Remova uma para adicionar outra.",
+        empty: "Nenhuma palavra-chave. O lançador não busca na web.",
+        problems: {
+          keywordEmpty: "Digite a palavra-chave.",
+          keywordSpaces: "A palavra-chave não pode ter espaços.",
+          keywordTooLong: "Use até 16 caracteres.",
+          keywordRepeated: "Essa palavra-chave já está na lista.",
+          nameEmpty: "Digite o nome da busca.",
+          nameTooLong: "Use até 40 caracteres.",
+          templateNotHttps:
+            "O endereço precisa começar com https:// e ter um site.",
+          templateNoTerm: "Coloque %s onde o termo buscado entra.",
+          templateSpaces: "O endereço não pode ter espaços.",
+          templateTooLong: "Use até 500 caracteres.",
+        } satisfies Record<KeywordProblem, string>,
+      },
     },
     theme: {
       system: "Sistema",
@@ -244,6 +276,8 @@ const messages = {
      * compile. */
     errors: {
       lookOutOfRange: "Esse ajuste do visual não é aceito.",
+      launcherKeywordsInvalid:
+        "Essa palavra-chave da busca na web não é aceita.",
       iconSizeOutOfRange:
         "Esse tamanho não é aceito. Escolha Pequeno, Médio ou Grande.",
       unsupportedVersion:

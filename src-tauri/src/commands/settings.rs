@@ -11,6 +11,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use std::collections::BTreeMap;
 
+use crate::domain::launcher_web::WebKeyword;
 use crate::domain::settings::{
     DockEdge, DockOpacity, DockSettings, DockStyle, HoverEffect, IconShape, Indicator, MiddleClick,
     OpenAnimation, Settings, SettingsError, SettingsErrorCode, StyleTweaks, TaskbarMode, Theme,
@@ -35,6 +36,16 @@ pub struct SettingsInput {
     dock: DockSettingsInput,
     launch_at_login: bool,
     launcher: bool,
+    launcher_keywords: Vec<WebKeywordInput>,
+}
+
+/// A keyword of [`SettingsInput`], as strict.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct WebKeywordInput {
+    keyword: String,
+    name: String,
+    template: String,
 }
 
 /// The `dock` part of [`SettingsInput`], as strict.
@@ -78,12 +89,21 @@ impl From<SettingsInput> for Settings {
             dock,
             launch_at_login,
             launcher,
+            launcher_keywords,
         } = input;
         Settings {
             version,
             theme,
             launch_at_login,
             launcher,
+            launcher_keywords: launcher_keywords
+                .into_iter()
+                .map(|input| WebKeyword {
+                    keyword: input.keyword,
+                    name: input.name,
+                    template: input.template,
+                })
+                .collect(),
             dock: DockSettings {
                 edge: dock.edge,
                 icon_size: dock.icon_size,
@@ -408,7 +428,7 @@ mod tests {
 
     fn full() -> String {
         format!(
-            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}},"launchAtLogin":true,"launcher":false}}"#
+            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}},"launchAtLogin":true,"launcher":false,"launcherKeywords":[{{"keyword":"d","name":"Duck","template":"https://duckduckgo.com/?q=%s"}}]}}"#
         )
     }
 
@@ -423,6 +443,11 @@ mod tests {
                 theme: Theme::Dark,
                 launch_at_login: true,
                 launcher: false,
+                launcher_keywords: vec![WebKeyword {
+                    keyword: "d".into(),
+                    name: "Duck".into(),
+                    template: "https://duckduckgo.com/?q=%s".into(),
+                }],
                 dock: DockSettings {
                     edge: DockEdge::Top,
                     icon_size: 64,

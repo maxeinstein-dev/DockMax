@@ -1,6 +1,9 @@
-//! The launcher (spec 0012 L1): a search box opened by Alt+Space from
+//! The launcher (spec 0012): a search box opened by Alt+Space from
 //! anywhere, or by "Buscar apps…" in the dock's and the tray's menus, that
-//! finds the programs of the Apps folder and opens them.
+//! finds the programs of the Apps folder and opens them (L1); and, mixed in
+//! the same list (L2), the result of a sum, a web search by keyword and the
+//! settings pages of Windows and of the DockMax. Each result does one action
+//! of a closed list (`search::Action`), checked before it runs.
 //!
 //! A native window, not WebView2 (author's decision, 2026-10-26): it opens in
 //! a few milliseconds and costs a few megabytes only while open. The frame is
@@ -62,7 +65,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{HSTRING, PCWSTR, w};
 
 use self::layout::{BOX, Colors, ROW, Rgb};
-use crate::domain::launcher::{self as search, Candidate, MAX_RESULTS};
+use crate::domain::launcher::{self as search, Action, Candidate, MAX_RESULTS};
+use crate::domain::launcher_calc;
+use crate::domain::launcher_pages::{self, Target};
+use crate::domain::launcher_web::{self, WebKeyword};
 use crate::persistence::database::Storage;
 
 /// The classes of the frame and of the list.
@@ -94,6 +100,11 @@ const ANNOUNCE_AFTER: u32 = 300;
 
 /// The search glyph of Windows' icon font.
 const SEARCH_GLYPH: &str = "\u{E721}";
+/// The glyphs of the results that are not programs: a settings page, the
+/// calculator, the web.
+const SETTINGS_GLYPH: char = '\u{E713}';
+const CALCULATOR_GLYPH: char = '\u{E8EF}';
+const WEB_GLYPH: char = '\u{E774}';
 
 /// Event sent to the windows when the hotkey's state changes (Configurações
 /// shows it).
@@ -118,14 +129,102 @@ thread_local! {
     static EDIT_LOOK: Cell<(COLORREF, COLORREF, isize)> = const { Cell::new((COLORREF(0), COLORREF(0), 0)) };
 }
 
+/// What a result is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    App,
+    WindowsPage,
+    DockMaxPage,
+    Calculator,
+    Web,
+}
+
+impl Kind {
+    /// Opening it is kept in the use (the apps and the pages).
+    fn remembered(self) -> bool {
+        matches!(self, Kind::App | Kind::WindowsPage | Kind::DockMaxPage)
+    }
+
+    fn glyph(self) -> Option<char> {
+        match self {
+            Kind::App => None,
+            Kind::WindowsPage | Kind::DockMaxPage => Some(SETTINGS_GLYPH),
+            Kind::Calculator => Some(CALCULATOR_GLYPH),
+            Kind::Web => Some(WEB_GLYPH),
+        }
+    }
+}
+
 /// One result.
 #[derive(Debug, Clone)]
 struct Found {
-    /// The key its use is kept under (`app:<id>`).
+    /// Tells it from the others: the key its use is kept under (`app:<id>`,
+    /// `setting:<id>`), or `calc` and `web`.
     key: String,
-    /// The program's id in the Apps folder.
-    id: String,
+    kind: Kind,
     name: String,
+    /// What it shows under its name; the kind's when `None`.
+    subtitle: Option<String>,
+    action: Action,
+}
+
+impl Found {
+    /// The program's id, for a program (its icon).
+    fn app_id(&self) -> Option<&str> {
+        match &self.action {
+            Action::OpenApp(id) if self.kind == Kind::App => Some(id),
+            _ => None,
+        }
+    }
+
+    fn subtitle(&self) -> &str {
+        if let Some(subtitle) = &self.subtitle {
+            return subtitle;
+        }
+        let text = &crate::i18n::messages().launcher;
+        match self.kind {
+            Kind::App => text.app,
+            Kind::WindowsPage => text.windows_page,
+            Kind::DockMaxPage => text.dockmax_page,
+            Kind::Calculator => text.calculator,
+            Kind::Web => text.web,
+        }
+    }
+
+    fn page(page: &launcher_pages::Page) -> Found {
+        let (kind, action) = match page.target {
+            Target::Windows(uri) => (Kind::WindowsPage, Action::OpenUri(uri.to_owned())),
+            Target::DockMax(section) => (Kind::DockMaxPage, Action::OpenSection(section)),
+        };
+        Found {
+            key: launcher_pages::page_key(page.id),
+            kind,
+            name: page.name.to_owned(),
+            subtitle: None,
+            action,
+        }
+    }
+
+    /// The search of `term` with `keyword`, if it makes a valid address.
+    fn web(keyword: &WebKeyword, term: &str) -> Option<Found> {
+        let url = launcher_web::url(&keyword.template, term)?;
+        let text = &crate::i18n::messages().launcher;
+        Some(Found {
+            key: "web".to_owned(),
+            kind: Kind::Web,
+            name: text.search_for.replace("{term}", term),
+            subtitle: Some(text.search_with.replace("{name}", &keyword.name)),
+            action: Action::OpenUri(url),
+        })
+    }
+}
+
+/// The pages of the fixed list, as results and as the search sees them.
+fn pages() -> (Vec<Found>, Vec<Candidate>) {
+    launcher_pages::PAGES
+        .iter()
+        .map(|page| (Found::page(page), Candidate::page(page)))
+        .unzip()
 }
 
 /// A program's icon: being read, or read (`None` when it has none).
@@ -148,10 +247,17 @@ pub struct Launcher {
     frame: HWND,
     edit: HWND,
     list: HWND,
-    /// The programs of the Apps folder, as last read, and the search's view
-    /// of them; `None` before the first read.
-    catalog: Option<(Vec<Found>, Vec<Candidate>)>,
+    /// What the search looks in, and its view of it: the programs of the
+    /// Apps folder as last read, then the settings pages.
+    entries: Vec<Found>,
+    candidates: Vec<Candidate>,
+    /// The Apps folder was read at least once.
+    apps_read: bool,
     reading: bool,
+    /// The web search's keywords and the decimal mark, read when the
+    /// launcher opens.
+    keywords: Vec<WebKeyword>,
+    decimal: char,
     /// Each key's weight now, read when the launcher opens.
     usage: HashMap<String, f64>,
     query: String,
@@ -301,13 +407,18 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
         );
     }
     FRAME.store(frame.0 as isize, Ordering::SeqCst);
+    let (entries, candidates) = pages();
     let launcher = Launcher {
         app: app.clone(),
         frame,
         edit,
         list,
-        catalog: None,
+        entries,
+        candidates,
+        apps_read: false,
         reading: false,
+        keywords: Vec::new(),
+        decimal: ',',
         usage: HashMap::new(),
         query: String::new(),
         results: Vec::new(),
@@ -454,6 +565,63 @@ fn text_scale() -> f64 {
     }
 }
 
+/// The decimal mark of the user's region (Windows' "Formato regional").
+fn decimal_mark() -> char {
+    use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_SZ, RegGetValueW};
+    let mut value = [0u16; 8];
+    let mut size = size_of_val(&value) as u32;
+    let read = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            w!(r"Control Panel\International"),
+            w!("sDecimal"),
+            RRF_RT_REG_SZ,
+            None,
+            Some(value.as_mut_ptr().cast()),
+            Some(&mut size),
+        )
+    };
+    match String::from_utf16_lossy(&value).chars().next() {
+        Some(mark @ (',' | '.')) if read.is_ok() => mark,
+        _ => ',',
+    }
+}
+
+/// Puts `text` in the clipboard, owned by `owner`.
+fn copy_text(owner: HWND, text: &str) -> bool {
+    use windows::Win32::Foundation::{GlobalFree, HANDLE};
+    use windows::Win32::System::DataExchange::{
+        CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+    };
+    use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
+    use windows::Win32::System::Ole::CF_UNICODETEXT;
+
+    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    if unsafe { OpenClipboard(Some(owner)) }.is_err() {
+        return false;
+    }
+    let copied = unsafe {
+        EmptyClipboard().and_then(|()| {
+            let memory = GlobalAlloc(GMEM_MOVEABLE, wide.len() * size_of::<u16>())?;
+            let pointer = GlobalLock(memory).cast::<u16>();
+            if pointer.is_null() {
+                let _ = GlobalFree(Some(memory));
+                return Err(windows::core::Error::from_thread());
+            }
+            std::ptr::copy_nonoverlapping(wide.as_ptr(), pointer, wide.len());
+            let _ = GlobalUnlock(memory);
+            // The clipboard owns the memory once it takes it.
+            SetClipboardData(u32::from(CF_UNICODETEXT.0), Some(HANDLE(memory.0)))
+                .inspect_err(|_| {
+                    let _ = GlobalFree(Some(memory));
+                })
+                .map(|_| ())
+        })
+    };
+    let _ = unsafe { CloseClipboard() };
+    copied.is_ok()
+}
+
 fn delete_font(font: Option<HFONT>) {
     if let Some(font) = font {
         let _ = unsafe { DeleteObject(HGDIOBJ(font.0)) };
@@ -508,6 +676,8 @@ impl Launcher {
         self.scale = monitor.scale * text_scale();
         self.restyle();
         self.usage = self.read_usage();
+        self.keywords = crate::commands::settings::current(&self.app).launcher_keywords;
+        self.decimal = decimal_mark();
         self.query.clear();
         self.failed = None;
         self.launching = None;
@@ -709,31 +879,32 @@ impl Launcher {
             Ok(apps) => apps,
             Err(error) => {
                 log::warn!("launcher: the apps could not be read: {error}");
-                if self.catalog.is_none() {
-                    self.catalog = Some((Vec::new(), Vec::new()));
-                }
+                self.apps_read = true;
                 self.refresh();
                 self.after_change();
                 return;
             }
         };
-        let found: Vec<Found> = apps
+        let (pages, page_candidates) = pages();
+        let mut candidates: Vec<Candidate> = apps
+            .iter()
+            .map(|app| Candidate::app(&app.id, &app.name))
+            .collect();
+        let mut entries: Vec<Found> = apps
             .into_iter()
             .map(|app| Found {
                 key: search::app_key(&app.id),
-                id: app.id,
+                kind: Kind::App,
                 name: app.name,
+                subtitle: None,
+                action: Action::OpenApp(app.id),
             })
             .collect();
-        let candidates = found
-            .iter()
-            .map(|app| Candidate {
-                key: app.key.clone(),
-                name: app.name.clone(),
-                file: search::file_of(&app.id),
-            })
-            .collect();
-        self.catalog = Some((found, candidates));
+        entries.extend(pages);
+        candidates.extend(page_candidates);
+        self.entries = entries;
+        self.candidates = candidates;
+        self.apps_read = true;
         if is_open() {
             let selected_key = self
                 .results
@@ -749,30 +920,52 @@ impl Launcher {
         }
     }
 
-    /// The results for what is typed now.
+    /// The results for what is typed now: the sum's result first; then a
+    /// keyword's search alone, or the apps and the pages; and, when nothing
+    /// matched, the search on the web with the first keyword.
     fn refresh(&mut self) {
-        let Some((apps, candidates)) = &self.catalog else {
-            self.results.clear();
-            self.recent = false;
-            self.note = Note::Reading;
-            self.selected = 0;
-            return;
-        };
-        let query = self.query.trim();
-        let indices = if query.is_empty() {
-            search::recents(candidates, &self.usage, MAX_RESULTS)
+        let query = self.query.trim().to_owned();
+        let mut results = Vec::new();
+        if query.is_empty() {
+            results.extend(
+                search::recents(&self.candidates, &self.usage, MAX_RESULTS)
+                    .into_iter()
+                    .map(|index| self.entries[index].clone()),
+            );
         } else {
-            search::search(candidates, &self.usage, query, MAX_RESULTS)
-        };
+            if let Some(value) = launcher_calc::evaluate(&query) {
+                let shown = launcher_calc::format(value, self.decimal);
+                results.push(Found {
+                    key: "calc".to_owned(),
+                    kind: Kind::Calculator,
+                    name: format!("= {shown}"),
+                    subtitle: None,
+                    action: Action::Copy(shown),
+                });
+            }
+            if let Some((keyword, term)) = launcher_web::matching(&self.keywords, &query) {
+                results.extend(Found::web(keyword, term));
+            } else {
+                let room = MAX_RESULTS - results.len();
+                results.extend(
+                    search::search(&self.candidates, &self.usage, &query, room)
+                        .into_iter()
+                        .map(|index| self.entries[index].clone()),
+                );
+                if results.is_empty()
+                    && let Some(keyword) = self.keywords.first()
+                {
+                    results.extend(Found::web(keyword, &query));
+                }
+            }
+        }
         self.recent = query.is_empty();
-        self.results = indices
-            .into_iter()
-            .map(|index| apps[index].clone())
-            .collect();
-        self.note = match (self.results.is_empty(), query.is_empty()) {
-            (false, _) => Note::None,
-            (true, true) => Note::Hint,
-            (true, false) => Note::NothingFound,
+        self.results = results;
+        self.note = match (self.results.is_empty(), query.is_empty(), self.apps_read) {
+            (false, ..) => Note::None,
+            (true, _, false) => Note::Reading,
+            (true, true, true) => Note::Hint,
+            (true, false, true) => Note::NothingFound,
         };
         self.selected = 0;
     }
@@ -838,7 +1031,7 @@ impl Launcher {
         let shown: Vec<(String, String)> = self
             .results
             .iter()
-            .map(|found| (found.id.clone(), found.name.clone()))
+            .filter_map(|found| Some((found.app_id()?.to_owned(), found.name.clone())))
             .collect();
         for (id, name) in shown {
             let key = (pack.clone(), id.clone());
@@ -902,7 +1095,6 @@ impl Launcher {
         }
         let s = self.scale;
         let top = layout::LIST_PAD + if self.recent { layout::TITLE } else { 0.0 };
-        let kind = crate::i18n::messages().launcher.app;
         let entries = self
             .results
             .iter()
@@ -910,7 +1102,7 @@ impl Launcher {
             .map(|(index, found)| access::Entry {
                 key: found.key.clone(),
                 name: found.name.clone(),
-                kind: kind.to_owned(),
+                kind: found.subtitle().to_owned(),
                 rect: (
                     f64::from(origin.x) + layout::SIDE * s,
                     f64::from(origin.y) + (top + index as f64 * ROW) * s,
@@ -956,7 +1148,7 @@ impl Launcher {
             .launcher
             .selected
             .replace("{name}", &found.name)
-            .replace("{kind}", crate::i18n::messages().launcher.app)
+            .replace("{kind}", found.subtitle())
             .replace("{n}", &(index + 1).to_string())
             .replace("{count}", &self.results.len().to_string());
         access::selected(self.list.0 as isize, &found.key, &said);
@@ -984,8 +1176,8 @@ impl Launcher {
         }
     }
 
-    /// Opens the result `index`: the launcher closes once the program
-    /// opens, or stays saying it could not.
+    /// Does what the result `index` does, once its action is checked: the
+    /// launcher closes once it is done, or stays saying it could not.
     fn open(&mut self, index: usize) {
         let Some(found) = self.results.get(index).cloned() else {
             return;
@@ -994,25 +1186,72 @@ impl Launcher {
             return;
         }
         let key = found.key.clone();
-        self.launching = Some(key.clone());
-        let spawned = std::thread::Builder::new()
-            .name("launcher-open".into())
-            .spawn(move || {
-                let opened = super::apps::launch(&found.id).is_ok();
-                post(move |launcher| launcher.launched(&found.key, opened));
-            });
-        if spawned.is_err() {
-            self.launched(&key, false);
+        let remembered = found.kind.remembered();
+        if !search::is_allowed(&found.action) {
+            log::warn!("launcher: a result's action was refused");
+            self.launched(&key, false, false);
+            return;
+        }
+        match found.action {
+            Action::OpenApp(id) => {
+                self.open_off_thread(key, remembered, move || super::apps::launch(&id))
+            }
+            Action::OpenUri(uri) => {
+                self.open_off_thread(key, remembered, move || super::apps::open_uri(&uri))
+            }
+            Action::OpenSection(section) => {
+                let opened = super::settings_window::open_section(&self.app, section)
+                    .inspect_err(|error| {
+                        log::warn!("launcher: Configurações did not open: {error}")
+                    })
+                    .is_ok();
+                self.launched(&key, remembered, opened);
+            }
+            Action::Copy(text) => {
+                let copied = copy_text(self.frame, &text);
+                if copied {
+                    access::announce(
+                        self.list.0 as isize,
+                        crate::i18n::messages().launcher.copied,
+                    );
+                }
+                self.launched(&key, false, copied);
+            }
         }
     }
 
-    fn launched(&mut self, key: &str, opened: bool) {
+    /// Runs `open` on a thread of its own (Windows may take a while to
+    /// start a program), then tells the launcher.
+    fn open_off_thread(
+        &mut self,
+        key: String,
+        remembered: bool,
+        open: impl FnOnce() -> Result<(), String> + Send + 'static,
+    ) {
+        self.launching = Some(key.clone());
+        let thread_key = key.clone();
+        let spawned = std::thread::Builder::new()
+            .name("launcher-open".into())
+            .spawn(move || {
+                let opened = open()
+                    .inspect_err(|error| log::warn!("launcher: it did not open: {error}"))
+                    .is_ok();
+                post(move |launcher| launcher.launched(&thread_key, remembered, opened));
+            });
+        if spawned.is_err() {
+            self.launched(&key, remembered, false);
+        }
+    }
+
+    fn launched(&mut self, key: &str, remembered: bool, opened: bool) {
         self.launching = None;
         if opened {
-            self.record(key);
+            if remembered {
+                self.record(key);
+            }
             self.hide();
         } else {
-            log::warn!("launcher: a program could not be opened");
+            log::warn!("launcher: a result could not be opened");
             self.failed = Some(key.to_owned());
             self.paint_soon();
             access::announce(
@@ -1099,19 +1338,22 @@ impl Launcher {
             .iter()
             .enumerate()
             .map(|(index, found)| {
-                let icon = match self.icons.get(&(pack.clone(), found.id.clone())) {
-                    Some(Loaded::Ready(Some(bitmap))) => Some(bitmap),
-                    _ => None,
-                };
+                let icon = found.app_id().and_then(|id| {
+                    match self.icons.get(&(pack.clone(), id.to_owned())) {
+                        Some(Loaded::Ready(Some(bitmap))) => Some(bitmap),
+                        _ => None,
+                    }
+                });
                 let subtitle = if self.failed.as_deref() == Some(found.key.as_str()) {
                     text.failed
                 } else {
-                    text.app
+                    found.subtitle()
                 };
                 paint::Row {
                     name: &found.name,
                     subtitle,
                     icon,
+                    glyph: found.kind.glyph(),
                     letter: found.name.chars().next().unwrap_or(' '),
                     selected: index == self.selected,
                     shortcut: layout::shortcut(index),
@@ -1335,6 +1577,8 @@ pub struct View {
     pub open: bool,
     pub query: String,
     pub results: Vec<String>,
+    /// What each result shows under its name.
+    pub subtitles: Vec<String>,
     pub selected: Option<usize>,
     pub note: &'static str,
 }
@@ -1351,6 +1595,11 @@ pub fn view() -> Option<View> {
                 .results
                 .iter()
                 .map(|found| found.name.clone())
+                .collect(),
+            subtitles: launcher
+                .results
+                .iter()
+                .map(|found| found.subtitle().to_owned())
                 .collect(),
             selected: (!launcher.results.is_empty()).then_some(launcher.selected),
             note: match launcher.note {

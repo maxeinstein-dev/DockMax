@@ -30,7 +30,7 @@ Ordem decidida pelo autor em 2026-10-26, depois da fase D: **C → E → F → G
 | **F. Widgets** | Depois da E. |
 | **G. Extras** | Depois da F. |
 
-Fora das fases: o **lançador** no estilo do Ulauncher ([spec 0012](specs/0012-lancador.md)). O L1 entrou em 2026-10-27 (Alt+Espaço, busca nos apps, recentes). Faltam o L2 (calculadora, busca na web por palavra-chave, Configurações do DockMax e do Windows) e, depois, o L3 (personalizar o atalho).
+Fora das fases: o **lançador** no estilo do Ulauncher ([spec 0012](specs/0012-lancador.md)). O L1 entrou em 2026-10-27 (Alt+Espaço, busca nos apps, recentes), no [PR #33](https://github.com/maxeinstein-dev/DockMax/pull/33). O L2 (calculadora, busca na web por palavra-chave, Configurações do DockMax e do Windows) vem no [PR #37](https://github.com/maxeinstein-dev/DockMax/pull/37). Depois, o L3 (personalizar o atalho).
 
 ## Visão do produto
 
@@ -183,6 +183,7 @@ A fase D acabou: a rodada única está no **[roteiro de verificação](roteiro-d
 - [ ] O dock nativo (spec 0011 H3) com o **mouse de verdade**: os três efeitos ao passar o mouse; os nove estilos e os reflexos na tela; a borda de cima; escala de 150 %. (Arrastar para reordenar: confirmado pelo autor em 2026-10-26.)
 - [ ] Um dock por monitor (spec 0010 D4b): o mouse no segundo dock, ligar e desligar um monitor com o DockMax aberto, mudar "Dock em todos os monitores" com ele aberto, tela cheia de verdade no segundo monitor. (Um dock em cada monitor: confirmado pelo autor em 2026-10-26.)
 - [ ] O lançador (spec 0012 L1): o Alt+Espaço com o teclado físico, o Narrador lendo a lista e a seleção, o IME de outro idioma na caixa de busca, o alto contraste, escala de 150 % e dois monitores.
+- [ ] O lançador (spec 0012 L2): o Narrador lendo "Resultado copiado"; o editor de palavras-chave em Configurações com o teclado e o leitor de tela. (O Enter na conta, em `g dockmax` e em `wifi` o autor verificou em 2026-10-27.)
 
 ### Medição de recursos (build de release 0.3.0, 2026-10-26)
 

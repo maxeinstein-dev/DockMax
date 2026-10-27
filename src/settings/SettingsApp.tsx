@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useApps } from "../core/apps";
 import { errorKind, log } from "../core/log";
@@ -10,7 +11,13 @@ import AppsPanel from "../panel/AppsPanel";
 import DockItems from "../panel/DockItems";
 import LookPanel from "../panel/LookPanel";
 import SettingsPanel from "../panel/SettingsPanel";
-import { SECTIONS, type Section } from "./sections";
+import {
+  SECTIONS,
+  SECTION_EVENT,
+  isSection,
+  startSection,
+  type Section,
+} from "./sections";
 import "./SettingsApp.css";
 
 function closeWindow() {
@@ -34,7 +41,19 @@ function SettingsApp() {
   const settings = useSettings();
   const widgets = useWidgets();
   const apps = useApps();
-  const [section, setSection] = useState<Section>("general");
+  const [section, setSection] = useState<Section>(startSection);
+
+  // The launcher found a section with the window already open.
+  useEffect(() => {
+    let active = true;
+    const unlisten = listen<unknown>(SECTION_EVENT, (event) => {
+      if (active && isSection(event.payload)) setSection(event.payload);
+    });
+    return () => {
+      active = false;
+      void unlisten.then((stop) => stop());
+    };
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

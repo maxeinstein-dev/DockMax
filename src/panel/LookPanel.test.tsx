@@ -11,6 +11,7 @@ const SETTINGS: Settings = {
   theme: "dark",
   launchAtLogin: false,
   launcher: true,
+  launcherKeywords: [],
   dock: {
     edge: "bottom",
     iconSize: 48,

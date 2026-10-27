@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::icon_pack::is_valid_pack_id;
+use super::launcher_web::{self, WebKeyword};
 
 /// Format version written by this build. Files with any other version are
 /// rejected.
@@ -67,6 +68,9 @@ pub struct Settings {
     /// Whether Alt+Space opens the launcher (spec 0012). On unless the user
     /// turns it off; the menus open it either way.
     pub launcher: bool,
+    /// The launcher's web search by keyword (spec 0012 L2); the first is
+    /// the default search.
+    pub launcher_keywords: Vec<WebKeyword>,
 }
 
 impl Default for Settings {
@@ -77,6 +81,7 @@ impl Default for Settings {
             dock: DockSettings::default(),
             launch_at_login: false,
             launcher: true,
+            launcher_keywords: launcher_web::defaults(),
         }
     }
 }
@@ -90,6 +95,9 @@ impl Settings {
         }
         if !(MIN_ICON_SIZE..=MAX_ICON_SIZE).contains(&self.dock.icon_size) {
             return Err(SettingsError::IconSizeOutOfRange);
+        }
+        if !launcher_web::is_valid_list(&self.launcher_keywords) {
+            return Err(SettingsError::LauncherKeywordsInvalid);
         }
         self.dock.validate_look()
     }
@@ -437,6 +445,9 @@ pub enum SettingsError {
     /// A value of the dock's look is outside its range or malformed.
     #[error("dock look value out of range")]
     LookOutOfRange,
+    /// A keyword of the launcher's web search is malformed or repeated.
+    #[error("launcher keyword invalid")]
+    LauncherKeywordsInvalid,
     #[error("settings file could not be written ({0})")]
     Write(io::ErrorKind),
     /// There is nowhere to save: the app config folder could not be
@@ -452,6 +463,7 @@ impl SettingsError {
         match self {
             SettingsError::IconSizeOutOfRange => SettingsErrorCode::IconSizeOutOfRange,
             SettingsError::LookOutOfRange => SettingsErrorCode::LookOutOfRange,
+            SettingsError::LauncherKeywordsInvalid => SettingsErrorCode::LauncherKeywordsInvalid,
             SettingsError::UnsupportedVersion => SettingsErrorCode::UnsupportedVersion,
             SettingsError::Write(_) => SettingsErrorCode::WriteFailed,
             SettingsError::Unavailable => SettingsErrorCode::NotReady,
@@ -469,6 +481,9 @@ pub enum SettingsErrorCode {
     IconSizeOutOfRange,
     /// A value of the dock's look is outside its range or malformed.
     LookOutOfRange,
+    /// A keyword of the launcher's web search is malformed or repeated, or
+    /// there are too many.
+    LauncherKeywordsInvalid,
     /// The format version is not `CURRENT_VERSION`.
     UnsupportedVersion,
     /// The settings could not be saved; the previous ones stay.
@@ -530,6 +545,18 @@ mod tests {
     }
 
     #[test]
+    fn a_bad_launcher_keyword_is_rejected() {
+        let mut settings = Settings::default();
+        settings.launcher_keywords[0].template = "http://example.com/?q=%s".into();
+        assert_eq!(
+            settings.validate(),
+            Err(SettingsError::LauncherKeywordsInvalid)
+        );
+        settings.launcher_keywords.clear();
+        assert_eq!(settings.validate(), Ok(()), "no keywords is fine");
+    }
+
+    #[test]
     fn any_version_other_than_1_is_rejected() {
         for version in [0, 2, u32::MAX] {
             let settings = Settings {
@@ -581,7 +608,13 @@ mod tests {
                 "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2
               },
               "launchAtLogin": false,
-              "launcher": true
+              "launcher": true,
+              "launcherKeywords": [
+                {"keyword": "g", "name": "Google", "template": "https://www.google.com/search?q=%s"},
+                {"keyword": "yt", "name": "YouTube", "template": "https://www.youtube.com/results?search_query=%s"},
+                {"keyword": "w", "name": "Wikipédia", "template": "https://pt.wikipedia.org/w/index.php?search=%s"},
+                {"keyword": "gh", "name": "GitHub", "template": "https://github.com/search?q=%s"}
+              ]
             }"#,
         )
         .unwrap();
