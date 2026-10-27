@@ -79,6 +79,9 @@ static SHARED: Mutex<Option<Shared>> = Mutex::new(None);
 static WINDOW: AtomicIsize = AtomicIsize::new(0);
 /// The id Windows gave the `TaskbarCreated` message.
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
+/// Explorer's taskbar window when the bands were last asked for (an `HWND`
+/// as a number, 0 for none).
+static EXPLORER_TASKBAR: AtomicIsize = AtomicIsize::new(0);
 
 fn with_shared<T>(change: impl FnOnce(&mut Shared) -> T) -> T {
     let mut shared = SHARED.lock().unwrap_or_else(PoisonError::into_inner);
@@ -311,6 +314,13 @@ fn apply_all() {
     }
 }
 
+/// Whether Explorer's taskbar window is another than when last asked,
+/// remembering the one there is now.
+fn explorer_taskbar_changed() -> bool {
+    let now = super::tray_host::explorer_taskbar().unwrap_or(0);
+    EXPLORER_TASKBAR.swap(now, Ordering::Relaxed) != now
+}
+
 fn changed() {
     let callback = with_shared(|shared| shared.on_change.clone());
     if let Some(callback) = callback {
@@ -391,8 +401,16 @@ unsafe extern "system" fn procedure(
             super::tray_host::stop();
             super::taskbar::release();
         }
-        _ if manager && msg == TASKBAR_CREATED.load(Ordering::Relaxed) && msg != 0 => {
-            // Explorer started again and showed its taskbar.
+        // The tray host sends `TaskbarCreated` too, so that programs send
+        // their icons to it: only a new taskbar window means Explorer
+        // started again and forgot the bands. Asking for them lowers the
+        // host for an instant, and an icon put back meanwhile (the dock's
+        // own, on that very message) would miss it.
+        _ if manager
+            && msg == TASKBAR_CREATED.load(Ordering::Relaxed)
+            && msg != 0
+            && explorer_taskbar_changed() =>
+        {
             super::taskbar::keep();
             apply_all();
             changed();
@@ -416,6 +434,7 @@ fn run(ready: mpsc::Sender<()>) {
         unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) },
         Ordering::Relaxed,
     );
+    explorer_taskbar_changed();
     match make_window(w!("DockMax app bar")) {
         Some(hwnd) => WINDOW.store(hwnd.0 as isize, Ordering::Release),
         None => log::warn!("appbar: the window was not created"),
