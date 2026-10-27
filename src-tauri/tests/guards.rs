@@ -98,10 +98,13 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-open-icon-packs-folder",
             // Which tray icons the dock shows itself: the list to choose from.
             "allow-list-tray",
-            // The launcher's switch (spec 0012): whether Alt+Space is held by
-            // another program, and forgetting what it opened.
+            // The launcher (spec 0012): whether its hotkey is held by another
+            // program, forgetting what it opened, and a new hotkey, tried
+            // before it is saved (with the current one let go meanwhile).
             "allow-launcher-status",
             "allow-clear-launcher-history",
+            "allow-set-launcher-hotkey",
+            "allow-capture-launcher-hotkey",
             "log:allow-log",
         ],
     ),

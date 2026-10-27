@@ -47,8 +47,8 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    MOD_ALT, MOD_NOREPEAT, RegisterHotKey, SetFocus, UnregisterHotKey, VK_DOWN, VK_ESCAPE,
-    VK_RETURN, VK_SPACE, VK_TAB, VK_UP,
+    HOT_KEY_MODIFIERS, MOD_NOREPEAT, RegisterHotKey, SetFocus, UnregisterHotKey, VK_DOWN,
+    VK_ESCAPE, VK_RETURN, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -65,6 +65,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{HSTRING, PCWSTR, w};
 
 use self::layout::{BOX, Colors, ROW, Rgb};
+use crate::domain::hotkey::{self, Hotkey};
 use crate::domain::launcher::{self as search, Action, Candidate, MAX_RESULTS};
 use crate::domain::launcher_calc;
 use crate::domain::launcher_pages::{self, Target};
@@ -97,6 +98,10 @@ const RELEASE_AFTER: u32 = 45_000;
 /// Says how many results there are once the typing pauses.
 const ANNOUNCE_TIMER: usize = 2;
 const ANNOUNCE_AFTER: u32 = 300;
+/// Takes the hotkey back if a capture never ended (Configurações closed in
+/// the middle).
+const CAPTURE_TIMER: usize = 3;
+const CAPTURE_FOR: u32 = 60_000;
 
 /// The search glyph of Windows' icon font.
 const SEARCH_GLYPH: &str = "\u{E721}";
@@ -112,9 +117,11 @@ pub const STATUS_EVENT: &str = "launcher-status";
 
 /// The frame's window (0 before it is made).
 static FRAME: AtomicIsize = AtomicIsize::new(0);
-/// Whether another program holds Alt+Space (the launcher then opens only
+/// Whether another program holds the hotkey (the launcher then opens only
 /// from the menus).
 static HOTKEY_TAKEN: AtomicBool = AtomicBool::new(false);
+/// Configurações is capturing a new hotkey: the current one is let go.
+static CAPTURING: AtomicBool = AtomicBool::new(false);
 
 static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
 
@@ -455,13 +462,37 @@ pub fn shutdown() {
     drop(launcher);
 }
 
-/// Takes Alt+Space (`on`) or lets it go, from any thread: the hotkey
-/// belongs to the launcher's window, on the main thread.
+/// Takes the hotkey of the settings (`on`) or lets it go, from any thread:
+/// the hotkey belongs to the launcher's window, on the main thread.
 pub fn set_enabled(on: bool) {
     post(move |_| register(on));
 }
 
-/// Takes Alt+Space (`on`) or lets it go. When another program holds it, the
+/// The hotkey of the settings; Alt+Space when it is not one the launcher
+/// can take (a file edited by hand).
+fn configured() -> Hotkey {
+    APP.get()
+        .and_then(|app| {
+            hotkey::check(&crate::commands::settings::current(app).launcher_hotkey).ok()
+        })
+        .or_else(|| Hotkey::parse(hotkey::DEFAULT))
+        .expect("the default hotkey is valid")
+}
+
+/// Asks Windows for `hotkey` on the launcher's window.
+fn take(frame: HWND, hotkey: Hotkey) -> windows::core::Result<()> {
+    unsafe {
+        RegisterHotKey(
+            Some(frame),
+            HOTKEY,
+            HOT_KEY_MODIFIERS(hotkey.modifiers()) | MOD_NOREPEAT,
+            hotkey.key.vk(),
+        )
+    }
+}
+
+/// Takes the hotkey of the settings (`on`) or lets it go; nothing while
+/// Configurações captures a new one. When another program holds it, the
 /// launcher opens only from the menus, and Configurações says so.
 fn register(on: bool) {
     let frame = FRAME.load(Ordering::SeqCst);
@@ -470,24 +501,75 @@ fn register(on: bool) {
     }
     let frame = HWND(frame as _);
     let _ = unsafe { UnregisterHotKey(Some(frame), HOTKEY) };
-    let taken = if on {
-        match unsafe {
-            RegisterHotKey(
-                Some(frame),
-                HOTKEY,
-                MOD_ALT | MOD_NOREPEAT,
-                u32::from(VK_SPACE.0),
-            )
-        } {
+    let taken = if on && !CAPTURING.load(Ordering::SeqCst) {
+        let hotkey = configured();
+        match take(frame, hotkey) {
             Ok(()) => false,
             Err(error) => {
-                log::warn!("launcher: Alt+Space is held by another program: {error}");
+                log::warn!("launcher: {hotkey} is held by another program: {error}");
                 true
             }
         }
     } else {
         false
     };
+    set_taken(taken);
+}
+
+/// Configurações captures a new hotkey (`on`): the current one is let go,
+/// or the combination would open the launcher. It comes back when the
+/// capture ends, or on its own after `CAPTURE_FOR`, should Configurações
+/// close in the middle.
+pub fn capture(on: bool) {
+    post(move |launcher| {
+        CAPTURING.store(on, Ordering::SeqCst);
+        unsafe {
+            if on {
+                SetTimer(Some(launcher.frame), CAPTURE_TIMER, CAPTURE_FOR, None);
+            } else {
+                let _ = KillTimer(Some(launcher.frame), CAPTURE_TIMER);
+            }
+        }
+        register(launcher.enabled());
+    });
+}
+
+/// Why a new hotkey could not be taken.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TryError {
+    /// Another program holds it.
+    Taken,
+    /// The launcher did not answer.
+    NotReady,
+}
+
+/// Tries `hotkey` for real before it is saved: on success it is held from
+/// now on (the capture ends); when another program holds it, the one of the
+/// settings is taken back. From any thread but the main one.
+pub fn try_hotkey(hotkey: Hotkey) -> Result<(), TryError> {
+    let (sent, received) = std::sync::mpsc::channel();
+    post(move |launcher| {
+        CAPTURING.store(false, Ordering::SeqCst);
+        let _ = unsafe { KillTimer(Some(launcher.frame), CAPTURE_TIMER) };
+        let _ = unsafe { UnregisterHotKey(Some(launcher.frame), HOTKEY) };
+        let result = take(launcher.frame, hotkey).map_err(|error| {
+            log::warn!("launcher: {hotkey} is held by another program: {error}");
+            register(launcher.enabled());
+            TryError::Taken
+        });
+        if result.is_ok() {
+            set_taken(false);
+        }
+        let _ = sent.send(result);
+    });
+    received
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .unwrap_or(Err(TryError::NotReady))
+}
+
+/// Keeps whether another program holds the hotkey, and tells the windows
+/// when it changes.
+fn set_taken(taken: bool) {
     let before = HOTKEY_TAKEN.swap(taken, Ordering::SeqCst);
     if before != taken
         && let Some(app) = APP.get()
@@ -662,6 +744,11 @@ fn make_font(size: f64, family: PCWSTR) -> Option<HFONT> {
 }
 
 impl Launcher {
+    /// Whether the launcher's switch is on in the settings.
+    fn enabled(&self) -> bool {
+        crate::commands::settings::current(&self.app).launcher
+    }
+
     fn toggle(&mut self) {
         if is_open() {
             self.hide();
@@ -1474,6 +1561,11 @@ extern "system" fn frame_procedure(
         }
         WM_TIMER => match wparam.0 {
             RELEASE_TIMER => with(Launcher::release),
+            CAPTURE_TIMER => with(|launcher| {
+                let _ = unsafe { KillTimer(Some(launcher.frame), CAPTURE_TIMER) };
+                CAPTURING.store(false, Ordering::SeqCst);
+                register(launcher.enabled());
+            }),
             ANNOUNCE_TIMER => with(|launcher| launcher.announce()),
             _ => return unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
         },

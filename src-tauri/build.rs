@@ -54,6 +54,8 @@ fn main() {
             "open_icon_packs_folder",
             "launcher_status",
             "clear_launcher_history",
+            "set_launcher_hotkey",
+            "capture_launcher_hotkey",
             // The E2E suite's, registered only in the test build (`e2e.rs`).
             "e2e_dock_view",
             "e2e_press_dock",

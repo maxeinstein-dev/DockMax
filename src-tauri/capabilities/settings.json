@@ -26,6 +26,8 @@
     "allow-list-tray",
     "allow-launcher-status",
     "allow-clear-launcher-history",
+    "allow-set-launcher-hotkey",
+    "allow-capture-launcher-hotkey",
     "log:allow-log"
   ]
 }

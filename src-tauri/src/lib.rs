@@ -136,7 +136,9 @@ macro_rules! handler {
             commands::icons::reload_icon_packs,
             commands::icons::open_icon_packs_folder,
             commands::launcher::launcher_status,
-            commands::launcher::clear_launcher_history
+            commands::launcher::clear_launcher_history,
+            commands::launcher::set_launcher_hotkey,
+            commands::launcher::capture_launcher_hotkey
         ]
     };
 }
@@ -185,6 +187,8 @@ macro_rules! handler {
             commands::icons::open_icon_packs_folder,
             commands::launcher::launcher_status,
             commands::launcher::clear_launcher_history,
+            commands::launcher::set_launcher_hotkey,
+            commands::launcher::capture_launcher_hotkey,
             e2e::e2e_dock_view,
             e2e::e2e_press_dock,
             e2e::e2e_launcher_view,
