@@ -1,0 +1,83 @@
+/* The visual choices of the Configurações app (spec 0014 R1, R2,
+   ChoiceCards): cards with a picture over the name, in a grid; the chosen
+   one with the accent ring (selection, The One Cobalt Rule). Only tokens
+   from tokens.css. */
+.choice-field {
+  display: grid;
+  gap: 8px;
+}
+
+.choice-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.choice-cards.wide {
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+}
+
+.choice-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--r-panel);
+  font: inherit;
+  text-align: left;
+  position: relative;
+  color: var(--ink);
+  background: var(--track);
+  cursor: pointer;
+}
+
+/* The edge over the picture: an inset shadow on the card itself sits under
+   it, and the chosen ring showed only around the name. */
+.choice-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--hair);
+  pointer-events: none;
+}
+
+.choice-card:hover::after {
+  box-shadow: inset 0 0 0 1px var(--field-line);
+}
+
+.choice-card[aria-pressed="true"]::after {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.choice-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.choice-card:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.choice-card-text {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 7px 10px 9px;
+}
+
+.choice-card-name {
+  font-size: 12.5px;
+}
+
+.choice-card[aria-pressed="true"] .choice-card-name {
+  font-weight: 600;
+}
+
+.choice-card-hint {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--ink-2);
+}
