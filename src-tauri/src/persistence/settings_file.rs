@@ -166,6 +166,7 @@ mod tests {
             version: 1,
             theme: Theme::Dark,
             launch_at_login: false,
+            launcher: true,
             dock: DockSettings {
                 edge: DockEdge::Top,
                 icon_size: 64,
@@ -363,7 +364,8 @@ mod tests {
                     "showOpenApps": true, "middleClick": "newInstance",
                     "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2
                 },
-                "launchAtLogin": false
+                "launchAtLogin": false,
+                "launcher": true
             })
         );
     }

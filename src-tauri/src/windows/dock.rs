@@ -160,6 +160,12 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     }
     native_dock::start(app)?;
     native_dock::show();
+    // After the dock, which initializes COM on this thread. The app works
+    // without the launcher.
+    #[cfg(windows)]
+    if let Err(error) = super::launcher::start(app) {
+        log::warn!("launcher: could not be made: {error}");
+    }
     Ok(())
 }
 

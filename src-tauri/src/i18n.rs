@@ -11,6 +11,31 @@ pub struct Messages {
     pub tray: TrayMessages,
     pub settings: SettingsMessages,
     pub dock: DockMessages,
+    pub launcher: LauncherMessages,
+}
+
+/// The launcher (spec 0012).
+#[derive(Debug)]
+pub struct LauncherMessages {
+    /// The window's name for assistive technology.
+    pub title: &'static str,
+    /// What the empty search box shows, and its name.
+    pub placeholder: &'static str,
+    /// What a program is, under its name.
+    pub app: &'static str,
+    /// The title above the most used, with nothing typed.
+    pub recent: &'static str,
+    pub reading: &'static str,
+    pub hint: &'static str,
+    pub nothing_found: &'static str,
+    /// Under a program that could not be opened.
+    pub failed: &'static str,
+    /// How many results there are; `{n}` is replaced.
+    pub results: &'static str,
+    pub one_result: &'static str,
+    /// The selected result, read aloud; `{name}`, `{kind}`, `{n}` and
+    /// `{count}` are replaced.
+    pub selected: &'static str,
 }
 
 /// The dock's own texts (spec 0011 H3): the names of its items, in their
@@ -53,6 +78,8 @@ pub struct SettingsMessages {
 pub struct TrayMessages {
     /// Opens the Windows Task Manager, as the taskbar's menu does.
     pub task_manager: &'static str,
+    /// Opens the launcher (spec 0012).
+    pub search_apps: &'static str,
     /// Turns the dock's own hiding on and off (checked when on).
     pub auto_hide: &'static str,
     /// Opens the Configurações app.
@@ -64,6 +91,7 @@ pub struct TrayMessages {
 const PT_BR: Messages = Messages {
     tray: TrayMessages {
         task_manager: "Gerenciador de Tarefas",
+        search_apps: "Buscar apps…",
         auto_hide: "Ocultar automaticamente",
         open_settings: "Configurações",
         quit: "Sair",
@@ -89,6 +117,19 @@ const PT_BR: Messages = Messages {
         muted: "Sem som",
         battery: "Bateria: {n}%",
         battery_charging: "Bateria: {n}% (carregando)",
+    },
+    launcher: LauncherMessages {
+        title: "Lançador do DockMax",
+        placeholder: "Buscar apps",
+        app: "App",
+        recent: "Recentes",
+        reading: "Lendo os apps…",
+        hint: "Digite para buscar apps",
+        nothing_found: "Nenhum app encontrado",
+        failed: "Não foi possível abrir",
+        results: "{n} resultados",
+        one_result: "1 resultado",
+        selected: "{name}, {kind}, {n} de {count}",
     },
 };
 

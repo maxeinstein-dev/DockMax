@@ -18,6 +18,7 @@ import PanelFooter from "./PanelFooter";
 import NavRow from "./parts/NavRow";
 import RangeField from "./parts/RangeField";
 import ToggleField from "./parts/ToggleField";
+import LauncherField from "./LauncherField";
 import TrayInDockField from "./TrayInDockField";
 import { useSettingsEditor } from "./useSettingsEditor";
 
@@ -97,6 +98,9 @@ type SettingsPanelProps = {
   /** Shows which tray icons the dock shows itself (`TrayInDockField`), with
    * the taskbar hidden: the Configurações app's, which reads the tray. */
   withTrayInDock?: boolean;
+  /** Shows the launcher's switch and history (`LauncherField`): the
+   * Configurações app's, which may ask about the launcher. */
+  withLauncher?: boolean;
 };
 
 /**
@@ -116,6 +120,7 @@ function SettingsPanel({
   focusLookRow = false,
   focusAppsRow = false,
   withTrayInDock = false,
+  withLauncher = false,
 }: SettingsPanelProps) {
   const t = useT();
   const { shown, change, error } = useSettingsEditor(settings);
@@ -248,6 +253,12 @@ function SettingsPanel({
         disabled={shown === null}
         onChange={(launchAtLogin) => change((s) => ({ ...s, launchAtLogin }))}
       />
+      {withLauncher ? (
+        <LauncherField
+          on={shown?.launcher ?? null}
+          onChange={(launcher) => change((s) => ({ ...s, launcher }))}
+        />
+      ) : null}
       <OptionGroup
         label={t.settings.groups.middleClick}
         options={options(MIDDLE_CLICKS, t.settings.middleClick)}

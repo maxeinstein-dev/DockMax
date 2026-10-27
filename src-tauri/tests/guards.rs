@@ -98,6 +98,10 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-open-icon-packs-folder",
             // Which tray icons the dock shows itself: the list to choose from.
             "allow-list-tray",
+            // The launcher's switch (spec 0012): whether Alt+Space is held by
+            // another program, and forgetting what it opened.
+            "allow-launcher-status",
+            "allow-clear-launcher-history",
             "log:allow-log",
         ],
     ),
@@ -107,7 +111,14 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
         // The hidden window of the test build only (`tauri.e2e.conf.json`);
         // the released app never makes a window with this label.
         &["e2e"],
-        &["allow-e2e-dock-view", "allow-e2e-press-dock"],
+        &[
+            "allow-e2e-dock-view",
+            "allow-e2e-press-dock",
+            "allow-e2e-launcher-view",
+            "allow-e2e-launcher-toggle",
+            "allow-e2e-launcher-type",
+            "allow-e2e-launcher-key",
+        ],
     ),
 ];
 
@@ -609,7 +620,15 @@ fn every_declared_command_is_registered_and_vice_versa() {
         .collect();
     assert_eq!(
         added,
-        vec!["e2e_dock_view".to_string(), "e2e_press_dock".to_string()],
+        [
+            "e2e_dock_view",
+            "e2e_launcher_key",
+            "e2e_launcher_toggle",
+            "e2e_launcher_type",
+            "e2e_launcher_view",
+            "e2e_press_dock",
+        ]
+        .map(String::from),
         "src/lib.rs: the test build's commands must be the app's plus the E2E suite's"
     );
     assert!(

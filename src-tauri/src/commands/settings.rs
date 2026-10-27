@@ -34,6 +34,7 @@ pub struct SettingsInput {
     theme: Theme,
     dock: DockSettingsInput,
     launch_at_login: bool,
+    launcher: bool,
 }
 
 /// The `dock` part of [`SettingsInput`], as strict.
@@ -76,11 +77,13 @@ impl From<SettingsInput> for Settings {
             theme,
             dock,
             launch_at_login,
+            launcher,
         } = input;
         Settings {
             version,
             theme,
             launch_at_login,
+            launcher,
             dock: DockSettings {
                 edge: dock.edge,
                 icon_size: dock.icon_size,
@@ -263,15 +266,16 @@ fn apply(
     state: &State<'_, Mutex<SettingsState>>,
     wanted: Settings,
 ) -> Result<Settings, SettingsError> {
-    let (before, updated, launch_before) = {
+    let (before, updated, launch_before, launcher_before) = {
         let mut state = lock(state);
         let before = state.settings.dock.clone();
         let launch_before = state.settings.launch_at_login;
+        let launcher_before = state.settings.launcher;
         let updated = state
             .update(wanted)
             .inspect_err(|error| log::warn!("settings: change rejected: {error}"))?
             .clone();
-        (before, updated, launch_before)
+        (before, updated, launch_before, launcher_before)
     };
     let app = app.clone();
     // The lock is released before emitting and placing the dock, which
@@ -284,6 +288,12 @@ fn apply(
     if updated.launch_at_login != launch_before {
         apply_launch_at_login(updated.launch_at_login);
     }
+    #[cfg(windows)]
+    if updated.launcher != launcher_before {
+        crate::windows::launcher::set_enabled(updated.launcher);
+    }
+    #[cfg(not(windows))]
+    let _ = launcher_before;
     Ok(updated)
 }
 
@@ -398,7 +408,7 @@ mod tests {
 
     fn full() -> String {
         format!(
-            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}},"launchAtLogin":true}}"#
+            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}},"launchAtLogin":true,"launcher":false}}"#
         )
     }
 
@@ -412,6 +422,7 @@ mod tests {
                 version: 1,
                 theme: Theme::Dark,
                 launch_at_login: true,
+                launcher: false,
                 dock: DockSettings {
                     edge: DockEdge::Top,
                     icon_size: 64,
