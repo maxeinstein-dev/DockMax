@@ -134,6 +134,7 @@ export const DEFAULT_LOOK = {
   iconPack: null,
   openAnimation: "bounce",
   showOpenApps: true,
+  showBadges: true,
   middleClick: "newInstance",
   taskbar: "hidden",
   everyMonitor: true,
@@ -153,6 +154,7 @@ export const DEFAULT_LOOK = {
   | "iconPack"
   | "openAnimation"
   | "showOpenApps"
+  | "showBadges"
   | "middleClick"
   | "taskbar"
   | "everyMonitor"
@@ -185,6 +187,9 @@ export interface DockSettings {
   /** Whether the open programs that are not pinned show on the dock, after
    * the widgets (spec 0009 D2). */
   showOpenApps: boolean;
+  /** Whether a program's icon wears the notification badge of its button of
+   * the Windows taskbar (spec 0014). */
+  showBadges: boolean;
   /** What the middle button does on a program of the dock. */
   middleClick: MiddleClick;
   /** The tray icons the dock shows itself, by their lasting `id`

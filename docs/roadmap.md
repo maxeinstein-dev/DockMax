@@ -32,6 +32,8 @@ Ordem decidida pelo autor em 2026-10-26, depois da fase D: **C → E → F → G
 
 Fora das fases: o **lançador** no estilo do Ulauncher ([spec 0012](specs/0012-lancador.md)). O L1 entrou em 2026-10-27 (Alt+Espaço, busca nos apps, recentes), no [PR #33](https://github.com/maxeinstein-dev/DockMax/pull/33). O L2 (calculadora, busca na web por palavra-chave, Configurações do DockMax e do Windows) vem no [PR #37](https://github.com/maxeinstein-dev/DockMax/pull/37). Depois, o L3 (personalizar o atalho).
 
+Também fora das fases: os **selos de notificação** ([spec 0014](specs/0014-selos-de-notificacao.md)), o número de não lidas que o app põe no botão da barra do Windows, lido pela UI Automation e desenhado no ícone do dock. Para isso a barra passa a ficar transparente e sem receber cliques, em vez de escondida.
+
 ## Visão do produto
 
 DockMax será um dock personalizável para Windows, inspirado em aplicações de dock e widgets, mas com identidade própria. A interface principal reunirá atalhos e painéis de widgets. A integração com a barra de tarefas será evolutiva: o DockMax começará convivendo com a barra nativa e poderá incorporar capacidades de gerenciamento de janelas ao longo do tempo.

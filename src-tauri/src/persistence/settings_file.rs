@@ -362,7 +362,8 @@ mod tests {
                     "style": "native", "tweaks": {}, "hover": "scale", "hoverScale": 110,
                     "indicator": "dot", "indicatorColor": null,
                     "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
-                    "showOpenApps": true, "middleClick": "newInstance",
+                    "showOpenApps": true, "showBadges": true,
+                    "middleClick": "newInstance",
                     "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2
                 },
                 "launchAtLogin": false,

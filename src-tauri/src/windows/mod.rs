@@ -2,6 +2,8 @@
 pub mod appbar;
 pub mod apps;
 pub mod autostart;
+#[cfg(windows)]
+pub mod badges;
 pub mod dock;
 #[cfg(windows)]
 pub mod drop_target;

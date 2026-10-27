@@ -3,8 +3,11 @@
 //!
 //! Two things of the taskbar change while the dock takes the edge: its
 //! auto-hide flag, which Windows keeps in the user's settings (it outlives
-//! the process, and a reboot), and its windows, hidden with `SW_HIDE`. Both
-//! are restored on every way out the dock has:
+//! the process, and a reboot), and its windows, made see-through and deaf to
+//! the mouse (`WS_EX_LAYERED` with an alpha of 0, and `WS_EX_TRANSPARENT`).
+//! They stay shown so that UI Automation still finds their buttons, where
+//! the notification badges are read (spec 0014): a window hidden with
+//! `SW_HIDE` has none. Both are restored on every way out the dock has:
 //!
 //! 1. the normal exit and the end of the Windows session (`release`);
 //! 2. a panic (a hook, see `lib.rs`);
@@ -25,7 +28,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
-use ::windows::Win32::Foundation::{CloseHandle, HWND, LPARAM};
+use ::windows::Win32::Foundation::{COLORREF, CloseHandle, HWND, LPARAM};
+use ::windows::Win32::Graphics::Gdi::{
+    RDW_ALLCHILDREN, RDW_ERASE, RDW_FRAME, RDW_INVALIDATE, RedrawWindow,
+};
 use ::windows::Win32::System::Threading::{
     GetExitCodeProcess, INFINITE, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
     PROCESS_SYNCHRONIZE, WaitForSingleObject,
@@ -34,9 +40,11 @@ use ::windows::Win32::UI::Shell::{
     ABM_GETSTATE, ABM_SETSTATE, ABS_AUTOHIDE, APPBARDATA, SHAppBarMessage,
 };
 use ::windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetClassNameW, GetWindowThreadProcessId, HWND_NOTOPMOST, HWND_TOPMOST, IsWindow,
-    IsWindowVisible, SW_HIDE, SW_SHOWNA, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowPos,
-    ShowWindow,
+    EnumWindows, GWL_EXSTYLE, GetClassNameW, GetLayeredWindowAttributes, GetWindowLongPtrW,
+    GetWindowThreadProcessId, HWND_NOTOPMOST, HWND_TOPMOST, IsWindow, IsWindowVisible,
+    LAYERED_WINDOW_ATTRIBUTES_FLAGS, LWA_ALPHA, SW_SHOWNA, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, ShowWindow, WS_EX_LAYERED,
+    WS_EX_TRANSPARENT,
 };
 use ::windows::core::BOOL;
 use serde::{Deserialize, Serialize};
@@ -67,10 +75,31 @@ pub struct Saved {
     pub pid: u32,
     /// Whether the taskbar hid itself on its own.
     pub autohide: bool,
-    /// The taskbar windows this process hid (handles, as numbers), which
-    /// were visible.
+    /// The taskbar windows hidden with `SW_HIDE` (handles, as numbers), as
+    /// the versions before spec 0014 hid them: kept so that the file one of
+    /// them left still restores.
+    #[serde(default)]
     pub hidden: Vec<isize>,
+    /// The taskbar windows this process made see-through, with what they
+    /// were.
+    #[serde(default)]
+    pub faded: Vec<Faded>,
 }
+
+/// A taskbar window made see-through, and what it was before.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Faded {
+    /// The window's handle, as a number.
+    pub hwnd: isize,
+    /// Its extended style (`GWL_EXSTYLE`).
+    pub ex_style: isize,
+    /// Its layered attributes, when it had some: the key color, the alpha
+    /// and the flags (`LWA_*`).
+    pub layered: Option<(u32, u8, u32)>,
+}
+
+/// What a see-through taskbar window has on top of its own style.
+const FADED_STYLE: isize = (WS_EX_LAYERED.0 | WS_EX_TRANSPARENT.0) as isize;
 
 impl Saved {
     fn write(&self, path: &Path) -> io::Result<()> {
@@ -125,7 +154,7 @@ pub fn keep() {
         TaskbarMode::Hidden => {
             let showing = windows
                 .iter()
-                .any(|&hwnd| unsafe { IsWindowVisible(hwnd) }.as_bool());
+                .any(|&hwnd| unsafe { IsWindowVisible(hwnd) }.as_bool() && !is_faded(hwnd));
             let autohide = flags() & ABS_AUTOHIDE != 0;
             if !showing && autohide {
                 return;
@@ -136,7 +165,7 @@ pub fn keep() {
                 return;
             };
             set_autohide(true, windows.first().copied());
-            if let Err(error) = hide_visible(&windows, &mut saved, &path) {
+            if let Err(error) = fade_visible(&windows, &mut saved, &path) {
                 log::warn!("taskbar: could not be kept hidden: {error}");
             }
         }
@@ -150,7 +179,9 @@ fn hwnd_of(value: isize) -> HWND {
 }
 
 /// The taskbar windows: one on the primary monitor, one on each other.
-fn taskbar_windows() -> Vec<HWND> {
+/// Explorer's only, never the dock's own tray proxy; the primary one first
+/// when there is one.
+pub fn taskbar_windows() -> Vec<HWND> {
     unsafe extern "system" fn collect(hwnd: HWND, found: LPARAM) -> BOOL {
         let mut name = [0u16; 64];
         let length = unsafe { GetClassNameW(hwnd, &mut name) };
@@ -168,7 +199,15 @@ fn taskbar_windows() -> Vec<HWND> {
     // A failed enumeration leaves what it found; there is nothing to do
     // about the rest.
     let _ = unsafe { EnumWindows(Some(collect), LPARAM(&mut found as *mut _ as isize)) };
+    found.sort_by_key(|&hwnd| !is_primary(hwnd));
     found
+}
+
+/// Whether `hwnd` is the primary monitor's taskbar (`Shell_TrayWnd`).
+fn is_primary(hwnd: HWND) -> bool {
+    let mut name = [0u16; 64];
+    let length = unsafe { GetClassNameW(hwnd, &mut name) };
+    String::from_utf16_lossy(&name[..usize::try_from(length).unwrap_or(0)]) == CLASSES[0]
 }
 
 /// The flags of the taskbar (`ABS_*`).
@@ -219,6 +258,7 @@ pub fn hold(mode: TaskbarMode, state_path: &Path) -> Result<(), Box<dyn Error>> 
                 pid: std::process::id(),
                 autohide: flags() & ABS_AUTOHIDE != 0,
                 hidden: Vec::new(),
+                faded: Vec::new(),
             };
             saved.write(state_path)?;
             ensure_watchdog(state_path);
@@ -232,30 +272,71 @@ pub fn hold(mode: TaskbarMode, state_path: &Path) -> Result<(), Box<dyn Error>> 
     set_autohide(true, windows.first().copied());
     match mode {
         TaskbarMode::Hidden => {
-            hide_visible(&windows, &mut saved, state_path)?;
+            fade_visible(&windows, &mut saved, state_path)?;
             spawn_keeper();
         }
-        // Autohide: the windows hidden before come back.
-        TaskbarMode::Autohide | TaskbarMode::Visible => show_hidden(&mut saved, state_path)?,
+        // Autohide: the windows faded before come back.
+        TaskbarMode::Autohide | TaskbarMode::Visible => show_faded(&mut saved, state_path)?,
     }
     Ok(())
 }
 
-/// Hides the taskbar windows that are showing, recording each one first: a
-/// window hidden and never recorded would stay hidden. They also go below
-/// every topmost window, so the dock's tray host (which is topmost) is the
-/// `Shell_TrayWnd` programs find first; `restore_file` puts them back.
-fn hide_visible(windows: &[HWND], saved: &mut Saved, state_path: &Path) -> io::Result<()> {
+/// Whether a taskbar window is see-through and deaf to the mouse, as
+/// `fade_visible` leaves it.
+fn is_faded(hwnd: HWND) -> bool {
+    let style = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) };
+    if style & FADED_STYLE != FADED_STYLE {
+        return false;
+    }
+    let mut alpha = 255u8;
+    let mut flags = LAYERED_WINDOW_ATTRIBUTES_FLAGS(0);
+    let read =
+        unsafe { GetLayeredWindowAttributes(hwnd, None, Some(&mut alpha), Some(&mut flags)) };
+    read.is_ok() && flags.0 & LWA_ALPHA.0 != 0 && alpha == 0
+}
+
+/// What a taskbar window is before it is faded.
+fn faded_of(hwnd: HWND) -> Faded {
+    let ex_style = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) };
+    let layered = if ex_style & WS_EX_LAYERED.0 as isize != 0 {
+        let mut key = COLORREF(0);
+        let mut alpha = 255u8;
+        let mut flags = LAYERED_WINDOW_ATTRIBUTES_FLAGS(0);
+        unsafe {
+            GetLayeredWindowAttributes(hwnd, Some(&mut key), Some(&mut alpha), Some(&mut flags))
+        }
+        .ok()
+        .map(|()| (key.0, alpha, flags.0))
+    } else {
+        None
+    };
+    Faded {
+        hwnd: hwnd.0 as isize,
+        ex_style,
+        layered,
+    }
+}
+
+/// Fades the taskbar windows that are showing, recording what each one was
+/// first: a window faded and never recorded would stay faded. They also go
+/// below every topmost window, so the dock's tray host (which is topmost) is
+/// the `Shell_TrayWnd` programs find first; `restore_file` puts them back.
+fn fade_visible(windows: &[HWND], saved: &mut Saved, state_path: &Path) -> io::Result<()> {
     for &hwnd in windows {
         if !unsafe { IsWindowVisible(hwnd) }.as_bool() {
             continue;
         }
         let value = hwnd.0 as isize;
-        if !saved.hidden.contains(&value) {
-            saved.hidden.push(value);
+        // Recorded once: later, what it is may be what this run made it.
+        if !saved.faded.iter().any(|faded| faded.hwnd == value) {
+            saved.faded.push(faded_of(hwnd));
             saved.write(state_path)?;
         }
-        let _ = unsafe { ShowWindow(hwnd, SW_HIDE) };
+        if !is_faded(hwnd) {
+            let style = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) };
+            unsafe { SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style | FADED_STYLE) };
+            let _ = unsafe { SetLayeredWindowAttributes(hwnd, COLORREF(0), 0, LWA_ALPHA) };
+        }
         let _ = unsafe {
             SetWindowPos(
                 hwnd,
@@ -291,12 +372,44 @@ fn spawn_keeper() {
     }
 }
 
-fn show_hidden(saved: &mut Saved, state_path: &Path) -> io::Result<()> {
+/// Gives a faded window what it was: its style and, if it was layered, its
+/// layered attributes; then has it painted again, as a window that stops
+/// being layered must be.
+fn unfade(faded: &Faded) {
+    let hwnd = hwnd_of(faded.hwnd);
+    if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
+        return;
+    }
+    unsafe { SetWindowLongPtrW(hwnd, GWL_EXSTYLE, faded.ex_style) };
+    if let Some((key, alpha, flags)) = faded.layered {
+        let _ = unsafe {
+            SetLayeredWindowAttributes(
+                hwnd,
+                COLORREF(key),
+                alpha,
+                LAYERED_WINDOW_ATTRIBUTES_FLAGS(flags),
+            )
+        };
+    }
+    let _ = unsafe {
+        RedrawWindow(
+            Some(hwnd),
+            None,
+            None,
+            RDW_ERASE | RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN,
+        )
+    };
+}
+
+fn show_faded(saved: &mut Saved, state_path: &Path) -> io::Result<()> {
     for value in saved.hidden.drain(..) {
         let hwnd = hwnd_of(value);
         if unsafe { IsWindow(Some(hwnd)) }.as_bool() {
             let _ = unsafe { ShowWindow(hwnd, SW_SHOWNA) };
         }
+    }
+    for faded in saved.faded.drain(..) {
+        unfade(&faded);
     }
     saved.write(state_path)
 }
@@ -324,11 +437,23 @@ fn restore_file(path: &Path, pid: u32) {
     if saved.pid != pid {
         return;
     }
-    for value in &saved.hidden {
-        let hwnd = hwnd_of(*value);
+    for faded in &saved.faded {
+        unfade(faded);
+    }
+    let touched = saved
+        .hidden
+        .iter()
+        .map(|&hwnd| (hwnd, true))
+        .chain(saved.faded.iter().map(|faded| (faded.hwnd, false)));
+    for (value, hidden) in touched {
+        let hwnd = hwnd_of(value);
         if unsafe { IsWindow(Some(hwnd)) }.as_bool() {
-            let _ = unsafe { ShowWindow(hwnd, SW_SHOWNA) };
-            // The taskbar is a topmost window; `hide_visible` lowered it.
+            // A faded window was never hidden: Explorer alone says whether
+            // it shows.
+            if hidden {
+                let _ = unsafe { ShowWindow(hwnd, SW_SHOWNA) };
+            }
+            // The taskbar is a topmost window; `fade_visible` lowered it.
             let _ = unsafe {
                 SetWindowPos(
                     hwnd,
@@ -497,6 +622,11 @@ mod tests {
             pid: 4242,
             autohide: true,
             hidden: vec![1, 2, 3],
+            faded: vec![Faded {
+                hwnd: 4,
+                ex_style: 0x0800_0088,
+                layered: Some((0, 255, 2)),
+            }],
         }
     }
 
@@ -539,6 +669,25 @@ mod tests {
     }
 
     #[test]
+    fn a_file_of_an_earlier_version_still_reads() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join(STATE_FILE);
+        // Before spec 0014 the windows were hidden, and the file had no
+        // `faded`.
+        fs::write(&path, br#"{"pid":7,"autohide":false,"hidden":[10,20]}"#).unwrap();
+
+        assert_eq!(
+            Saved::read(&path),
+            Some(Saved {
+                pid: 7,
+                autohide: false,
+                hidden: vec![10, 20],
+                faded: Vec::new(),
+            })
+        );
+    }
+
+    #[test]
     fn a_file_of_another_process_is_not_restored() {
         let dir = tempdir().unwrap();
         let path = dir.path().join(STATE_FILE);
@@ -558,6 +707,7 @@ mod tests {
             // the restore must change nothing on this machine.
             autohide: flags() & ABS_AUTOHIDE != 0,
             hidden: Vec::new(),
+            faded: Vec::new(),
             ..saved()
         }
         .write(&path)
@@ -600,6 +750,7 @@ mod tests {
             pid: u32::MAX,
             autohide: flags() & ABS_AUTOHIDE != 0,
             hidden: Vec::new(),
+            faded: Vec::new(),
         }
         .write(&path)
         .unwrap();

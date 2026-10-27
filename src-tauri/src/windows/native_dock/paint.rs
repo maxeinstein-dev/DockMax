@@ -52,7 +52,8 @@ use windows_numerics::{Matrix3x2, Vector2};
 use super::look::Look;
 use super::svg::{self, Segment};
 use super::theme::{APP_INK, Color, Glaze, Palette};
-use crate::domain::dock_layout::Area;
+use crate::domain::badges::Badge;
+use crate::domain::dock_layout::{self, Area};
 use crate::domain::settings::{DockEdge, IconShape, Indicator};
 
 /// The superellipse every tile is cut to, in a 100 × 100 box.
@@ -116,6 +117,8 @@ pub struct Tile {
     pub dot: Option<(f64, f32)>,
     /// The item's box (for the focus ring).
     pub item: Area,
+    /// The program's notification badge (spec 0014).
+    pub notice: Option<Badge>,
 }
 
 /// The clock and the date at the end of the bar.
@@ -1130,6 +1133,7 @@ impl Painter {
             dragging: false,
             dot: None,
             item: tile.item,
+            notice: None,
         };
         self.tile(scene, &plain);
         self.base = IDENTITY;
@@ -1498,6 +1502,9 @@ impl Painter {
                 }
             }
         }
+        if let Some(notice) = tile.notice {
+            self.notice(scene, tile.area, notice);
+        }
         if tile.attention {
             let center = v(
                 tile.area.x + tile.area.width + 2.0 - 5.0,
@@ -1525,6 +1532,48 @@ impl Painter {
                     &danger,
                 );
             }
+        }
+    }
+
+    /// The notification badge on a program's tile (spec 0014): the number
+    /// in white on the danger color, in a ring of the bar's, or a dot for a
+    /// badge with no number.
+    fn notice(&mut self, scene: &Scene, tile: Area, notice: Badge) {
+        let label = notice.label();
+        let probe = dock_layout::badge_area(tile, 1.0);
+        let size = dock_layout::badge_text_size(probe.height);
+        let text_width = label
+            .as_deref()
+            .map_or(0.0, |text| self.text_width(text, size, 700, true));
+        let area = dock_layout::badge_area(tile, text_width);
+        let radius = (area.height / 2.0) as f32;
+        let ring = self.solid(scene.palette.surface.with_alpha(1.0)).clone();
+        let fill = self.solid(scene.palette.danger).clone();
+        unsafe {
+            self.target.FillRoundedRectangle(
+                &D2D1_ROUNDED_RECT {
+                    rect: rect(Area {
+                        x: area.x - 1.5,
+                        y: area.y - 1.5,
+                        width: area.width + 3.0,
+                        height: area.height + 3.0,
+                    }),
+                    radiusX: radius + 1.5,
+                    radiusY: radius + 1.5,
+                },
+                &ring,
+            );
+            self.target.FillRoundedRectangle(
+                &D2D1_ROUNDED_RECT {
+                    rect: rect(area),
+                    radiusX: radius,
+                    radiusY: radius,
+                },
+                &fill,
+            );
+        }
+        if let Some(text) = label {
+            self.text(&text, area, size, 700, true, Color::WHITE);
         }
     }
 

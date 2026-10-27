@@ -52,6 +52,7 @@ use super::dock::Rect;
 use super::monitors::Monitor;
 use super::panel::{LogicalRect, PanelId};
 use crate::domain::apps::AppsSnapshot;
+use crate::domain::badges::{self, Badge};
 use crate::domain::dock_items::{self, Item, Names, SystemItem};
 use crate::domain::dock_layout::{
     self, Area, DRAG_GROW, DRAG_LIFT, DRAG_THRESHOLD, DockSize, Hover, Magnification, Shape,
@@ -257,6 +258,9 @@ pub struct Dock {
     opening: HashMap<String, Instant>,
     icons: HashMap<(Option<String>, String), Loaded>,
     badges: HashMap<String, Loaded>,
+    /// The notification badge of each item (spec 0014), as the taskbar
+    /// last had it.
+    notices: Vec<Option<Badge>>,
     tracking: bool,
     animating: bool,
     visible: bool,
@@ -426,6 +430,7 @@ fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
         opening: HashMap::new(),
         icons: HashMap::new(),
         badges: HashMap::new(),
+        notices: Vec::new(),
         tracking: false,
         animating: false,
         visible: false,
@@ -765,8 +770,49 @@ impl Dock {
             .iter()
             .map(|name| self.painter.label_width(name))
             .collect();
+        self.notices = self.read_notices();
         self.request_pictures();
         self.place();
+    }
+
+    /// The notification badge of each item: a program's, from its button of
+    /// the taskbar (spec 0014). None while the setting is off.
+    fn read_notices(&self) -> Vec<Option<Badge>> {
+        let buttons = if self.data.settings.dock.show_badges {
+            super::badges::buttons()
+        } else {
+            Vec::new()
+        };
+        self.items
+            .iter()
+            .map(|item| {
+                if buttons.is_empty() {
+                    return None;
+                }
+                match item {
+                    Item::App(app) => badges::for_pinned(
+                        &buttons,
+                        super::open_apps::known_identity(&app.app_id).as_ref(),
+                        &app.name,
+                    ),
+                    Item::Other(other) => badges::for_other(
+                        &buttons,
+                        super::open_apps::group_key_of_other(&other.key).as_deref(),
+                        &other.name,
+                    ),
+                    _ => None,
+                }
+            })
+            .collect()
+    }
+
+    /// The taskbar's badges changed: drawn again if this dock's did.
+    fn notices_changed(&mut self) {
+        let notices = self.read_notices();
+        if notices != self.notices {
+            self.notices = notices;
+            self.paint();
+        }
     }
 
     /// The images of the tray icons kept in the dock, read again when one
@@ -1463,6 +1509,7 @@ impl Dock {
                 dragging,
                 dot: Some((box_area.center_x(), dot)),
                 item: box_area,
+                notice: self.notices.get(index).copied().flatten(),
             });
         }
         let tip = self
@@ -2514,6 +2561,11 @@ pub fn shutdown() {
 
 pub fn refresh() {
     post(Dock::reload);
+}
+
+/// The notification badges of the taskbar changed (spec 0014).
+pub fn badges_changed() {
+    post(Dock::notices_changed);
 }
 
 /// The icon pack or its folder changed: reads the icons again.

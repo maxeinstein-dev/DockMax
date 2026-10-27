@@ -248,6 +248,15 @@ function SettingsPanel({
         }
       />
       <ToggleField
+        label={t.settings.showBadges}
+        hint={t.settings.showBadgesHint}
+        checked={shown?.dock.showBadges ?? true}
+        disabled={shown === null}
+        onChange={(showBadges) =>
+          change((s) => ({ ...s, dock: { ...s.dock, showBadges } }))
+        }
+      />
+      <ToggleField
         label={t.settings.launchAtLogin}
         hint={t.settings.launchAtLoginHint}
         checked={shown?.launchAtLogin ?? false}

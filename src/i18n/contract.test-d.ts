@@ -27,6 +27,8 @@ export const otherText: Messages = {
     middleClick: { newInstance: "New instance", none: "Nothing" },
     showOpenApps: "Show open apps",
     showOpenAppsHint: "The ones that are not pinned, after the widgets",
+    showBadges: "Show notification badges",
+    showBadgesHint: "The unread count the app puts on the Windows taskbar",
     autoHide: "Hide automatically",
     autoHideHint: "Goes down when the pointer leaves, up at the screen edge",
     autoHideReveal: "Delay to show",
