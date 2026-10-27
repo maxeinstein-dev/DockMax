@@ -120,6 +120,10 @@ export const DEFAULT_AUTO_HIDE_REVEAL = 300;
 export const MAX_AUTO_HIDE_REVEAL = 2000;
 export const DEFAULT_AUTO_HIDE_DELAY = 700;
 export const MAX_AUTO_HIDE_DELAY = 5000;
+/** Milliseconds over an open program before its windows' previews show
+ * (spec 0015). */
+export const DEFAULT_PREVIEW_DELAY = 200;
+export const MAX_PREVIEW_DELAY = 1000;
 
 /** The look fields of `DockSettings` before the user changes anything;
  * equal to `DockSettings::default()` in `src-tauri/src/domain/settings.rs`. */
@@ -143,6 +147,9 @@ export const DEFAULT_LOOK = {
   bottomSpace: DEFAULT_BOTTOM_SPACE,
   switchEveryMonitor: false,
   indicatorFollowsWorkspace: false,
+  previews: true,
+  previewDelay: DEFAULT_PREVIEW_DELAY,
+  previewsOnlySeveral: false,
 } as const satisfies Pick<
   DockSettings,
   | "style"
@@ -164,6 +171,9 @@ export const DEFAULT_LOOK = {
   | "bottomSpace"
   | "switchEveryMonitor"
   | "indicatorFollowsWorkspace"
+  | "previews"
+  | "previewDelay"
+  | "previewsOnlySeveral"
 >;
 
 export interface DockSettings {
@@ -215,6 +225,13 @@ export interface DockSettings {
   /** The mark under an open item wears the color of the workspace shown,
    * over `indicatorColor` (spec 0013 C3). */
   indicatorFollowsWorkspace: boolean;
+  /** The pointer resting on an open program shows its windows' previews
+   * (spec 0015). */
+  previews: boolean;
+  /** Milliseconds before they show, 0–`MAX_PREVIEW_DELAY`. */
+  previewDelay: number;
+  /** Only for a program with two windows or more. */
+  previewsOnlySeveral: boolean;
 }
 
 export interface Settings {

@@ -30,6 +30,8 @@ pub mod panel_window;
 #[cfg(windows)]
 pub mod popup_menu;
 #[cfg(windows)]
+pub mod previews;
+#[cfg(windows)]
 pub mod profiles;
 #[cfg(windows)]
 pub mod recovery;

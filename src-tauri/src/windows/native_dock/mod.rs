@@ -75,6 +75,9 @@ const WM_RUN: u32 = WM_APP + 0x31;
 const ANIMATION_TIMER: usize = 1;
 const CLOCK_TIMER: usize = 2;
 const WARM_TIMER: usize = 3;
+/// The pointer rested on an open program for the preview's delay (spec
+/// 0015).
+const PREVIEW_TIMER: usize = 6;
 const STATUS_TIMER: usize = 4;
 /// Looks at the pointer while the dock hides on its own.
 const AUTO_HIDE_TIMER: usize = 5;
@@ -1131,6 +1134,7 @@ impl Dock {
 
     /// The dock's monitor is gone (or the user keeps only one dock).
     fn destroy(&mut self) {
+        self.end_preview();
         self.hide();
         let hwnd = self.hwnd.0 as isize;
         shared().docks.retain(|known| known.hwnd != hwnd);
@@ -1219,6 +1223,7 @@ impl Dock {
             || self.press.is_some()
             || self.landing.is_some()
             || self.menu_open
+            || self.previewing()
             || menu_on_screen();
         if busy || near_dock(point, self.window, self.monitor.rect, edge) {
             self.away_since = None;
@@ -1227,6 +1232,7 @@ impl Dock {
         let since = *self.away_since.get_or_insert(now);
         if now.duration_since(since) >= tuck_after {
             self.away_since = None;
+            self.end_preview();
             self.tucking = true;
             self.hovered = None;
             self.status_hovered = false;
@@ -1455,13 +1461,17 @@ impl Dock {
         }
     }
 
-    fn palette(&self) -> Palette {
-        let dark = match self.data.settings.theme {
+    /// Whether the dock is drawn dark: the setting, or Windows' own.
+    fn dark_now(&self) -> bool {
+        match self.data.settings.theme {
             Theme::System => self.dark,
             Theme::Light => false,
             Theme::Dark => true,
-        };
-        Palette::of(dark, self.data.settings.dock.opacity)
+        }
+    }
+
+    fn palette(&self) -> Palette {
+        Palette::of(self.dark_now(), self.data.settings.dock.opacity)
     }
 
     fn scene(&mut self) -> Scene {
@@ -1748,8 +1758,93 @@ impl Dock {
             if self.warmable() {
                 unsafe { SetTimer(Some(self.hwnd), WARM_TIMER, WARM_DELAY, None) };
             }
+            self.arm_preview();
             self.animate();
             self.paint();
+        }
+    }
+
+    /// Whether this dock's preview card shows.
+    fn previewing(&self) -> bool {
+        super::previews::shown_by() == Some(self.hwnd.0 as isize)
+    }
+
+    /// The pointer is on another item: with a card already shown it changes
+    /// at once (spec 0015, proposal 1), else it shows after the delay. The
+    /// card hides itself once the pointer has left the icon and the card.
+    fn arm_preview(&mut self) {
+        let _ = unsafe { KillTimer(Some(self.hwnd), PREVIEW_TIMER) };
+        let settings = &self.data.settings.dock;
+        let program = self
+            .hovered
+            .and_then(|index| self.items.get(index))
+            .is_some_and(Item::is_program);
+        if !settings.previews || !program {
+            return;
+        }
+        if self.previewing() || settings.preview_delay == 0 {
+            self.show_preview();
+        } else {
+            let delay = u32::from(settings.preview_delay);
+            unsafe { SetTimer(Some(self.hwnd), PREVIEW_TIMER, delay, None) };
+        }
+    }
+
+    /// Shows the card of the program under the pointer: its windows in this
+    /// dock's workspace.
+    fn show_preview(&mut self) {
+        let busy = self.press.is_some() || self.open.is_some() || self.menu_open || self.tucking;
+        let Some(index) = self.hovered.filter(|_| !busy) else {
+            return;
+        };
+        let workspace = self.workspace_id();
+        let windows = match self.items.get(index) {
+            Some(Item::App(app)) => {
+                super::open_apps::windows_of_pinned(app.id.as_str(), workspace.as_deref())
+            }
+            Some(Item::Other(other)) => {
+                super::open_apps::windows_of_other(&other.key, workspace.as_deref())
+            }
+            _ => return,
+        };
+        let settings = &self.data.settings.dock;
+        if !crate::domain::previews::shows(windows.len(), settings.previews_only_several) {
+            if self.previewing() {
+                super::previews::hide();
+            }
+            return;
+        }
+        let Some(area) = self.placement_now().items.get(index).copied() else {
+            return;
+        };
+        let rect = self.monitor.rect;
+        super::previews::show(super::previews::Request {
+            owner: self.hwnd.0 as isize,
+            icon: Area {
+                x: f64::from(self.window.x) + area.x * self.scale,
+                y: f64::from(self.window.y) + area.y * self.scale,
+                width: area.width * self.scale,
+                height: area.height * self.scale,
+            },
+            screen: Area {
+                x: f64::from(rect.x),
+                y: f64::from(rect.y),
+                width: f64::from(rect.width),
+                height: f64::from(rect.height),
+            },
+            edge: self.edge(),
+            scale: self.scale,
+            dark: self.dark_now(),
+            windows,
+        });
+    }
+
+    /// Hides this dock's card, if it shows (a click, a menu, a drag, the dock
+    /// going down).
+    fn end_preview(&mut self) {
+        let _ = unsafe { KillTimer(Some(self.hwnd), PREVIEW_TIMER) };
+        if self.previewing() {
+            super::previews::hide();
         }
     }
 
@@ -1773,6 +1868,8 @@ impl Dock {
 
     fn mouse_leave(&mut self) {
         self.tracking = false;
+        // A card already shown hides itself once the pointer is off it too.
+        let _ = unsafe { KillTimer(Some(self.hwnd), PREVIEW_TIMER) };
         if self.press.is_some() {
             return;
         }
@@ -1818,6 +1915,7 @@ impl Dock {
         if self.data.workspaces.len() < 2 || delta == 0 {
             return;
         }
+        self.end_preview();
         let monitor = self.monitor.key.clone();
         let forward = delta < 0;
         self.effects.push(Box::new(move |app| {
@@ -1835,6 +1933,7 @@ impl Dock {
     }
 
     fn left_down(&mut self, x: f64, y: f64) {
+        self.end_preview();
         self.use_here();
         shared().clicked = Some(Instant::now());
         let index = self.hit(x, y);
@@ -2527,6 +2626,7 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
             }
         }),
         WM_RBUTTONUP => with_dock(hwnd, |dock| {
+            dock.end_preview();
             shared().clicked = Some(Instant::now());
             dock.use_here();
             let (x, y) = dock.point(lparam);
@@ -2558,6 +2658,10 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
             }),
             STATUS_TIMER => with_dock(hwnd, Dock::read_system),
             AUTO_HIDE_TIMER => with_dock(hwnd, Dock::watch_pointer),
+            PREVIEW_TIMER => with_dock(hwnd, |dock| {
+                let _ = unsafe { KillTimer(Some(dock.hwnd), PREVIEW_TIMER) };
+                dock.show_preview();
+            }),
             WARM_TIMER => with_dock(hwnd, |dock| {
                 let _ = unsafe { KillTimer(Some(dock.hwnd), WARM_TIMER) };
                 if dock.warmable() && dock.open.is_none() {
