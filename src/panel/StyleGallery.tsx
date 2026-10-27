@@ -1,4 +1,3 @@
-import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { ICON_SIZES, useAppIcon } from "../core/apps";
 import {
   DOCK_STYLES,
@@ -16,6 +15,7 @@ import {
 } from "../dock/paints";
 import { useT } from "../i18n";
 import { MiniTile } from "./DockItems";
+import ChoiceCards from "./parts/ChoiceCards";
 import "./StyleGallery.css";
 
 /** How many items a miniature shows. */
@@ -123,9 +123,7 @@ function MiniDock({
 
 /**
  * The style of the dock as a grid of cards (spec 0014 R1), each with the
- * dock drawn in that style: a labelled group of toggle buttons, the chosen
- * one `aria-pressed`. One Tab stop (roving tabindex, at the chosen card);
- * the arrows, Home and End move inside it, and choosing applies at once.
+ * dock drawn in that style (`ChoiceCards`).
  */
 function StyleGallery({
   dock,
@@ -135,73 +133,19 @@ function StyleGallery({
   onSelect,
 }: StyleGalleryProps) {
   const t = useT();
-  const labelId = useId();
-  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-  const [focused, setFocused] = useState<number | null>(null);
-  const selected = dock ? DOCK_STYLES.indexOf(dock.style) : -1;
-  const tabStop = focused ?? Math.max(selected, 0);
-
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const last = DOCK_STYLES.length - 1;
-    const from = buttons.current.findIndex(
-      (button) => button === document.activeElement,
-    );
-    const current = from >= 0 ? from : tabStop;
-    const next = {
-      ArrowRight: current === last ? 0 : current + 1,
-      ArrowDown: current === last ? 0 : current + 1,
-      ArrowLeft: current === 0 ? last : current - 1,
-      ArrowUp: current === 0 ? last : current - 1,
-      Home: 0,
-      End: last,
-    }[event.key];
-    if (next === undefined) return;
-    event.preventDefault();
-    setFocused(next);
-    buttons.current[next]?.focus();
-  };
-
   return (
-    <div className="style-gallery-field">
-      <span id={labelId} className="option-label">
-        {label}
-      </span>
-      <div
-        className="style-gallery"
-        role="group"
-        aria-labelledby={labelId}
-        onKeyDown={onKeyDown}
-        onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget)) {
-            setFocused(null);
-          }
-        }}
-      >
-        {DOCK_STYLES.map((style, index) => (
-          <button
-            key={style}
-            ref={(button) => {
-              buttons.current[index] = button;
-            }}
-            type="button"
-            className="style-card"
-            aria-pressed={index === selected}
-            tabIndex={index === tabStop ? 0 : -1}
-            disabled={disabled}
-            onFocus={() => setFocused(index)}
-            onClick={() => {
-              setFocused(index);
-              if (index !== selected) onSelect(style);
-            }}
-          >
-            <MiniDock of={style} dock={dock} appIds={appIds} />
-            <span className="style-card-name">
-              {t.settings.look.styles[style]}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
+    <ChoiceCards
+      label={label}
+      choices={DOCK_STYLES.map((style) => ({
+        value: style,
+        label: t.settings.look.styles[style],
+      }))}
+      selected={dock?.style ?? null}
+      disabled={disabled}
+      onSelect={onSelect}
+      thumb={(style) => <MiniDock of={style} dock={dock} appIds={appIds} />}
+      wide
+    />
   );
 }
 
