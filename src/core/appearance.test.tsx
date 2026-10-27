@@ -43,6 +43,7 @@ const DEFAULTS: Settings = {
   launchAtLogin: false,
   launcher: true,
   launcherKeywords: [],
+  launcherHotkey: "Alt+Space",
   dock: {
     edge: "bottom",
     iconSize: 48,

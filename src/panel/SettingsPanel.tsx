@@ -257,6 +257,7 @@ function SettingsPanel({
       {withLauncher ? (
         <LauncherField
           on={shown?.launcher ?? null}
+          hotkey={shown?.launcherHotkey ?? null}
           onChange={(launcher) => change((s) => ({ ...s, launcher }))}
         />
       ) : null}

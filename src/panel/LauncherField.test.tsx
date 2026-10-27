@@ -30,12 +30,20 @@ async function renderField(
   invoke.mockImplementation((command: string) =>
     Promise.resolve(command === "launcher_status" ? status : undefined),
   );
-  render(<LauncherField on={on} onChange={onChange} />);
+  render(
+    <LauncherField
+      on={on}
+      onChange={onChange}
+      hotkey={on === null ? null : "Alt+Space"}
+    />,
+  );
   await act(async () => {});
   return onChange;
 }
 
-const toggle = () => screen.getByRole("switch", { name: text.label });
+const toggle = () =>
+  screen.getByRole("switch", { name: "Lançador (Alt+Espaço)" });
+const taken = "Alt+Espaço está em uso por outro programa.";
 
 describe("LauncherField", () => {
   beforeEach(() => {
@@ -60,25 +68,42 @@ describe("LauncherField", () => {
   it("says when another program holds Alt+Space", async () => {
     await renderField(true, { hotkeyTaken: true });
 
-    expect(screen.getByRole("status")).toHaveTextContent(text.taken);
+    expect(screen.getByText(taken)).toBeInTheDocument();
   });
 
   it("says nothing of the hotkey while it is off", async () => {
     await renderField(false, { hotkeyTaken: true });
 
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByText(taken)).not.toBeInTheDocument();
   });
 
   it("follows the status Rust sends", async () => {
     await renderField(true, { hotkeyTaken: false });
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByText(taken)).not.toBeInTheDocument();
 
     act(() => {
       for (const listener of listeners) {
         listener({ payload: { hotkeyTaken: true } });
       }
     });
-    expect(screen.getByRole("status")).toHaveTextContent(text.taken);
+    expect(screen.getByText(taken)).toBeInTheDocument();
+  });
+
+  it("names the hotkey in use", async () => {
+    invoke.mockImplementation((command: string) =>
+      Promise.resolve(
+        command === "launcher_status" ? { hotkeyTaken: true } : undefined,
+      ),
+    );
+    render(<LauncherField on onChange={vi.fn()} hotkey="Ctrl+Shift+Space" />);
+    await act(async () => {});
+
+    expect(
+      screen.getByRole("switch", { name: "Lançador (Ctrl+Shift+Espaço)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Ctrl+Shift+Espaço está em uso por outro programa."),
+    ).toBeInTheDocument();
   });
 
   it("clears the history once, and says so", async () => {

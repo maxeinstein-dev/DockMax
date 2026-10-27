@@ -1,0 +1,200 @@
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { hotkeyFromEvent, hotkeyLabel } from "../core/launcher";
+import { ptBR } from "../i18n/pt-BR";
+import HotkeyField from "./HotkeyField";
+
+const text = ptBR.settings.launcher.hotkey;
+
+const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+vi.mock("../core/log", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../core/log")>()),
+  log: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}));
+
+const button = () => screen.getByRole("button", { pressed: false });
+const capturing = () => screen.getByRole("button", { name: text.press });
+
+function press(
+  code: string,
+  modifiers: Partial<
+    Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>
+  > = {},
+  key = code,
+) {
+  fireEvent.keyDown(capturing(), { code, key, ...modifiers });
+}
+
+describe("HotkeyField", () => {
+  beforeEach(() => {
+    invoke.mockReset();
+    invoke.mockResolvedValue(undefined);
+  });
+
+  it("shows the hotkey in use, readable", () => {
+    render(<HotkeyField hotkey="Alt+Space" />);
+
+    expect(button()).toHaveTextContent("Alt+Espaço");
+    expect(button()).toHaveAccessibleName("Alterar o atalho, hoje Alt+Espaço");
+    expect(
+      screen.queryByRole("button", { name: text.restore }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("lets go of the hotkey while it captures, and saves the new one", async () => {
+    render(<HotkeyField hotkey="Alt+Space" />);
+
+    fireEvent.click(button());
+    expect(invoke).toHaveBeenCalledWith("capture_launcher_hotkey", {
+      on: true,
+    });
+    expect(capturing()).toHaveAttribute("aria-pressed", "true");
+
+    // Modifiers alone wait for the key.
+    press("ControlLeft", { ctrlKey: true }, "Control");
+    expect(invoke).not.toHaveBeenCalledWith(
+      "set_launcher_hotkey",
+      expect.anything(),
+    );
+    press("KeyK", { ctrlKey: true, shiftKey: true }, "K");
+    await act(async () => {});
+
+    expect(invoke).toHaveBeenCalledWith("set_launcher_hotkey", {
+      hotkey: "Ctrl+Shift+K",
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Atalho salvo: Ctrl+Shift+K",
+    );
+  });
+
+  it("says why Rust refused the combination", async () => {
+    invoke.mockImplementation((command: string) =>
+      command === "set_launcher_hotkey"
+        ? Promise.reject({ code: "taken" })
+        : Promise.resolve(undefined),
+    );
+    render(<HotkeyField hotkey="Alt+Space" />);
+
+    fireEvent.click(button());
+    press("Space", { altKey: true, shiftKey: true }, " ");
+    await act(async () => {});
+
+    expect(screen.getByRole("alert")).toHaveTextContent(text.errors.taken);
+  });
+
+  it("refuses a key a hotkey can't have, without asking Rust", () => {
+    render(<HotkeyField hotkey="Alt+Space" />);
+
+    fireEvent.click(button());
+    press("Enter", { altKey: true }, "Enter");
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      text.errors.unsupportedKey,
+    );
+    expect(invoke).toHaveBeenCalledWith("capture_launcher_hotkey", {
+      on: false,
+    });
+  });
+
+  it("cancels with Esc, without closing Configurações", () => {
+    const onWindowKey = vi.fn();
+    window.addEventListener("keydown", onWindowKey);
+    render(<HotkeyField hotkey="Alt+Space" />);
+
+    fireEvent.click(button());
+    press("Escape", {}, "Escape");
+
+    expect(onWindowKey).not.toHaveBeenCalled();
+    expect(button()).toHaveTextContent("Alt+Espaço");
+    expect(invoke).toHaveBeenLastCalledWith("capture_launcher_hotkey", {
+      on: false,
+    });
+    window.removeEventListener("keydown", onWindowKey);
+  });
+
+  it("gives the hotkey back when it loses the focus or goes away", () => {
+    const { unmount } = render(<HotkeyField hotkey="Alt+Space" />);
+
+    fireEvent.click(button());
+    fireEvent.blur(capturing());
+    expect(invoke).toHaveBeenLastCalledWith("capture_launcher_hotkey", {
+      on: false,
+    });
+
+    fireEvent.click(button());
+    invoke.mockClear();
+    unmount();
+    expect(invoke).toHaveBeenCalledWith("capture_launcher_hotkey", {
+      on: false,
+    });
+  });
+
+  it("goes back to Alt+Space", async () => {
+    render(<HotkeyField hotkey="Ctrl+Shift+K" />);
+
+    fireEvent.click(screen.getByRole("button", { name: text.restore }));
+    await act(async () => {});
+
+    expect(invoke).toHaveBeenCalledWith("set_launcher_hotkey", {
+      hotkey: "Alt+Space",
+    });
+  });
+});
+
+describe("hotkeyFromEvent", () => {
+  const none = {
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    metaKey: false,
+  };
+
+  it("writes the combination as Rust keeps it", () => {
+    expect(
+      hotkeyFromEvent({ ...none, code: "KeyK", ctrlKey: true, shiftKey: true }),
+    ).toBe("Ctrl+Shift+K");
+    expect(
+      hotkeyFromEvent({
+        code: "Space",
+        ctrlKey: true,
+        altKey: true,
+        shiftKey: true,
+        metaKey: true,
+      }),
+    ).toBe("Ctrl+Alt+Shift+Win+Space");
+    expect(hotkeyFromEvent({ ...none, code: "Digit7", altKey: true })).toBe(
+      "Alt+7",
+    );
+    expect(hotkeyFromEvent({ ...none, code: "F12", altKey: true })).toBe(
+      "Alt+F12",
+    );
+    expect(hotkeyFromEvent({ ...none, code: "KeyQ" })).toBe("Q");
+  });
+
+  it("tells modifiers and other keys apart", () => {
+    expect(hotkeyFromEvent({ ...none, code: "AltLeft", altKey: true })).toBe(
+      "modifier",
+    );
+    expect(hotkeyFromEvent({ ...none, code: "MetaRight", metaKey: true })).toBe(
+      "modifier",
+    );
+    for (const code of [
+      "Enter",
+      "Tab",
+      "ArrowUp",
+      "F25",
+      "Numpad1",
+      "Semicolon",
+    ]) {
+      expect(hotkeyFromEvent({ ...none, code, altKey: true })).toBe(
+        "unsupported",
+      );
+    }
+  });
+
+  it("reads Space in the user's language", () => {
+    expect(hotkeyLabel("Alt+Space", "Espaço")).toBe("Alt+Espaço");
+    expect(hotkeyLabel("Ctrl+Shift+K", "Espaço")).toBe("Ctrl+Shift+K");
+  });
+});
