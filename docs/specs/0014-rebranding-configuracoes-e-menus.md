@@ -125,4 +125,10 @@ A busca nos ajustes, a prévia do dock sobre o papel de parede de verdade, a apa
 - "Sair" pelo menu novo (End e Enter) saiu sem queda no log, sem processo sobrando e com a barra do Windows igual;
 - memória privada: 207 MB com o dock e 219 MB com o menu aberto (o menu é um processo só, sem WebView2).
 
-**Não verificado (R3):** o menu do ícone da bandeja (o clique no ícone não foi simulado), o menu de um programa com a aparência nova (sem programas fixados nos dados de teste), o mouse de verdade, o leitor de tela falando, o contraste alto, escala acima de 100 % e o dock no topo da tela.
+- **Segunda rodada (R3, 2026-10-27),** com o dock no topo da tela:
+  - o menu do dock abriu para baixo do ponteiro;
+  - o clique direito no ícone da bandeja (a mensagem do próprio ícone) abriu o menu novo, o mesmo do dock sem os espaços, sem nenhum menu do Windows; a seta deu o foco a "Buscar apps…" e Esc fechou;
+  - com o Bloco de notas fixado por Configurações › Apps do dock, o clique direito nele abriu o menu do programa com a aparência nova (a Jump List com "Recentes", o item com o foco preenchido no azul);
+  - nas duas rodadas, "Sair" sem queda no log, sem processo sobrando e com a barra do Windows igual.
+
+**Não verificado (R3):** o mouse de verdade, o leitor de tela falando, o contraste alto e escala acima de 100 %.
