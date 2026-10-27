@@ -133,6 +133,11 @@ export const otherText: Messages = {
     edge: { bottom: "Bottom", top: "Top" },
     size: { small: "Small", medium: "Medium", large: "Large" },
     opacity: { translucent: "Translucent", solid: "Solid" },
+    taskbarHints: {
+      visible: "a",
+      autohide: "a",
+      hidden: "a",
+    },
     taskbar: { visible: "Visible", autohide: "Automatic", hidden: "Hidden" },
     look: {
       title: "Dock look",

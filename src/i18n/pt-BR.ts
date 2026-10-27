@@ -219,6 +219,12 @@ const messages = {
       autohide: "Automática",
       hidden: "Oculta",
     } satisfies Record<TaskbarMode, string>,
+    /** Under each taskbar card of the Configurações app (spec 0014 R2). */
+    taskbarHints: {
+      visible: "O dock fica logo acima da barra de tarefas.",
+      autohide: "Ela aparece ao encostar na borda da tela.",
+      hidden: "Só o dock; o relógio e a bandeja vêm para ele.",
+    } satisfies Record<TaskbarMode, string>,
     /** Configurações › Aparência do dock (spec 0005 §3.5). */
     look: {
       /** The row that opens it, and its title. */

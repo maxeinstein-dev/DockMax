@@ -1,6 +1,6 @@
 # Spec 0014 — Rebranding de Configurações e dos menus
 
-**Status:** R1 feito (estrutura de Configurações e temas com miniatura); R2 a R4 a fazer.
+**Status:** R1 feito (estrutura de Configurações e temas com miniatura); R2 implementado (as outras escolhas em cartões); R3 e R4 a fazer.
 **Origem:** pedido do autor (2026-10-27): Configurações, os menus do dock e da bandeja e as outras telas de apoio estão "muito simples e sem vida". Referência de acabamento: o PrimoDock ([interface](../reference/primodock/interface.md), "Janela de configurações" e "Menus"), com o tema WhiteSur GTK e o dock do ZorinOS como inspiração. Exemplo dado pelo autor: em Aparência, mostrar os temas aplicados, e não só os nomes.
 
 ## 1. Decisões do autor (2026-10-27)
@@ -73,6 +73,15 @@ Cada recorte é um PR, com a verificação no app real nos dois temas e a mediç
 ### 5.4 Fora do R1
 
 A busca nos ajustes, a prévia do dock sobre o papel de parede de verdade, a aparência dos menus (R3) e as miniaturas das outras escolhas (R2).
+
+## 5b. Como o R2 ficou
+
+- Um componente só para todas as escolhas visuais (`ChoiceCards`): cartões com a miniatura em cima e o nome embaixo, com uma explicação opcional (a barra do Windows), a mesma navegação pelo teclado da grade de temas e o nome e a explicação ligados ao cartão (`aria-labelledby`, `aria-describedby`). A grade de temas passou a usá-lo.
+- **Geral:** Posição (uma tela com o dock embaixo ou em cima) e Barra de tarefas do Windows (a tela com a barra visível, só um fio dela, ou sem ela, e uma frase em cada cartão).
+- **Aparência:** Ao passar o mouse (três ícones, o do meio sob o ponteiro, crescendo sozinho ou com os vizinhos), Indicador (ponto ou traço), Formato dos ícones (um ícone redondo, um quadrado e um largo, em placas, do mesmo tamanho ou como vieram) e Animação de abertura.
+- O cartão escolhido do efeito ao passar o mouse e da animação de abertura **anima o efeito**; com "Reduzir movimento" no Windows, fica parado (o guarda de movimento do projeto cobre os quatro).
+- O painel antigo continua com os botões de texto: os cartões só aparecem no app de Configurações.
+- Os deslizantes já tinham o valor em algarismos tabulares. As seções Espaços, Apps, Itens e Sobre ganharam o cabeçalho no R1; o acabamento interno delas passa para o R4.
 
 ## 6. Verificação
 
