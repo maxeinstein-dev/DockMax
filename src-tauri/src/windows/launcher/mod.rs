@@ -15,6 +15,7 @@
 //! when it opens and dropped 45 s after it closes.
 
 mod access;
+pub mod icons;
 mod layout;
 mod paint;
 
@@ -164,6 +165,9 @@ pub struct Launcher {
     failed: Option<String>,
     painter: Option<paint::Painter>,
     icons: HashMap<(Option<String>, String), Loaded>,
+    /// Reads the programs' icons from Windows in a helper process, while
+    /// the launcher is open.
+    icon_reader: Option<icons::Reader>,
     font: Option<HFONT>,
     glyph_font: Option<HFONT>,
     brush: Option<HBRUSH>,
@@ -314,6 +318,7 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
         failed: None,
         painter: None,
         icons: HashMap::new(),
+        icon_reader: None,
         font: None,
         glyph_font: None,
         brush: None,
@@ -555,6 +560,11 @@ impl Launcher {
         self.query.clear();
         self.results.clear();
         access::publish(Vec::new());
+        // The helper leaves, and the memory of reading the icons with it;
+        // the icons it had not answered are asked again next time.
+        self.icon_reader = None;
+        self.icons
+            .retain(|_, loaded| matches!(loaded, Loaded::Ready(_)));
         log::info!("launcher: closed");
     }
 
@@ -825,30 +835,63 @@ impl Launcher {
         if self.icons.len() > paint::MAX_ICONS {
             self.icons.clear();
         }
-        for found in &self.results {
-            let key = (pack.clone(), found.id.clone());
+        let shown: Vec<(String, String)> = self
+            .results
+            .iter()
+            .map(|found| (found.id.clone(), found.name.clone()))
+            .collect();
+        for (id, name) in shown {
+            let key = (pack.clone(), id.clone());
             if self.icons.contains_key(&key) {
                 continue;
             }
             self.icons.insert(key.clone(), Loaded::Loading);
+            let Some(pack) = pack.clone() else {
+                self.ask_windows(id);
+                continue;
+            };
+            // The icon pack's image is a file: read here, off the main
+            // thread; Windows answers for a program the pack lacks.
             let app = self.app.clone();
-            let id = found.id.clone();
+            let names = crate::commands::icons::names_of(&id, &name);
             let spawned = std::thread::Builder::new()
                 .name("launcher-icon".into())
                 .spawn(move || {
-                    let png = crate::commands::apps::dock_icon_png(&app, &id);
-                    post(move |launcher| {
-                        let bitmap = png.and_then(|png| {
-                            launcher.painter().and_then(|painter| painter.bitmap(&png))
-                        });
-                        launcher.icons.insert(key, Loaded::Ready(bitmap));
-                        launcher.paint_soon();
+                    let png = crate::commands::icons::pack_icon(&app, &pack, &names);
+                    post(move |launcher| match png {
+                        Some(png) => launcher.icon_read(&id, Some(png)),
+                        None => launcher.ask_windows(id),
                     });
                 });
             if spawned.is_err() {
-                self.icons.remove(&(pack.clone(), found.id.clone()));
+                self.icons.remove(&key);
             }
         }
+    }
+
+    /// Asks Windows for the icon of the program `id`, through the helper.
+    fn ask_windows(&mut self, id: String) {
+        if self.icon_reader.is_none() {
+            self.icon_reader = icons::Reader::start(|id, png| {
+                post(move |launcher| launcher.icon_read(&id, png));
+            });
+        }
+        let size = (layout::ICON * self.scale).round().clamp(16.0, 256.0) as u32;
+        match &self.icon_reader {
+            Some(reader) => reader.ask(id, size),
+            None => self.icon_read(&id, None),
+        }
+    }
+
+    /// The icon of the program `id` came (`None`: it has none).
+    fn icon_read(&mut self, id: &str, png: Option<Vec<u8>>) {
+        let bitmap = png.and_then(|png| self.painter().and_then(|painter| painter.bitmap(&png)));
+        for ((_, key_id), loaded) in &mut self.icons {
+            if key_id == id && matches!(loaded, Loaded::Loading) {
+                *loaded = Loaded::Ready(bitmap.clone());
+            }
+        }
+        self.paint_soon();
     }
 
     /// Tells assistive technology what the list shows now.

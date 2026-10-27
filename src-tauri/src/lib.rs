@@ -59,9 +59,9 @@ pub fn managed_state<R: Runtime>(app: &impl Manager<R>) -> Vec<&'static str> {
     found
 }
 
-/// The two jobs this executable has besides being the app (ADR 0009), told
-/// by its first argument: the watchdog that gives the taskbar back when the
-/// app is killed, and the manual restore. Returns whether it did one, in
+/// The jobs this executable has besides being the app, told by its first
+/// argument: the watchdog that gives the taskbar back when the app is killed
+/// and the manual restore (ADR 0009), and the launcher's icon reader. Returns whether it did one, in
 /// which case `main` has nothing left to do.
 pub fn run_special_mode() -> bool {
     #[cfg(windows)]
@@ -78,6 +78,11 @@ pub fn run_special_mode() -> bool {
             }
             [flag, path] if flag == RESTORE_FLAG => {
                 windows::taskbar::restore_now(Path::new(path));
+                return true;
+            }
+            // The launcher's icon reader (spec 0012 L1): a helper process.
+            [flag] if flag == windows::launcher::icons::FLAG => {
+                windows::launcher::icons::serve();
                 return true;
             }
             _ => {}
