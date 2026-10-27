@@ -218,6 +218,86 @@ export interface Settings {
   /** Whether Alt+Space opens the launcher (spec 0012); the menus open it
    * either way. */
   launcher: boolean;
+  /** The launcher's web search by keyword (spec 0012 L2); the first is the
+   * default search. */
+  launcherKeywords: WebKeyword[];
+}
+
+/** A keyword of the launcher's web search; must match `WebKeyword` in
+ * `src-tauri/src/domain/launcher_web.rs`. */
+export interface WebKeyword {
+  /** What is typed before the term (`g`). */
+  keyword: string;
+  /** The search's name (`Google`). */
+  name: string;
+  /** The address, with `%s` where the term goes. */
+  template: string;
+}
+
+/** The limits of the keywords, as Rust checks them (in characters, not
+ * UTF-16 units). */
+export const MAX_KEYWORDS = 20;
+export const MAX_KEYWORD = 16;
+export const MAX_KEYWORD_NAME = 40;
+export const MAX_KEYWORD_TEMPLATE = 500;
+
+/** What is wrong with a keyword's field, if anything. */
+export type KeywordProblem =
+  | "keywordEmpty"
+  | "keywordSpaces"
+  | "keywordTooLong"
+  | "keywordRepeated"
+  | "nameEmpty"
+  | "nameTooLong"
+  | "templateNotHttps"
+  | "templateNoTerm"
+  | "templateSpaces"
+  | "templateTooLong";
+
+export interface KeywordProblems {
+  keyword?: KeywordProblem;
+  name?: KeywordProblem;
+  template?: KeywordProblem;
+}
+
+const chars = (text: string) => [...text].length;
+// Any control character, as Rust's `char::is_control`.
+// eslint-disable-next-line no-control-regex
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
+
+/** Why Rust would refuse `draft` among `others` (the other keywords), field
+ * by field; empty when it would keep it. Mirrors `launcher_web::is_valid`. */
+export function keywordProblems(
+  draft: WebKeyword,
+  others: readonly WebKeyword[],
+): KeywordProblems {
+  const problems: KeywordProblems = {};
+  const word = draft.keyword;
+  if (chars(word) === 0) problems.keyword = "keywordEmpty";
+  else if (/\s/.test(word) || CONTROL.test(word))
+    problems.keyword = "keywordSpaces";
+  else if (chars(word) > MAX_KEYWORD) problems.keyword = "keywordTooLong";
+  else if (
+    others.some((other) => other.keyword.toLowerCase() === word.toLowerCase())
+  )
+    problems.keyword = "keywordRepeated";
+
+  if (draft.name.trim() === "" || CONTROL.test(draft.name))
+    problems.name = "nameEmpty";
+  else if (chars(draft.name) > MAX_KEYWORD_NAME) problems.name = "nameTooLong";
+
+  const template = draft.template;
+  const host = template.startsWith("https://")
+    ? (template.slice("https://".length).split(/[/?#]/)[0] ?? "")
+    : "";
+  if (host === "" || host.includes("%s"))
+    problems.template = "templateNotHttps";
+  else if (/\s/.test(template) || CONTROL.test(template))
+    problems.template = "templateSpaces";
+  else if (!template.includes("%s")) problems.template = "templateNoTerm";
+  else if (chars(template) > MAX_KEYWORD_TEMPLATE)
+    problems.template = "templateTooLong";
+  return problems;
 }
 
 /** Named icon sizes offered by the Settings panel; must match `SizePreset`
@@ -238,6 +318,8 @@ export type SettingsErrorCode =
   | "iconSizeOutOfRange"
   /** A value of the dock's look is outside its range. */
   | "lookOutOfRange"
+  /** A keyword of the launcher's web search is malformed or repeated. */
+  | "launcherKeywordsInvalid"
   | "unsupportedVersion"
   | "writeFailed"
   /** The settings can't be changed in this run (no config folder), or the
@@ -254,6 +336,7 @@ const ERROR_CODES: ReadonlySet<string> = new Set(
   Object.keys({
     iconSizeOutOfRange: true,
     lookOutOfRange: true,
+    launcherKeywordsInvalid: true,
     unsupportedVersion: true,
     writeFailed: true,
     notReady: true,

@@ -418,3 +418,57 @@
   opacity: 0.4;
   cursor: default;
 }
+
+/* The keywords of the launcher's web search (WebKeywordsField). */
+.web-keywords {
+  display: grid;
+  gap: 8px;
+}
+
+.web-keyword-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.web-keyword {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.web-keyword code {
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.web-keyword-default {
+  color: var(--ink-2);
+  font-weight: 400;
+}
+
+.web-keyword-template {
+  overflow-wrap: anywhere;
+}
+
+.web-keyword-actions,
+.web-keyword-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.web-keyword-form {
+  display: grid;
+  gap: 8px;
+}
+
+.field-error {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--danger);
+}
