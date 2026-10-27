@@ -1,0 +1,289 @@
+/* The pictures of the visual choices (spec 0014 R2, ChoiceThumbs.tsx). The
+   screen uses the same fixed wallpaper as the styles' miniatures (the named
+   exception of StyleGallery.css); the rest only tokens. The chosen card's
+   effect moves only for whoever has not asked for less motion. */
+.thumb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 66px;
+  overflow: hidden;
+  background: rgb(var(--surface-rgb));
+  border-bottom: 1px solid var(--hair);
+}
+
+/* A row of tiles: the dock reduced to three items. */
+.thumb-strip {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  padding: 6px 9px 8px;
+  border-radius: 10px;
+  background: var(--track);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+
+.thumb-slot {
+  display: grid;
+  place-items: end center;
+  transform-origin: 50% 100%;
+  transition: transform var(--t-magnify) var(--ease);
+}
+
+/* Ao passar o mouse: the middle item is under the pointer. */
+.thumb[data-hover="scale"] .thumb-slot[data-middle] {
+  transform: scale(1.18);
+}
+
+.thumb[data-hover="magnify"] .thumb-slot {
+  transform: scale(1.18);
+}
+
+.thumb[data-hover="magnify"] .thumb-slot[data-middle] {
+  transform: translateY(-2px) scale(1.45);
+}
+
+.thumb-pointer {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 8px;
+  height: 11px;
+  background: var(--ink);
+  clip-path: polygon(
+    0 0,
+    100% 62%,
+    52% 64%,
+    70% 100%,
+    52% 100%,
+    36% 70%,
+    0 92%
+  );
+  transform: translate(2px, 1px);
+}
+
+.thumb[data-hover="none"] .thumb-pointer {
+  opacity: 0.85;
+}
+
+/* The indicator under the first two items: dot or dash. */
+.thumb-mark {
+  position: absolute;
+  bottom: 3px;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--r-dot);
+  background: var(--accent);
+}
+
+.thumb-mark[data-shape="dash"] {
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.thumb-mark[data-at="0"] {
+  left: 18px;
+  transform: translateX(-50%);
+}
+
+.thumb-mark[data-at="1"] {
+  left: 43px;
+  transform: translateX(-50%);
+}
+
+.thumb-mark[data-at="2"] {
+  display: none;
+}
+
+/* Formato dos ícones: a round, a square and a wide icon, as programs ship
+   them. */
+.thumb-icon-slot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+}
+
+.thumb-icon {
+  display: block;
+  background: linear-gradient(180deg, var(--accent), var(--accent-ink));
+}
+
+.thumb-icon[data-form="round"] {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.thumb-icon[data-form="square"] {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+}
+
+.thumb-icon[data-form="wide"] {
+  width: 20px;
+  height: 11px;
+  border-radius: 2px;
+}
+
+/* Placas: each on the same pale plate. */
+.thumb[data-shape="plate"] .thumb-icon-slot {
+  border-radius: 23%;
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+
+.thumb[data-shape="plate"] .thumb-icon {
+  transform: scale(0.72);
+}
+
+/* Mesmo tamanho: every icon fills the same box. */
+.thumb[data-shape="uniform"] .thumb-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* The screen: wallpaper, the dock on its edge, the taskbar. */
+.thumb-screen {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
+  background: linear-gradient(165deg, #56688f 0%, #2e3a57 55%, #191f2e 100%);
+}
+
+.thumb-desktop {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 5px;
+}
+
+.thumb-screen[data-edge="top"] .thumb-desktop {
+  align-items: flex-start;
+}
+
+.thumb-dock {
+  display: flex;
+  gap: 4px;
+  padding: 3px 5px;
+  border-radius: 7px;
+  background: rgb(var(--surface-rgb) / 0.85);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+
+.thumb-dock .mini-tile.small {
+  width: 13px;
+  height: 13px;
+}
+
+.thumb-taskbar {
+  flex: none;
+  height: 8px;
+  background: rgb(20 22 28 / 0.92);
+  border-top: 1px solid rgb(255 255 255 / 0.12);
+}
+
+/* Automática: only a hairline of it, the rest comes on touching the edge. */
+.thumb-screen[data-taskbar="autohide"] .thumb-taskbar {
+  height: 2px;
+  opacity: 0.7;
+}
+
+.thumb-screen[data-taskbar="hidden"] .thumb-taskbar {
+  display: none;
+}
+
+.thumb[data-hover][data-chosen] .thumb-slot[data-middle] {
+  animation: thumb-hover 1.6s var(--ease) infinite alternate;
+}
+
+.thumb[data-hover="none"][data-chosen] .thumb-slot[data-middle] {
+  animation: none;
+}
+
+.thumb[data-open="bounce"][data-chosen] .thumb-slot[data-middle] {
+  animation: thumb-bounce 1.4s var(--ease) infinite;
+}
+
+.thumb[data-open="pulse"][data-chosen] .thumb-slot[data-middle] {
+  animation: thumb-pulse 1.4s ease-in-out infinite;
+}
+
+.thumb[data-open="shake"][data-chosen] .thumb-slot[data-middle] {
+  animation: thumb-shake 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thumb-slot {
+    transition: none;
+  }
+
+  .thumb[data-hover][data-chosen] .thumb-slot[data-middle] {
+    animation: none;
+  }
+
+  .thumb[data-open="bounce"][data-chosen] .thumb-slot[data-middle] {
+    animation: none;
+  }
+
+  .thumb[data-open="pulse"][data-chosen] .thumb-slot[data-middle] {
+    animation: none;
+  }
+
+  .thumb[data-open="shake"][data-chosen] .thumb-slot[data-middle] {
+    animation: none;
+  }
+}
+
+@keyframes thumb-hover {
+  from {
+    transform: none;
+  }
+}
+
+@keyframes thumb-bounce {
+  0%,
+  60%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translateY(-9px);
+  }
+  40% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes thumb-pulse {
+  0%,
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.7;
+  }
+}
+
+@keyframes thumb-shake {
+  0%,
+  50%,
+  100% {
+    transform: none;
+  }
+  10%,
+  30% {
+    transform: translateX(-2px) rotate(-6deg);
+  }
+  20%,
+  40% {
+    transform: translateX(2px) rotate(6deg);
+  }
+}
