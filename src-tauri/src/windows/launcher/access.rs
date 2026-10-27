@@ -22,17 +22,19 @@ use windows::Win32::UI::Accessibility::{
     IRawElementProviderFragment_Impl, IRawElementProviderFragmentRoot,
     IRawElementProviderFragmentRoot_Impl, IRawElementProviderSimple,
     IRawElementProviderSimple_Impl, ISelectionItemProvider, ISelectionItemProvider_Impl,
-    ISelectionProvider, ISelectionProvider_Impl, NavigateDirection, NavigateDirection_FirstChild,
-    NavigateDirection_LastChild, NavigateDirection_NextSibling, NavigateDirection_Parent,
-    NavigateDirection_PreviousSibling, NotificationKind_ActionCompleted,
-    NotificationProcessing_MostRecent, ProviderOptions, ProviderOptions_ServerSideProvider,
-    UIA_AutomationIdPropertyId, UIA_ControlTypePropertyId, UIA_InvokePatternId,
-    UIA_IsEnabledPropertyId, UIA_IsKeyboardFocusablePropertyId, UIA_ItemTypePropertyId,
+    ISelectionProvider, ISelectionProvider_Impl, IValueProvider, IValueProvider_Impl,
+    NavigateDirection, NavigateDirection_FirstChild, NavigateDirection_LastChild,
+    NavigateDirection_NextSibling, NavigateDirection_Parent, NavigateDirection_PreviousSibling,
+    NotificationKind_ActionCompleted, NotificationProcessing_MostRecent, ProviderOptions,
+    ProviderOptions_ServerSideProvider, UIA_AutomationIdPropertyId, UIA_ControlTypePropertyId,
+    UIA_EditControlTypeId, UIA_InvokePatternId, UIA_IsEnabledPropertyId,
+    UIA_IsKeyboardFocusablePropertyId, UIA_IsPasswordPropertyId, UIA_ItemTypePropertyId,
     UIA_ListControlTypeId, UIA_ListItemControlTypeId, UIA_NamePropertyId, UIA_PATTERN_ID,
     UIA_PROPERTY_ID, UIA_PositionInSetPropertyId, UIA_SelectionItem_ElementSelectedEventId,
     UIA_SelectionItemPatternId, UIA_SelectionPatternId, UIA_SizeOfSetPropertyId,
-    UiaAppendRuntimeId, UiaClientsAreListening, UiaHostProviderFromHwnd, UiaRaiseAutomationEvent,
-    UiaRaiseNotificationEvent, UiaRect, UiaReturnRawElementProvider, UiaRootObjectId,
+    UIA_ValuePatternId, UiaAppendRuntimeId, UiaClientsAreListening, UiaHostProviderFromHwnd,
+    UiaRaiseAutomationEvent, UiaRaiseNotificationEvent, UiaRect, UiaReturnRawElementProvider,
+    UiaRootObjectId,
 };
 use windows::core::{BSTR, Error, IUnknown, IUnknownImpl, Interface, Result, implement};
 
@@ -96,6 +98,72 @@ pub fn selected(hwnd: isize, key: &str, said: &str) {
         let _ = UiaRaiseAutomationEvent(&item, UIA_SelectionItem_ElementSelectedEventId);
     }
     announce(hwnd, said);
+}
+
+/// Answers `WM_GETOBJECT` for the search box: a text field named "Buscar
+/// apps", whose value is what is typed. Windows' own text field gave no name
+/// and no kind to UI Automation (it showed as an unnamed pane).
+pub fn get_field_object(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> Option<LRESULT> {
+    if lparam.0 as i32 != UiaRootObjectId {
+        return None;
+    }
+    let field: IRawElementProviderSimple = Field {
+        hwnd: hwnd.0 as isize,
+    }
+    .into();
+    Some(unsafe { UiaReturnRawElementProvider(hwnd, wparam, lparam, &field) })
+}
+
+#[implement(IRawElementProviderSimple, IValueProvider)]
+struct Field {
+    hwnd: isize,
+}
+
+impl IRawElementProviderSimple_Impl for Field_Impl {
+    fn ProviderOptions(&self) -> Result<ProviderOptions> {
+        Ok(ProviderOptions_ServerSideProvider)
+    }
+
+    fn GetPatternProvider(&self, pattern: UIA_PATTERN_ID) -> Result<IUnknown> {
+        if pattern == UIA_ValuePatternId {
+            self.to_interface::<IValueProvider>().cast()
+        } else {
+            none()
+        }
+    }
+
+    fn GetPropertyValue(&self, property: UIA_PROPERTY_ID) -> Result<VARIANT> {
+        Ok(match property {
+            UIA_ControlTypePropertyId => VARIANT::from(UIA_EditControlTypeId.0),
+            UIA_NamePropertyId => {
+                VARIANT::from(BSTR::from(crate::i18n::messages().launcher.placeholder))
+            }
+            UIA_AutomationIdPropertyId => VARIANT::from(BSTR::from("search")),
+            UIA_IsKeyboardFocusablePropertyId => VARIANT::from(true),
+            UIA_IsPasswordPropertyId => VARIANT::from(false),
+            _ => VARIANT::default(),
+        })
+    }
+
+    fn HostRawElementProvider(&self) -> Result<IRawElementProviderSimple> {
+        unsafe { UiaHostProviderFromHwnd(HWND(self.hwnd as _)) }
+    }
+}
+
+impl IValueProvider_Impl for Field_Impl {
+    fn SetValue(&self, value: &windows::core::PCWSTR) -> Result<()> {
+        let text = unsafe { value.to_string() }.unwrap_or_default();
+        super::post(move |launcher| launcher.set_query(&text));
+        Ok(())
+    }
+
+    fn Value(&self) -> Result<BSTR> {
+        Ok(BSTR::from(super::read_text(HWND(self.hwnd as _)).as_str()))
+    }
+
+    fn IsReadOnly(&self) -> Result<windows::core::BOOL> {
+        Ok(false.into())
+    }
 }
 
 /// Says `text` (how many results there are, the selected one), the newest

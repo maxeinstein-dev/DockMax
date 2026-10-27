@@ -296,7 +296,6 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
             size_of_val(&corners) as u32,
         );
     }
-    name_field(edit);
     FRAME.store(frame.0 as isize, Ordering::SeqCst);
     let launcher = Launcher {
         app: app.clone(),
@@ -328,33 +327,6 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
 }
 
 type WindowProcedure = unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT;
-
-/// Gives the text field its name for assistive technology ("Buscar apps"):
-/// a Windows text field takes its name from a label next to it, and there
-/// is none, so the name is set on the field itself.
-fn name_field(edit: HWND) {
-    use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
-    use windows::Win32::UI::Accessibility::{
-        CAccPropServices, IAccPropServices, Name_Property_GUID,
-    };
-    use windows::Win32::UI::WindowsAndMessaging::{CHILDID_SELF, OBJID_CLIENT};
-    let name = HSTRING::from(crate::i18n::messages().launcher.placeholder);
-    let named = unsafe {
-        CoCreateInstance::<_, IAccPropServices>(&CAccPropServices, None, CLSCTX_INPROC_SERVER)
-            .and_then(|services| {
-                services.SetHwndPropStr(
-                    edit,
-                    OBJID_CLIENT.0 as u32,
-                    CHILDID_SELF,
-                    Name_Property_GUID,
-                    &name,
-                )
-            })
-    };
-    if let Err(error) = named {
-        log::warn!("launcher: the search box could not be named: {error}");
-    }
-}
 
 /// Takes Alt+Space (`on`) or lets it go, from any thread: the hotkey
 /// belongs to the launcher's window, on the main thread.
@@ -678,6 +650,10 @@ impl Launcher {
             );
             let _ = InvalidateRect(Some(self.frame), None, true);
         }
+        // The list's `WM_SIZE` came while the launcher was busy here.
+        if let Some(painter) = &mut self.painter {
+            painter.resize();
+        }
     }
 
     fn list_height(&self) -> f64 {
@@ -789,6 +765,17 @@ impl Launcher {
             (true, false) => Note::NothingFound,
         };
         self.selected = 0;
+    }
+
+    /// Puts `text` in the search box, as typing it would (UI Automation's
+    /// `SetValue`, the e2e build).
+    fn set_query(&mut self, text: &str) {
+        let wide = HSTRING::from(text);
+        unsafe {
+            let _ = SetWindowTextW(self.edit, &wide);
+        }
+        // The field's change notice came while the launcher was busy here.
+        self.text_changed();
     }
 
     /// The text changed: new results, the list resized and painted.
@@ -1287,6 +1274,11 @@ unsafe extern "system" fn edit_procedure(
         WM_SYSCHAR if (u32::from(b'1')..=u32::from(b'9')).contains(&(wparam.0 as u32)) => {
             return LRESULT(0);
         }
+        WM_GETOBJECT => {
+            if let Some(result) = access::get_field_object(hwnd, wparam, lparam) {
+                return result;
+            }
+        }
         _ => {}
     }
     unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
@@ -1333,14 +1325,7 @@ pub fn view() -> Option<View> {
 /// build only).
 #[cfg(feature = "e2e")]
 pub fn type_text(text: String) {
-    post(move |launcher| {
-        let wide = HSTRING::from(text.as_str());
-        unsafe {
-            let _ = SetWindowTextW(launcher.edit, &wide);
-        }
-        // The field's change notice came while the launcher was busy here.
-        launcher.text_changed();
-    });
+    post(move |launcher| launcher.set_query(&text));
 }
 
 /// Presses a key of the box (`up`, `down`, `escape`), as the keyboard would
