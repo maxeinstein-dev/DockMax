@@ -101,6 +101,40 @@ pub const TIP_HEIGHT: f64 = 24.0;
 /// Width of the clock and date at the end of the bar.
 pub const STATUS_WIDTH: f64 = 76.0;
 
+/// Width of the column of workspace dots at the start of the bar (spec
+/// 0013), in logical pixels.
+pub const SWITCHER_WIDTH: f64 = 12.0;
+
+/// Radius of a workspace dot, and of the one shown.
+pub const DOT_RADIUS: f64 = 3.0;
+pub const ACTIVE_DOT_RADIUS: f64 = 4.0;
+
+/// The centres of `count` workspace dots in the column `area`, top first:
+/// spread over its height, at most 12 px apart.
+pub fn switcher_dots(area: Area, count: usize) -> Vec<(f64, f64)> {
+    if count == 0 {
+        return Vec::new();
+    }
+    let pitch = (area.height / count as f64).min(12.0);
+    let first = area.y + area.height / 2.0 - pitch * (count as f64 - 1.0) / 2.0;
+    (0..count)
+        .map(|index| (area.center_x(), first + pitch * index as f64))
+        .collect()
+}
+
+/// The dot of the column `area` under the point, by its row: the one whose
+/// centre is nearest across, within the column.
+pub fn switcher_hit(area: Area, count: usize, x: f64, y: f64) -> Option<usize> {
+    if !area.contains(x, y) {
+        return None;
+    }
+    switcher_dots(area, count)
+        .iter()
+        .enumerate()
+        .min_by(|(_, a), (_, b)| (a.1 - y).abs().total_cmp(&(b.1 - y).abs()))
+        .map(|(index, _)| index)
+}
+
 /// The side of a small icon's cell in the tray strip (two rows in the
 /// height of an item), at most `MAX_TRAY_CELL`.
 pub fn tray_cell(icon: f64) -> f64 {
@@ -221,6 +255,9 @@ pub struct Shape {
     /// The small icons at the end (the tray's arrow, the battery, the
     /// network, the volume, the tray icons kept in the dock): 0 for none.
     pub tray: usize,
+    /// The workspaces (spec 0013): with two or more, a column of dots starts
+    /// the bar.
+    pub switcher: usize,
 }
 
 /// One item along the bar: its left edge from the bar's outer left edge,
@@ -240,6 +277,7 @@ struct Row {
     width: f64,
     items: Vec<RowItem>,
     separators: Vec<f64>,
+    switcher: Option<f64>,
     tray: Option<f64>,
     status: Option<f64>,
 }
@@ -249,6 +287,14 @@ fn row(shape: &Shape, growth: &dyn Fn(usize) -> Magnification) -> Row {
     let mut items = Vec::new();
     let mut separators = Vec::new();
     let mut x = pad;
+    // [switcher][gap][separator][gap][items]: the dots, then the items.
+    let switcher = (shape.switcher >= 2).then(|| {
+        let at = x;
+        x += SWITCHER_WIDTH + gap;
+        separators.push(x + gap * 0.4);
+        x += separator_width(gap) + gap;
+        at
+    });
     for &count in shape.groups.iter().filter(|&&count| count > 0) {
         if !items.is_empty() {
             separators.push(x + gap * 0.4);
@@ -283,7 +329,7 @@ fn row(shape: &Shape, growth: &dyn Fn(usize) -> Magnification) -> Row {
             x += STATUS_WIDTH + gap;
         }
     }
-    let width = if items.is_empty() && !shape.status && shape.tray == 0 {
+    let width = if items.is_empty() && !shape.status && shape.tray == 0 && switcher.is_none() {
         2.0 * pad
     } else {
         x - gap + pad
@@ -292,6 +338,7 @@ fn row(shape: &Shape, growth: &dyn Fn(usize) -> Magnification) -> Row {
         width,
         items,
         separators,
+        switcher,
         tray,
         status,
     }
@@ -347,6 +394,8 @@ pub struct Placement {
     pub scales: Vec<f64>,
     /// The x of each separator's line.
     pub separators: Vec<f64>,
+    /// The column of workspace dots, when it starts the bar.
+    pub switcher: Option<Area>,
     /// The strip of small icons, when there is one.
     pub tray: Option<Area>,
     /// The clock's box, when it ends the bar.
@@ -405,6 +454,12 @@ pub fn place_with(
             .map(|item| item.magnification.scale)
             .collect(),
         separators: row.separators.iter().map(|x| bar.x + x).collect(),
+        switcher: row.switcher.map(|x| Area {
+            x: bar.x + x,
+            y: top,
+            width: SWITCHER_WIDTH,
+            height: icon,
+        }),
         tray: row.tray.map(|x| Area {
             x: bar.x + x,
             y: top,
@@ -532,6 +587,7 @@ mod tests {
             },
             status: false,
             tray: 0,
+            switcher: 0,
         }
     }
 

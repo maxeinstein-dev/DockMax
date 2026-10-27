@@ -102,6 +102,15 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // another program, and forgetting what it opened.
             "allow-launcher-status",
             "allow-clear-launcher-history",
+            // The workspaces (spec 0013): Configurações reads them and makes,
+            // renames, recolors, moves and deletes them. Their programs and
+            // widgets go through the apps and widgets commands above.
+            "allow-list-workspaces",
+            "allow-create-workspace",
+            "allow-rename-workspace",
+            "allow-recolor-workspace",
+            "allow-move-workspace",
+            "allow-delete-workspace",
             "log:allow-log",
         ],
     ),

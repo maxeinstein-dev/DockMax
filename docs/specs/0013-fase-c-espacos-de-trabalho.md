@@ -27,46 +27,56 @@ Um espaço de trabalho tem um **nome**, uma **cor** (uma paleta fixa, a mesma da
 
 Cada recorte é um PR, com o plano e a verificação no app real, e mede a memória (o dock nativo não deve crescer de forma visível com espaços).
 
-## 3. C1 em detalhe
+## 3. C1 em detalhe (feito)
 
-### 3.1 Dados (migração 3)
+### 3.1 Dados (migração 4)
+
+A migração 3 ficou com o lançador (spec 0012); os espaços são a 4 (`src-tauri/migrations/0004_workspaces.sql`).
 
 ```sql
 CREATE TABLE workspaces (
-  id TEXT PRIMARY KEY NOT NULL,     -- UUID v7
+  id TEXT PRIMARY KEY NOT NULL,      -- UUID v7
   name TEXT NOT NULL,
-  color TEXT NOT NULL,              -- uma cor da paleta, #RRGGBB
-  position INTEGER NOT NULL,        -- ordem das bolinhas e do atalho
+  color TEXT NOT NULL,               -- uma cor da paleta, #RRGGBB
+  position INTEGER NOT NULL,         -- ordem das bolinhas e do atalho
   created_at INTEGER NOT NULL
 ) STRICT;
 
 CREATE TABLE workspace_items (
   workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL,               -- 'app' (pinned_apps.id) ou 'widget' (widget_instances.id)
-  item_id TEXT NOT NULL,
-  position INTEGER NOT NULL,        -- ordem no dock, apps e widgets misturados
-  PRIMARY KEY (workspace_id, kind, item_id)
+  item_key TEXT NOT NULL,            -- `app:<pinned_apps.id>` ou `widget:<widget_instances.id>`
+  position INTEGER NOT NULL,         -- ordem no dock, apps e widgets misturados
+  PRIMARY KEY (workspace_id, item_key)
 ) STRICT;
 ```
 
-- A migração cria o espaço **"Principal"** (cor azul) com todos os programas fixados e widgets de hoje, na ordem de `meta.dock_order`, que deixa de ser usada.
-- `pinned_apps` continua com uma linha por programa (`app_id` segue único); o que se repete é o item em cada espaço. Desafixar de um espaço remove o item; a linha em `pinned_apps` some quando nenhum espaço a usa mais. O mesmo vale para os widgets.
-- O espaço ativo de cada monitor fica em `meta` (`workspace:<nome do monitor>`, como `\\.\DISPLAY1`); um monitor novo começa no primeiro espaço.
-- Excluir um espaço: não pode excluir o último; os itens dele saem (os programas e widgets que nenhum outro espaço usa são removidos, com confirmação que diz quantos); os monitores nele passam para o primeiro espaço.
+- **O primeiro espaço** ("Principal", azul) é criado pelo Rust na primeira leitura depois da migração, com os programas e widgets que existem, na ordem que o dock mostrava (`meta.dock_order`, que deixa de ser usado). Fazer isso em SQL puro exigiria refazer a regra de mistura do dock.
+- **As chaves** são as que o dock já usava para a ordem. `pinned_apps` e `widget_instances` continuam sendo o catálogo: uma linha por programa e por widget. O que se repete é o item em cada espaço. Tirar um item de um espaço o remove só dali, e ele sai do catálogo (um widget com o texto da nota) quando nenhum espaço o tem mais.
+- **Cada monitor** guarda o seu espaço em `meta` (`workspace:<nome do monitor>`); um monitor sem espaço guardado mostra o primeiro.
+- **O espaço em uso** (`meta`, `workspace:in-use`) é o do dock usado por último: qualquer clique num dock o marca. É para onde vai o que nasce no dock sem dizer o espaço: um programa solto no dock (vai para o espaço daquele monitor), "Fixar no dock" e "Remover do dock" nos menus de um programa.
+- **Excluir um espaço:** nunca o último. Os programas e widgets que só ele tinha saem para sempre, com uma confirmação que avisa disso. Os monitores que o mostravam passam para o primeiro.
+- **Paleta:** oito cores fixas (as três do PrimoDock mais roxo, rosa, vermelho, amarelo e cinza). Até nove espaços.
 
-### 3.2 Troca
+### 3.2 Troca no dock
 
-- **Bolinhas** no começo do dock (antes dos programas), uma por espaço, na cor dele; a do ativo é maior e cheia, as outras vazadas. Só com dois ou mais espaços. Clique troca; o nome aparece como rótulo ao passar o mouse; a UI Automation as apresenta como botões ("Espaço Trabalho, ativo").
-- **Roda do mouse** sobre o dock: próximo ou anterior, sem dar a volta.
-- **`Ctrl+Alt+1…9`** (`RegisterHotKey`): vai ao espaço daquela posição **no monitor onde está o ponteiro**. Se o Windows recusar um atalho (outro programa já o tem), o DockMax segue sem ele e registra no log.
-- **Menu do dock** (botão direito no espaço vazio): seção "Espaços" com cada espaço, a marca no ativo e o atalho à direita.
-- A troca anima os itens: os que saem e os que entram deslizam como no arrasto (spec 0011, `slide`).
+- **Bolinhas** no começo do dock, numa coluna, uma por espaço e na cor dele: a do espaço mostrado é cheia e maior, as outras são só o contorno. Aparecem com dois ou mais espaços. O clique troca; o nome aparece ao passar o mouse.
+- **Roda do mouse** sobre o dock: o próximo para baixo, o anterior para cima, sem dar a volta.
+- **`Ctrl+Alt+1…9`** (`RegisterHotKey`): vai ao espaço daquela posição no monitor onde está o ponteiro. Os atalhos só são registrados com dois ou mais espaços, e só os que existem: no teclado ABNT2, AltGr+1, 2 e 3 (¹ ² ³) chegam ao Windows como Ctrl+Alt e seriam tomados. Se outro programa já tiver um atalho, o DockMax segue sem ele e registra no log.
+- **Menu do dock:** os espaços (com dois ou mais), cada um com o seu atalho e a marca no mostrado, e **"Novo espaço"**, que cria e mostra um espaço vazio naquele monitor.
 
 ### 3.3 Configurações
 
-Uma seção nova, **"Espaços de trabalho"**: a lista dos espaços (bolinha, nome, quantos apps e widgets), com renomear, mudar a cor, subir e descer, excluir, e "+ Novo espaço" (nasce vazio, com a próxima cor da paleta). Uma frase explica: "Cada espaço tem o seu dock e guarda as suas janelas. Troque pelas bolinhas, pela roda do mouse sobre o dock ou com Ctrl+Alt+número."
+**Decisão do autor (2026-10-27):** como no PrimoDock, Configurações edita qualquer espaço, sem depender do que está na tela nem do espaço em uso ("posso estar usando o pessoal e querer alterar um app do de trabalho").
 
-Os itens de cada espaço se arrumam no próprio dock (fixar, arrastar, desafixar), com o espaço ativo.
+- **Seção "Espaços de trabalho":** os espaços como fichas (bolinha, nome, `Ctrl+Alt+N`) e "+ Novo espaço". A ficha escolhida abre o cartão do espaço: nome, cor, quantos apps e widgets, "Editar apps", "Editar widgets", subir, descer e excluir (com confirmação).
+- **"Apps do dock" e "Itens do dock"** mostram e editam o espaço escolhido, com as fichas no topo para trocar (só com dois ou mais). Os comandos de apps e widgets recebem o espaço (`workspace`); sem ele, vale o espaço em uso.
+- **Comandos novos**, só para a janela de Configurações: `list_workspaces`, `create_workspace`, `rename_workspace`, `recolor_workspace`, `move_workspace` e `delete_workspace`, com o evento `workspaces-changed`.
+
+### 3.4 Ficou para depois
+
+- As bolinhas na UI Automation (o leitor de tela ainda não as encontra).
+- A troca animada: hoje os itens do outro espaço aparecem sem deslizar.
+- A aparência da seção, que entra no rebranding de Configurações e dos menus (roadmap).
 
 ## 4. C2 em detalhe: janelas por espaço
 
@@ -82,13 +92,20 @@ Pilhas de widgets e espaçadores (do PrimoDock), a prévia do dock sobre o papel
 
 ## 6. Perguntas em aberto para o autor
 
-1. Uma janela arrastada para o outro monitor deve passar para o espaço ativo de lá (proposta) ou continuar no espaço de origem?
-2. Clicar num programa fixado cujas janelas estão todas **em outro espaço**: abrir uma nova janela no espaço atual (proposta, como se não estivesse aberto) ou trocar para o espaço onde ele está?
-3. A paleta de cores: as 3 do PrimoDock (azul `#0A84FF`, laranja `#FF9F0A`, verde `#30D158`) mais umas 5 (proposta: roxo, rosa, vermelho, amarelo, cinza), ou uma cor livre?
+O autor pediu para seguir sem responder (2026-10-27); valem as propostas até ele decidir:
+
+1. Uma janela arrastada para o outro monitor passa para o espaço ativo de lá (proposta) ou continua no espaço de origem? (C2)
+2. Clicar num programa fixado cujas janelas estão todas **em outro espaço** abre uma nova janela no espaço atual (proposta) ou troca para o espaço onde ele está? (C2)
+3. ~~A paleta de cores~~: oito fixas, a proposta (C1).
 
 ## 7. Verificação
 
-- **Testes:** a migração 3 sobre um banco real de versão 2 (os itens e a ordem iguais no "Principal"), fixar e desafixar por espaço, excluir espaço, o estado de cada monitor, a regra de dono das janelas e a lista de estacionadas (a pura, com janelas de mentira).
+- **Verificado (C1, 2026-10-27):**
+  - testes do repositório (criar, renomear, recolorir, mover, excluir, itens em dois espaços, ordem do arrasto, espaço por monitor e em uso) e dos comandos;
+  - a tela de Configurações (fichas, renomear, cor, excluir, o espaço passado aos comandos);
+  - no app real (release), sem mexer no ponteiro: a migração sobre os dados do autor criou o "Principal" com o que o dock tinha; com um segundo espaço vazio ativo no monitor principal, o dock mostrou as bolinhas e nenhum item; a roda do mouse voltou ao "Principal", e o item voltou. Dados e barra restaurados.
+- **Não verificado (C1):** o clique nas bolinhas, `Ctrl+Alt+número` e o menu com o mouse e o teclado de verdade; a seção de Configurações com o mouse; dois monitores em espaços diferentes ao mesmo tempo (o segundo estava em tela cheia).
+- **Testes (C1 e C2):** a migração sobre um banco real (os itens e a ordem iguais no "Principal"), fixar e desafixar por espaço, excluir espaço, o estado de cada monitor, a regra de dono das janelas e a lista de estacionadas (a pura, com janelas de mentira).
 - **App real:**
   - criar três espaços e trocar pelas quatro formas;
   - dois monitores em espaços diferentes;

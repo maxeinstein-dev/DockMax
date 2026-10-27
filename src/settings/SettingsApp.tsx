@@ -4,12 +4,15 @@ import { useApps } from "../core/apps";
 import { errorKind, log } from "../core/log";
 import { useSettings } from "../core/settings";
 import { useWidgets } from "../core/widgets";
+import { useWorkspaces } from "../core/workspaces";
 import { useT } from "../i18n";
 import AboutPanel from "../panel/AboutPanel";
 import AppsPanel from "../panel/AppsPanel";
 import DockItems from "../panel/DockItems";
 import LookPanel from "../panel/LookPanel";
 import SettingsPanel from "../panel/SettingsPanel";
+import WorkspacePicker from "../panel/WorkspacePicker";
+import WorkspacesPanel from "../panel/WorkspacesPanel";
 import { SECTIONS, type Section } from "./sections";
 import "./SettingsApp.css";
 
@@ -34,7 +37,17 @@ function SettingsApp() {
   const settings = useSettings();
   const widgets = useWidgets();
   const apps = useApps();
+  const spaces = useWorkspaces();
   const [section, setSection] = useState<Section>("general");
+  /** The workspace being edited (spec 0013): chosen here, whichever the
+   * docks show; at first the one in use. */
+  const [chosen, setChosen] = useState<string | null>(null);
+  const all = spaces?.workspaces ?? [];
+  const editing =
+    all.find((each) => each.id === chosen) ??
+    all.find((each) => each.id === spaces?.inUse) ??
+    all[0] ??
+    null;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -78,9 +91,36 @@ function SettingsApp() {
               />
             </>
           ) : null}
+          {section === "workspaces" ? (
+            <WorkspacesPanel
+              snapshot={spaces}
+              selected={editing}
+              onSelect={setChosen}
+              onEditApps={() => setSection("apps")}
+              onEditItems={() => setSection("items")}
+            />
+          ) : null}
           {section === "look" ? <LookPanel settings={settings} /> : null}
-          {section === "apps" ? <AppsPanel snapshot={apps} /> : null}
-          {section === "items" ? <DockItems snapshot={widgets} /> : null}
+          {section === "apps" ? (
+            <>
+              <WorkspacePicker
+                workspaces={all}
+                selected={editing}
+                onSelect={setChosen}
+              />
+              <AppsPanel snapshot={apps} workspace={editing} />
+            </>
+          ) : null}
+          {section === "items" ? (
+            <>
+              <WorkspacePicker
+                workspaces={all}
+                selected={editing}
+                onSelect={setChosen}
+              />
+              <DockItems snapshot={widgets} workspace={editing} />
+            </>
+          ) : null}
           {section === "about" ? (
             <>
               <h1 id="panel-title">{t.panel.titles.about}</h1>

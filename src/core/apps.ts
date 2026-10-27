@@ -153,22 +153,37 @@ export function listCatalog(): Promise<CatalogEntry[]> {
   );
 }
 
-/** Pins a program of the catalog at the end of the dock. */
-export function pinApp(appId: string): Promise<PinnedApp> {
-  return run(APP_COMMANDS.pin, { appId }, (error) =>
+/** `{ workspace }` when one is named: without it, Rust takes the workspace
+ * in use (spec 0013). */
+function inSpace(workspace: string | undefined): { workspace?: string } {
+  return workspace === undefined ? {} : { workspace };
+}
+
+/** Pins a program of the catalog at the end of the workspace `workspace`
+ * (or the one in use). */
+export function pinApp(appId: string, workspace?: string): Promise<PinnedApp> {
+  return run(APP_COMMANDS.pin, { appId, ...inSpace(workspace) }, (error) =>
     log.warn(`apps: pin failed: ${errorKind(error)}`),
   );
 }
 
-export function unpinApp(id: WidgetId): Promise<void> {
-  return run(APP_COMMANDS.unpin, { id }, (error) =>
+/** Takes a program out of the workspace; with no other one showing it, it
+ * is unpinned for good. */
+export function unpinApp(id: WidgetId, workspace?: string): Promise<void> {
+  return run(APP_COMMANDS.unpin, { id, ...inSpace(workspace) }, (error) =>
     log.warn(`apps: unpin failed: ${errorKind(error)}`),
   );
 }
 
-export function moveApp(id: WidgetId, direction: MoveDirection): Promise<void> {
-  return run(APP_COMMANDS.move, { id, direction }, (error) =>
-    log.warn(`apps: move failed: ${errorKind(error)}`),
+export function moveApp(
+  id: WidgetId,
+  direction: MoveDirection,
+  workspace?: string,
+): Promise<void> {
+  return run(
+    APP_COMMANDS.move,
+    { id, direction, ...inSpace(workspace) },
+    (error) => log.warn(`apps: move failed: ${errorKind(error)}`),
   );
 }
 

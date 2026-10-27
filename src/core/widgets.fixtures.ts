@@ -42,15 +42,22 @@ const NOTE_DEFAULT = {
   config: {},
 } satisfies WidgetInstance<"note">;
 
+/** A workspace (spec 0013) the commands that take one may name. */
+const WORKSPACE_ID = "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6079";
+
 /** One example of the arguments of each widget command, with every key.
  * The keys are what `invoke` sends: `satisfies` makes a key too many a type
  * error, and `Required<>` a key left out (even an optional one), so the
  * argument names below are those of the `*Args` types. */
 export const COMMAND_ARGS_SAMPLES = {
   list_widgets: {},
-  add_widget: { kind: "clock" },
-  remove_widget: { id: CLOCK_DEFAULT.id },
-  move_widget: { id: CLOCK_DEFAULT.id, direction: "up" },
+  add_widget: { kind: "clock", workspace: WORKSPACE_ID },
+  remove_widget: { id: CLOCK_DEFAULT.id, workspace: WORKSPACE_ID },
+  move_widget: {
+    id: CLOCK_DEFAULT.id,
+    direction: "up",
+    workspace: WORKSPACE_ID,
+  },
   update_widget: {
     id: NOTE_DEFAULT.id,
     label: null,

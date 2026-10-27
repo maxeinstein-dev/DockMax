@@ -94,8 +94,10 @@ pub struct Sources<'a> {
     pub open: &'a OpenSnapshot,
     /// Whether the open programs that are not pinned show (a setting).
     pub show_open: bool,
-    /// How the programs and the widgets mix: keys in dock order.
-    pub order: &'a [String],
+    /// The keys of the workspace the dock shows (spec 0013), in its order:
+    /// only those programs and widgets show. `None` when the workspaces
+    /// can't be read: then every program, then every widget.
+    pub workspace: Option<&'a [String]>,
 }
 
 impl Sources<'_> {
@@ -151,7 +153,10 @@ pub fn items(sources: Sources<'_>) -> Items {
     if sources.attention() {
         systems.push(Item::System(SystemItem::Settings));
     }
-    let mixed = interleave(sources.order, apps, widgets);
+    let mixed = match sources.workspace {
+        Some(keys) => in_workspace(keys, apps, widgets),
+        None => apps.into_iter().chain(widgets).collect(),
+    };
     let groups = [mixed.len(), others.len(), systems.len()]
         .into_iter()
         .filter(|&size| size > 0)
@@ -160,29 +165,16 @@ pub fn items(sources: Sources<'_>) -> Items {
     Items { items, groups }
 }
 
-/// The programs and the widgets mixed: `order` says, by its keys of each
-/// kind, where the next program and where the next widget go; each kind
-/// comes in its own order. Those `order` doesn't know (new) go at the end,
-/// the programs first.
-pub fn interleave(order: &[String], apps: Vec<Item>, widgets: Vec<Item>) -> Vec<Item> {
-    let app_keys: std::collections::HashSet<String> = apps.iter().map(Item::key).collect();
-    let widget_keys: std::collections::HashSet<String> = widgets.iter().map(Item::key).collect();
-    let mut apps = apps.into_iter();
-    let mut widgets = widgets.into_iter();
-    let mut mixed = Vec::new();
-    for key in order {
-        let next = if app_keys.contains(key) {
-            apps.next()
-        } else if widget_keys.contains(key) {
-            widgets.next()
-        } else {
-            None
-        };
-        mixed.extend(next);
-    }
-    mixed.extend(apps);
-    mixed.extend(widgets);
-    mixed
+/// The programs and the widgets of a workspace, in its order: `keys` names
+/// them; a key whose program or widget is gone is skipped.
+pub fn in_workspace(keys: &[String], apps: Vec<Item>, widgets: Vec<Item>) -> Vec<Item> {
+    let mut all: Vec<Item> = apps.into_iter().chain(widgets).collect();
+    keys.iter()
+        .filter_map(|key| {
+            let index = all.iter().position(|item| item.key() == *key)?;
+            Some(all.remove(index))
+        })
+        .collect()
 }
 
 /// The dock's order after the item `from` (an index of `items`) is let go at
@@ -279,7 +271,7 @@ mod tests {
             apps,
             open,
             show_open: true,
-            order: &[],
+            workspace: None,
         }
     }
 
@@ -315,7 +307,7 @@ mod tests {
     }
 
     #[test]
-    fn programs_and_widgets_mix_as_the_order_says_each_kind_in_its_own_order() {
+    fn a_workspace_shows_its_items_in_its_order() {
         let keys = |items: &[Item]| -> Vec<String> { items.iter().map(Item::key).collect() };
         let apps = vec![Item::App(app(1, "A")), Item::App(app(2, "B"))];
         let widgets = vec![
@@ -325,30 +317,14 @@ mod tests {
         let (a1, a2) = (apps[0].key(), apps[1].key());
         let (w1, w2) = (widgets[0].key(), widgets[1].key());
 
-        // Widget, program, widget, program.
-        let order = vec![w1.clone(), a1.clone(), w2.clone(), a2.clone()];
-        let mixed = interleave(&order, apps.clone(), widgets.clone());
-        assert_eq!(
-            keys(&mixed),
-            [w1.clone(), a1.clone(), w2.clone(), a2.clone()]
-        );
+        // Widget, program, widget; the other program is not in it.
+        let order = vec![w2.clone(), a2.clone(), w1.clone()];
+        let shown = in_workspace(&order, apps.clone(), widgets.clone());
+        assert_eq!(keys(&shown), [w2.clone(), a2.clone(), w1.clone()]);
 
-        // Configurações swapped the programs: their places stay, they swap.
-        let swapped = vec![apps[1].clone(), apps[0].clone()];
-        let mixed = interleave(&order, swapped, widgets.clone());
-        assert_eq!(
-            keys(&mixed),
-            [w1.clone(), a2.clone(), w2.clone(), a1.clone()]
-        );
-
-        // Unknown keys are skipped; the new go at the end, programs first.
-        let order = vec!["app:gone".to_string(), w2.clone()];
-        let mixed = interleave(&order, apps.clone(), widgets.clone());
-        assert_eq!(
-            keys(&mixed),
-            [w1.clone(), a1.clone(), a2.clone(), w2.clone()]
-        );
-        assert_eq!(keys(&interleave(&[], apps, widgets)), [a1, a2, w1, w2]);
+        // A key whose item is gone is skipped.
+        let order = vec!["app:gone".to_string(), a1.clone()];
+        assert_eq!(keys(&in_workspace(&order, apps, widgets)), [a1]);
     }
 
     #[test]

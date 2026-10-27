@@ -25,7 +25,7 @@ Ordem decidida pelo autor em 2026-10-26, depois da fase D: **C → E → F → G
 | **A. Visual** | Concluída: nove estilos, efeito ao passar o mouse, indicador, posições ([spec 0005](specs/0005-fase-a-visual.md)). |
 | **B. Itens e ícones** | Concluída no escopo do MVP ([spec 0006](specs/0006-fase-b-apps.md), [spec 0007](specs/0007-fase-b4-icones.md)); a personalização de ícones (B4b, B4c) fica para o futuro. |
 | **D. Windows** | **Concluída em 2026-10-26**: barra de aplicativos e barra do Windows oculta (ADR 0009), apps abertos, ativar e minimizar, menus ([spec 0009](specs/0009-fase-d-janelas.md)), tela cheia e um dock por monitor ([spec 0010](specs/0010-fase-d4-monitores-e-tela-cheia.md)), dock nativo ([spec 0011](specs/0011-arquitetura-hibrida.md)) e ocultar automaticamente. Falta a [rodada de verificações](roteiro-de-verificacao.md). |
-| **C. Espaços de trabalho** | **Próxima.** |
+| **C. Espaços de trabalho** | **Em andamento** ([spec 0013](specs/0013-fase-c-espacos-de-trabalho.md)): C1 (espaços, troca no dock e edição em Configurações) feito; faltam C2 (janelas por espaço) e C3. |
 | **E. Prévias e bandeja** | A bandeja já está pronta (painel da seta, ícones no dock, menus no lugar); faltam as prévias das janelas. |
 | **F. Widgets** | Depois da E. |
 | **G. Extras** | Depois da F. |
@@ -226,6 +226,10 @@ Não verificado: máquina limpa ou virtual, Windows 10, atualização por cima d
 - [ ] Conta-gotas de cores
 - [ ] Beber água
 - [ ] Uso do Claude: depende de dados que a conta pode não expor
+
+### Rebranding de Configurações e menus
+
+- [ ] Configurações, os menus do dock e da bandeja e o resto das telas de apoio estão "muito simples" (autor, 2026-10-27). Referências: o acabamento do PrimoDock ([interface](reference/primodock/interface.md): abas com ícones coloridos em placa, menus com ícones e destaque), o tema WhiteSur GTK e o dock do ZorinOS. Precisa de spec própria.
 
 ### Personalização do dock
 - [ ] Cor de destaque escolhida pelo usuário (o token `--accent` já existe)
