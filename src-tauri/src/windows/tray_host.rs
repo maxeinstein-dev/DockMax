@@ -328,6 +328,12 @@ fn real_tray() -> Option<HWND> {
     found
 }
 
+/// The Windows taskbar's own window (an `HWND` as a number), not the host's:
+/// a new one means Explorer started again.
+pub fn explorer_taskbar() -> Option<isize> {
+    real_tray().map(|hwnd| hwnd.0 as isize)
+}
+
 /// Passes `msg` on to the taskbar's window and returns its answer; `fallback`
 /// when there is none (Explorer is restarting) or it does not answer.
 fn forward(msg: u32, wparam: WPARAM, lparam: LPARAM, fallback: isize) -> LRESULT {

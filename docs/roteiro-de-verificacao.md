@@ -24,7 +24,7 @@ O autor rodou os blocos 1 a 4 com o build do main depois do #29.
 - **Não se repetiu ao testar de novo:** o programa fixado duplicado e o dock voltando por cima da tela cheia no principal. Se voltarem, a sonda `spike_open_and_full_screen` (em `windows/open_apps.rs`) mostra o estado da máquina.
 - **Falhou:**
   - Um programa fixado, quando aberto, aparece duas vezes: no grupo dos fixados e no dos abertos.
-  - O ícone do próprio DockMax não aparece na bandeja.
+  - O ícone do próprio DockMax não aparece na bandeja. Causa: o `TaskbarCreated` que a bandeja hospedada reenvia fazia o DockMax pedir as faixas de novo, o que abaixa a bandeja hospedada por um instante, bem quando o ícone do DockMax era recriado: ele ia para o Explorer oculto. **Corrigido** (as faixas só são pedidas de novo quando o Explorer reinicia); falta o autor confirmar.
   - O menu de um ícone da bandeja clicado no dock do segundo monitor abre no monitor principal. Causa: o FortiClient e outros programas "system aware" enxergam a tela na escala do monitor principal, e a posição do ícone ia em pixels físicos (o segundo monitor está em 125 %). **Corrigido no #34**, confirmado pelo autor.
   - Os painéis do Windows (Wi-Fi, volume e bateria) abrem sempre no monitor principal. O Windows só os abre pelo atalho Win+A, sem escolha de monitor.
   - Com tela cheia no monitor principal e o segundo monitor em uso, o dock do principal volta por cima do vídeo.
