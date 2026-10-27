@@ -20,7 +20,14 @@ import OptionGroup, { type Option } from "./OptionGroup";
 import PanelFooter from "./PanelFooter";
 import PanelHeader from "./parts/PanelHeader";
 import RangeField from "./parts/RangeField";
+import ChoiceCards from "./parts/ChoiceCards";
 import SettingsGroup from "./parts/SettingsGroup";
+import {
+  HoverThumb,
+  IndicatorThumb,
+  OpenThumb,
+  ShapeThumb,
+} from "./ChoiceThumbs";
 import ToggleField from "./parts/ToggleField";
 import StyleGallery from "./StyleGallery";
 import { useSettingsEditor } from "./useSettingsEditor";
@@ -265,12 +272,25 @@ function LookPanel({
         </section>
       )}
       <SettingsGroup title={groups.hover} grouped={grouped}>
-        <OptionGroup
-          label={text.hover}
-          options={options(HOVERS, text.hoverOptions)}
-          selected={dock?.hover ?? null}
-          onSelect={(hover) => update({ hover })}
-        />
+        {grouped ? (
+          <ChoiceCards
+            label={text.hover}
+            choices={options(HOVERS, text.hoverOptions)}
+            selected={dock?.hover ?? null}
+            disabled={disabled}
+            onSelect={(hover) => update({ hover })}
+            thumb={(hover, chosen) => (
+              <HoverThumb effect={hover} chosen={chosen} />
+            )}
+          />
+        ) : (
+          <OptionGroup
+            label={text.hover}
+            options={options(HOVERS, text.hoverOptions)}
+            selected={dock?.hover ?? null}
+            onSelect={(hover) => update({ hover })}
+          />
+        )}
         {dock?.hover === "scale" ? (
           <RangeField
             label={text.hoverScale}
@@ -286,12 +306,23 @@ function LookPanel({
         ) : null}
       </SettingsGroup>
       <SettingsGroup title={groups.indicator} grouped={grouped}>
-        <OptionGroup
-          label={text.indicator}
-          options={options(INDICATORS, text.indicatorOptions)}
-          selected={dock?.indicator ?? null}
-          onSelect={(indicator) => update({ indicator })}
-        />
+        {grouped ? (
+          <ChoiceCards
+            label={text.indicator}
+            choices={options(INDICATORS, text.indicatorOptions)}
+            selected={dock?.indicator ?? null}
+            disabled={disabled}
+            onSelect={(indicator) => update({ indicator })}
+            thumb={(indicator) => <IndicatorThumb shape={indicator} />}
+          />
+        ) : (
+          <OptionGroup
+            label={text.indicator}
+            options={options(INDICATORS, text.indicatorOptions)}
+            selected={dock?.indicator ?? null}
+            onSelect={(indicator) => update({ indicator })}
+          />
+        )}
         {/* The color right after the mark it colors. */}
         <SwatchGroup
           label={text.indicatorColor}
@@ -305,12 +336,23 @@ function LookPanel({
         />
       </SettingsGroup>
       <SettingsGroup title={groups.icons} grouped={grouped}>
-        <OptionGroup
-          label={text.iconShape}
-          options={options(ICON_SHAPES, text.iconShapeOptions)}
-          selected={dock?.iconShape ?? null}
-          onSelect={(iconShape) => update({ iconShape })}
-        />
+        {grouped ? (
+          <ChoiceCards
+            label={text.iconShape}
+            choices={options(ICON_SHAPES, text.iconShapeOptions)}
+            selected={dock?.iconShape ?? null}
+            disabled={disabled}
+            onSelect={(iconShape) => update({ iconShape })}
+            thumb={(iconShape) => <ShapeThumb shape={iconShape} />}
+          />
+        ) : (
+          <OptionGroup
+            label={text.iconShape}
+            options={options(ICON_SHAPES, text.iconShapeOptions)}
+            selected={dock?.iconShape ?? null}
+            onSelect={(iconShape) => update({ iconShape })}
+          />
+        )}
         <IconPacksField
           selected={dock?.iconPack ?? null}
           disabled={disabled}
@@ -318,12 +360,25 @@ function LookPanel({
         />
       </SettingsGroup>
       <SettingsGroup title={groups.openAnimation} grouped={grouped}>
-        <OptionGroup
-          label={text.openAnimation}
-          options={options(OPEN_ANIMATIONS, text.openAnimationOptions)}
-          selected={dock?.openAnimation ?? null}
-          onSelect={(openAnimation) => update({ openAnimation })}
-        />
+        {grouped ? (
+          <ChoiceCards
+            label={text.openAnimation}
+            choices={options(OPEN_ANIMATIONS, text.openAnimationOptions)}
+            selected={dock?.openAnimation ?? null}
+            disabled={disabled}
+            onSelect={(openAnimation) => update({ openAnimation })}
+            thumb={(openAnimation, chosen) => (
+              <OpenThumb animation={openAnimation} chosen={chosen} />
+            )}
+          />
+        ) : (
+          <OptionGroup
+            label={text.openAnimation}
+            options={options(OPEN_ANIMATIONS, text.openAnimationOptions)}
+            selected={dock?.openAnimation ?? null}
+            onSelect={(openAnimation) => update({ openAnimation })}
+          />
+        )}
       </SettingsGroup>
       <PanelFooter alert={error && t.settings.errors[error]}>
         {t.settings.footer}

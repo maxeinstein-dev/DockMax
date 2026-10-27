@@ -49,6 +49,7 @@ use self::paint::{Dot, Face, Painter, Scene, Status, StripCell, Tile, Tip};
 use self::strip::Cell;
 use self::theme::{Color, Palette};
 use super::dock::Rect;
+use super::menu;
 use super::monitors::Monitor;
 use super::panel::{LogicalRect, PanelId};
 use crate::domain::apps::AppsSnapshot;
@@ -75,6 +76,9 @@ const WM_RUN: u32 = WM_APP + 0x31;
 const ANIMATION_TIMER: usize = 1;
 const CLOCK_TIMER: usize = 2;
 const WARM_TIMER: usize = 3;
+/// The pointer rested on an open program for the preview's delay (spec
+/// 0015).
+const PREVIEW_TIMER: usize = 6;
 const STATUS_TIMER: usize = 4;
 /// Looks at the pointer while the dock hides on its own.
 const AUTO_HIDE_TIMER: usize = 5;
@@ -1176,6 +1180,7 @@ impl Dock {
 
     /// The dock's monitor is gone (or the user keeps only one dock).
     fn destroy(&mut self) {
+        self.end_preview();
         self.hide();
         let hwnd = self.hwnd.0 as isize;
         shared().docks.retain(|known| known.hwnd != hwnd);
@@ -1264,6 +1269,7 @@ impl Dock {
             || self.press.is_some()
             || self.landing.is_some()
             || self.menu_open
+            || self.previewing()
             || menu_on_screen();
         if busy || near_dock(point, self.window, self.monitor.rect, edge) {
             self.away_since = None;
@@ -1272,6 +1278,7 @@ impl Dock {
         let since = *self.away_since.get_or_insert(now);
         if now.duration_since(since) >= tuck_after {
             self.away_since = None;
+            self.end_preview();
             self.tucking = true;
             self.hovered = None;
             self.status_hovered = false;
@@ -1500,13 +1507,17 @@ impl Dock {
         }
     }
 
-    fn palette(&self) -> Palette {
-        let dark = match self.data.settings.theme {
+    /// Whether the dock is drawn dark: the setting, or Windows' own.
+    fn dark_now(&self) -> bool {
+        match self.data.settings.theme {
             Theme::System => self.dark,
             Theme::Light => false,
             Theme::Dark => true,
-        };
-        Palette::of(dark, self.data.settings.dock.opacity)
+        }
+    }
+
+    fn palette(&self) -> Palette {
+        Palette::of(self.dark_now(), self.data.settings.dock.opacity)
     }
 
     fn scene(&mut self) -> Scene {
@@ -1794,8 +1805,93 @@ impl Dock {
             if self.warmable() {
                 unsafe { SetTimer(Some(self.hwnd), WARM_TIMER, WARM_DELAY, None) };
             }
+            self.arm_preview();
             self.animate();
             self.paint();
+        }
+    }
+
+    /// Whether this dock's preview card shows.
+    fn previewing(&self) -> bool {
+        super::previews::shown_by() == Some(self.hwnd.0 as isize)
+    }
+
+    /// The pointer is on another item: with a card already shown it changes
+    /// at once (spec 0015, proposal 1), else it shows after the delay. The
+    /// card hides itself once the pointer has left the icon and the card.
+    fn arm_preview(&mut self) {
+        let _ = unsafe { KillTimer(Some(self.hwnd), PREVIEW_TIMER) };
+        let settings = &self.data.settings.dock;
+        let program = self
+            .hovered
+            .and_then(|index| self.items.get(index))
+            .is_some_and(Item::is_program);
+        if !settings.previews || !program {
+            return;
+        }
+        if self.previewing() || settings.preview_delay == 0 {
+            self.show_preview();
+        } else {
+            let delay = u32::from(settings.preview_delay);
+            unsafe { SetTimer(Some(self.hwnd), PREVIEW_TIMER, delay, None) };
+        }
+    }
+
+    /// Shows the card of the program under the pointer: its windows in this
+    /// dock's workspace.
+    fn show_preview(&mut self) {
+        let busy = self.press.is_some() || self.open.is_some() || self.menu_open || self.tucking;
+        let Some(index) = self.hovered.filter(|_| !busy) else {
+            return;
+        };
+        let workspace = self.workspace_id();
+        let windows = match self.items.get(index) {
+            Some(Item::App(app)) => {
+                super::open_apps::windows_of_pinned(app.id.as_str(), workspace.as_deref())
+            }
+            Some(Item::Other(other)) => {
+                super::open_apps::windows_of_other(&other.key, workspace.as_deref())
+            }
+            _ => return,
+        };
+        let settings = &self.data.settings.dock;
+        if !crate::domain::previews::shows(windows.len(), settings.previews_only_several) {
+            if self.previewing() {
+                super::previews::hide();
+            }
+            return;
+        }
+        let Some(area) = self.placement_now().items.get(index).copied() else {
+            return;
+        };
+        let rect = self.monitor.rect;
+        super::previews::show(super::previews::Request {
+            owner: self.hwnd.0 as isize,
+            icon: Area {
+                x: f64::from(self.window.x) + area.x * self.scale,
+                y: f64::from(self.window.y) + area.y * self.scale,
+                width: area.width * self.scale,
+                height: area.height * self.scale,
+            },
+            screen: Area {
+                x: f64::from(rect.x),
+                y: f64::from(rect.y),
+                width: f64::from(rect.width),
+                height: f64::from(rect.height),
+            },
+            edge: self.edge(),
+            scale: self.scale,
+            dark: self.dark_now(),
+            windows,
+        });
+    }
+
+    /// Hides this dock's card, if it shows (a click, a menu, a drag, the dock
+    /// going down).
+    fn end_preview(&mut self) {
+        let _ = unsafe { KillTimer(Some(self.hwnd), PREVIEW_TIMER) };
+        if self.previewing() {
+            super::previews::hide();
         }
     }
 
@@ -1819,6 +1915,8 @@ impl Dock {
 
     fn mouse_leave(&mut self) {
         self.tracking = false;
+        // A card already shown hides itself once the pointer is off it too.
+        let _ = unsafe { KillTimer(Some(self.hwnd), PREVIEW_TIMER) };
         if self.press.is_some() {
             return;
         }
@@ -1864,6 +1962,7 @@ impl Dock {
         if self.data.workspaces.len() < 2 || delta == 0 {
             return;
         }
+        self.end_preview();
         let monitor = self.monitor.key.clone();
         let forward = delta < 0;
         self.effects.push(Box::new(move |app| {
@@ -1881,6 +1980,7 @@ impl Dock {
     }
 
     fn left_down(&mut self, x: f64, y: f64) {
+        self.end_preview();
         self.use_here();
         shared().clicked = Some(Instant::now());
         let index = self.hit(x, y);
@@ -2116,11 +2216,15 @@ impl Dock {
         let hwnd = self.hwnd.0 as isize;
         let edge = self.edge();
         let shown = self.data.workspace.as_ref().map(|w| w.id.clone());
-        let workspaces: Vec<(String, bool)> = self
+        let workspaces: Vec<MenuWorkspace> = self
             .data
             .workspaces
             .iter()
-            .map(|w| (w.name.clone(), Some(&w.id) == shown.as_ref()))
+            .map(|w| MenuWorkspace {
+                name: w.name.clone(),
+                color: w.color.clone(),
+                shown: Some(&w.id) == shown.as_ref(),
+            })
             .collect();
         let items = dock_menu_items(
             self.data.settings.dock.auto_hide,
@@ -2132,38 +2236,10 @@ impl Dock {
         // Up, under its menu, until it closes.
         self.menu_open = true;
         self.effects.push(Box::new(move |app| {
-            let chosen = show_dock_menu(HWND(hwnd as _), edge, items);
+            let chosen = show_dock_menu(edge, items);
             post_to(hwnd, |dock: &mut Dock| dock.menu_open = false);
-            match chosen {
-                Some(MenuChoice::TaskManager) => {
-                    if let Err(error) = super::apps::open_task_manager() {
-                        log::warn!("dock: the Task Manager could not be opened: {error}");
-                    }
-                }
-                Some(MenuChoice::Settings) => {
-                    if let Err(error) = super::settings_window::open(app) {
-                        log::warn!("dock: the settings could not be opened: {error}");
-                    }
-                }
-                Some(MenuChoice::Launcher) => super::launcher::toggle(),
-                Some(MenuChoice::AutoHide) => {
-                    let changed = crate::commands::settings::change(app, |settings| {
-                        settings.dock.auto_hide = !settings.dock.auto_hide;
-                    });
-                    if let Err(error) = changed {
-                        log::warn!("dock: hiding on its own could not be changed: {error}");
-                    }
-                }
-                Some(MenuChoice::Quit) => app.exit(0),
-                Some(MenuChoice::Workspace(index)) => {
-                    if let Some(id) = ids.get(index) {
-                        crate::commands::workspaces::switch(app, &monitor, id);
-                    }
-                }
-                Some(MenuChoice::NewWorkspace) => {
-                    crate::commands::workspaces::create_and_switch(app, &monitor);
-                }
-                None => {}
+            if let Some(choice) = chosen {
+                act(app, choice, &monitor, &ids);
             }
         }));
     }
@@ -2231,8 +2307,11 @@ fn near_dock(point: (i32, i32), window: Rect, monitor: Rect, edge: DockEdge) -> 
 /// dock opened): the dock stays up under it.
 fn menu_on_screen() -> bool {
     use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, IsWindowVisible};
-    unsafe { FindWindowW(w!("#32768"), None) }
-        .is_ok_and(|menu| unsafe { IsWindowVisible(menu) }.as_bool())
+    // Windows' menus (a tray icon's) and the DockMax's own (spec 0014 R3).
+    [w!("#32768"), menu::CLASS].into_iter().any(|class| {
+        unsafe { FindWindowW(class, None) }
+            .is_ok_and(|menu| unsafe { IsWindowVisible(menu) }.as_bool())
+    })
 }
 
 /// One frame of the dock going out or coming in (`now` and `target` from 0,
@@ -2390,120 +2469,170 @@ enum MenuChoice {
     NewWorkspace,
 }
 
-/// One line of the dock's menu: what it does, its text, and whether it
-/// carries the check.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One line of the dock's menu: what it does and how it shows (spec 0014
+/// R3).
+#[derive(Debug, Clone, PartialEq)]
 struct MenuEntry {
-    choice: MenuChoice,
-    label: String,
-    checked: bool,
+    choice: Option<MenuChoice>,
+    line: menu::Line,
 }
 
+/// Glyphs of Windows' icon font for the dock's menu.
+const SEARCH_GLYPH: char = '\u{E721}';
+const TASKS_GLYPH: char = '\u{E9D9}';
+const ADD_GLYPH: char = '\u{E710}';
+const SETTINGS_GLYPH: char = '\u{E713}';
+const HIDE_GLYPH: char = '\u{E70D}';
+const QUIT_GLYPH: char = '\u{E7E8}';
+
 impl MenuEntry {
-    fn new(choice: MenuChoice, label: &str, checked: bool) -> Option<MenuEntry> {
-        Some(MenuEntry {
-            choice,
-            label: label.to_owned(),
-            checked,
-        })
+    fn item(choice: MenuChoice, item: menu::Item) -> MenuEntry {
+        MenuEntry {
+            choice: Some(choice),
+            line: menu::Line::Item(item),
+        }
+    }
+
+    fn separator() -> MenuEntry {
+        MenuEntry {
+            choice: None,
+            line: menu::Line::Separator,
+        }
+    }
+
+    fn title(text: &str) -> MenuEntry {
+        MenuEntry {
+            choice: None,
+            line: menu::Line::Title(text.to_owned()),
+        }
     }
 }
 
-/// The dock's menu, in order; `None` is a separator. `workspaces` are the
-/// names and whether each is the one shown: with two or more, they come with
-/// their shortcut, the shown one checked; "Novo espaço" comes while one more
-/// can be made.
+/// A workspace as the dock's menu lists it: its name, its color (`#RRGGBB`)
+/// and whether it is the one shown.
+struct MenuWorkspace {
+    name: String,
+    color: String,
+    shown: bool,
+}
+
+/// The dock's menu, in order. `workspaces`: with two or more, they come
+/// under a title, with their color and their shortcut, the shown one
+/// checked; "Novo espaço" comes while one more can be made. The tray icon's
+/// menu is this one with no workspaces.
 fn dock_menu_items(
     auto_hide: bool,
-    workspaces: &[(String, bool)],
+    workspaces: &[MenuWorkspace],
     can_create: bool,
-) -> Vec<Option<MenuEntry>> {
+) -> Vec<MenuEntry> {
     let text = &crate::i18n::messages().tray;
     let mut items = vec![
-        MenuEntry::new(MenuChoice::Launcher, text.search_apps, false),
-        MenuEntry::new(MenuChoice::TaskManager, text.task_manager, false),
-        None,
+        MenuEntry::item(
+            MenuChoice::Launcher,
+            menu::Item::new(text.search_apps, SEARCH_GLYPH),
+        ),
+        MenuEntry::item(
+            MenuChoice::TaskManager,
+            menu::Item::new(text.task_manager, TASKS_GLYPH),
+        ),
+        MenuEntry::separator(),
     ];
     if workspaces.len() >= 2 {
-        for (index, (name, shown)) in workspaces.iter().enumerate() {
-            let label = format!("{name}\tCtrl+Alt+{}", index + 1);
-            items.push(MenuEntry::new(MenuChoice::Workspace(index), &label, *shown));
+        items.push(MenuEntry::title(text.workspaces));
+        for (index, workspace) in workspaces.iter().enumerate() {
+            let color = Color::hex(&workspace.color).unwrap_or(Color::WHITE);
+            let rgb = |part: f32| (part * 255.0).round() as u8;
+            items.push(MenuEntry::item(
+                MenuChoice::Workspace(index),
+                menu::Item::new(&workspace.name, SEARCH_GLYPH)
+                    .swatch((rgb(color.r), rgb(color.g), rgb(color.b)))
+                    .shortcut(format!("Ctrl+Alt+{}", index + 1))
+                    .checked(workspace.shown),
+            ));
         }
     }
     if can_create {
-        items.push(MenuEntry::new(
+        items.push(MenuEntry::item(
             MenuChoice::NewWorkspace,
-            text.new_workspace,
-            false,
+            menu::Item::new(text.new_workspace, ADD_GLYPH),
         ));
     }
     if workspaces.len() >= 2 || can_create {
-        items.push(None);
+        items.push(MenuEntry::separator());
     }
     items.extend([
-        MenuEntry::new(MenuChoice::Settings, text.open_settings, false),
-        MenuEntry::new(MenuChoice::AutoHide, text.auto_hide, auto_hide),
-        None,
-        MenuEntry::new(MenuChoice::Quit, text.quit, false),
+        MenuEntry::item(
+            MenuChoice::Settings,
+            menu::Item::new(text.open_settings, SETTINGS_GLYPH),
+        ),
+        MenuEntry::item(
+            MenuChoice::AutoHide,
+            menu::Item::new(text.auto_hide, HIDE_GLYPH).checked(auto_hide),
+        ),
+        MenuEntry::separator(),
+        MenuEntry::item(MenuChoice::Quit, menu::Item::new(text.quit, QUIT_GLYPH)),
     ]);
     items
 }
 
 /// Shows the menu `items` at the pointer, opening away from the screen edge,
 /// and returns what was chosen.
-fn show_dock_menu(hwnd: HWND, edge: DockEdge, items: Vec<Option<MenuEntry>>) -> Option<MenuChoice> {
-    use windows::Win32::UI::WindowsAndMessaging::{
-        AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, MF_CHECKED, MF_SEPARATOR,
-        MF_STRING, SetForegroundWindow, TPM_BOTTOMALIGN, TPM_CENTERALIGN, TPM_RETURNCMD,
-        TPM_RIGHTBUTTON, TPM_TOPALIGN, TrackPopupMenu, WM_NULL,
-    };
-    unsafe {
-        let menu = CreatePopupMenu().ok()?;
-        for (index, item) in items.iter().enumerate() {
-            // The command of an item is its place plus one: 0 is no choice.
-            let added = match item {
-                Some(entry) => AppendMenuW(
-                    menu,
-                    if entry.checked {
-                        MF_STRING | MF_CHECKED
-                    } else {
-                        MF_STRING
-                    },
-                    index + 1,
-                    &windows::core::HSTRING::from(entry.label.as_str()),
-                ),
-                None => AppendMenuW(menu, MF_SEPARATOR, 0, None),
-            };
-            if added.is_err() {
-                let _ = DestroyMenu(menu);
-                return None;
+fn show_dock_menu(edge: DockEdge, items: Vec<MenuEntry>) -> Option<MenuChoice> {
+    let (choices, lines): (Vec<_>, Vec<_>) = items
+        .into_iter()
+        .map(|entry| (entry.choice, entry.line))
+        .unzip();
+    let chosen = menu::show(None, edge == DockEdge::Bottom, lines)?;
+    choices.get(chosen).copied().flatten()
+}
+
+/// The tray icon's menu (spec 0014 R3: the DockMax's own, as the dock's),
+/// opened at the pointer: what the dock's has, without the workspaces.
+pub fn tray_menu(app: &AppHandle) {
+    let auto_hide = crate::commands::settings::current(app).dock.auto_hide;
+    // The taskbar is at the bottom of the screen, as a dock most often is.
+    let chosen = show_dock_menu(DockEdge::Bottom, dock_menu_items(auto_hide, &[], false));
+    if chosen == Some(MenuChoice::Settings) {
+        // From the tray, the dock comes up too if it is hiding.
+        show();
+    }
+    if let Some(choice) = chosen {
+        act(app, choice, "", &[]);
+    }
+}
+
+/// Does what was chosen in the dock's menu (or the tray icon's): `monitor`
+/// and `ids` are where the workspaces switch and which they are.
+fn act(app: &AppHandle, choice: MenuChoice, monitor: &str, ids: &[String]) {
+    match choice {
+        MenuChoice::TaskManager => {
+            if let Err(error) = super::apps::open_task_manager() {
+                log::warn!("dock: the Task Manager could not be opened: {error}");
             }
         }
-        let mut at = POINT::default();
-        let _ = GetCursorPos(&mut at);
-        // A menu closes on a click elsewhere only if its window is in front;
-        // the click on the dock was the last input, so Windows allows it.
-        let _ = SetForegroundWindow(hwnd);
-        let vertical = match edge {
-            DockEdge::Bottom => TPM_BOTTOMALIGN,
-            DockEdge::Top => TPM_TOPALIGN,
-        };
-        let chosen = TrackPopupMenu(
-            menu,
-            TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_CENTERALIGN | vertical,
-            at.x,
-            at.y,
-            None,
-            hwnd,
-            None,
-        );
-        let _ = PostMessageW(Some(hwnd), WM_NULL, WPARAM(0), LPARAM(0));
-        let _ = DestroyMenu(menu);
-        let chosen = usize::try_from(chosen.0).ok()?.checked_sub(1)?;
-        items
-            .get(chosen)
-            .and_then(Option::as_ref)
-            .map(|entry| entry.choice)
+        MenuChoice::Settings => {
+            if let Err(error) = super::settings_window::open(app) {
+                log::warn!("dock: the settings could not be opened: {error}");
+            }
+        }
+        MenuChoice::Launcher => super::launcher::toggle(),
+        MenuChoice::AutoHide => {
+            let changed = crate::commands::settings::change(app, |settings| {
+                settings.dock.auto_hide = !settings.dock.auto_hide;
+            });
+            if let Err(error) = changed {
+                log::warn!("dock: hiding on its own could not be changed: {error}");
+            }
+        }
+        MenuChoice::Quit => app.exit(0),
+        MenuChoice::Workspace(index) => {
+            if let Some(id) = ids.get(index) {
+                crate::commands::workspaces::switch(app, monitor, id);
+            }
+        }
+        MenuChoice::NewWorkspace => {
+            crate::commands::workspaces::create_and_switch(app, monitor);
+        }
     }
 }
 
@@ -2544,6 +2673,7 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
             }
         }),
         WM_RBUTTONUP => with_dock(hwnd, |dock| {
+            dock.end_preview();
             shared().clicked = Some(Instant::now());
             dock.use_here();
             let (x, y) = dock.point(lparam);
@@ -2575,6 +2705,10 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
             }),
             STATUS_TIMER => with_dock(hwnd, Dock::read_system),
             AUTO_HIDE_TIMER => with_dock(hwnd, Dock::watch_pointer),
+            PREVIEW_TIMER => with_dock(hwnd, |dock| {
+                let _ = unsafe { KillTimer(Some(dock.hwnd), PREVIEW_TIMER) };
+                dock.show_preview();
+            }),
             WARM_TIMER => with_dock(hwnd, |dock| {
                 let _ = unsafe { KillTimer(Some(dock.hwnd), WARM_TIMER) };
                 if dock.warmable() && dock.open.is_none() {
@@ -2929,49 +3063,94 @@ mod tests {
         assert_eq!(tuck_step(1.0, 0.0), 0.75);
     }
 
-    fn labels(items: &[Option<MenuEntry>]) -> Vec<Option<(&str, bool)>> {
+    /// The menu as text: an item's label (with ✓ when checked), "—" for a
+    /// separator and "# title" for a title.
+    fn labels(items: &[MenuEntry]) -> Vec<String> {
         items
             .iter()
-            .map(|item| item.as_ref().map(|e| (e.label.as_str(), e.checked)))
+            .map(|entry| match &entry.line {
+                menu::Line::Item(item) => {
+                    let check = if item.checked { " ✓" } else { "" };
+                    format!("{}{check}", item.label)
+                }
+                menu::Line::Separator => "—".to_owned(),
+                menu::Line::Title(title) => format!("# {title}"),
+            })
             .collect()
+    }
+
+    fn workspace(name: &str, color: &str, shown: bool) -> MenuWorkspace {
+        MenuWorkspace {
+            name: name.to_owned(),
+            color: color.to_owned(),
+            shown,
+        }
     }
 
     #[test]
     fn the_dock_menu_has_what_the_tray_menu_has() {
         // One workspace: no list to switch, "Novo espaço" to make the second.
-        let one = [("Principal".to_owned(), true)];
+        let one = [workspace("Principal", "#0A84FF", true)];
         assert_eq!(
             labels(&dock_menu_items(true, &one, true)),
             [
-                Some(("Buscar apps…", false)),
-                Some(("Gerenciador de Tarefas", false)),
-                None,
-                Some(("Novo espaço", false)),
-                None,
-                Some(("Configurações", false)),
-                Some(("Ocultar automaticamente", true)),
-                None,
-                Some(("Sair", false)),
+                "Buscar apps…",
+                "Gerenciador de Tarefas",
+                "—",
+                "Novo espaço",
+                "—",
+                "Configurações",
+                "Ocultar automaticamente ✓",
+                "—",
+                "Sair",
+            ]
+        );
+        // The tray icon's: the same, without the workspaces.
+        assert_eq!(
+            labels(&dock_menu_items(false, &[], false)),
+            [
+                "Buscar apps…",
+                "Gerenciador de Tarefas",
+                "—",
+                "Configurações",
+                "Ocultar automaticamente",
+                "—",
+                "Sair",
             ]
         );
     }
 
     #[test]
-    fn the_dock_menu_switches_workspaces_with_their_shortcuts() {
-        let two = [("Principal".to_owned(), false), ("Foco".to_owned(), true)];
+    fn every_item_has_a_glyph_and_auto_hide_says_it_turns() {
+        for entry in dock_menu_items(true, &[], true) {
+            if let menu::Line::Item(item) = entry.line {
+                assert!(item.glyph.is_some(), "{}", item.label);
+                let turns = entry.choice == Some(MenuChoice::AutoHide);
+                assert_eq!(item.toggle, turns, "{}", item.label);
+            }
+        }
+    }
+
+    #[test]
+    fn the_dock_menu_switches_workspaces_with_their_color_and_shortcut() {
+        let two = [
+            workspace("Principal", "#0A84FF", false),
+            workspace("Foco", "#30D158", true),
+        ];
         let items = dock_menu_items(false, &two, false);
         assert_eq!(
-            labels(&items)[3..6],
-            [
-                Some(("Principal\tCtrl+Alt+1", false)),
-                Some(("Foco\tCtrl+Alt+2", true)),
-                None,
-            ]
+            labels(&items)[3..7],
+            ["# Espaços de trabalho", "Principal", "Foco ✓", "—"]
         );
-        assert_eq!(
-            items[4].as_ref().map(|e| e.choice),
-            Some(MenuChoice::Workspace(1))
-        );
+        assert_eq!(items[5].choice, Some(MenuChoice::Workspace(1)));
+        let menu::Line::Item(focus) = &items[5].line else {
+            panic!("not an item");
+        };
+        assert_eq!(focus.swatch, Some((0x30, 0xD1, 0x58)));
+        assert_eq!(focus.glyph, None);
+        assert_eq!(focus.shortcut.as_deref(), Some("Ctrl+Alt+2"));
+        // A title chooses nothing.
+        assert_eq!(items[3].choice, None);
     }
 
     #[test]

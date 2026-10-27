@@ -135,6 +135,12 @@ const messages = {
     indicatorFollowsWorkspace: "Indicador na cor do espaço",
     indicatorFollowsWorkspaceHint:
       "A marca dos apps abertos usa a cor do espaço mostrado",
+    previews: "Prévia ao passar o mouse",
+    previewsHint: "Pare o ponteiro sobre um app aberto para ver as janelas",
+    previewDelay: "Atraso da prévia",
+    previewDelayHint: "Quanto tempo parado antes de a prévia aparecer",
+    previewsOnlySeveral: "Só com 2 ou mais janelas",
+    previewsOnlySeveralHint: "Um app com uma janela só não mostra a prévia",
     launchAtLogin: "Iniciar com o Windows",
     launchAtLoginHint: "Abre o DockMax ao entrar no Windows",
     /** The launcher (spec 0012): its switch, the notice when another
@@ -225,6 +231,12 @@ const messages = {
       visible: "Visível",
       autohide: "Automática",
       hidden: "Oculta",
+    } satisfies Record<TaskbarMode, string>,
+    /** Under each taskbar card of the Configurações app (spec 0014 R2). */
+    taskbarHints: {
+      visible: "O dock fica logo acima da barra de tarefas.",
+      autohide: "Ela aparece ao encostar na borda da tela.",
+      hidden: "Só o dock; o relógio e a bandeja vêm para ele.",
     } satisfies Record<TaskbarMode, string>,
     /** Configurações › Aparência do dock (spec 0005 §3.5). */
     look: {

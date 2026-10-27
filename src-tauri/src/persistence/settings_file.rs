@@ -365,7 +365,8 @@ mod tests {
                     "iconShape": "plate", "iconPack": null, "openAnimation": "bounce",
                     "showOpenApps": true, "showBadges": true, "middleClick": "newInstance",
                     "taskbar": "hidden", "everyMonitor": true, "autoHide": false, "autoHideReveal": 300, "autoHideDelay": 700, "bottomSpace": 2,
-                "switchEveryMonitor": false, "indicatorFollowsWorkspace": false
+                "switchEveryMonitor": false, "indicatorFollowsWorkspace": false,
+                "previews": true, "previewDelay": 200, "previewsOnlySeveral": false
                 },
                 "launchAtLogin": false,
                 "launcher": true,

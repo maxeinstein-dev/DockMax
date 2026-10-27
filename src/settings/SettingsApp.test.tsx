@@ -111,6 +111,65 @@ describe("SettingsApp", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the position and the taskbar as cards with a picture", async () => {
+    await renderApp();
+
+    const edges = screen.getByRole("group", {
+      name: ptBR.settings.groups.edge,
+    });
+    expect(
+      within(edges).getByRole("button", { name: "Embaixo" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(edges)
+        .getByRole("button", { name: "Em cima" })
+        .querySelector(".thumb-screen"),
+    ).toHaveAttribute("data-edge", "top");
+
+    const taskbar = within(
+      screen.getByRole("group", { name: ptBR.settings.groups.taskbar }),
+    ).getByRole("button", { name: "Visível" });
+    expect(taskbar).toHaveAccessibleDescription(
+      ptBR.settings.taskbarHints.visible,
+    );
+    expect(taskbar).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(taskbar);
+    await act(async () => {});
+    const saved = invoke.mock.calls.find(
+      ([command]) => command === "update_settings",
+    )?.[1] as { settings: Settings } | undefined;
+    expect(saved?.settings.dock.taskbar).toBe("visible");
+  });
+
+  it("shows the look's choices as cards, the chosen one moving", async () => {
+    await renderApp();
+    fireEvent.click(sectionButton("Aparência do dock"));
+    await act(async () => {});
+
+    const look = ptBR.settings.look;
+    for (const [group, chosen] of [
+      [look.hover, look.hoverOptions.scale],
+      [look.indicator, look.indicatorOptions.dot],
+      [look.iconShape, look.iconShapeOptions.plate],
+      [look.openAnimation, look.openAnimationOptions.bounce],
+    ] as const) {
+      const card = within(screen.getByRole("group", { name: group })).getByRole(
+        "button",
+        { name: chosen },
+      );
+      expect(card, group).toHaveAttribute("aria-pressed", "true");
+      expect(card.querySelector(".thumb"), group).not.toBeNull();
+    }
+    const bounce = within(
+      screen.getByRole("group", { name: look.openAnimation }),
+    ).getByRole("button", { name: look.openAnimationOptions.bounce });
+    expect(bounce.querySelector(".thumb")).toHaveAttribute("data-chosen");
+    const shake = within(
+      screen.getByRole("group", { name: look.openAnimation }),
+    ).getByRole("button", { name: look.openAnimationOptions.shake });
+    expect(shake.querySelector(".thumb")).not.toHaveAttribute("data-chosen");
+  });
+
   it("puts Geral in titled groups, the launcher among them", async () => {
     await renderApp();
 

@@ -26,7 +26,7 @@ Ordem decidida pelo autor em 2026-10-26, depois da fase D: **C → E → F → G
 | **B. Itens e ícones** | Concluída no escopo do MVP ([spec 0006](specs/0006-fase-b-apps.md), [spec 0007](specs/0007-fase-b4-icones.md)); a personalização de ícones (B4b, B4c) fica para o futuro. |
 | **D. Windows** | **Concluída em 2026-10-26**: barra de aplicativos e barra do Windows oculta (ADR 0009), apps abertos, ativar e minimizar, menus ([spec 0009](specs/0009-fase-d-janelas.md)), tela cheia e um dock por monitor ([spec 0010](specs/0010-fase-d4-monitores-e-tela-cheia.md)), dock nativo ([spec 0011](specs/0011-arquitetura-hibrida.md)) e ocultar automaticamente. Falta a [rodada de verificações](roteiro-de-verificacao.md). |
 | **C. Espaços de trabalho** | **Concluída** ([spec 0013](specs/0013-fase-c-espacos-de-trabalho.md)): C1 (espaços, troca no dock e edição em Configurações), C2 (janelas por espaço, guardadas entre execuções) e C3 (mover janelas para outro espaço, troca em todos os monitores, indicador na cor do espaço, widgets em vários espaços, bolinhas no leitor de tela, troca animada). |
-| **E. Prévias e bandeja** | A bandeja já está pronta (painel da seta, ícones no dock, menus no lugar); faltam as prévias das janelas. |
+| **E. Prévias e bandeja** | **Em andamento** ([spec 0015](specs/0015-fase-e-previas.md)): a bandeja já está pronta (painel da seta, ícones no dock, menus no lugar); E1 (o cartão com as miniaturas ao vivo) e E2 (teclado, leitor de tela, destaque e animação) a fazer. |
 | **F. Widgets** | Depois da E. |
 | **G. Extras** | Depois da F. |
 
@@ -293,6 +293,7 @@ Para cada tarefa:
 8. Antes do teste manual do usuário, capturar o build real via CDP nos dois temas (pega contraste e controle faltando antes do teste).
 9. Medir memória e CPU em repouso em todo PR que mude a interface.
 10. Versionar por fase (v0.2.0 no fim da Fase 2), para o painel Sobre e o instalador nascerem alinhados.
+11. A `main` é protegida (2026-10-27): o PR só entra com a CI (`checks`) verde e a branch atualizada com a `main`, também para o dono; a branch é apagada no merge. Um PR empilhado sobre outro fica vermelho no job `base` até apontar para a `main`: mergeie primeiro o de baixo (o #45 caiu na branch do R1 por isso).
 
 ## Estimativa geral
 

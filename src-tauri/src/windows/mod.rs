@@ -16,6 +16,8 @@ pub mod jumplist;
 pub mod launcher;
 pub mod memory;
 #[cfg(windows)]
+pub mod menu;
+#[cfg(windows)]
 pub mod monitors;
 #[cfg(windows)]
 mod native;
@@ -29,6 +31,8 @@ pub mod panel;
 pub mod panel_window;
 #[cfg(windows)]
 pub mod popup_menu;
+#[cfg(windows)]
+pub mod previews;
 #[cfg(windows)]
 pub mod profiles;
 #[cfg(windows)]

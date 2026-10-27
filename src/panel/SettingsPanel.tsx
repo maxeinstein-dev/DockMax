@@ -1,5 +1,6 @@
 import {
   MAX_AUTO_HIDE_DELAY,
+  MAX_PREVIEW_DELAY,
   MAX_AUTO_HIDE_REVEAL,
   SIZE_PRESETS,
   type DockEdge,
@@ -17,7 +18,9 @@ import OptionGroup, { type Option } from "./OptionGroup";
 import PanelFooter from "./PanelFooter";
 import NavRow from "./parts/NavRow";
 import RangeField from "./parts/RangeField";
+import ChoiceCards from "./parts/ChoiceCards";
 import SettingsGroup from "./parts/SettingsGroup";
+import { ScreenThumb } from "./ChoiceThumbs";
 import ToggleField from "./parts/ToggleField";
 import LauncherField from "./LauncherField";
 import TrayInDockField from "./TrayInDockField";
@@ -148,16 +151,18 @@ function SettingsPanel({
             selected={theme}
             onSelect={(value) => change((s) => ({ ...s, theme: value }))}
           />
-          <OptionGroup
+          <ChoiceCards
             label={t.settings.groups.edge}
-            options={options(EDGES, t.settings.edge)}
+            choices={options(EDGES, t.settings.edge)}
             selected={edge}
+            disabled={shown === null}
             onSelect={(value) =>
               change((s) => ({
                 ...s,
                 dock: { ...s.dock, edge: value },
               }))
             }
+            thumb={(value) => <ScreenThumb edge={value} />}
           />
           <OptionGroup
             label={t.settings.groups.size}
@@ -183,16 +188,24 @@ function SettingsPanel({
           />
         </SettingsGroup>
         <SettingsGroup title={groups.taskbar} grouped>
-          <OptionGroup
+          <ChoiceCards
             label={t.settings.groups.taskbar}
-            options={options(TASKBARS, t.settings.taskbar)}
+            choices={TASKBARS.map((value) => ({
+              value,
+              label: t.settings.taskbar[value],
+              hint: t.settings.taskbarHints[value],
+            }))}
             selected={taskbar}
+            disabled={shown === null}
             onSelect={(value) =>
               change((s) => ({
                 ...s,
                 dock: { ...s.dock, taskbar: value },
               }))
             }
+            thumb={(value) => (
+              <ScreenThumb edge={edge ?? "bottom"} taskbar={value} />
+            )}
           />
           {/* The dock holds the tray only with the taskbar hidden altogether. */}
           {withTrayInDock && shown !== null && taskbar === "hidden" ? (
@@ -271,6 +284,42 @@ function SettingsPanel({
                 display={seconds}
                 onCommit={(autoHideDelay) =>
                   change((s) => ({ ...s, dock: { ...s.dock, autoHideDelay } }))
+                }
+              />
+            </>
+          ) : null}
+          <ToggleField
+            label={t.settings.previews}
+            hint={t.settings.previewsHint}
+            checked={shown?.dock.previews ?? true}
+            disabled={shown === null}
+            onChange={(previews) =>
+              change((s) => ({ ...s, dock: { ...s.dock, previews } }))
+            }
+          />
+          {shown?.dock.previews ? (
+            <>
+              <RangeField
+                label={t.settings.previewDelay}
+                hint={t.settings.previewDelayHint}
+                value={shown.dock.previewDelay}
+                min={0}
+                max={MAX_PREVIEW_DELAY}
+                step={50}
+                display={seconds}
+                onCommit={(previewDelay) =>
+                  change((s) => ({ ...s, dock: { ...s.dock, previewDelay } }))
+                }
+              />
+              <ToggleField
+                label={t.settings.previewsOnlySeveral}
+                hint={t.settings.previewsOnlySeveralHint}
+                checked={shown.dock.previewsOnlySeveral}
+                onChange={(previewsOnlySeveral) =>
+                  change((s) => ({
+                    ...s,
+                    dock: { ...s.dock, previewsOnlySeveral },
+                  }))
                 }
               />
             </>
@@ -481,6 +530,42 @@ function SettingsPanel({
             display={seconds}
             onCommit={(autoHideDelay) =>
               change((s) => ({ ...s, dock: { ...s.dock, autoHideDelay } }))
+            }
+          />
+        </>
+      ) : null}
+      <ToggleField
+        label={t.settings.previews}
+        hint={t.settings.previewsHint}
+        checked={shown?.dock.previews ?? true}
+        disabled={shown === null}
+        onChange={(previews) =>
+          change((s) => ({ ...s, dock: { ...s.dock, previews } }))
+        }
+      />
+      {shown?.dock.previews ? (
+        <>
+          <RangeField
+            label={t.settings.previewDelay}
+            hint={t.settings.previewDelayHint}
+            value={shown.dock.previewDelay}
+            min={0}
+            max={MAX_PREVIEW_DELAY}
+            step={50}
+            display={seconds}
+            onCommit={(previewDelay) =>
+              change((s) => ({ ...s, dock: { ...s.dock, previewDelay } }))
+            }
+          />
+          <ToggleField
+            label={t.settings.previewsOnlySeveral}
+            hint={t.settings.previewsOnlySeveralHint}
+            checked={shown.dock.previewsOnlySeveral}
+            onChange={(previewsOnlySeveral) =>
+              change((s) => ({
+                ...s,
+                dock: { ...s.dock, previewsOnlySeveral },
+              }))
             }
           />
         </>

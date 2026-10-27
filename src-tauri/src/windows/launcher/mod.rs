@@ -19,7 +19,7 @@
 
 mod access;
 pub mod icons;
-mod layout;
+pub(crate) mod layout;
 mod paint;
 
 use std::cell::{Cell, RefCell};
@@ -611,7 +611,7 @@ pub fn is_open() -> bool {
 }
 
 /// Whether Windows' contrast mode is on.
-fn high_contrast() -> bool {
+pub(crate) fn high_contrast() -> bool {
     let mut contrast = HIGHCONTRASTW {
         cbSize: size_of::<HIGHCONTRASTW>() as u32,
         ..Default::default()
@@ -627,7 +627,7 @@ fn high_contrast() -> bool {
     read.is_ok() && contrast.dwFlags.contains(HCF_HIGHCONTRASTON)
 }
 
-fn system_color(index: SYS_COLOR_INDEX) -> Rgb {
+pub(crate) fn system_color(index: SYS_COLOR_INDEX) -> Rgb {
     let value = unsafe { GetSysColor(index) };
     (
         (value & 0xFF) as u8,
@@ -641,7 +641,7 @@ fn colorref(c: Rgb) -> COLORREF {
 }
 
 /// How much bigger Windows' "Text size" makes text: 1 at 100 %.
-fn text_scale() -> f64 {
+pub(crate) fn text_scale() -> f64 {
     use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
     let mut value: u32 = 100;
     let mut size = size_of::<u32>() as u32;
