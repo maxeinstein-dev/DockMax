@@ -56,7 +56,7 @@ export const otherText: Messages = {
       },
       groups: {
         dock: "Dock",
-        taskbar: "Windows taskbar",
+        taskbar: "Windows",
         behavior: "Behavior",
         launcher: "Launcher",
         startup: "Startup",

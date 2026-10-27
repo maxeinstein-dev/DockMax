@@ -101,7 +101,7 @@ const messages = {
       /** The titles of the groups of Geral and Aparência. */
       groups: {
         dock: "Dock",
-        taskbar: "Barra de tarefas do Windows",
+        taskbar: "Windows",
         behavior: "Comportamento",
         launcher: "Lançador",
         startup: "Inicialização",
