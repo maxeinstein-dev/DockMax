@@ -3,7 +3,10 @@
 //! A program that counts what is unread (WhatsApp, Telegram, Outlook, Teams)
 //! puts the number on its button of the taskbar; UI Automation shows it as a
 //! text under the button. The taskbar stays shown, only see-through, while
-//! the dock holds it (`taskbar.rs`), so its buttons can be read.
+//! the dock holds it (`taskbar.rs`). Its own auto-hide still tucks it away,
+//! and then Windows hides the window of its XAML content and leaves its
+//! buttons out of the taskbar's tree; they are still there under that
+//! window, so the buttons are read from it (`content_of`).
 //!
 //! No polling of the whole taskbar: a thread of its own asks UI Automation
 //! for the changes of names and of the tree of Explorer's primary taskbar,
@@ -19,6 +22,7 @@ use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Listener};
+use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Com::{
     CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree,
     SAFEARRAY,
@@ -33,7 +37,8 @@ use windows::Win32::UI::Accessibility::{
     UIA_PROPERTY_ID,
 };
 use windows::Win32::UI::Shell::{KF_FLAG_DEFAULT, SHGetKnownFolderPath};
-use windows::core::{BSTR, GUID, Interface, Ref, Result, implement};
+use windows::Win32::UI::WindowsAndMessaging::FindWindowExW;
+use windows::core::{BSTR, GUID, Interface, Ref, Result, implement, w};
 
 use crate::commands::settings::CHANGED_EVENT as SETTINGS_CHANGED_EVENT;
 use crate::domain::badges::{Button, app_id_of, known_folder_path, parse};
@@ -239,8 +244,23 @@ fn texts_under(element: &IUIAutomationElement, depth: usize, texts: &mut Vec<Str
     }
 }
 
-/// The taskbar being followed: its window and its element, with the
-/// handlers on it.
+/// The window of a taskbar's XAML content, where its buttons are: the
+/// taskbar's tree leaves them out while it is tucked away (auto-hide), not
+/// this window's. The taskbar itself when it has none.
+fn content_of(taskbar: HWND) -> HWND {
+    unsafe {
+        FindWindowExW(
+            Some(taskbar),
+            None,
+            w!("Windows.UI.Composition.DesktopWindowContentBridge"),
+            None,
+        )
+    }
+    .unwrap_or(taskbar)
+}
+
+/// The taskbar being followed: the window of its content and its element,
+/// with the handlers on it.
 struct Attached {
     hwnd: isize,
     root: IUIAutomationElement,
@@ -259,7 +279,7 @@ fn run() -> Result<()> {
         // Explorer's taskbar, never the dock's proxy: the primary first.
         let taskbar = super::taskbar::taskbar_windows()
             .first()
-            .map(|hwnd| hwnd.0 as isize);
+            .map(|&hwnd| content_of(hwnd).0 as isize);
         if attached.as_ref().map(|a| a.hwnd) != taskbar {
             if attached.take().is_some() {
                 let _ = unsafe { reader.automation.RemoveAllEventHandlers() };
@@ -319,8 +339,7 @@ fn attach(
     structure: &IUIAutomationStructureChangedEventHandler,
     property: &IUIAutomationPropertyChangedEventHandler,
 ) -> Result<Attached> {
-    let root =
-        unsafe { automation.ElementFromHandle(windows::Win32::Foundation::HWND(hwnd as _)) }?;
+    let root = unsafe { automation.ElementFromHandle(HWND(hwnd as _)) }?;
     unsafe {
         automation.AddStructureChangedEventHandler(&root, TreeScope_Subtree, None, structure)?;
         automation.AddPropertyChangedEventHandlerNativeArray(
@@ -340,6 +359,15 @@ fn publish(buttons: Vec<Button>) {
         let mut known = BUTTONS.lock().unwrap_or_else(PoisonError::into_inner);
         if *known == buttons {
             return;
+        }
+        // Counts only: the names of the programs stay out of the log.
+        let count = |list: &[Button]| list.iter().filter(|b| b.badge.is_some()).count();
+        if known.len() != buttons.len() || count(&known) != count(&buttons) {
+            log::info!(
+                "badges: {} taskbar buttons, {} with a badge",
+                buttons.len(),
+                count(&buttons)
+            );
         }
         *known = buttons;
     }
@@ -361,7 +389,7 @@ mod probe {
             .unwrap();
         let mut reader = Reader::new().unwrap();
         for hwnd in super::super::taskbar::taskbar_windows() {
-            let root = unsafe { reader.automation.ElementFromHandle(hwnd) }.unwrap();
+            let root = unsafe { reader.automation.ElementFromHandle(content_of(hwnd)) }.unwrap();
             let started = Instant::now();
             let buttons = reader.read(&root).unwrap();
             println!(

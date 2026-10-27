@@ -480,6 +480,20 @@ fn restore_file(path: &Path, pid: u32) {
     }
     // A fresh handle: the one saved may be gone with an Explorer restart.
     set_autohide(saved.autohide, taskbar_windows().first().copied());
+    // Explorer lays the taskbar out again after the auto-hide changes, and
+    // may write back the style it read while the window was still faded
+    // (seen live): looked at once more, a moment later.
+    if !saved.faded.is_empty() {
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        for faded in &saved.faded {
+            if unsafe { IsWindow(Some(hwnd_of(faded.hwnd))) }.as_bool()
+                && unsafe { GetWindowLongPtrW(hwnd_of(faded.hwnd), GWL_EXSTYLE) } & FADED_STYLE
+                    != faded.ex_style & FADED_STYLE
+            {
+                unfade(faded);
+            }
+        }
+    }
     let _ = fs::remove_file(path);
 }
 
