@@ -12,7 +12,7 @@
 //! need to read (whether they are on screen, where they are) is kept in
 //! `SHARED`.
 
-mod access;
+pub(crate) mod access;
 mod faces;
 mod look;
 mod paint;
@@ -1932,6 +1932,8 @@ impl Dock {
             scale: self.scale,
             dark: self.dark_now(),
             windows,
+            name: self.names.get(index).cloned().unwrap_or_default(),
+            motion: self.motion,
         });
     }
 

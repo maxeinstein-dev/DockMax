@@ -11,6 +11,11 @@
 //!
 //! Everything lives on the main thread, like the dock that asks for it. The
 //! window is made the first time a card shows and kept, hidden, after.
+//!
+//! For assistive technology (E2) the card is a toolbar of buttons, through
+//! the dock's own provider (`native_dock::access`): each window by its title,
+//! and "Fechar <título>". A new card slides in from the dock's side, unless
+//! Windows asks for less motion.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -49,15 +54,18 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
     CS_DROPSHADOW, CreateWindowExW, DefWindowProcW, GetClientRect, GetCursorPos,
     GetWindowTextLengthW, GetWindowTextW, HWND_TOPMOST, IDC_ARROW, KillTimer, LoadCursorW,
-    MA_NOACTIVATE, RegisterClassW, SW_HIDE, SWP_NOACTIVATE, SWP_SHOWWINDOW, SetTimer, SetWindowPos,
-    ShowWindow, WM_ERASEBKGND, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_PAINT, WM_TIMER,
-    WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    MA_NOACTIVATE, PostMessageW, RegisterClassW, SW_HIDE, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER,
+    SWP_SHOWWINDOW, SetTimer, SetWindowPos, ShowWindow, WM_APP, WM_ERASEBKGND, WM_GETOBJECT,
+    WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_PAINT, WM_TIMER, WNDCLASSW, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 use windows::core::{PCWSTR, w};
 
 use crate::domain::dock_layout::Area;
 use crate::domain::previews::{self, Card, Hit};
 use crate::domain::settings::DockEdge;
+
+use super::native_dock::access::{self, Entry};
 
 const CLASS: PCWSTR = w!("DockMaxPreview");
 
@@ -67,7 +75,19 @@ const WATCH_TIMER: usize = 1;
 const WATCH_EVERY: u32 = 50;
 const LEAVE_GRACE: Duration = Duration::from_millis(300);
 
+/// A new card slides `SLIDE` logical pixels in from the dock's side, in
+/// `SLIDE_TIME`.
+const SLIDE_TIMER: usize = 2;
+const SLIDE_EVERY: u32 = 16;
+const SLIDE: f64 = 8.0;
+const SLIDE_TIME: Duration = Duration::from_millis(120);
+
+/// A button of the card pressed by assistive technology: `wparam` is the
+/// cell's index, doubled, plus one for its close button.
+const WM_PRESS: u32 = WM_APP + 1;
+
 /// What a dock asks to show.
+#[derive(Clone)]
 pub struct Request {
     /// The dock's window: the card belongs to it.
     pub owner: isize,
@@ -77,8 +97,12 @@ pub struct Request {
     pub edge: DockEdge,
     pub scale: f64,
     pub dark: bool,
-    /// The windows, the front one first.
+    /// The windows, in the order the dock found them.
     pub windows: Vec<isize>,
+    /// The program's name, for assistive technology.
+    pub name: String,
+    /// Windows does not ask for less motion: a new card slides in.
+    pub motion: bool,
 }
 
 /// A card on the screen.
@@ -90,6 +114,8 @@ struct Shown {
     card: Card,
     hovered: Option<Hit>,
     away_since: Option<Instant>,
+    /// When the card started sliding in, while it does.
+    sliding: Option<Instant>,
 }
 
 struct Preview {
@@ -186,6 +212,9 @@ pub fn show(request: Request) {
         return;
     };
     let previous = PREVIEW.with_borrow_mut(|preview| preview.as_mut()?.shown.take());
+    // Only a card that was not there slides in; one taking another's place
+    // (the pointer on the next program, a window closed) is just there.
+    let slides = previous.is_none() && request.motion;
     if let Some(previous) = previous {
         unregister(&previous.thumbs);
     }
@@ -217,18 +246,23 @@ pub fn show(request: Request) {
     // in the list, for the card shown again after a close.
     unregister(&thumbs[card.cells.len()..]);
     thumbs.truncate(card.cells.len());
-    let titles = windows
+    let titles: Vec<String> = windows
         .iter()
         .take(card.cells.len())
         .map(|&value| title_of(value))
         .collect();
     let area = card.area;
+    let start = if slides {
+        slide_offset(request.edge, request.scale, 0.0)
+    } else {
+        0.0
+    };
     unsafe {
         let _ = SetWindowPos(
             hwnd,
             Some(HWND_TOPMOST),
             area.x as i32,
-            area.y as i32,
+            (area.y + start) as i32,
             area.width as i32,
             area.height as i32,
             SWP_NOACTIVATE | SWP_SHOWWINDOW,
@@ -253,23 +287,137 @@ pub fn show(request: Request) {
         };
         let _ = unsafe { DwmUpdateThumbnailProperties(thumb, &properties) };
     }
+    let request = Request { windows, ..request };
+    publish(hwnd, &request, &card, &titles);
     PREVIEW.with_borrow_mut(|preview| {
         if let Some(preview) = preview {
             preview.painter.resize();
             preview.shown = Some(Shown {
-                request: Request { windows, ..request },
+                request,
                 titles,
                 thumbs,
                 card,
                 hovered: None,
                 away_since: None,
+                sliding: slides.then(Instant::now),
             });
         }
     });
     unsafe {
         SetTimer(Some(hwnd), WATCH_TIMER, WATCH_EVERY, None);
+        if slides {
+            SetTimer(Some(hwnd), SLIDE_TIMER, SLIDE_EVERY, None);
+        } else {
+            let _ = KillTimer(Some(hwnd), SLIDE_TIMER);
+        }
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
+}
+
+/// How far from its place the card is drawn, `done` (0 to 1) of the way in:
+/// toward the dock (down over a dock at the bottom), easing out.
+fn slide_offset(edge: DockEdge, scale: f64, done: f64) -> f64 {
+    let left = 1.0 - (1.0 - (1.0 - done.clamp(0.0, 1.0)).powi(3));
+    let distance = SLIDE * scale * left;
+    match edge {
+        DockEdge::Bottom => distance,
+        DockEdge::Top => -distance,
+    }
+}
+
+/// One frame of the card sliding in.
+fn slide(hwnd: HWND) {
+    let frame = PREVIEW.with_borrow_mut(|preview| {
+        let shown = preview.as_mut()?.shown.as_mut()?;
+        let started = shown.sliding?;
+        let done = started.elapsed().as_secs_f64() / SLIDE_TIME.as_secs_f64();
+        if done >= 1.0 {
+            shown.sliding = None;
+        }
+        let offset = slide_offset(shown.request.edge, shown.request.scale, done);
+        Some((shown.card.area, offset, done >= 1.0))
+    });
+    let Some((area, offset, finished)) = frame else {
+        let _ = unsafe { KillTimer(Some(hwnd), SLIDE_TIMER) };
+        return;
+    };
+    unsafe {
+        let _ = SetWindowPos(
+            hwnd,
+            None,
+            area.x as i32,
+            (area.y + offset).round() as i32,
+            0,
+            0,
+            SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+        );
+        if finished {
+            let _ = KillTimer(Some(hwnd), SLIDE_TIMER);
+        }
+    }
+}
+
+/// The card's buttons for assistive technology: each window by its title,
+/// then its close button.
+fn publish(hwnd: HWND, request: &Request, card: &Card, titles: &[String]) {
+    let text = &crate::i18n::messages().dock;
+    let on_screen = |area: Area| {
+        (
+            card.area.x + area.x,
+            card.area.y + area.y,
+            area.width,
+            area.height,
+        )
+    };
+    let entries = card
+        .cells
+        .iter()
+        .zip(titles)
+        .flat_map(|(cell, title)| {
+            let name = if title.is_empty() {
+                text.untitled.to_owned()
+            } else {
+                title.clone()
+            };
+            [
+                Entry {
+                    key: format!("window:{}", cell.index),
+                    name: name.clone(),
+                    rect: on_screen(cell.area),
+                },
+                Entry {
+                    key: format!("close:{}", cell.index),
+                    name: text.close_window.replace("{name}", &name),
+                    rect: on_screen(cell.close),
+                },
+            ]
+        })
+        .collect();
+    access::publish_for(
+        hwnd.0 as isize,
+        text.previews.replace("{name}", &request.name),
+        entries,
+        press,
+    );
+}
+
+/// A button pressed by assistive technology, on UI Automation's thread: the
+/// card's own thread does it.
+fn press(hwnd: isize, key: &str) {
+    let Some(code) = press_code(key) else {
+        return;
+    };
+    let _ = unsafe { PostMessageW(Some(HWND(hwnd as _)), WM_PRESS, WPARAM(code), LPARAM(0)) };
+}
+
+/// `WM_PRESS`'s `wparam` for the button `key` (`window:<i>`, `close:<i>`).
+fn press_code(key: &str) -> Option<usize> {
+    let (index, close) = match key.split_once(':')? {
+        ("window", index) => (index, 0),
+        ("close", index) => (index, 1),
+        _ => return None,
+    };
+    Some(index.parse::<usize>().ok()? * 2 + close)
 }
 
 /// Hides the card, if one shows.
@@ -281,8 +429,10 @@ pub fn hide() {
     });
     if let Some((hwnd, shown)) = hidden {
         unregister(&shown.thumbs);
+        access::forget(hwnd.0 as isize);
         unsafe {
             let _ = KillTimer(Some(hwnd), WATCH_TIMER);
+            let _ = KillTimer(Some(hwnd), SLIDE_TIMER);
             let _ = ShowWindow(hwnd, SW_HIDE);
         }
     }
@@ -306,13 +456,8 @@ fn without(value: isize) {
             .filter(|&other| other != value)
             .collect();
         Some(Request {
-            owner: shown.request.owner,
-            icon: shown.request.icon,
-            screen: shown.request.screen,
-            edge: shown.request.edge,
-            scale: shown.request.scale,
-            dark: shown.request.dark,
             windows,
+            ..shown.request.clone()
         })
     });
     match request {
@@ -377,9 +522,19 @@ fn hover(hwnd: HWND, x: f64, y: f64) {
 /// A click at `(x, y)`: a cell brings its window to the front, a close
 /// button asks its window to close.
 fn click(x: f64, y: f64) {
+    let hit = PREVIEW.with_borrow(|preview| {
+        let shown = preview.as_ref()?.shown.as_ref()?;
+        previews::hit(&shown.card, x, y)
+    });
+    if let Some(hit) = hit {
+        act(hit);
+    }
+}
+
+/// Does what the cell or close button `hit` does.
+fn act(hit: Hit) {
     let target = PREVIEW.with_borrow(|preview| {
         let shown = preview.as_ref()?.shown.as_ref()?;
-        let hit = previews::hit(&shown.card, x, y)?;
         let index = match hit {
             Hit::Cell(index) | Hit::Close(index) => index,
         };
@@ -445,6 +600,21 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
             watch();
             LRESULT(0)
         }
+        WM_TIMER if wparam.0 == SLIDE_TIMER => {
+            slide(hwnd);
+            LRESULT(0)
+        }
+        WM_PRESS => {
+            let index = wparam.0 / 2;
+            act(if wparam.0 % 2 == 1 {
+                Hit::Close(index)
+            } else {
+                Hit::Cell(index)
+            });
+            LRESULT(0)
+        }
+        WM_GETOBJECT => access::get_object(hwnd, wparam, lparam)
+            .unwrap_or_else(|| unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }),
         _ => unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
     }
 }
@@ -756,5 +926,30 @@ fn grown(area: Area, by: f64) -> Area {
         y: area.y - by,
         width: area.width + 2.0 * by,
         height: area.height + 2.0 * by,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_new_card_slides_in_from_the_docks_side() {
+        assert_eq!(slide_offset(DockEdge::Bottom, 1.5, 0.0), SLIDE * 1.5);
+        assert_eq!(slide_offset(DockEdge::Top, 1.0, 0.0), -SLIDE);
+        assert_eq!(slide_offset(DockEdge::Bottom, 1.0, 1.0), 0.0);
+        // Easing out: most of the way is done in the first half.
+        assert!(slide_offset(DockEdge::Bottom, 1.0, 0.5) < SLIDE / 4.0);
+        assert_eq!(slide_offset(DockEdge::Bottom, 1.0, 3.0), 0.0);
+    }
+
+    #[test]
+    fn a_button_of_assistive_technology_names_its_cell_and_action() {
+        assert_eq!(press_code("window:0"), Some(0));
+        assert_eq!(press_code("close:0"), Some(1));
+        assert_eq!(press_code("window:3"), Some(6));
+        assert_eq!(press_code("close:3"), Some(7));
+        assert_eq!(press_code("app:3"), None);
+        assert_eq!(press_code("close:x"), None);
     }
 }
