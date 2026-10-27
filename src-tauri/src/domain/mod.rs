@@ -2,6 +2,7 @@
 //! touches the file system, Tauri or Windows.
 
 pub mod apps;
+pub mod badges;
 pub mod browser_profile;
 pub mod dock_items;
 pub mod dock_layout;

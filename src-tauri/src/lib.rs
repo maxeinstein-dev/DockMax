@@ -263,6 +263,8 @@ pub fn run() {
             windows::dock::setup(app.handle())?;
             #[cfg(windows)]
             windows::open_apps::start(app.handle());
+            #[cfg(windows)]
+            windows::badges::start(app.handle());
             tray::setup(app.handle())?;
             Ok(())
         })

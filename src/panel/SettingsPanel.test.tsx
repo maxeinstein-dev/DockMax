@@ -186,6 +186,22 @@ describe("SettingsPanel", () => {
     });
   });
 
+  it("turns the notification badges on and off, in the dock settings", () => {
+    invoke.mockReturnValue(new Promise(() => {}));
+    render(<SettingsPanel settings={SETTINGS} />);
+    const toggle = screen.getByRole("switch", { name: text.showBadges });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(toggle);
+
+    expect(invoke).toHaveBeenLastCalledWith("update_settings", {
+      settings: {
+        ...SETTINGS,
+        dock: { ...SETTINGS.dock, showBadges: false },
+      },
+    });
+  });
+
   it("turns hiding on its own on, then shows its two times to change", () => {
     invoke.mockReturnValue(new Promise(() => {}));
     const { rerender } = render(<SettingsPanel settings={SETTINGS} />);

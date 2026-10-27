@@ -69,6 +69,7 @@ struct DockSettingsInput {
     icon_pack: Option<String>,
     open_animation: OpenAnimation,
     show_open_apps: bool,
+    show_badges: bool,
     /// Left out of the settings while empty, so the interface may leave it out.
     #[serde(default)]
     tray_in_dock: Vec<String>,
@@ -126,6 +127,7 @@ impl From<SettingsInput> for Settings {
                 icon_pack: dock.icon_pack,
                 open_animation: dock.open_animation,
                 show_open_apps: dock.show_open_apps,
+                show_badges: dock.show_badges,
                 tray_in_dock: dock.tray_in_dock,
                 middle_click: dock.middle_click,
                 taskbar: dock.taskbar,
@@ -440,7 +442,7 @@ mod tests {
     }
 
     /// The look fields of a full update payload.
-    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","showOpenApps":false,"middleClick":"none","taskbar":"hidden","everyMonitor":false,"autoHide":true,"autoHideReveal":500,"autoHideDelay":1500,"bottomSpace":2,"switchEveryMonitor":true,"indicatorFollowsWorkspace":true,"previews":false,"previewDelay":400,"previewsOnlySeveral":true"##;
+    const LOOK: &str = r##""style":"neon","tweaks":{"neon":{"corners":30}},"hover":"magnify","hoverScale":120,"indicator":"dash","indicatorColor":"#0A84FF","iconShape":"uniform","iconPack":"pixel-system","openAnimation":"pulse","showOpenApps":false,"showBadges":false,"middleClick":"none","taskbar":"hidden","everyMonitor":false,"autoHide":true,"autoHideReveal":500,"autoHideDelay":1500,"bottomSpace":2,"switchEveryMonitor":true,"indicatorFollowsWorkspace":true,"previews":false,"previewDelay":400,"previewsOnlySeveral":true"##;
 
     fn full() -> String {
         format!(
@@ -485,6 +487,7 @@ mod tests {
                     icon_pack: Some("pixel-system".into()),
                     open_animation: OpenAnimation::Pulse,
                     show_open_apps: false,
+                    show_badges: false,
                     tray_in_dock: Vec::new(),
                     middle_click: MiddleClick::None,
                     taskbar: TaskbarMode::Hidden,
@@ -543,6 +546,7 @@ mod tests {
             "hover",
             "hoverScale",
             "indicator",
+            "showBadges",
             "taskbar",
             "everyMonitor",
             "autoHide",

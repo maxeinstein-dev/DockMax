@@ -163,6 +163,37 @@ pub fn tray_cells(area: Area, count: usize, icon: f64) -> Vec<Area> {
         .collect()
 }
 
+/// The notification badge on a tile (spec 0016): a pill on its top right
+/// corner, reaching a little beyond it, as on a phone. `text_width` is the
+/// width of its number (0 for a badge with no number, which is a smaller
+/// round dot).
+pub fn badge_area(tile: Area, text_width: f64) -> Area {
+    let height = (tile.height * BADGE_SHARE).clamp(BADGE_MIN, BADGE_MAX);
+    let (width, height) = if text_width > 0.0 {
+        (height.max(text_width + height * 0.6), height)
+    } else {
+        (height * 0.65, height * 0.65)
+    };
+    Area {
+        x: tile.x + tile.width + BADGE_OUT - width,
+        y: tile.y - BADGE_OUT,
+        width,
+        height,
+    }
+}
+
+/// The badge's height, as a share of the tile's, within its limits.
+const BADGE_SHARE: f64 = 0.38;
+const BADGE_MIN: f64 = 14.0;
+const BADGE_MAX: f64 = 22.0;
+/// How far the badge reaches beyond the tile's corner.
+const BADGE_OUT: f64 = 3.0;
+
+/// The size of a badge's number for a badge `height` tall.
+pub fn badge_text_size(height: f64) -> f64 {
+    height * 0.68
+}
+
 /// Transparent room the window keeps beyond the label and on both sides of
 /// the widest bar, for the pill's shadow and the bar's.
 pub const ROOM: f64 = 8.0;
@@ -611,6 +642,31 @@ mod tests {
         ] {
             assert!((a - e).abs() < 1e-6, "{actual:?} != {expected:?}");
         }
+    }
+
+    #[test]
+    fn the_badge_sits_on_the_top_right_corner_and_reaches_beyond_it() {
+        let tile = area(100.0, 20.0, 48.0, 48.0);
+
+        let one = badge_area(tile, 7.0);
+
+        // As tall as 38 % of the tile, never narrower than tall.
+        close(one, area(148.0 + 3.0 - 18.24, 17.0, 18.24, 18.24));
+        // A long number widens it to the left, keeping the corner.
+        let many = badge_area(tile, 20.0);
+        assert!(many.width > one.width);
+        assert!((many.x + many.width - (one.x + one.width)).abs() < 1e-9);
+        assert_eq!(many.y, one.y);
+    }
+
+    #[test]
+    fn the_badge_keeps_a_size_that_reads_on_every_tile() {
+        assert_eq!(badge_area(area(0.0, 0.0, 20.0, 20.0), 5.0).height, 14.0);
+        assert_eq!(badge_area(area(0.0, 0.0, 120.0, 120.0), 5.0).height, 22.0);
+        // With no number, a smaller round dot.
+        let dot = badge_area(area(0.0, 0.0, 48.0, 48.0), 0.0);
+        assert_eq!(dot.width, dot.height);
+        assert!(dot.height < 18.24);
     }
 
     #[test]

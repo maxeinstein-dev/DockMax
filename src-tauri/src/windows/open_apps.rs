@@ -524,6 +524,28 @@ pub fn aumid_of_other(key: &str) -> Option<String> {
         .and_then(|other| other.aumid.clone())
 }
 
+/// What the windows of the open program `key` that is not pinned are grouped
+/// by: their AppID, else their file, lowercased. For its notification badge
+/// (spec 0016).
+pub fn group_key_of_other(key: &str) -> Option<String> {
+    state()
+        .others
+        .iter()
+        .find(|other| other.id == key)
+        .map(|other| other.key.clone())
+}
+
+/// What the shell calls the pinned program `app_id`, if it was read already
+/// (the looks at the windows read it): never asks the shell.
+pub fn known_identity(app_id: &str) -> Option<Identity> {
+    IDENTITIES
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .as_ref()?
+        .get(app_id)
+        .cloned()
+}
+
 /// What `app_icon` and `launch` take for the open program that is not pinned
 /// named by `key`: for a new instance of it. `None` when it is no longer open.
 pub fn app_id_of_other(key: &str) -> Option<String> {
