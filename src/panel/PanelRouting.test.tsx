@@ -427,7 +427,7 @@ describe("Panel routing", () => {
         screen.getByRole("heading", { name: ptBR.settings.look.title }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("combobox", { name: ptBR.settings.look.style }),
+        screen.getByRole("group", { name: ptBR.settings.look.style }),
       ).toBeInTheDocument();
       expect(readyCalls()).toHaveLength(2);
 
