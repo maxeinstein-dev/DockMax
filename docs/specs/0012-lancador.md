@@ -179,7 +179,7 @@ No build de teste em release (`dockmax-e2e.exe`, dados numa pasta temporária, b
 
 | Medida (memória privada, processo principal contra o repouso) | Resultado | Meta |
 |---|---|---|
-| Em repouso, lançador nunca aberto | sem diferença medível | +1 MB |
+| Em repouso, lançador nunca aberto | não medido à parte (sem um build sem o lançador para comparar); o build de teste ficou em 86–88 MB | +1 MB |
 | Aberto, depois de buscas que leram os ícones de uns 30 apps | **+7,2 MB**, mais o auxiliar com **9,9 MB** | +10 MB |
 | 50 s depois de fechar | **+1,8 MB**; o auxiliar já saiu | +3 MB |
 
