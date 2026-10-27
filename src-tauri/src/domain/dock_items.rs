@@ -48,6 +48,15 @@ impl Item {
         }
     }
 
+    /// How many icons wide the item is in the dock: a widget says; the rest
+    /// are one.
+    pub fn span(&self) -> usize {
+        match self {
+            Item::Widget(widget) => widget.config.span(),
+            _ => 1,
+        }
+    }
+
     /// Whether the item stands for a program (pinned or open).
     pub fn is_program(&self) -> bool {
         matches!(self, Item::App(_) | Item::Other(_))

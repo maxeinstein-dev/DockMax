@@ -643,6 +643,7 @@ impl Dock {
             status: dock.taskbar != TaskbarMode::Visible,
             tray: self.strip.len(),
             switcher: self.data.workspaces.len(),
+            spans: self.items.iter().map(Item::span).collect(),
         }
     }
 

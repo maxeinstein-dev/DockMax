@@ -215,6 +215,18 @@ impl WidgetConfig {
         }
     }
 
+    /// How many icons wide the widget is in the dock (spec 0017: 1 to 4).
+    /// The widgets of the first phases are all one icon wide.
+    pub fn span(&self) -> usize {
+        match self {
+            WidgetConfig::Clock(_)
+            | WidgetConfig::TimeProgress(_)
+            | WidgetConfig::Note(_)
+            | WidgetConfig::Shortcut(_)
+            | WidgetConfig::Files(_) => 1,
+        }
+    }
+
     /// The config a new instance of `kind` gets, and the one an instance
     /// falls back to when its stored config can't be read.
     pub fn default_for(kind: WidgetKind) -> WidgetConfig {
