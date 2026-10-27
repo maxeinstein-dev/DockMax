@@ -54,6 +54,12 @@ fn main() {
             "open_icon_packs_folder",
             "launcher_status",
             "clear_launcher_history",
+            "list_workspaces",
+            "create_workspace",
+            "rename_workspace",
+            "recolor_workspace",
+            "move_workspace",
+            "delete_workspace",
             // The E2E suite's, registered only in the test build (`e2e.rs`).
             "e2e_dock_view",
             "e2e_press_dock",

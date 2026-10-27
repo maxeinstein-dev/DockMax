@@ -1,3 +1,4 @@
+import { inWorkspace, type Workspace } from "../core/workspaces";
 import { useEffect, useRef, useState } from "react";
 import {
   MAX_APPS,
@@ -29,6 +30,10 @@ export interface AppsPanelProps {
   /** The pinned programs in dock order and the storage state (`useApps`);
    * null while loading, and for good when they can't be read. */
   snapshot: AppsSnapshot | null;
+  /** The workspace being edited (spec 0013): only its programs list, in its
+   * order, and every change goes to it. Without one (the panel opened from
+   * the dock), the whole list and the workspace in use. */
+  workspace?: Workspace | null;
   /** Voltar: back to Configurações, where the "Apps do dock" row takes the
    * focus. */
   /** Back to the main view of the panel; none in the Configurações app,
@@ -81,7 +86,7 @@ function LoadedIcon({ appId }: { appId: string }) {
  * from, with a search. Rust is the source of truth: nothing here changes
  * before `apps-changed` says so.
  */
-function AppsPanel({ snapshot, onBack }: AppsPanelProps) {
+function AppsPanel({ snapshot, workspace, onBack }: AppsPanelProps) {
   const t = useT();
   const [error, setError] = useState<AppErrorCode | null>(null);
   /** What the catalog read of one attempt answered; a newer attempt makes
@@ -99,7 +104,10 @@ function AppsPanel({ snapshot, onBack }: AppsPanelProps) {
 
   const storage = snapshot?.storage.state ?? null;
   const available = snapshot !== null && storage !== "unavailable";
-  const pinned: readonly PinnedApp[] = available ? snapshot.apps : [];
+  const pinned: readonly PinnedApp[] = available
+    ? inWorkspace(snapshot.apps, workspace, "app")
+    : [];
+  const space = workspace?.id;
   const full = pinned.length >= MAX_APPS;
 
   useEffect(() => {
@@ -129,7 +137,7 @@ function AppsPanel({ snapshot, onBack }: AppsPanelProps) {
   function pin(entry: CatalogEntry) {
     setError(null);
     setBusy(entry.appId);
-    pinApp(entry.appId).then(
+    pinApp(entry.appId, space).then(
       () => {
         setBusy(null);
         focusSearch();
@@ -144,7 +152,7 @@ function AppsPanel({ snapshot, onBack }: AppsPanelProps) {
   function unpin(app: PinnedApp) {
     setError(null);
     setBusy(app.id);
-    unpinApp(app.id).then(
+    unpinApp(app.id, space).then(
       () => setBusy(null),
       (reason: unknown) => {
         setBusy(null);
@@ -155,7 +163,7 @@ function AppsPanel({ snapshot, onBack }: AppsPanelProps) {
 
   function move(app: PinnedApp, direction: MoveDirection) {
     setError(null);
-    moveApp(app.id, direction).catch(fail);
+    moveApp(app.id, direction, space).catch(fail);
   }
 
   const pinnedIds = new Set(pinned.map((app) => app.appId.toLowerCase()));

@@ -3,14 +3,17 @@
   "commands": {
     "list_widgets": [],
     "add_widget": [
-      "kind"
+      "kind",
+      "workspace"
     ],
     "remove_widget": [
-      "id"
+      "id",
+      "workspace"
     ],
     "move_widget": [
       "id",
-      "direction"
+      "direction",
+      "workspace"
     ],
     "update_widget": [
       "id",

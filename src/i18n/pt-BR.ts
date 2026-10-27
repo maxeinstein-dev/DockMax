@@ -79,6 +79,7 @@ const messages = {
       nav: "Seções das configurações",
       sections: {
         general: "Geral",
+        workspaces: "Espaços de trabalho",
         look: "Aparência do dock",
         apps: "Apps do dock",
         items: "Itens do dock",
@@ -330,6 +331,48 @@ const messages = {
    * with `{name}` placeholders goes through `format`; a `{ one, other }`
    * pair through `plural`. */
   /** Configurações › Apps do dock (spec 0006). */
+  workspaces: {
+    title: "Espaços de trabalho",
+    lead: "Cada espaço tem o seu dock e guarda as suas janelas. Troque pelas bolinhas no dock, pela roda do mouse sobre ele ou com Ctrl+Alt+número. Editar aqui não muda o que o dock mostra.",
+    loading: "Lendo os espaços…",
+    listLabel: "Espaços",
+    editing: "Espaço em edição",
+    shortcut: "Ctrl+Alt+{n}",
+    create: "+ Novo espaço",
+    name: "Nome",
+    color: "Cor",
+    colors: {
+      "#0A84FF": "Azul",
+      "#FF9F0A": "Laranja",
+      "#30D158": "Verde",
+      "#BF5AF2": "Roxo",
+      "#FF375F": "Rosa",
+      "#FF453A": "Vermelho",
+      "#FFD60A": "Amarelo",
+      "#8E8E93": "Cinza",
+    },
+    counts: "{apps} apps e {widgets} widgets",
+    editApps: "Editar apps",
+    editItems: "Editar widgets",
+    moveUp: "Subir {name}",
+    moveDown: "Descer {name}",
+    remove: "Excluir {name}",
+    confirmTitle: "Excluir {name}?",
+    confirmDetail:
+      "Os apps e widgets que só estão nele saem do dock, e o texto das notas vai junto.",
+    cancel: "Cancelar",
+    confirm: "Excluir espaço",
+    errors: {
+      notFound: "Esse espaço não existe mais.",
+      limitReached: "O limite é de 9 espaços.",
+      invalidName: "Use de 1 a 32 caracteres, sem espaços nas pontas.",
+      invalidColor: "Escolha uma das cores.",
+      lastWorkspace: "O último espaço não pode ser excluído.",
+      unavailable: "Os dados do DockMax não estão disponíveis agora.",
+      writeFailed: "Não deu para salvar. Tente de novo.",
+      notReady: "Não deu para concluir. Tente de novo.",
+    },
+  },
   apps: {
     /** The navigation row in Configurações, and the subview's title. */
     title: "Apps do dock",

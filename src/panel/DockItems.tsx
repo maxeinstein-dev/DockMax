@@ -1,3 +1,4 @@
+import { inWorkspace, type Workspace } from "../core/workspaces";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   CREATABLE_KINDS,
@@ -36,6 +37,10 @@ export interface DockItemsProps {
   /** The instances in dock order and the storage state (`useWidgets`);
    * null while loading, and for good when they can't be read. */
   snapshot: WidgetsSnapshot | null;
+  /** The workspace being edited (spec 0013): only its widgets list, in its
+   * order, and every change goes to it. Without one, the whole list and the
+   * workspace in use. */
+  workspace?: Workspace | null;
   /** Voltar: back to Configurações, where the "Itens do dock" row takes the
    * focus (`NavRow` `focusOnMount`). The view mounts with the focus on
    * Voltar. */
@@ -190,7 +195,7 @@ function focusLost(): boolean {
  * notice of a recovered or unavailable storage. Rust is the source of
  * truth: nothing here changes before `widgets-changed` says so.
  */
-function DockItems({ snapshot, onBack }: DockItemsProps) {
+function DockItems({ snapshot, workspace, onBack }: DockItemsProps) {
   const t = useT();
   const [error, setError] = useState<WidgetErrorCode | null>(null);
   const [dismissing, setDismissing] = useState(false);
@@ -210,7 +215,10 @@ function DockItems({ snapshot, onBack }: DockItemsProps) {
 
   const storage = snapshot?.storage.state ?? null;
   const available = snapshot !== null && storage !== "unavailable";
-  const widgets = available ? snapshot.widgets : [];
+  const widgets = available
+    ? inWorkspace(snapshot.widgets, workspace, "widget")
+    : [];
+  const space = workspace?.id;
   const full = widgets.length >= MAX_WIDGETS;
 
   /** Moves the focus to `focusTarget` when the snapshot allows it. */
@@ -305,13 +313,13 @@ function DockItems({ snapshot, onBack }: DockItemsProps) {
     // Applied when the reordered snapshot comes (`widgets-changed`), which
     // may be before or after the command answers.
     focusTarget.current = { kind: "move", id, direction };
-    moveWidget({ id, direction }).catch(fail);
+    moveWidget({ id, direction, workspace: space }).catch(fail);
   }
 
   function add(kind: CreatableKind) {
     setError(null);
     focusTarget.current = null;
-    addWidget({ kind }).then((instance) => {
+    addWidget({ kind, workspace: space }).then((instance) => {
       focusTarget.current = { kind: "added", id: instance.id };
       restoreFocus();
     }, fail);
@@ -352,7 +360,7 @@ function DockItems({ snapshot, onBack }: DockItemsProps) {
     setError(null);
     setRemoving(id);
     focusTarget.current = { kind: "removed", id, index };
-    removeWidget({ id }).then(
+    removeWidget({ id, workspace: space }).then(
       () => {
         // The unsaved text of a note goes with it.
         forgetNote(id);

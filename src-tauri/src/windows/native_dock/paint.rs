@@ -142,6 +142,15 @@ pub struct Tip {
 }
 
 /// Everything one frame shows.
+/// A workspace dot of the switcher (spec 0013): its centre, its color,
+/// whether it is the workspace shown and whether the pointer is on it.
+pub struct Dot {
+    pub center: (f64, f64),
+    pub color: Color,
+    pub active: bool,
+    pub hovered: bool,
+}
+
 pub struct Scene {
     pub palette: Palette,
     pub look: Look,
@@ -150,6 +159,7 @@ pub struct Scene {
     pub icon: f64,
     pub bar: Area,
     pub separators: Vec<f64>,
+    pub dots: Vec<Dot>,
     pub tiles: Vec<Tile>,
     pub status: Option<Status>,
     pub strip: Vec<StripCell>,
@@ -684,6 +694,9 @@ impl Painter {
                 )
             };
         }
+        for dot in &scene.dots {
+            self.dot(dot);
+        }
         if scene.look.reflections {
             for tile in scene.tiles.iter().filter(|tile| !tile.dragging) {
                 self.reflection(scene, tile);
@@ -709,6 +722,40 @@ impl Painter {
         }
         if let Some(tip) = &scene.tip {
             self.tip(scene, tip);
+        }
+    }
+
+    /// A workspace dot: full for the one shown, a ring for the others; a
+    /// little bigger under the pointer.
+    fn dot(&mut self, dot: &Dot) {
+        use crate::domain::dock_layout::{ACTIVE_DOT_RADIUS, DOT_RADIUS};
+        let grow = if dot.hovered { 1.0 } else { 0.0 };
+        let brush = self.solid(dot.color).clone();
+        let center = v(dot.center.0, dot.center.1);
+        unsafe {
+            if dot.active {
+                let radius = (ACTIVE_DOT_RADIUS + grow) as f32;
+                self.target.FillEllipse(
+                    &D2D1_ELLIPSE {
+                        point: center,
+                        radiusX: radius,
+                        radiusY: radius,
+                    },
+                    &brush,
+                );
+            } else {
+                let radius = (DOT_RADIUS + grow) as f32;
+                self.target.DrawEllipse(
+                    &D2D1_ELLIPSE {
+                        point: center,
+                        radiusX: radius - 0.75,
+                        radiusY: radius - 0.75,
+                    },
+                    &brush,
+                    1.5,
+                    None,
+                );
+            }
         }
     }
 

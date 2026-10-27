@@ -58,6 +58,9 @@ fn effect_for(accepts: bool) -> DROPEFFECT {
 #[implement(IDropTarget)]
 struct DockDropTarget {
     app: AppHandle,
+    /// The dock's window: what is dropped goes to the workspace its monitor
+    /// shows.
+    hwnd: isize,
     /// What is over the dock has something that can be pinned.
     accepts: Cell<bool>,
 }
@@ -103,7 +106,11 @@ impl IDropTarget_Impl for DockDropTarget_Impl {
     ) -> windows::core::Result<()> {
         let accepts = self.accepts.replace(false);
         if let (true, Some(data)) = (accepts, pDataObj.as_ref()) {
-            commands::apps::pin_dropped(&self.app, paths_of(data));
+            commands::apps::pin_dropped(
+                &self.app,
+                paths_of(data),
+                super::native_dock::monitor_of(self.hwnd),
+            );
         }
         unsafe { *pdwEffect = effect_for(accepts) };
         Ok(())
@@ -115,6 +122,7 @@ impl IDropTarget_Impl for DockDropTarget_Impl {
 pub fn install(app: &AppHandle, hwnd: HWND) {
     let target: IDropTarget = DockDropTarget {
         app: app.clone(),
+        hwnd: hwnd.0 as isize,
         accepts: Cell::new(false),
     }
     .into();

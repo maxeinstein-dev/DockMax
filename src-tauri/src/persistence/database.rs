@@ -35,12 +35,13 @@ use rusqlite::{Connection, ErrorCode, MAIN_DB, OpenFlags, OptionalExtension, Tra
 use rusqlite::{TransactionBehavior, params};
 use rusqlite_migration::{HookResult, M, Migrations};
 
-use super::{apps_repo, widgets_repo};
+use super::{apps_repo, widgets_repo, workspaces_repo};
 use crate::domain::apps::{AppError, AppsSnapshot};
 use crate::domain::widgets::{
     RECOVERY_NOTICE_KEY, RECOVERY_NOTICE_PENDING, StorageStatus, UnavailableReason, WidgetError,
     WidgetKind, WidgetsSnapshot,
 };
+use crate::domain::workspaces::{Workspace, WorkspaceError};
 
 /// Name of the widget database inside the app data folder.
 pub const FILE_NAME: &str = "dockmax.db";
@@ -71,10 +72,13 @@ const MIGRATION_2: &str = include_str!("../../migrations/0002_apps.sql");
 /// SQL of migration 3: what the launcher opened (spec 0012).
 const MIGRATION_3: &str = include_str!("../../migrations/0003_launcher.sql");
 
+/// SQL of migration 4: the workspaces (spec 0013).
+const MIGRATION_4: &str = include_str!("../../migrations/0004_workspaces.sql");
+
 /// The SQL of the schema migrations, in order; the database's
 /// `user_version` is the number of them applied. Never change or reorder one
 /// that has shipped: add the next file in `src-tauri/migrations/` instead.
-pub const MIGRATIONS: &[&str] = &[MIGRATION_1, MIGRATION_2, MIGRATION_3];
+pub const MIGRATIONS: &[&str] = &[MIGRATION_1, MIGRATION_2, MIGRATION_3, MIGRATION_4];
 
 /// `application_id` of a new database that replaces one set aside, until
 /// the transaction that makes its schema commits with the recovery notice.
@@ -181,7 +185,9 @@ impl Storage {
             .unwrap_or_default()
     }
 
-    /// Keeps the dock's order (`dock_order`).
+    /// Keeps the dock's order (`dock_order`): only the tests, for the order
+    /// the first workspace starts with (spec 0013).
+    #[cfg(test)]
     pub fn set_dock_order(&mut self, keys: &[String]) -> Result<(), WidgetError> {
         let conn = self.connection()?;
         let keys: Vec<&String> = keys.iter().take(MAX_DOCK_ORDER).collect();
@@ -192,6 +198,144 @@ impl Storage {
             params![DOCK_ORDER_KEY, text],
         )
         .map_err(write_failed)?;
+        Ok(())
+    }
+
+    /// The workspaces in order (spec 0013), making the first one, with what
+    /// the dock showed, when there is none yet.
+    pub fn workspaces(&mut self) -> Result<Vec<Workspace>, WorkspaceError> {
+        let order = self.dock_order();
+        let conn = self.connection()?;
+        workspaces_repo::ensure_first(conn, &order)?;
+        workspaces_repo::list(conn)
+    }
+
+    /// The workspace `id` of `all`, or the first one.
+    fn pick(all: Vec<Workspace>, id: Option<String>) -> Result<Workspace, WorkspaceError> {
+        let mut all = all.into_iter();
+        let first = all.next().ok_or(WorkspaceError::NotFound)?;
+        Ok(match id {
+            Some(id) if first.id != id => all.find(|w| w.id == id).unwrap_or(first),
+            _ => first,
+        })
+    }
+
+    /// The workspace the monitor `monitor` (its device name) shows.
+    pub fn shown_on(&mut self, monitor: &str) -> Result<Workspace, WorkspaceError> {
+        let all = self.workspaces()?;
+        let id = workspaces_repo::active(self.connection()?, monitor)?;
+        Self::pick(all, id)
+    }
+
+    /// The workspace in use: the one of the dock used last.
+    pub fn in_use(&mut self) -> Result<Workspace, WorkspaceError> {
+        let all = self.workspaces()?;
+        let id = workspaces_repo::in_use(self.connection()?)?;
+        Self::pick(all, id)
+    }
+
+    /// Makes `id` the workspace in use; returns whether it changed.
+    pub fn use_workspace(&mut self, id: &str) -> Result<bool, WorkspaceError> {
+        self.workspaces()?;
+        workspaces_repo::set_in_use(self.connection()?, id)
+    }
+
+    /// The monitor `monitor` shows the workspace `id`, which is now in use.
+    pub fn switch_workspace(&mut self, monitor: &str, id: &str) -> Result<(), WorkspaceError> {
+        self.workspaces()?;
+        let conn = self.connection()?;
+        workspaces_repo::set_active(conn, monitor, id)?;
+        workspaces_repo::set_in_use(conn, id)?;
+        Ok(())
+    }
+
+    /// Puts the item `key` at the end of the workspace `id`, unless it is
+    /// there.
+    pub fn add_to_workspace(&mut self, id: &str, key: &str) -> Result<(), WorkspaceError> {
+        self.workspaces()?;
+        workspaces_repo::add_item(self.connection()?, id, key)
+    }
+
+    /// Takes the item `key` out of the workspace `id`; returns whether
+    /// another workspace still has it (then it is not to be removed for
+    /// good).
+    pub fn remove_from_workspace(&mut self, id: &str, key: &str) -> Result<bool, WorkspaceError> {
+        self.workspaces()?;
+        workspaces_repo::remove_item(self.connection()?, id, key)
+    }
+
+    /// The item `key` is gone for good: out of every workspace.
+    pub fn forget_item(&mut self, key: &str) -> Result<(), WorkspaceError> {
+        workspaces_repo::forget_item(self.connection()?, key)
+    }
+
+    /// Puts the items of the workspace `id` in the order of `keys`.
+    pub fn reorder_workspace(&mut self, id: &str, keys: &[String]) -> Result<(), WorkspaceError> {
+        workspaces_repo::reorder(self.connection()?, id, keys)
+    }
+
+    /// Moves the item `key` of the workspace `id` one place up or down among
+    /// its own kind (the lists of Configurações show each kind apart).
+    pub fn shift_in_workspace(
+        &mut self,
+        id: &str,
+        key: &str,
+        up: bool,
+    ) -> Result<(), WorkspaceError> {
+        let workspace = self
+            .workspaces()?
+            .into_iter()
+            .find(|w| w.id == id)
+            .ok_or(WorkspaceError::NotFound)?;
+        let Some(moved) = crate::domain::workspaces::shifted(&workspace.items, key, up) else {
+            return Ok(());
+        };
+        workspaces_repo::reorder(self.connection()?, id, &moved)
+    }
+
+    /// Makes a workspace at the end.
+    pub fn create_workspace(&mut self, name: Option<&str>) -> Result<Workspace, WorkspaceError> {
+        self.workspaces()?;
+        workspaces_repo::create(self.connection()?, name)
+    }
+
+    pub fn rename_workspace(&mut self, id: &str, name: &str) -> Result<(), WorkspaceError> {
+        workspaces_repo::rename(self.connection()?, id, name)
+    }
+
+    pub fn recolor_workspace(&mut self, id: &str, color: &str) -> Result<(), WorkspaceError> {
+        workspaces_repo::recolor(self.connection()?, id, color)
+    }
+
+    /// Moves the workspace one place up or down.
+    pub fn shift_workspace(&mut self, id: &str, up: bool) -> Result<(), WorkspaceError> {
+        workspaces_repo::shift(self.connection()?, id, up)
+    }
+
+    /// Deletes the workspace `id`, and for good the programs and widgets no
+    /// other workspace has (a note's text with its widget).
+    pub fn delete_workspace(&mut self, id: &str) -> Result<(), WorkspaceError> {
+        let orphans = workspaces_repo::delete(self.connection()?, id)?;
+        for key in orphans {
+            let conn = self.connection()?;
+            let removed = match key.split_once(':') {
+                Some(("app", item)) => {
+                    crate::domain::widgets::WidgetId::parse(item)
+                        .ok()
+                        .map(|item| {
+                            apps_repo::unpin(conn, &item).map_err(|_| WorkspaceError::WriteFailed)
+                        })
+                }
+                Some(("widget", item)) => crate::domain::widgets::WidgetId::parse(item)
+                    .ok()
+                    .map(|item| widgets_repo::remove(conn, &item).map_err(WorkspaceError::from)),
+                _ => None,
+            };
+            match removed {
+                Some(Ok(())) | None => {}
+                Some(Err(error)) => log::warn!("workspaces: an item left behind: {error}"),
+            }
+        }
         Ok(())
     }
 
