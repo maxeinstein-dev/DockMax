@@ -103,6 +103,8 @@ pub struct TrayMessages {
     pub quit: &'static str,
     /// Makes a workspace and shows it (the dock's menu, spec 0013).
     pub new_workspace: &'static str,
+    /// The title over the workspaces in the dock's menu (spec 0014 R3).
+    pub workspaces: &'static str,
 }
 
 const PT_BR: Messages = Messages {
@@ -113,6 +115,7 @@ const PT_BR: Messages = Messages {
         open_settings: "Configurações",
         quit: "Sair",
         new_workspace: "Novo espaço",
+        workspaces: "Espaços de trabalho",
     },
     settings: SettingsMessages {
         window_title: "Configurações do DockMax",

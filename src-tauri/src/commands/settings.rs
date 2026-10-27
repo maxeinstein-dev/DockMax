@@ -314,7 +314,6 @@ fn apply(
         log::warn!("settings: saved, but failed to notify the windows: {error}");
     }
     dock::settings_changed(&app, &before, &updated.dock);
-    crate::tray::show_auto_hide(&app, updated.dock.auto_hide);
     if updated.launch_at_login != launch_before {
         apply_launch_at_login(updated.launch_at_login);
     }

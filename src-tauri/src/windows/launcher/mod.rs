@@ -19,7 +19,7 @@
 
 mod access;
 pub mod icons;
-mod layout;
+pub(crate) mod layout;
 mod paint;
 
 use std::cell::{Cell, RefCell};
@@ -611,7 +611,7 @@ pub fn is_open() -> bool {
 }
 
 /// Whether Windows' contrast mode is on.
-fn high_contrast() -> bool {
+pub(crate) fn high_contrast() -> bool {
     let mut contrast = HIGHCONTRASTW {
         cbSize: size_of::<HIGHCONTRASTW>() as u32,
         ..Default::default()
@@ -627,7 +627,7 @@ fn high_contrast() -> bool {
     read.is_ok() && contrast.dwFlags.contains(HCF_HIGHCONTRASTON)
 }
 
-fn system_color(index: SYS_COLOR_INDEX) -> Rgb {
+pub(crate) fn system_color(index: SYS_COLOR_INDEX) -> Rgb {
     let value = unsafe { GetSysColor(index) };
     (
         (value & 0xFF) as u8,
