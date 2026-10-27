@@ -4,6 +4,9 @@ import {
   type CreatableKind,
   type WidgetInstance,
 } from "../core/widgets";
+import ActivityPanel from "./activity/ActivityPanel";
+import ActivitySettings from "./activity/ActivitySettings";
+import ActivityTile from "./activity/ActivityTile";
 import ClockPanel from "./clock/ClockPanel";
 import ClockSettings from "./clock/ClockSettings";
 import ClockTile from "./clock/ClockTile";
@@ -12,6 +15,9 @@ import type {
   WidgetSettingsProps,
   WidgetTileProps,
 } from "./contract";
+import NetworkPanel from "./network/NetworkPanel";
+import NetworkSettings from "./network/NetworkSettings";
+import NetworkTile from "./network/NetworkTile";
 import NotePanel from "./notes/NotePanel";
 import NoteSettings from "./notes/NoteSettings";
 import NoteTile from "./notes/NoteTile";
@@ -26,7 +32,8 @@ import ProgressTile from "./time-progress/ProgressTile";
 
 /** The static glaze class of each kind's tile (tokens.css, The Own Glaze
  * Rule). */
-export type GlazeClass = "t-clock" | "t-progress" | "t-notes";
+export type GlazeClass =
+  "t-clock" | "t-progress" | "t-notes" | "t-activity" | "t-network";
 
 export interface WidgetDefinition<K extends CreatableKind> {
   kind: K;
@@ -69,6 +76,22 @@ export const WIDGET_REGISTRY: {
     Tile: NoteTile,
     Panel: NotePanel,
     Settings: NoteSettings,
+  },
+  activity: {
+    kind: "activity",
+    nameKey: "activity",
+    glaze: "t-activity",
+    Tile: ActivityTile,
+    Panel: ActivityPanel,
+    Settings: ActivitySettings,
+  },
+  network: {
+    kind: "network",
+    nameKey: "network",
+    glaze: "t-network",
+    Tile: NetworkTile,
+    Panel: NetworkPanel,
+    Settings: NetworkSettings,
   },
 };
 

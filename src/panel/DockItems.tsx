@@ -62,6 +62,8 @@ const GLYPHS: Readonly<Record<CreatableKind, readonly string[]>> = {
     "M7.5 3.5h9a2.5 2.5 0 0 1 2.5 2.5v12a2.5 2.5 0 0 1 -2.5 2.5h-9a2.5 2.5 0 0 1 -2.5 -2.5v-12a2.5 2.5 0 0 1 2.5 -2.5z",
     "M8.5 8.5h7M8.5 12h7M8.5 15.5h4",
   ],
+  activity: ["M7 19V11M12 19V5M17 19v-5"],
+  network: ["M8.5 4.5v15M4.5 15.5l4 4 4-4M15.5 19.5v-15M11.5 8.5l4-4 4 4"],
 };
 
 /** The kind's tile, static: 26 px in the list, 18 px on an add button and

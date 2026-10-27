@@ -1,5 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
+  ACTIVITY_SHOWS,
+  ACTIVITY_STYLES,
   CLOCK_ICON_STYLES,
   CREATABLE_KINDS,
   HOUR_CYCLES,
@@ -13,6 +15,8 @@ import {
   WIDGET_ERROR_CODES,
   WIDGET_KINDS,
   WIDGETS_CHANGED_EVENT,
+  type ActivityShow,
+  type ActivityStyle,
   type ClockIconStyle,
   type HourCycle,
   type MoveDirection,
@@ -100,6 +104,12 @@ describe("widget closed sets", () => {
     expectTypeOf<ShortcutTarget["type"]>().toEqualTypeOf<
       (typeof SHORTCUT_TARGET_TYPES)[number]
     >();
+    expectTypeOf<ActivityShow>().toEqualTypeOf<
+      (typeof ACTIVITY_SHOWS)[number]
+    >();
+    expectTypeOf<ActivityStyle>().toEqualTypeOf<
+      (typeof ACTIVITY_STYLES)[number]
+    >();
   });
 
   it("matches the Rust enums, in the order of their ALL", () => {
@@ -113,6 +123,8 @@ describe("widget closed sets", () => {
       UnavailableReason: [...UNAVAILABLE_REASONS],
       StorageState: [...STORAGE_STATES],
       ShortcutTargetType: [...SHORTCUT_TARGET_TYPES],
+      ActivityShow: [...ACTIVITY_SHOWS],
+      ActivityStyle: [...ACTIVITY_STYLES],
       WidgetErrorCode: WIDGET_ERROR_CODES.filter((code) => code !== "notReady"),
     });
   });
@@ -148,8 +160,14 @@ describe("widget commands and event", () => {
 });
 
 describe("widget contract constants", () => {
-  it("only clock, time progress and note can be created", () => {
-    expect(CREATABLE_KINDS).toEqual(["clock", "time-progress", "note"]);
+  it("every kind but shortcut and files can be created", () => {
+    expect(CREATABLE_KINDS).toEqual([
+      "clock",
+      "time-progress",
+      "note",
+      "activity",
+      "network",
+    ]);
     expect(CREATABLE_KINDS.every((kind) => WIDGET_KINDS.includes(kind))).toBe(
       true,
     );

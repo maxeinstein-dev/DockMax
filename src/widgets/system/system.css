@@ -1,0 +1,124 @@
+/* The system widgets (spec 0017 F1): Atividade and Atividade de rede. Only
+   tokens from tokens.css, plus `--f`, the share of a bar, which the panel
+   sets through the CSSOM (`style.setProperty`): no inline style (strict
+   CSP). The dock's tiles are native (`native_dock/paint.rs`); these are
+   the panels. */
+
+/* A meter: name and figure on top, the bar, then the detail. */
+.sys-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sys-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 5px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+
+.sys-name {
+  font-weight: 600;
+}
+
+.sys-figure {
+  font: 600 15px / 1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.sys-detail {
+  grid-column: 1 / -1;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sys-bar {
+  grid-column: 1 / -1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--pg-track);
+}
+
+.sys-fill {
+  display: block;
+  width: calc(var(--f, 0) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sys-fill {
+    transition: width 0.4s ease-out;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sys-fill {
+    transition: none;
+  }
+}
+
+/* The last minute: a filled line, as wide as the panel. */
+.sys-spark {
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
+  height: 40px;
+}
+
+.sys-spark-area {
+  fill: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.sys-spark-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.sys-hint {
+  margin: -4px 0 0;
+  color: var(--ink-2);
+  font-size: 11.5px;
+}
+
+@media (forced-colors: active) {
+  .sys-fill {
+    background: Highlight;
+  }
+
+  .sys-spark-line {
+    stroke: CanvasText;
+  }
+
+  .sys-spark-area {
+    fill: none;
+  }
+}
+
+/* The tile outside the dock: a white line glyph on the glaze. */
+.sys-tile {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.sys-tile svg {
+  width: 54%;
+  height: 54%;
+  fill: none;
+  stroke: var(--glyph);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

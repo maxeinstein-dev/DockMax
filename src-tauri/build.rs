@@ -29,6 +29,7 @@ fn main() {
             "dismiss_storage_notice",
             "list_tray",
             "tray_click",
+            "read_system_activity",
             "tray_to_dock",
             "list_apps",
             "list_catalog",
