@@ -1,4 +1,9 @@
-import { dayText, useCycle, type CycleStatus } from "../../core/cycle";
+import {
+  dayText,
+  useCycle,
+  type CycleNotice,
+  type CycleStatus,
+} from "../../core/cycle";
 import { format, plural, useT, type Messages } from "../../i18n";
 import PanelFooter from "../../panel/PanelFooter";
 import PanelHeader from "../../panel/parts/PanelHeader";
@@ -20,6 +25,13 @@ function phaseText(t: Messages, status: CycleStatus): string {
     case "between":
       return phase.in <= 0 ? text.due : plural(text.between, phase.in);
   }
+}
+
+/** The line of a notice of today. */
+function noticeText(t: Messages, notice: CycleNotice): string {
+  return notice.kind === "reminder"
+    ? notice.text
+    : t.widgets.cycle.notices[notice.kind];
 }
 
 /**
@@ -50,6 +62,20 @@ function CyclePanel({
       ) : (
         <>
           <p className="cycle-phase">{phaseText(t, status)}</p>
+          {view && view.notices.length > 0 ? (
+            <section className="cycle-today" aria-label={text.today}>
+              <h3>{text.today}</h3>
+              <ul>
+                {view.notices.map((notice) => (
+                  <li
+                    key={notice.kind === "reminder" ? notice.text : notice.kind}
+                  >
+                    {noticeText(t, notice)}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           {status.next !== null ? (
             <dl className="cycle-facts">
               <dt>{text.next}</dt>

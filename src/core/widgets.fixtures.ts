@@ -2,6 +2,7 @@ import {
   ACTIVITY_SHOWS,
   ACTIVITY_STYLES,
   CARD_PERIODS,
+  REMINDER_ANCHORS,
   CLOCK_ICON_STYLES,
   HOUR_CYCLES,
   MOVE_DIRECTIONS,
@@ -198,14 +199,26 @@ export const WIDGET_FIXTURES = {
     id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6086",
     label: null,
     kind: "cycle",
-    config: { symbol: "🌸", calendar: null, sensitive: 5 },
+    config: {
+      symbol: "🌸",
+      calendar: null,
+      sensitive: 5,
+      notices: { sensitive: true, eve: true, day: true },
+      reminders: [],
+    },
   } satisfies WidgetInstance<"cycle">,
 
   "cycle-sample": {
     id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6087",
     label: null,
     kind: "cycle",
-    config: { symbol: "🌸", calendar: "noiva@example.com", sensitive: 3 },
+    config: {
+      symbol: "🌸",
+      calendar: "noiva@example.com",
+      sensitive: 3,
+      notices: { sensitive: true, eve: false, day: true },
+      reminders: [{ text: "Comprar chocolate", anchor: "sensitive", days: -1 }],
+    },
   } satisfies WidgetInstance<"cycle">,
 
   "snapshot-sample": {
@@ -236,6 +249,7 @@ export const WIDGET_FIXTURES = {
     ActivityShow: ACTIVITY_SHOWS,
     ActivityStyle: ACTIVITY_STYLES,
     CardPeriod: CARD_PERIODS,
+    ReminderAnchor: REMINDER_ANCHORS,
     WidgetErrorCode: WIDGET_ERROR_CODES.filter((code) => code !== "notReady"),
   },
 

@@ -908,6 +908,40 @@ const messages = {
       allCalendars: "Todas as agendas",
       window: "TPM: dias antes",
       windowHint: "Quantos dias antes da menstruação prevista a TPM começa.",
+      today: "Hoje",
+      notices: {
+        sensitive: "A TPM deve começar hoje.",
+        eve: "A menstruação deve vir amanhã.",
+        day: "A menstruação deve vir hoje.",
+      },
+      noticesTitle: "Avisos do Windows",
+      noticeToggles: {
+        sensitive: "Quando a TPM começar",
+        eve: "Na véspera da menstruação",
+        day: "No dia da menstruação",
+      },
+      noticesHint:
+        "A partir das 9h, um aviso discreto “Lembrete do Ciclo”, sem detalhes. O que é fica no painel.",
+      testNotice: "Enviar aviso de teste",
+      testSent: "Aviso enviado.",
+      testFailed: "O Windows não mostrou o aviso.",
+      remindersTitle: "Lembretes",
+      noReminders: "Nenhum lembrete ainda.",
+      remindersHint:
+        "Caem no dia escolhido junto com os avisos, e o texto aparece só no painel.",
+      reminderText: "Novo lembrete",
+      reminderPlaceholder: "Comprar chocolate",
+      reminderDaysLabel: "Quando",
+      reminderAnchorLabel: "Contando de",
+      anchors: { sensitive: "da TPM", period: "da menstruação" },
+      reminderDays: {
+        same: "No dia",
+        before: { one: "{n} dia antes", other: "{n} dias antes" },
+        after: { one: "{n} dia depois", other: "{n} dias depois" },
+      },
+      reminderWhen: "{days} {anchor}",
+      addReminder: "Adicionar lembrete",
+      removeReminder: "Remover o lembrete {text}",
     },
     items: {
       /** The navigation row in Configurações, and the subview's title. */
@@ -967,7 +1001,7 @@ const messages = {
       invalidWidth: "Essa largura não vale para este widget.",
       invalidCalendars: "Não foi possível guardar os ajustes do calendário.",
       invalidCycle:
-        "Use um símbolo de até 16 caracteres e uma janela de 1 a 10 dias.",
+        "Use um símbolo de até 16 caracteres, uma janela de 1 a 10 dias e até 10 lembretes de 120 caracteres.",
       noteTooLarge: "Passou de 64 KB e não foi salvo. Encurte o texto.",
       invalidConfig:
         "Não foi possível aplicar este ajuste. Feche o painel e tente de novo.",

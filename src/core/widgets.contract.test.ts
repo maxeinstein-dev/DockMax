@@ -8,6 +8,7 @@ import {
   HOUR_CYCLES,
   MOVE_DIRECTIONS,
   PERIODS,
+  REMINDER_ANCHORS,
   SHORTCUT_TARGET_TYPES,
   STORAGE_STATES,
   UNAVAILABLE_REASONS,
@@ -23,6 +24,7 @@ import {
   type HourCycle,
   type MoveDirection,
   type Period,
+  type ReminderAnchor,
   type ShortcutTarget,
   type StorageStatus,
   type UnavailableReason,
@@ -113,6 +115,9 @@ describe("widget closed sets", () => {
       (typeof ACTIVITY_STYLES)[number]
     >();
     expectTypeOf<CardPeriod>().toEqualTypeOf<(typeof CARD_PERIODS)[number]>();
+    expectTypeOf<ReminderAnchor>().toEqualTypeOf<
+      (typeof REMINDER_ANCHORS)[number]
+    >();
   });
 
   it("matches the Rust enums, in the order of their ALL", () => {
@@ -129,6 +134,7 @@ describe("widget closed sets", () => {
       ActivityShow: [...ACTIVITY_SHOWS],
       ActivityStyle: [...ACTIVITY_STYLES],
       CardPeriod: [...CARD_PERIODS],
+      ReminderAnchor: [...REMINDER_ANCHORS],
       WidgetErrorCode: WIDGET_ERROR_CODES.filter((code) => code !== "notReady"),
     });
   });

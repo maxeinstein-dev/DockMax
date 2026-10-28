@@ -28,6 +28,89 @@
   font-size: 12px;
 }
 
+.cycle-today {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--track);
+}
+
+.cycle-today h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.cycle-today ul {
+  margin: 0;
+  padding: 0 0 0 16px;
+  font-size: 12.5px;
+}
+
+.cycle-group {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cycle-group legend {
+  margin-bottom: 4px;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.cycle-test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cycle-test .secondary-button,
+.cycle-group > .secondary-button {
+  justify-self: start;
+}
+
+.cycle-reminders {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cycle-reminders li {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  font-size: 12.5px;
+}
+
+.cycle-reminder-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cycle-reminder-when {
+  grid-column: 1;
+  grid-row: 2;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.cycle-reminders .icon-button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
 .cycle-select {
   display: grid;
   gap: 4px;
