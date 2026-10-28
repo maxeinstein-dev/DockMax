@@ -263,6 +263,25 @@ export const WIDGET_FIXTURES = {
     },
   } satisfies WidgetInstance<"pomodoro">,
 
+  "todo-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6092",
+    label: null,
+    kind: "todo",
+    config: { items: [] },
+  } satisfies WidgetInstance<"todo">,
+
+  "todo-sample": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6093",
+    label: null,
+    kind: "todo",
+    config: {
+      items: [
+        { id: "t1", text: "Comprar pão", done: false },
+        { id: "t2", text: "Pagar a conta de luz", done: true },
+      ],
+    },
+  } satisfies WidgetInstance<"todo">,
+
   "snapshot-sample": {
     storage: { state: "ok" },
     widgets: [CLOCK_DEFAULT, { ...NOTE_DEFAULT, label: "Mercado" }],

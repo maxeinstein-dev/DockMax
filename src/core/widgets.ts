@@ -43,7 +43,8 @@ export type WidgetKind =
   | "calendar"
   | "cycle"
   | "countdown"
-  | "pomodoro";
+  | "pomodoro"
+  | "todo";
 
 /* Each closed set below has a tuple with every value, in the order of the
  * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
@@ -63,6 +64,7 @@ export const WIDGET_KINDS = [
   "cycle",
   "countdown",
   "pomodoro",
+  "todo",
 ] as const;
 
 /** The kinds `add_widget` accepts in this phase. */
@@ -81,6 +83,7 @@ export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "cycle",
   "countdown",
   "pomodoro",
+  "todo",
 ];
 
 /** Stable ID of an instance: a UUID v7 made in Rust, never reused and never
@@ -296,6 +299,24 @@ export const POMODORO_CHOICES = {
   every: [2, 3, 4, 5, 6],
 } as const;
 
+/** A task of the Lista de tarefas: an ID the panel makes, its text and
+ * whether it is done. */
+export interface TodoItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+/** The Lista de tarefas (spec 0017 F3): the tasks, in the author's order.
+ * Checked in Rust. */
+export interface TodoConfig {
+  items: TodoItem[];
+}
+
+/** Most tasks in a list, and the longest text of one. */
+export const MAX_TASKS = 200;
+export const MAX_TASK_CHARS = 200;
+
 /** The config of each kind. */
 export interface WidgetConfigs {
   clock: ClockConfig;
@@ -309,6 +330,7 @@ export interface WidgetConfigs {
   cycle: CycleConfig;
   countdown: CountdownConfig;
   pomodoro: PomodoroConfig;
+  todo: TodoConfig;
 }
 
 /** A kind's config tagged with the kind, as `update_widget` takes it:
@@ -387,6 +409,9 @@ export type WidgetErrorCode =
   | "invalidCountdown"
   /** The times of the Pomodoro out of their ranges. */
   | "invalidPomodoro"
+  /** A task empty, too long, with a control character or an ID used
+   * twice, or too many tasks. */
+  | "invalidTasks"
   | "noteTooLarge"
   /** A stored config has another version or is not valid JSON, or the
    * config given to `update_widget` is not exactly the canonical one (a
@@ -416,6 +441,7 @@ export const WIDGET_ERROR_CODES: readonly WidgetErrorCode[] = Object.keys({
   invalidCycle: true,
   invalidCountdown: true,
   invalidPomodoro: true,
+  invalidTasks: true,
   noteTooLarge: true,
   invalidConfig: true,
   unavailable: true,

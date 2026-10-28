@@ -10,7 +10,8 @@
     "calendar",
     "cycle",
     "countdown",
-    "pomodoro"
+    "pomodoro",
+    "todo"
   ],
   "HourCycle": [
     "h23",
@@ -86,6 +87,7 @@
     "invalidCycle",
     "invalidCountdown",
     "invalidPomodoro",
+    "invalidTasks",
     "noteTooLarge",
     "invalidConfig",
     "unavailable",

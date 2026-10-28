@@ -598,6 +598,7 @@ const messages = {
       cycle: "Ciclo",
       countdown: "Contagem regressiva",
       pomodoro: "Pomodoro",
+      todo: "Lista de tarefas",
     } satisfies Record<WidgetKind, string>,
     /** Short name of each kind on the add buttons of Itens do dock. */
     addNames: {
@@ -610,6 +611,7 @@ const messages = {
       cycle: "Ciclo",
       countdown: "Contagem regressiva",
       pomodoro: "Pomodoro",
+      todo: "Lista de tarefas",
     } satisfies Record<CreatableKind, string>,
     /** Parts every widget panel shares. */
     common: {
@@ -813,6 +815,7 @@ const messages = {
         calendar:
           "As próximas reuniões das suas agendas Google, com Entrar a um clique.",
         cycle: "Acompanha um ciclo marcado na agenda, com discrição no dock.",
+        todo: "Tarefas com marca de feita; o dock mostra quantas faltam.",
         pomodoro:
           "Foco e pausa com o tempo no dock; continua contando com o painel fechado.",
         countdown:
@@ -884,6 +887,24 @@ const messages = {
       showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },
     /** The Ciclo (spec 0017 F2b): the panel says what the tile doesn't. */
+    /** The Lista de tarefas (spec 0017 F3). */
+    todo: {
+      settingsTitle: "Ajustes da lista",
+      new: "Nova tarefa",
+      placeholder: "Nova tarefa",
+      full: "A lista chegou a 200 tarefas",
+      add: "Adicionar",
+      empty: "Nenhuma tarefa ainda.",
+      allDone: "Tudo feito.",
+      openTitle: "Abertas",
+      doneTitle: { one: "{n} feita", other: "{n} feitas" },
+      remove: "Remover a tarefa {text}",
+      clearDone: "Limpar as feitas",
+      footer: {
+        one: "{n} aberta · salvo no DockMax",
+        other: "{n} abertas · salvo no DockMax",
+      },
+    },
     /** The Pomodoro (spec 0017 F2c-2). */
     pomodoro: {
       settingsTitle: "Ajustes do Pomodoro",
@@ -1054,6 +1075,7 @@ const messages = {
       invalidCalendars: "Não foi possível guardar os ajustes do calendário.",
       invalidCountdown: "Escolha uma data válida.",
       invalidPomodoro: "Não foi possível guardar os tempos do Pomodoro.",
+      invalidTasks: "Não foi possível guardar a lista.",
       invalidCycle:
         "Use um símbolo de até 16 caracteres, uma janela de 1 a 10 dias e até 10 lembretes de 120 caracteres.",
       noteTooLarge: "Passou de 64 KB e não foi salvo. Encurte o texto.",

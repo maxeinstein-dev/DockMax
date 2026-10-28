@@ -8,7 +8,13 @@ import { labelFromDraft } from "../../panel/parts/label";
 import type { WidgetSettingsProps, WidgetUpdate } from "../contract";
 
 type SystemKind =
-  "activity" | "network" | "calendar" | "cycle" | "countdown" | "pomodoro";
+  | "activity"
+  | "network"
+  | "calendar"
+  | "cycle"
+  | "countdown"
+  | "pomodoro"
+  | "todo";
 
 /** The error code of a refused command; anything else counts as a failed
  * write (the contract rejects only with a `WidgetCommandError`). */

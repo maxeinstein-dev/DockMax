@@ -639,6 +639,7 @@ fn names() -> Names {
         cycle: dock.cycle,
         countdown: dock.countdown,
         pomodoro: dock.pomodoro,
+        todo: dock.todo,
     }
 }
 
@@ -3400,6 +3401,7 @@ pub fn view() -> Option<View> {
                         crate::domain::widgets::WidgetConfig::Cycle(_) => "ring",
                         crate::domain::widgets::WidgetConfig::Countdown(_) => "agenda",
                         crate::domain::widgets::WidgetConfig::Pomodoro(_) => "ring",
+                        crate::domain::widgets::WidgetConfig::Todo(_) => "agenda",
                         _ => "glyph",
                     },
                 };

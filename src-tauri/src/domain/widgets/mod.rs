@@ -39,6 +39,7 @@ pub mod pomodoro;
 pub mod shortcut;
 pub mod system;
 pub mod time_progress;
+pub mod todo;
 
 use std::fmt;
 
@@ -56,6 +57,7 @@ pub use pomodoro::PomodoroConfig;
 pub use shortcut::ShortcutConfig;
 pub use system::{ActivityConfig, NetworkConfig};
 pub use time_progress::TimeProgressConfig;
+pub use todo::TodoConfig;
 
 /// Most widget instances the dock holds (spec 0003 §2.1 item 3).
 pub const MAX_WIDGETS: usize = 12;
@@ -93,6 +95,7 @@ pub enum WidgetKind {
     Cycle,
     Countdown,
     Pomodoro,
+    Todo,
 }
 
 closed_set!(WidgetKind {
@@ -107,6 +110,7 @@ closed_set!(WidgetKind {
     Cycle,
     Countdown,
     Pomodoro,
+    Todo,
 });
 
 impl WidgetKind {
@@ -122,7 +126,8 @@ impl WidgetKind {
             | WidgetKind::Calendar
             | WidgetKind::Cycle
             | WidgetKind::Countdown
-            | WidgetKind::Pomodoro => true,
+            | WidgetKind::Pomodoro
+            | WidgetKind::Todo => true,
             WidgetKind::Shortcut | WidgetKind::Files => false,
         }
     }
@@ -141,7 +146,8 @@ impl WidgetKind {
             | WidgetKind::Calendar
             | WidgetKind::Cycle
             | WidgetKind::Countdown
-            | WidgetKind::Pomodoro => 1,
+            | WidgetKind::Pomodoro
+            | WidgetKind::Todo => 1,
         }
     }
 
@@ -159,6 +165,7 @@ impl WidgetKind {
             WidgetKind::Cycle => "cycle",
             WidgetKind::Countdown => "countdown",
             WidgetKind::Pomodoro => "pomodoro",
+            WidgetKind::Todo => "todo",
         }
     }
 
@@ -250,6 +257,7 @@ pub enum WidgetConfig {
     Cycle(CycleConfig),
     Countdown(CountdownConfig),
     Pomodoro(PomodoroConfig),
+    Todo(TodoConfig),
 }
 
 impl WidgetConfig {
@@ -266,6 +274,7 @@ impl WidgetConfig {
             WidgetConfig::Cycle(_) => WidgetKind::Cycle,
             WidgetConfig::Countdown(_) => WidgetKind::Countdown,
             WidgetConfig::Pomodoro(_) => WidgetKind::Pomodoro,
+            WidgetConfig::Todo(_) => WidgetKind::Todo,
         }
     }
 
@@ -284,7 +293,8 @@ impl WidgetConfig {
             | WidgetConfig::Files(_)
             | WidgetConfig::Cycle(_)
             | WidgetConfig::Countdown(_)
-            | WidgetConfig::Pomodoro(_) => 1,
+            | WidgetConfig::Pomodoro(_)
+            | WidgetConfig::Todo(_) => 1,
             WidgetConfig::TimeProgress(config) => config.width,
             WidgetConfig::Activity(config) => config.width,
             WidgetConfig::Network(config) => config.width,
@@ -302,7 +312,8 @@ impl WidgetConfig {
             | WidgetConfig::Files(_)
             | WidgetConfig::Cycle(_)
             | WidgetConfig::Countdown(_)
-            | WidgetConfig::Pomodoro(_) => 1..=1,
+            | WidgetConfig::Pomodoro(_)
+            | WidgetConfig::Todo(_) => 1..=1,
             WidgetConfig::TimeProgress(_)
             | WidgetConfig::Activity(_)
             | WidgetConfig::Network(_) => system::WIDTHS,
@@ -328,7 +339,8 @@ impl WidgetConfig {
             | WidgetConfig::Files(_)
             | WidgetConfig::Cycle(_)
             | WidgetConfig::Countdown(_)
-            | WidgetConfig::Pomodoro(_) => {}
+            | WidgetConfig::Pomodoro(_)
+            | WidgetConfig::Todo(_) => {}
         }
         Some(config)
     }
@@ -348,6 +360,7 @@ impl WidgetConfig {
             WidgetKind::Cycle => WidgetConfig::Cycle(CycleConfig::default()),
             WidgetKind::Countdown => WidgetConfig::Countdown(CountdownConfig::default()),
             WidgetKind::Pomodoro => WidgetConfig::Pomodoro(PomodoroConfig::default()),
+            WidgetKind::Todo => WidgetConfig::Todo(TodoConfig::default()),
         }
     }
 
@@ -365,6 +378,7 @@ impl WidgetConfig {
             WidgetConfig::Cycle(config) => config.validate(),
             WidgetConfig::Countdown(config) => config.validate(),
             WidgetConfig::Pomodoro(config) => config.validate(),
+            WidgetConfig::Todo(config) => config.validate(),
         }
     }
 }
@@ -472,6 +486,7 @@ pub fn encode_config(config: &WidgetConfig) -> String {
         WidgetConfig::Cycle(config) => serde_json::to_string(config),
         WidgetConfig::Countdown(config) => serde_json::to_string(config),
         WidgetConfig::Pomodoro(config) => serde_json::to_string(config),
+        WidgetConfig::Todo(config) => serde_json::to_string(config),
     };
     // Plain structs with string keys: serializing them can't fail.
     json.expect("widget configs always serialize")
@@ -506,6 +521,7 @@ pub fn decode_config(
         WidgetKind::Cycle => serde_json::from_str(json).map(WidgetConfig::Cycle),
         WidgetKind::Countdown => serde_json::from_str(json).map(WidgetConfig::Countdown),
         WidgetKind::Pomodoro => serde_json::from_str(json).map(WidgetConfig::Pomodoro),
+        WidgetKind::Todo => serde_json::from_str(json).map(WidgetConfig::Todo),
     }
     .map_err(|_| WidgetError::InvalidConfig)?;
     config.validate()?;
@@ -625,6 +641,8 @@ pub enum WidgetError {
     InvalidCountdown,
     #[error("invalid pomodoro times")]
     InvalidPomodoro,
+    #[error("invalid tasks")]
+    InvalidTasks,
     #[error("note too large")]
     NoteTooLarge,
     #[error("widget config could not be read")]
@@ -655,6 +673,7 @@ impl WidgetError {
             WidgetError::InvalidCycle => WidgetErrorCode::InvalidCycle,
             WidgetError::InvalidCountdown => WidgetErrorCode::InvalidCountdown,
             WidgetError::InvalidPomodoro => WidgetErrorCode::InvalidPomodoro,
+            WidgetError::InvalidTasks => WidgetErrorCode::InvalidTasks,
             WidgetError::NoteTooLarge => WidgetErrorCode::NoteTooLarge,
             WidgetError::InvalidConfig => WidgetErrorCode::InvalidConfig,
             WidgetError::Unavailable => WidgetErrorCode::Unavailable,
@@ -702,6 +721,9 @@ pub enum WidgetErrorCode {
     InvalidCountdown,
     /// The Pomodoro's times out of their ranges.
     InvalidPomodoro,
+    /// A task of the Lista de tarefas empty, too long, with a control
+    /// character or an ID used twice, or too many tasks.
+    InvalidTasks,
     /// The note is over [`MAX_NOTE_BYTES`].
     NoteTooLarge,
     /// A stored config has another version or is not valid JSON, or the
@@ -730,6 +752,7 @@ closed_set!(WidgetErrorCode {
     InvalidCycle,
     InvalidCountdown,
     InvalidPomodoro,
+    InvalidTasks,
     NoteTooLarge,
     InvalidConfig,
     Unavailable,
@@ -777,7 +800,8 @@ mod tests {
                 WidgetKind::Calendar,
                 WidgetKind::Cycle,
                 WidgetKind::Countdown,
-                WidgetKind::Pomodoro
+                WidgetKind::Pomodoro,
+                WidgetKind::Todo
             ]
         );
     }
@@ -803,6 +827,7 @@ mod tests {
             "cycle",
             "countdown",
             "pomodoro",
+            "todo",
         ];
         for (kind, name) in WidgetKind::ALL.into_iter().zip(names) {
             assert_eq!(to_json(&kind), name);
@@ -982,6 +1007,7 @@ mod tests {
                     "windows": false
                 }),
             ),
+            (WidgetKind::Todo, json!({ "items": [] })),
         ];
         for (kind, config) in cases {
             let instance = instance(WidgetConfig::default_for(kind));
@@ -1215,6 +1241,7 @@ mod tests {
             WidgetError::InvalidCycle,
             WidgetError::InvalidCountdown,
             WidgetError::InvalidPomodoro,
+            WidgetError::InvalidTasks,
             WidgetError::NoteTooLarge,
             WidgetError::InvalidConfig,
             WidgetError::Unavailable,
@@ -1485,6 +1512,7 @@ mod tests {
             "invalidCycle",
             "invalidCountdown",
             "invalidPomodoro",
+            "invalidTasks",
             "noteTooLarge",
             "invalidConfig",
             "unavailable",

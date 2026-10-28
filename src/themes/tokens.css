@@ -244,6 +244,13 @@
   --l: 47%;
 }
 
+/* Folha: Lista de tarefas (spec 0017 F3). */
+.t-todo {
+  --h: 122;
+  --sat: 28%;
+  --l: 38%;
+}
+
 /* Argila. */
 .t-calendar {
   --h: 16;
