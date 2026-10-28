@@ -2,7 +2,7 @@
 
 Fase F da [spec 0004](0004-paridade-primodock.md) (§3.5), depois da fase E. Referência do PrimoDock em [`docs/reference/primodock/interface.md`](../reference/primodock/interface.md) (aba Widgets: catálogo, "Em uso", largura do tile) e [`settings-e-dados.md`](../reference/primodock/settings-e-dados.md).
 
-**Status:** em andamento: F1 (PR #52), F1b (#53), F2a-1 (Contas Google, #54 e #55, [ADR 0012](../adr/0012-contas-google.md)), F2a-2 (Calendário, #57), F2a-3 (Tasks, #58) e F2a-4 (cartão, #59) entregues; F2b-1 (o widget Ciclo, com o [guia do Atalho do iPhone](../guia-atalho-ciclo.md), #60), F2b-2 (avisos e lembretes, #61) e F2b-3 (o aviso no dock, #62) entregues; F2c-1 (Contagem regressiva) em curso; F2c-2 (Pomodoro) a F5 a fazer; o iCal ficou para depois.
+**Status:** em andamento: F1 (PR #52), F1b (#53), F2a-1 (Contas Google, #54 e #55, [ADR 0012](../adr/0012-contas-google.md)), F2a-2 (Calendário, #57), F2a-3 (Tasks, #58) e F2a-4 (cartão, #59) entregues; F2b-1 (o widget Ciclo, com o [guia do Atalho do iPhone](../guia-atalho-ciclo.md), #60), F2b-2 (avisos e lembretes, #61) e F2b-3 (o aviso no dock, #62) entregues; F2c-1 (Contagem regressiva, #65), F2c-2 (Pomodoro, #66) e F3-1 (Lista de tarefas, #67) entregues; F3-2 (Beber água) em curso; F4 e F5 a fazer; o iCal ficou para depois.
 
 ## 1. Decisões do autor (2026-10-27)
 
@@ -95,6 +95,8 @@ Relógio e Nota ficam com 1 ícone.
 **Pomodoro (F2c-2).** O tempo roda no Rust (`windows/pomodoro.rs`), um por widget, em memória: continua com o painel fechado e recomeça se o app for reaberto. No dock, um anel da etapa e os minutos que faltam; o clique do meio inicia ou pausa. No painel, a etapa, o tempo (mm:ss), Iniciar/Pausar/Continuar, Pular, Reiniciar e os focos da rodada. Como no Ciclo, o fim de cada etapa aparece no dock (balanço e selo, que some ao abrir o painel), e a notificação do Windows é opção desligada: o autor não quer depender dela. Ajustes: foco, pausa, pausa longa, a cada quantos focos, e começar a próxima etapa sozinho. Esmalte Tomate (`.t-pomodoro`).
 
 **Lista de tarefas (F3-1).** As tarefas ficam na config do widget, no banco com as outras (até 200, de até 200 caracteres). O painel adiciona, marca, desmarca e remove, salvando a cada mudança; as feitas vão para baixo, riscadas. Nos Ajustes, "Limpar as feitas". No dock, o número de abertas e "abertas" embaixo; um ✓ sem nenhuma. Esmalte Folha (`.t-todo`).
+
+**Beber água (F3-2).** Meta em copos (8), tamanho do copo (250 ml) e lembrete (desligado; ou depois de 30 a 120 min sem um copo). Os copos do dia ficam na config, com o dia e a hora do último, e zeram à meia-noite. O lembrete vale das 8h às 22h: o dock confere a cada minuto e, quando vence, o bloco balança e ganha um selo (como no Ciclo e no Pomodoro), que some ao abrir o painel; volta depois de outro intervalo se ainda faltar o copo. No dock, um anel da meta e o número de copos. Esmalte Água (`.t-water`).
 
 **Ciclo (F2b).** É um widget próprio, que pode ficar num espaço de trabalho fora do que o autor compartilha em reunião.
 - **Origem:** a noiva controla tudo pela agenda dela. Ela marca o primeiro dia com um evento de dia inteiro "🌸" (o símbolo se troca nos ajustes), por um Atalho de um toque no iPhone ou pela Siri. O DockMax lê esses eventos dos últimos 12 meses e não guarda nada em disco. No disco ficam só os ajustes do autor.

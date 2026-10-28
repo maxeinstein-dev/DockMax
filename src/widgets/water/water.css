@@ -1,0 +1,42 @@
+/* The Beber água's panel (spec 0017 F3-2). Tokens of tokens.css only. */
+
+.water-count {
+  margin: 0;
+  font: 600 22px / 1.3 var(--font-display);
+}
+
+.water-ml {
+  margin: 0 0 8px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.water-bar {
+  width: 100%;
+  height: 8px;
+  margin-bottom: 12px;
+  accent-color: var(--accent);
+}
+
+.water-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.water-actions .water-main {
+  background: var(--accent);
+  color: #fff;
+}
+
+.water-actions .water-main:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 86%, #000);
+}
+
+.water-note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}

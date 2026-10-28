@@ -333,6 +333,21 @@ pub fn todo(config: &crate::domain::widgets::TodoConfig, size: DockSize) -> Face
     }
 }
 
+/// The Beber água's face (spec 0017 F3-2): a ring of the day's goal and
+/// the cups so far; the small size shows only the ring.
+pub fn water(config: &crate::domain::widgets::WaterConfig, size: DockSize) -> Face {
+    let today = crate::domain::cycle::day_of(
+        crate::windows::calendar::now(),
+        crate::windows::calendar::offset(),
+    );
+    let count = config.count_on(today);
+    Face::Ring {
+        glaze: Glaze::WATER,
+        fraction: Some((f32::from(count) / f32::from(config.goal.max(1))).min(1.0)),
+        text: (size != DockSize::Small).then(|| count.to_string()),
+    }
+}
+
 /// The face of `widget` at `now`, with the system's reading for the
 /// system widgets and the calendar's for the Calendário.
 pub fn widget(
@@ -411,6 +426,7 @@ pub fn widget(
         WidgetConfig::Countdown(config) => countdown(config, size),
         WidgetConfig::Pomodoro(config) => pomodoro(widget, config, size),
         WidgetConfig::Todo(config) => todo(config, size),
+        WidgetConfig::Water(config) => water(config, size),
         WidgetConfig::Calendar(config) => {
             agenda(config, calendar, crate::windows::calendar::now(), opened)
         }

@@ -19,6 +19,7 @@ const INSTANCES = {
   countdown: WIDGET_FIXTURES["countdown-default"],
   pomodoro: WIDGET_FIXTURES["pomodoro-default"],
   todo: WIDGET_FIXTURES["todo-default"],
+  water: WIDGET_FIXTURES["water-default"],
 } as const;
 
 // 2026-10-15 18:07:05 UTC, a Thursday.

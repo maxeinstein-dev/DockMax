@@ -583,6 +583,7 @@ mod tests {
             (WidgetError::InvalidCountdown, "invalidCountdown"),
             (WidgetError::InvalidPomodoro, "invalidPomodoro"),
             (WidgetError::InvalidTasks, "invalidTasks"),
+            (WidgetError::InvalidWater, "invalidWater"),
             (WidgetError::NoteTooLarge, "noteTooLarge"),
             (WidgetError::InvalidConfig, "invalidConfig"),
             (WidgetError::Unavailable, "unavailable"),

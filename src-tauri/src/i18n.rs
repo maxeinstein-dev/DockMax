@@ -81,6 +81,7 @@ pub struct DockMessages {
     pub todo_open_many: &'static str,
     /// The tile with none open.
     pub todo_none: &'static str,
+    pub water: &'static str,
     /// The progress tile without a period running.
     pub no_value: &'static str,
     /// The Calendário's tile (spec 0017 F2a): no account, no meeting left,
@@ -205,6 +206,7 @@ const PT_BR: Messages = Messages {
         todo_open: "aberta",
         todo_open_many: "abertas",
         todo_none: "✓",
+        water: "Beber água",
         no_value: "–",
         calendar_connect: "Conectar",
         calendar_free: "Livre",
