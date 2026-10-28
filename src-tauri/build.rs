@@ -30,6 +30,8 @@ fn main() {
             "list_tray",
             "tray_click",
             "read_system_activity",
+            "calendar_events",
+            "open_calendar_link",
             "google_status",
             "set_google_client",
             "connect_google_account",

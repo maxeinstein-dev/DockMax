@@ -165,6 +165,23 @@ export const WIDGET_FIXTURES = {
     config: { width: 1 },
   } satisfies WidgetInstance<"network">,
 
+  "calendar-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6084",
+    label: null,
+    kind: "calendar",
+    config: { width: 2, hidden: [] },
+  } satisfies WidgetInstance<"calendar">,
+
+  "calendar-sample": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6085",
+    label: null,
+    kind: "calendar",
+    config: {
+      width: 3,
+      hidden: ["pt-br.brazilian#holiday@group.v.calendar.google.com"],
+    },
+  } satisfies WidgetInstance<"calendar">,
+
   "snapshot-sample": {
     storage: { state: "ok" },
     widgets: [CLOCK_DEFAULT, { ...NOTE_DEFAULT, label: "Mercado" }],

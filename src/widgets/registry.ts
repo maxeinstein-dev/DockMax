@@ -7,6 +7,9 @@ import {
 import ActivityPanel from "./activity/ActivityPanel";
 import ActivitySettings from "./activity/ActivitySettings";
 import ActivityTile from "./activity/ActivityTile";
+import CalendarPanel from "./calendar/CalendarPanel";
+import CalendarSettings from "./calendar/CalendarSettings";
+import CalendarTile from "./calendar/CalendarTile";
 import ClockPanel from "./clock/ClockPanel";
 import ClockSettings from "./clock/ClockSettings";
 import ClockTile from "./clock/ClockTile";
@@ -33,7 +36,12 @@ import ProgressTile from "./time-progress/ProgressTile";
 /** The static glaze class of each kind's tile (tokens.css, The Own Glaze
  * Rule). */
 export type GlazeClass =
-  "t-clock" | "t-progress" | "t-notes" | "t-activity" | "t-network";
+  | "t-clock"
+  | "t-progress"
+  | "t-notes"
+  | "t-activity"
+  | "t-network"
+  | "t-calendar";
 
 export interface WidgetDefinition<K extends CreatableKind> {
   kind: K;
@@ -92,6 +100,14 @@ export const WIDGET_REGISTRY: {
     Tile: NetworkTile,
     Panel: NetworkPanel,
     Settings: NetworkSettings,
+  },
+  calendar: {
+    kind: "calendar",
+    nameKey: "calendar",
+    glaze: "t-calendar",
+    Tile: CalendarTile,
+    Panel: CalendarPanel,
+    Settings: CalendarSettings,
   },
 };
 

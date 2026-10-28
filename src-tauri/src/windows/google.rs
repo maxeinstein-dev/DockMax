@@ -135,6 +135,11 @@ pub fn open_meeting(url: &str) -> Result<(), GoogleError> {
     }
 }
 
+/// Opens an event's page in Google Agenda, already checked by the caller.
+pub fn open_page(url: &str) -> Result<(), GoogleError> {
+    open_browser(url)
+}
+
 /// Opens `url` in the default browser.
 fn open_browser(url: &str) -> Result<(), GoogleError> {
     let result = unsafe {
