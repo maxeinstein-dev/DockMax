@@ -851,6 +851,8 @@ const messages = {
       late: "atrasada",
       noTasks: "Nenhuma tarefa para hoje.",
       completeNamed: "Concluir {title}",
+      moveUp: "Subir {title}",
+      moveDown: "Descer {title}",
       completeFailed: "Não foi possível concluir a tarefa no Google.",
       showTasks: "Tarefas do Google",
       showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
@@ -911,7 +913,7 @@ const messages = {
       invalidFolder:
         "Essa pasta não é aceita. Use o caminho completo de uma pasta do Windows.",
       invalidWidth: "Essa largura não vale para este widget.",
-      invalidCalendars: "Não foi possível guardar as agendas escolhidas.",
+      invalidCalendars: "Não foi possível guardar os ajustes do calendário.",
       noteTooLarge: "Passou de 64 KB e não foi salvo. Encurte o texto.",
       invalidConfig:
         "Não foi possível aplicar este ajuste. Feche o painel e tente de novo.",

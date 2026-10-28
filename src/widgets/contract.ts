@@ -48,6 +48,9 @@ export interface WidgetPanelProps<K extends CreatableKind> {
   /** True when the view was reached by Voltar from `Settings`: the
    * "Ajustes" button takes the focus (`PanelHeader` `focusAction`). */
   returnedFromSettings: boolean;
+  /** Saves the label and the config, as `Settings` does, for a change
+   * made in the main view (the Calendário's task order). */
+  onUpdate?: (update: WidgetUpdate<K>) => Promise<void>;
 }
 
 /** Props of a kind's `Settings`, the "Ajustes" view. */

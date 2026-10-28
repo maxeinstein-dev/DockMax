@@ -7,6 +7,10 @@
     "hidden": [
       "pt-br.brazilian#holiday@group.v.calendar.google.com"
     ],
-    "tasks": false
+    "tasks": false,
+    "taskOrder": [
+      "Própolis",
+      "Ferro"
+    ]
   }
 }

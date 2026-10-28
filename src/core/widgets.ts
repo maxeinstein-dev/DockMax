@@ -193,6 +193,9 @@ export interface CalendarConfig {
   hidden: string[];
   /** Whether the panel shows Google Tasks' tasks (F2a-3). */
   tasks: boolean;
+  /** The tasks' order given in the panel, by title: these first, then
+   * the others in Google's order. */
+  taskOrder: string[];
 }
 
 /** The config of each kind. */
@@ -274,8 +277,8 @@ export type WidgetErrorCode =
   | "invalidFolder"
   /** A width the kind doesn't accept. */
   | "invalidWidth"
-  /** A hidden calendar empty, too long or with a control character, or
-   * too many. */
+  /** A hidden calendar or a task of the order empty, too long or with a
+   * control character, or too many. */
   | "invalidCalendars"
   | "noteTooLarge"
   /** A stored config has another version or is not valid JSON, or the

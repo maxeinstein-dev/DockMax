@@ -3,6 +3,7 @@ import {
   clockText,
   completeTask,
   dayOf,
+  sortTasks,
   openCalendarLink,
   plainText,
   useCalendar,
@@ -11,6 +12,7 @@ import {
 } from "../../core/calendar";
 import { format, useT } from "../../i18n";
 import PanelFooter from "../../panel/PanelFooter";
+import IconButton from "../../panel/parts/IconButton";
 import PanelHeader from "../../panel/parts/PanelHeader";
 import type { WidgetPanelProps } from "../contract";
 import { widgetName } from "../names";
@@ -39,21 +41,50 @@ function titleOf(
 
 /** Today's and late tasks, each ticked off with its box: it leaves the
  * list at once, and comes back with a message if Google didn't take it. */
-function Tasks({ tasks }: { tasks: CalendarTask[] }) {
+function Tasks({
+  tasks,
+  order,
+  onOrder,
+}: {
+  /** In Google's order. */
+  tasks: CalendarTask[];
+  /** The order given in the panel, by title. */
+  order: string[];
+  /** Saves a new order; rejects when it was not kept. */
+  onOrder?: (order: string[]) => Promise<void>;
+}) {
   const t = useT();
   const text = t.widgets.calendar;
   const [done, setDone] = useState<string[]>([]);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const key = (task: CalendarTask) => `${task.account}|${task.list}|${task.id}`;
-  const shown = tasks.filter((task) => !done.includes(key(task)));
+  const shown = sortTasks(
+    tasks.filter((task) => !done.includes(key(task))),
+    order,
+  );
 
   function complete(task: CalendarTask) {
-    setFailed(false);
+    setFailed(null);
     setDone((keys) => [...keys, key(task)]);
     completeTask(task).catch(() => {
       setDone((keys) => keys.filter((each) => each !== key(task)));
-      setFailed(true);
+      setFailed(text.completeFailed);
     });
+  }
+
+  /** Moves `index` one place up or down; the whole order shown is kept,
+   * so the tasks moved before stay where they were put. */
+  function move(index: number, by: -1 | 1) {
+    if (!onOrder) return;
+    const titles = shown.map((task) => task.title);
+    const to = index + by;
+    if (to < 0 || to >= titles.length) return;
+    [titles[index], titles[to]] = [titles[to] ?? "", titles[index] ?? ""];
+    const kept = [...new Set([...titles, ...order])]
+      .filter((title) => title !== "")
+      .slice(0, 200);
+    setFailed(null);
+    onOrder(kept).catch(() => setFailed(t.widgets.errors.invalidCalendars));
   }
 
   return (
@@ -63,7 +94,7 @@ function Tasks({ tasks }: { tasks: CalendarTask[] }) {
         <p className="cal-empty">{text.noTasks}</p>
       ) : (
         <ul className="cal-list">
-          {shown.map((task) => (
+          {shown.map((task, index) => (
             <li key={key(task)}>
               <label className="cal-task">
                 <input
@@ -78,13 +109,33 @@ function Tasks({ tasks }: { tasks: CalendarTask[] }) {
                   <span className="cal-late">{text.late}</span>
                 ) : null}
               </label>
+              {onOrder ? (
+                <span className="cal-move">
+                  <IconButton
+                    icon="up"
+                    label={format(text.moveUp, {
+                      title: task.title || text.noTitle,
+                    })}
+                    disabled={index === 0}
+                    onClick={() => move(index, -1)}
+                  />
+                  <IconButton
+                    icon="down"
+                    label={format(text.moveDown, {
+                      title: task.title || text.noTitle,
+                    })}
+                    disabled={index === shown.length - 1}
+                    onClick={() => move(index, 1)}
+                  />
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
       {failed ? (
         <p className="cal-notice" role="alert">
-          {text.completeFailed}
+          {failed}
         </p>
       ) : null}
     </section>
@@ -171,6 +222,7 @@ function CalendarPanel({
   now: clock,
   onAdjust,
   returnedFromSettings,
+  onUpdate,
 }: WidgetPanelProps<"calendar">) {
   const t = useT();
   const text = t.widgets.calendar;
@@ -277,7 +329,19 @@ function CalendarPanel({
         })
       )}
       {snapshot !== null && instance.config.tasks ? (
-        <Tasks tasks={snapshot.tasks} />
+        <Tasks
+          tasks={snapshot.tasks}
+          order={instance.config.taskOrder}
+          onOrder={
+            onUpdate
+              ? (taskOrder) =>
+                  onUpdate({
+                    label: instance.label,
+                    config: { ...instance.config, taskOrder },
+                  })
+              : undefined
+          }
+        />
       ) : null}
       <PanelFooter>{text.footer}</PanelFooter>
     </>

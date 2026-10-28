@@ -205,6 +205,11 @@
   accent-color: var(--accent);
 }
 
+.cal-move {
+  flex: none;
+  display: flex;
+}
+
 .cal-late {
   flex: none;
   color: var(--danger-ink);

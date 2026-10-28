@@ -27,6 +27,10 @@ pub struct CalendarConfig {
     /// Whether the panel shows Google Tasks' tasks (F2a-3). A config
     /// stored before it reads as `true`.
     pub tasks: bool,
+    /// The tasks' order the author gave in the panel, by title (a task
+    /// that repeats every day keeps its title): these first, in this
+    /// order, then the others in Google's.
+    pub task_order: Vec<String>,
 }
 
 impl Default for CalendarConfig {
@@ -35,6 +39,7 @@ impl Default for CalendarConfig {
             width: 2,
             hidden: Vec::new(),
             tasks: true,
+            task_order: Vec::new(),
         }
     }
 }
@@ -44,11 +49,15 @@ impl CalendarConfig {
         if !WIDTHS.contains(&self.width) {
             return Err(WidgetError::InvalidWidth);
         }
-        let ids_ok = self.hidden.len() <= MAX_HIDDEN
-            && self.hidden.iter().all(|id| {
-                !id.is_empty() && id.len() <= MAX_ID_LEN && !id.chars().any(char::is_control)
-            });
-        if ids_ok {
+        let fits = |list: &[String]| {
+            list.len() <= MAX_HIDDEN
+                && list.iter().all(|text| {
+                    !text.is_empty()
+                        && text.len() <= MAX_ID_LEN
+                        && !text.chars().any(char::is_control)
+                })
+        };
+        if fits(&self.hidden) && fits(&self.task_order) {
             Ok(())
         } else {
             Err(WidgetError::InvalidCalendars)
@@ -71,6 +80,7 @@ mod tests {
             width: 2,
             hidden: vec!["pt-br.brazilian#holiday@group.v.calendar.google.com".into()],
             tasks: false,
+            task_order: vec!["🪴 Regar Mini Samambaia".into(), "😷 Própolis".into()],
         };
         assert_eq!(config.validate(), Ok(()));
         assert!(!config.shows("pt-br.brazilian#holiday@group.v.calendar.google.com"));
@@ -93,5 +103,10 @@ mod tests {
             ..CalendarConfig::default()
         };
         assert_eq!(many.validate(), Err(WidgetError::InvalidCalendars));
+        let broken_order = CalendarConfig {
+            task_order: vec!["a\tb".into()],
+            ..CalendarConfig::default()
+        };
+        assert_eq!(broken_order.validate(), Err(WidgetError::InvalidCalendars));
     }
 }

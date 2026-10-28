@@ -342,6 +342,7 @@ mod tests {
             width,
             hidden: hidden.iter().map(|id| id.to_string()).collect(),
             tasks: true,
+            task_order: Vec::new(),
         };
         match agenda(&config, snapshot, NOW, width == 3) {
             Face::Agenda { lines, .. } => lines.into_iter().map(|line| line.text).collect(),

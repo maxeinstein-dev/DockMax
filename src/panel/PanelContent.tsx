@@ -82,12 +82,18 @@ function WidgetMain({
 }) {
   const now = useNow(SECOND_MS);
   const { Panel } = definitionOf(instance);
+  const onUpdate = async ({ label, config }: WidgetUpdate<CreatableKind>) => {
+    // Sound: the view of a kind sends that kind's config.
+    const tagged = { kind: instance.kind, config } as WidgetConfig;
+    await updateWidget({ id: instance.id, label, config: tagged });
+  };
   return (
     <Panel
       instance={instance}
       now={now}
       onAdjust={onAdjust}
       returnedFromSettings={returned}
+      onUpdate={onUpdate}
     />
   );
 }

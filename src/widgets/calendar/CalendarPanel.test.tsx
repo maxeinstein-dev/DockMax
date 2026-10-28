@@ -5,7 +5,7 @@ import type {
   CalendarTask,
   CalendarView,
 } from "../../core/calendar";
-import { clockText, plainText } from "../../core/calendar";
+import { clockText, plainText, sortTasks } from "../../core/calendar";
 import type { WidgetInstance } from "../../core/widgets";
 import { ptBR } from "../../i18n/pt-BR";
 import CalendarPanel from "./CalendarPanel";
@@ -44,7 +44,7 @@ function instance(hidden: string[] = []): WidgetInstance<"calendar"> {
     id: "c",
     label: null,
     kind: "calendar",
-    config: { width: 2, hidden, tasks: true },
+    config: { width: 2, hidden, tasks: true, taskOrder: [] },
   };
 }
 
@@ -239,7 +239,7 @@ describe("CalendarPanel", () => {
       <CalendarPanel
         instance={{
           ...instance(),
-          config: { width: 2, hidden: [], tasks: false },
+          config: { width: 2, hidden: [], tasks: false, taskOrder: [] },
         }}
         now={new Date(NOW * 1000)}
         onAdjust={() => undefined}
@@ -283,6 +283,67 @@ describe("CalendarPanel", () => {
     show();
 
     expect(await screen.findByText(text.status.noAccounts)).toBeInTheDocument();
+  });
+});
+
+describe("task order", () => {
+  const task = (title: string, id = title): CalendarTask => ({
+    account: "a",
+    list: "L",
+    listName: "",
+    id,
+    title,
+    notes: null,
+    due: "2026-10-28",
+    late: false,
+    link: null,
+  });
+
+  it("puts the titles ordered in the panel first, then Google's", () => {
+    const google = ["Regar", "Ferro", "Própolis", "Escovar"].map((t) =>
+      task(t),
+    );
+    expect(
+      sortTasks(google, ["Própolis", "Ferro"]).map((each) => each.title),
+    ).toEqual(["Própolis", "Ferro", "Regar", "Escovar"]);
+    expect(sortTasks(google, []).map((each) => each.title)).toEqual([
+      "Regar",
+      "Ferro",
+      "Própolis",
+      "Escovar",
+    ]);
+  });
+
+  it("moves a task down and keeps the whole order shown", async () => {
+    const onUpdate = vi.fn(() => Promise.resolve());
+    invoke.mockImplementation((command: string) =>
+      command === "calendar_events"
+        ? Promise.resolve(
+            view([], "ok", [task("Regar"), task("Ferro"), task("Própolis")]),
+          )
+        : Promise.resolve(),
+    );
+    render(
+      <CalendarPanel
+        instance={instance()}
+        now={new Date(NOW * 1000)}
+        onAdjust={() => undefined}
+        returnedFromSettings={false}
+        onUpdate={onUpdate}
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Descer Regar" }),
+    );
+    expect(onUpdate).toHaveBeenCalledWith({
+      label: null,
+      config: expect.objectContaining({
+        taskOrder: ["Ferro", "Regar", "Própolis"],
+      }),
+    });
+    // Until the saved order comes back, the first one can't go up.
+    expect(screen.getByRole("button", { name: "Subir Regar" })).toBeDisabled();
   });
 });
 

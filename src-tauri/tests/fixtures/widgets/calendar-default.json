@@ -5,6 +5,7 @@
   "config": {
     "width": 2,
     "hidden": [],
-    "tasks": true
+    "tasks": true,
+    "taskOrder": []
   }
 }

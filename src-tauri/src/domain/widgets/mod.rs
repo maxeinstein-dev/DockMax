@@ -569,7 +569,7 @@ pub enum WidgetError {
     InvalidFolder,
     #[error("invalid widget width")]
     InvalidWidth,
-    #[error("invalid hidden calendars")]
+    #[error("invalid calendar lists")]
     InvalidCalendars,
     #[error("note too large")]
     NoteTooLarge,
@@ -635,8 +635,8 @@ pub enum WidgetErrorCode {
     InvalidFolder,
     /// A width the kind doesn't accept.
     InvalidWidth,
-    /// A hidden calendar empty, too long or with a control character, or
-    /// too many of them.
+    /// A hidden calendar or a task of the order empty, too long or with a
+    /// control character, or too many of them.
     InvalidCalendars,
     /// The note is over [`MAX_NOTE_BYTES`].
     NoteTooLarge,
@@ -875,7 +875,7 @@ mod tests {
             (WidgetKind::Network, json!({ "width": 2 })),
             (
                 WidgetKind::Calendar,
-                json!({ "width": 2, "hidden": [], "tasks": true }),
+                json!({ "width": 2, "hidden": [], "tasks": true, "taskOrder": [] }),
             ),
         ];
         for (kind, config) in cases {

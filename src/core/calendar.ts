@@ -151,3 +151,19 @@ export function plainText(description: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
+
+/** The tasks in the order given in the panel (by title), then the others
+ * in Google's order. */
+export function sortTasks(
+  tasks: CalendarTask[],
+  order: string[],
+): CalendarTask[] {
+  const rank = (task: CalendarTask) => {
+    const at = order.indexOf(task.title);
+    return at < 0 ? order.length : at;
+  };
+  return tasks
+    .map((task, index) => ({ task, index }))
+    .sort((a, b) => rank(a.task) - rank(b.task) || a.index - b.index)
+    .map(({ task }) => task);
+}
