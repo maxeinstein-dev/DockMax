@@ -923,8 +923,11 @@ const messages = {
       noticesHint:
         "A partir das 9h, um aviso discreto “Lembrete do Ciclo”, sem detalhes. O que é fica no painel.",
       testNotice: "Enviar aviso de teste",
-      testSent: "Aviso enviado.",
-      testFailed: "O Windows não mostrou o aviso.",
+      testResult: {
+        sent: "Aviso enviado.",
+        off: "As notificações do Windows estão desligadas. Ative em Configurações › Sistema › Notificações.",
+        failed: "O Windows não mostrou o aviso.",
+      },
       remindersTitle: "Lembretes",
       noReminders: "Nenhum lembrete ainda.",
       remindersHint:

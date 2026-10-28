@@ -49,6 +49,15 @@ beforeEach(() => {
 });
 
 describe("CycleSettings", () => {
+  it("says when Windows has the notices off", async () => {
+    invoke.mockImplementation(() => Promise.reject("notificationsOff"));
+    show();
+    fireEvent.click(screen.getByRole("button", { name: text.testNotice }));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      text.testResult.off,
+    );
+  });
+
   it("turns a Windows notice off", () => {
     const onUpdate = show();
     fireEvent.click(
@@ -117,6 +126,8 @@ describe("CycleSettings", () => {
     show();
     fireEvent.click(screen.getByRole("button", { name: text.testNotice }));
     expect(invoke).toHaveBeenCalledWith("cycle_test_notice");
-    expect(await screen.findByRole("status")).toHaveTextContent(text.testSent);
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      text.testResult.sent,
+    );
   });
 });

@@ -122,10 +122,15 @@ pub fn cycle_status(
 #[tauri::command]
 pub fn cycle_test_notice(window: WebviewWindow) -> Result<(), String> {
     only_panel(&window)?;
-    crate::windows::toast::cycle_notice().map_err(|error| {
-        log::warn!("cycle: the test notice was not shown: {error}");
-        "the notice could not be shown".to_string()
-    })
+    match crate::windows::toast::cycle_notice() {
+        Ok(true) => Ok(()),
+        // The panel tells it apart: Windows has the notices off.
+        Ok(false) => Err("notificationsOff".into()),
+        Err(error) => {
+            log::warn!("cycle: the test notice was not shown: {error}");
+            Err("the notice could not be shown".into())
+        }
+    }
 }
 
 /// Whether `url` is an event's page in Google Agenda.

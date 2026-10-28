@@ -9,7 +9,9 @@
 use std::sync::OnceLock;
 
 use windows::Data::Xml::Dom::XmlDocument;
-use windows::UI::Notifications::{ToastNotification, ToastNotificationManager};
+use windows::UI::Notifications::{
+    NotificationSetting, ToastNotification, ToastNotificationManager,
+};
 use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx};
 use windows::Win32::System::Registry::{
     HKEY, HKEY_CURRENT_USER, KEY_WRITE, REG_OPTION_NON_VOLATILE, REG_SZ, RegCloseKey,
@@ -84,8 +86,10 @@ fn register() -> windows::core::Result<()> {
     }
 }
 
-/// Shows a toast with `title` and `line`.
-pub fn show(title: &str, line: &str) -> windows::core::Result<()> {
+/// Shows a toast with `title` and `line`: `false` when Windows has the
+/// notices off (for every app or for the DockMax), where it would take the
+/// toast and show nothing.
+pub fn show(title: &str, line: &str) -> windows::core::Result<bool> {
     // WinRT on a thread of its own (the calendar's): COM first. A thread
     // already set up another way answers an error that changes nothing.
     let _ = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
@@ -93,11 +97,17 @@ pub fn show(title: &str, line: &str) -> windows::core::Result<()> {
     let xml = XmlDocument::new()?;
     xml.LoadXml(&HSTRING::from(toast_xml(title, line)))?;
     let toast = ToastNotification::CreateToastNotification(&xml)?;
-    ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(identifier()))?.Show(&toast)
+    let notifier =
+        ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(identifier()))?;
+    if notifier.Setting()? != NotificationSetting::Enabled {
+        return Ok(false);
+    }
+    notifier.Show(&toast)?;
+    Ok(true)
 }
 
 /// The Ciclo's notice: neutral, the same for every notice and reminder.
-pub fn cycle_notice() -> windows::core::Result<()> {
+pub fn cycle_notice() -> windows::core::Result<bool> {
     let text = &crate::i18n::messages().dock;
     show(text.cycle_notice_title, text.cycle_notice_line)
 }

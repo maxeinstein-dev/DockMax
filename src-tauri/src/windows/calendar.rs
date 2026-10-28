@@ -238,10 +238,13 @@ fn notify(cycles: &[CycleConfig]) {
         fired.extend(unseen.iter().cloned());
         unseen
     };
-    if !unseen.is_empty()
-        && let Err(error) = super::toast::cycle_notice()
-    {
-        log::warn!("cycle: the notice was not shown: {error}");
+    if !unseen.is_empty() {
+        match super::toast::cycle_notice() {
+            Ok(true) => {}
+            // The panel still says them under "Hoje".
+            Ok(false) => log::info!("cycle: Windows has the notices off"),
+            Err(error) => log::warn!("cycle: the notice was not shown: {error}"),
+        }
     }
 }
 

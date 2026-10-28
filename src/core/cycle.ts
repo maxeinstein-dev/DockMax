@@ -40,9 +40,20 @@ export interface CycleView {
   notices: CycleNotice[];
 }
 
+/** What became of a test notice: `off` when Windows has the notices off,
+ * where it would take the notice and show nothing. */
+export type TestNotice = "sent" | "off" | "failed";
+
 /** Sends the neutral Windows notice once, to see it arrives. */
-export function cycleTestNotice(): Promise<void> {
-  return invoke<void>("cycle_test_notice");
+export function cycleTestNotice(): Promise<TestNotice> {
+  return invoke<void>("cycle_test_notice").then(
+    () => "sent" as const,
+    (error: unknown) => {
+      if (error === "notificationsOff") return "off" as const;
+      log.warn(`cycle: test notice failed: ${errorKind(error)}`);
+      return "failed" as const;
+    },
+  );
 }
 
 /** How often an open panel asks again. */
