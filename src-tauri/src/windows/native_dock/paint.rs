@@ -1394,12 +1394,29 @@ impl Painter {
                 let top = area.y + (u - row * count) / 2.0;
                 let left = area.x + u * 0.14;
                 let right = area.x + area.width - u * 0.14;
+                // The bars start after the longest name and end before the
+                // widest figure, so no text runs under a bar.
+                let widest = |painter: &mut Self, texts: &mut dyn Iterator<Item = &str>| {
+                    texts.fold(0.0_f64, |most, text| {
+                        most.max(painter.text_width(text, size, 600, true))
+                    })
+                };
+                // Less than two icons of room (beside a graph): the short names.
+                let name = |meter: &Meter| {
+                    if area.width < u * 2.0 {
+                        meter.short
+                    } else {
+                        meter.label
+                    }
+                };
+                let names = widest(self, &mut meters.iter().map(name));
+                let figures = widest(self, &mut meters.iter().map(|meter| meter.text.as_str()));
+                let start = left + names + u * 0.1;
+                let end = right - figures - u * 0.1;
                 for (index, meter) in meters.iter().enumerate() {
                     let cy = top + row * (index as f64 + 0.5);
-                    self.text_from(meter.label, left, cy, size, faint);
+                    self.text_from(name(meter), left, cy, size, faint);
                     self.text_to(&meter.text, right, cy, size, Color::WHITE);
-                    let start = left + u * 0.42;
-                    let end = right - u * 0.42;
                     let bar = Area {
                         x: start,
                         y: cy - u * 0.04,
