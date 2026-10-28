@@ -130,6 +130,7 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-google-status",
             "allow-set-google-client",
             "allow-connect-google-account",
+            "allow-cancel-google-sign-in",
             "allow-google-calendars",
             "allow-disconnect-google-account",
             "log:allow-log",
