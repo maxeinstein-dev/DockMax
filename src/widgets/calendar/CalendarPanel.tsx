@@ -9,6 +9,7 @@ import {
   useCalendar,
   type CalendarEvent,
   type CalendarTask,
+  type CalendarView,
 } from "../../core/calendar";
 import { format, useT } from "../../i18n";
 import PanelFooter from "../../panel/PanelFooter";
@@ -228,6 +229,12 @@ function CalendarPanel({
   const text = t.widgets.calendar;
   const view = useCalendar();
   const [open, setOpen] = useState<string | null>(null);
+  // An event clicked on the card over the dock: its details, once.
+  const [taken, setTaken] = useState<CalendarView | null>(null);
+  if (view && view !== taken) {
+    setTaken(view);
+    if (view.open) setOpen(view.open);
+  }
 
   const snapshot = view?.snapshot ?? null;
   // The panel's clock ticks every second; the events are the dock's.

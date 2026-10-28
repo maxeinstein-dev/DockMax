@@ -18,6 +18,8 @@ use crate::windows::{calendar, google};
 pub struct CalendarView {
     pub snapshot: Option<calendar::Snapshot>,
     pub now: i64,
+    /// An event to open on (a click on the card, F2a-4), once.
+    pub open: Option<String>,
 }
 
 fn only_panel(window: &WebviewWindow) -> Result<(), String> {
@@ -41,6 +43,7 @@ pub fn calendar_events(window: WebviewWindow, fresh: bool) -> Result<CalendarVie
     Ok(CalendarView {
         snapshot: calendar::snapshot(),
         now: calendar::now(),
+        open: calendar::take_open_event(),
     })
 }
 

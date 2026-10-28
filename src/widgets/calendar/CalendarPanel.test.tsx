@@ -44,7 +44,14 @@ function instance(hidden: string[] = []): WidgetInstance<"calendar"> {
     id: "c",
     label: null,
     kind: "calendar",
-    config: { width: 2, hidden, tasks: true, taskOrder: [] },
+    config: {
+      width: 2,
+      hidden,
+      tasks: true,
+      taskOrder: [],
+      cardPeriod: "auto",
+      cardTasks: true,
+    },
   };
 }
 
@@ -70,6 +77,7 @@ function view(
       offset: BRT,
     },
     now: NOW,
+    open: null,
   };
 }
 
@@ -239,7 +247,14 @@ describe("CalendarPanel", () => {
       <CalendarPanel
         instance={{
           ...instance(),
-          config: { width: 2, hidden: [], tasks: false, taskOrder: [] },
+          config: {
+            width: 2,
+            hidden: [],
+            tasks: false,
+            taskOrder: [],
+            cardPeriod: "auto",
+            cardTasks: true,
+          },
         }}
         now={new Date(NOW * 1000)}
         onAdjust={() => undefined}
@@ -248,6 +263,23 @@ describe("CalendarPanel", () => {
     );
     await screen.findByRole("region", { name: text.today });
     expect(screen.queryByRole("region", { name: text.tasks })).toBeNull();
+  });
+
+  it("opens on the event clicked on the card over the dock", async () => {
+    invoke.mockImplementation((command: string) =>
+      command === "calendar_events"
+        ? Promise.resolve({
+            ...view([event({ id: "x", title: "Sprint review" })]),
+            open: "x",
+          })
+        : Promise.resolve(),
+    );
+    show();
+
+    expect(
+      await screen.findByRole("heading", { name: "Sprint review" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Voltar" })).toBeInTheDocument();
   });
 
   it("names an event with no title: busy or untitled", async () => {

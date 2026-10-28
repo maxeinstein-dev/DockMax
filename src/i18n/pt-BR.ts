@@ -20,6 +20,7 @@ import type {
 import type {
   ActivityShow,
   ActivityStyle,
+  CardPeriod,
   ClockIconStyle,
   CreatableKind,
   HourCycle,
@@ -854,6 +855,19 @@ const messages = {
       moveUp: "Subir {title}",
       moveDown: "Descer {title}",
       completeFailed: "Não foi possível concluir a tarefa no Google.",
+      /** The card over the dock (F2a-4). */
+      cardContent: "Ao passar o mouse",
+      cardContents: { both: "Reuniões e tarefas", meetings: "Só reuniões" },
+      cardPeriod: "Período do cartão",
+      cardPeriods: {
+        auto: "Auto",
+        day: "Dia",
+        twoDays: "2 dias",
+        threeDays: "3 dias",
+        week: "Semana",
+      } satisfies Record<CardPeriod, string>,
+      cardHint:
+        "Auto mostra o dia; depois das 18h, as de amanhã até o meio-dia. O cartão rola com a roda do mouse.",
       showTasks: "Tarefas do Google",
       showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },

@@ -11,6 +11,8 @@
     "taskOrder": [
       "Própolis",
       "Ferro"
-    ]
+    ],
+    "cardPeriod": "week",
+    "cardTasks": false
   }
 }

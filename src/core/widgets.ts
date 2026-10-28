@@ -185,6 +185,18 @@ export const CALENDAR_WIDTHS = [1, 2] as const;
 
 export type CalendarWidth = (typeof CALENDAR_WIDTHS)[number];
 
+/** How far ahead the Calendário's card looks (F2a-4): `auto` is the day,
+ * or, after 18h, tomorrow until noon. */
+export type CardPeriod = "auto" | "day" | "twoDays" | "threeDays" | "week";
+
+export const CARD_PERIODS = [
+  "auto",
+  "day",
+  "twoDays",
+  "threeDays",
+  "week",
+] as const;
+
 export interface CalendarConfig {
   /** In icons: the next meeting's time; its time and title (rising to
    * three icons under the pointer, with the one after). */
@@ -196,6 +208,10 @@ export interface CalendarConfig {
   /** The tasks' order given in the panel, by title: these first, then
    * the others in Google's order. */
   taskOrder: string[];
+  /** The card over the dock: how far ahead it looks, and whether it lists
+   * the day's tasks under the meetings. */
+  cardPeriod: CardPeriod;
+  cardTasks: boolean;
 }
 
 /** The config of each kind. */
