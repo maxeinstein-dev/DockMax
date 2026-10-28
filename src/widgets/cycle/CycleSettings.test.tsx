@@ -54,6 +54,12 @@ describe("CycleSettings", () => {
       ...cycle,
       config: { ...CONFIG, notices: { ...CONFIG.notices, windows: false } },
     });
+    // The test shows the notice on the dock, Windows or not.
+    fireEvent.click(screen.getByRole("button", { name: text.testNotice }));
+    expect(invoke).toHaveBeenCalledWith("cycle_test_notice", {
+      widget: "c",
+      windows: false,
+    });
     fireEvent.click(
       screen.getByRole("switch", { name: text.noticeToggles.windows }),
     );

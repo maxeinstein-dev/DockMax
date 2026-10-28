@@ -174,22 +174,16 @@ function CycleSettings({
           checked={config.notices.windows}
           onChange={(windows) => saveNotices({ windows })}
         />
-        {config.notices.windows ? (
-          <div className="cycle-test">
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={sendTest}
-            >
-              {text.testNotice}
-            </button>
-            {testSent ? (
-              <span role="status" className="sys-hint">
-                {text.testResult[testSent]}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
+        <div className="cycle-test">
+          <button type="button" className="secondary-button" onClick={sendTest}>
+            {text.testNotice}
+          </button>
+          {testSent ? (
+            <span role="status" className="sys-hint">
+              {text.testResult[testSent]}
+            </span>
+          ) : null}
+        </div>
       </fieldset>
       <fieldset className="cycle-group">
         <legend>{text.remindersTitle}</legend>
