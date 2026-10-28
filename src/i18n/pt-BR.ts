@@ -599,6 +599,7 @@ const messages = {
       countdown: "Contagem regressiva",
       pomodoro: "Pomodoro",
       todo: "Lista de tarefas",
+      water: "Beber água",
     } satisfies Record<WidgetKind, string>,
     /** Short name of each kind on the add buttons of Itens do dock. */
     addNames: {
@@ -612,6 +613,7 @@ const messages = {
       countdown: "Contagem regressiva",
       pomodoro: "Pomodoro",
       todo: "Lista de tarefas",
+      water: "Beber água",
     } satisfies Record<CreatableKind, string>,
     /** Parts every widget panel shares. */
     common: {
@@ -816,6 +818,7 @@ const messages = {
           "As próximas reuniões das suas agendas Google, com Entrar a um clique.",
         cycle: "Acompanha um ciclo marcado na agenda, com discrição no dock.",
         todo: "Tarefas com marca de feita; o dock mostra quantas faltam.",
+        water: "Os copos do dia contra uma meta, com lembrete opcional.",
         pomodoro:
           "Foco e pausa com o tempo no dock; continua contando com o painel fechado.",
         countdown:
@@ -887,6 +890,27 @@ const messages = {
       showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },
     /** The Ciclo (spec 0017 F2b): the panel says what the tile doesn't. */
+    /** The Beber água (spec 0017 F3-2). */
+    water: {
+      settingsTitle: "Ajustes da água",
+      cups: "{n} de {goal} copos",
+      ml: "{n} de {goal} ml hoje",
+      progress: "Copos do dia",
+      add: "+ 1 copo ({cup} ml)",
+      undo: "Desfazer",
+      reached: "Meta do dia batida.",
+      footer: "Zera à meia-noite · salvo no DockMax",
+      reminding: "Lembrete depois de {n} min sem um copo, das 8h às 22h",
+      goal: "Meta do dia",
+      goalCups: "{n} copos",
+      cup: "Tamanho do copo",
+      cupMl: "{n} ml",
+      remind: "Lembrete",
+      remindOff: "Desligado",
+      remindEvery: "Depois de {n} min sem um copo",
+      remindHint:
+        "Das 8h às 22h, o Beber água balança no dock e ganha um selo; o selo some ao abrir o painel.",
+    },
     /** The Lista de tarefas (spec 0017 F3). */
     todo: {
       settingsTitle: "Ajustes da lista",
@@ -1076,6 +1100,7 @@ const messages = {
       invalidCountdown: "Escolha uma data válida.",
       invalidPomodoro: "Não foi possível guardar os tempos do Pomodoro.",
       invalidTasks: "Não foi possível guardar a lista.",
+      invalidWater: "Não foi possível guardar os copos.",
       invalidCycle:
         "Use um símbolo de até 16 caracteres, uma janela de 1 a 10 dias e até 10 lembretes de 120 caracteres.",
       noteTooLarge: "Passou de 64 KB e não foi salvo. Encurte o texto.",

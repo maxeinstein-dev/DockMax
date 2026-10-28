@@ -640,6 +640,7 @@ fn names() -> Names {
         countdown: dock.countdown,
         pomodoro: dock.pomodoro,
         todo: dock.todo,
+        water: dock.water,
     }
 }
 
@@ -877,6 +878,10 @@ impl Dock {
                         WidgetConfig::Pomodoro(_) => {
                             return super::pomodoro::pending(widget.id.as_str())
                                 .then_some(Badge::Dot);
+                        }
+                        // Time for a cup (F3-2).
+                        WidgetConfig::Water(_) => {
+                            return super::water::pending(widget.id.as_str()).then_some(Badge::Dot);
                         }
                         _ => {}
                     }
@@ -2352,6 +2357,26 @@ impl Dock {
         self.paint();
     }
 
+    /// The Beber água's reminder (spec 0017 F3-2), looked at every minute.
+    fn check_water(&self) {
+        let waters: Vec<_> = self
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Widget(widget) => match &widget.config {
+                    WidgetConfig::Water(config) => {
+                        Some((widget.id.as_str().to_owned(), config.clone()))
+                    }
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect();
+        if !waters.is_empty() {
+            super::water::check(&waters, super::calendar::now(), super::calendar::offset());
+        }
+    }
+
     /// The id in the Apps folder of the program at `index`: a pinned one or
     /// an open one. What a folder or files open with (spec 0018).
     fn program_id(&self, index: usize) -> Option<String> {
@@ -2508,7 +2533,8 @@ impl Dock {
             _ => {
                 if let Item::Widget(widget) = &item
                     && (super::calendar::seen(widget.id.as_str())
-                        | super::pomodoro::seen(widget.id.as_str()))
+                        | super::pomodoro::seen(widget.id.as_str())
+                        | super::water::seen(widget.id.as_str()))
                 {
                     post(Dock::notices_changed);
                 }
@@ -3193,6 +3219,7 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
             CLOCK_TIMER => with_dock(hwnd, |dock| {
                 dock.paint();
                 dock.arm_clock();
+                dock.check_water();
             }),
             STATUS_TIMER => with_dock(hwnd, Dock::read_system),
             CARD_TIMER => with_dock(hwnd, |dock| {
@@ -3402,6 +3429,7 @@ pub fn view() -> Option<View> {
                         crate::domain::widgets::WidgetConfig::Countdown(_) => "agenda",
                         crate::domain::widgets::WidgetConfig::Pomodoro(_) => "ring",
                         crate::domain::widgets::WidgetConfig::Todo(_) => "agenda",
+                        crate::domain::widgets::WidgetConfig::Water(_) => "ring",
                         _ => "glyph",
                     },
                 };

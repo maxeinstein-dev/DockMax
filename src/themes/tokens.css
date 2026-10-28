@@ -251,6 +251,13 @@
   --l: 38%;
 }
 
+/* Água: Beber água (spec 0017 F3). */
+.t-water {
+  --h: 204;
+  --sat: 58%;
+  --l: 44%;
+}
+
 /* Argila. */
 .t-calendar {
   --h: 16;

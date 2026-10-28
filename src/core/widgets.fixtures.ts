@@ -282,6 +282,27 @@ export const WIDGET_FIXTURES = {
     },
   } satisfies WidgetInstance<"todo">,
 
+  "water-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6094",
+    label: null,
+    kind: "water",
+    config: { goal: 8, cup: 250, remind: 0, count: 0, day: 0, last: null },
+  } satisfies WidgetInstance<"water">,
+
+  "water-sample": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6095",
+    label: null,
+    kind: "water",
+    config: {
+      goal: 10,
+      cup: 300,
+      remind: 60,
+      count: 3,
+      day: 20389,
+      last: 1761660000,
+    },
+  } satisfies WidgetInstance<"water">,
+
   "snapshot-sample": {
     storage: { state: "ok" },
     widgets: [CLOCK_DEFAULT, { ...NOTE_DEFAULT, label: "Mercado" }],

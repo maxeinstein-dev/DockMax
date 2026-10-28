@@ -71,6 +71,7 @@ const GLYPHS: Readonly<Record<CreatableKind, readonly string[]>> = {
   cycle: ["M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0"],
   pomodoro: ["M5 13.5a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M12 13.5V10M10 3.5h4"],
   todo: ["M4.5 7l1.5 1.5 3-3M4.5 14l1.5 1.5 3-3M12 7.5h7.5M12 14.5h7.5"],
+  water: ["M12 3.5c3 4 5.5 7 5.5 10a5.5 5.5 0 0 1 -11 0c0 -3 2.5 -6 5.5 -10z"],
   countdown: [
     "M7 4h10M7 20h10M8 4c0 4 4 5 4 8s-4 4-4 8M16 4c0 4-4 5-4 8s4 4 4 8",
   ],

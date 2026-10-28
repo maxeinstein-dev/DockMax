@@ -11,7 +11,8 @@
     "cycle",
     "countdown",
     "pomodoro",
-    "todo"
+    "todo",
+    "water"
   ],
   "HourCycle": [
     "h23",
@@ -88,6 +89,7 @@
     "invalidCountdown",
     "invalidPomodoro",
     "invalidTasks",
+    "invalidWater",
     "noteTooLarge",
     "invalidConfig",
     "unavailable",

@@ -40,6 +40,7 @@ pub mod shortcut;
 pub mod system;
 pub mod time_progress;
 pub mod todo;
+pub mod water;
 
 use std::fmt;
 
@@ -58,6 +59,7 @@ pub use shortcut::ShortcutConfig;
 pub use system::{ActivityConfig, NetworkConfig};
 pub use time_progress::TimeProgressConfig;
 pub use todo::TodoConfig;
+pub use water::WaterConfig;
 
 /// Most widget instances the dock holds (spec 0003 §2.1 item 3).
 pub const MAX_WIDGETS: usize = 12;
@@ -96,6 +98,7 @@ pub enum WidgetKind {
     Countdown,
     Pomodoro,
     Todo,
+    Water,
 }
 
 closed_set!(WidgetKind {
@@ -111,6 +114,7 @@ closed_set!(WidgetKind {
     Countdown,
     Pomodoro,
     Todo,
+    Water,
 });
 
 impl WidgetKind {
@@ -127,7 +131,8 @@ impl WidgetKind {
             | WidgetKind::Cycle
             | WidgetKind::Countdown
             | WidgetKind::Pomodoro
-            | WidgetKind::Todo => true,
+            | WidgetKind::Todo
+            | WidgetKind::Water => true,
             WidgetKind::Shortcut | WidgetKind::Files => false,
         }
     }
@@ -147,7 +152,8 @@ impl WidgetKind {
             | WidgetKind::Cycle
             | WidgetKind::Countdown
             | WidgetKind::Pomodoro
-            | WidgetKind::Todo => 1,
+            | WidgetKind::Todo
+            | WidgetKind::Water => 1,
         }
     }
 
@@ -166,6 +172,7 @@ impl WidgetKind {
             WidgetKind::Countdown => "countdown",
             WidgetKind::Pomodoro => "pomodoro",
             WidgetKind::Todo => "todo",
+            WidgetKind::Water => "water",
         }
     }
 
@@ -258,6 +265,7 @@ pub enum WidgetConfig {
     Countdown(CountdownConfig),
     Pomodoro(PomodoroConfig),
     Todo(TodoConfig),
+    Water(WaterConfig),
 }
 
 impl WidgetConfig {
@@ -275,6 +283,7 @@ impl WidgetConfig {
             WidgetConfig::Countdown(_) => WidgetKind::Countdown,
             WidgetConfig::Pomodoro(_) => WidgetKind::Pomodoro,
             WidgetConfig::Todo(_) => WidgetKind::Todo,
+            WidgetConfig::Water(_) => WidgetKind::Water,
         }
     }
 
@@ -294,7 +303,8 @@ impl WidgetConfig {
             | WidgetConfig::Cycle(_)
             | WidgetConfig::Countdown(_)
             | WidgetConfig::Pomodoro(_)
-            | WidgetConfig::Todo(_) => 1,
+            | WidgetConfig::Todo(_)
+            | WidgetConfig::Water(_) => 1,
             WidgetConfig::TimeProgress(config) => config.width,
             WidgetConfig::Activity(config) => config.width,
             WidgetConfig::Network(config) => config.width,
@@ -313,7 +323,8 @@ impl WidgetConfig {
             | WidgetConfig::Cycle(_)
             | WidgetConfig::Countdown(_)
             | WidgetConfig::Pomodoro(_)
-            | WidgetConfig::Todo(_) => 1..=1,
+            | WidgetConfig::Todo(_)
+            | WidgetConfig::Water(_) => 1..=1,
             WidgetConfig::TimeProgress(_)
             | WidgetConfig::Activity(_)
             | WidgetConfig::Network(_) => system::WIDTHS,
@@ -340,7 +351,8 @@ impl WidgetConfig {
             | WidgetConfig::Cycle(_)
             | WidgetConfig::Countdown(_)
             | WidgetConfig::Pomodoro(_)
-            | WidgetConfig::Todo(_) => {}
+            | WidgetConfig::Todo(_)
+            | WidgetConfig::Water(_) => {}
         }
         Some(config)
     }
@@ -361,6 +373,7 @@ impl WidgetConfig {
             WidgetKind::Countdown => WidgetConfig::Countdown(CountdownConfig::default()),
             WidgetKind::Pomodoro => WidgetConfig::Pomodoro(PomodoroConfig::default()),
             WidgetKind::Todo => WidgetConfig::Todo(TodoConfig::default()),
+            WidgetKind::Water => WidgetConfig::Water(WaterConfig::default()),
         }
     }
 
@@ -379,6 +392,7 @@ impl WidgetConfig {
             WidgetConfig::Countdown(config) => config.validate(),
             WidgetConfig::Pomodoro(config) => config.validate(),
             WidgetConfig::Todo(config) => config.validate(),
+            WidgetConfig::Water(config) => config.validate(),
         }
     }
 }
@@ -487,6 +501,7 @@ pub fn encode_config(config: &WidgetConfig) -> String {
         WidgetConfig::Countdown(config) => serde_json::to_string(config),
         WidgetConfig::Pomodoro(config) => serde_json::to_string(config),
         WidgetConfig::Todo(config) => serde_json::to_string(config),
+        WidgetConfig::Water(config) => serde_json::to_string(config),
     };
     // Plain structs with string keys: serializing them can't fail.
     json.expect("widget configs always serialize")
@@ -522,6 +537,7 @@ pub fn decode_config(
         WidgetKind::Countdown => serde_json::from_str(json).map(WidgetConfig::Countdown),
         WidgetKind::Pomodoro => serde_json::from_str(json).map(WidgetConfig::Pomodoro),
         WidgetKind::Todo => serde_json::from_str(json).map(WidgetConfig::Todo),
+        WidgetKind::Water => serde_json::from_str(json).map(WidgetConfig::Water),
     }
     .map_err(|_| WidgetError::InvalidConfig)?;
     config.validate()?;
@@ -643,6 +659,8 @@ pub enum WidgetError {
     InvalidPomodoro,
     #[error("invalid tasks")]
     InvalidTasks,
+    #[error("invalid water settings")]
+    InvalidWater,
     #[error("note too large")]
     NoteTooLarge,
     #[error("widget config could not be read")]
@@ -674,6 +692,7 @@ impl WidgetError {
             WidgetError::InvalidCountdown => WidgetErrorCode::InvalidCountdown,
             WidgetError::InvalidPomodoro => WidgetErrorCode::InvalidPomodoro,
             WidgetError::InvalidTasks => WidgetErrorCode::InvalidTasks,
+            WidgetError::InvalidWater => WidgetErrorCode::InvalidWater,
             WidgetError::NoteTooLarge => WidgetErrorCode::NoteTooLarge,
             WidgetError::InvalidConfig => WidgetErrorCode::InvalidConfig,
             WidgetError::Unavailable => WidgetErrorCode::Unavailable,
@@ -724,6 +743,8 @@ pub enum WidgetErrorCode {
     /// A task of the Lista de tarefas empty, too long, with a control
     /// character or an ID used twice, or too many tasks.
     InvalidTasks,
+    /// The Beber água's goal, cup, reminder or count out of range.
+    InvalidWater,
     /// The note is over [`MAX_NOTE_BYTES`].
     NoteTooLarge,
     /// A stored config has another version or is not valid JSON, or the
@@ -753,6 +774,7 @@ closed_set!(WidgetErrorCode {
     InvalidCountdown,
     InvalidPomodoro,
     InvalidTasks,
+    InvalidWater,
     NoteTooLarge,
     InvalidConfig,
     Unavailable,
@@ -801,7 +823,8 @@ mod tests {
                 WidgetKind::Cycle,
                 WidgetKind::Countdown,
                 WidgetKind::Pomodoro,
-                WidgetKind::Todo
+                WidgetKind::Todo,
+                WidgetKind::Water
             ]
         );
     }
@@ -828,6 +851,7 @@ mod tests {
             "countdown",
             "pomodoro",
             "todo",
+            "water",
         ];
         for (kind, name) in WidgetKind::ALL.into_iter().zip(names) {
             assert_eq!(to_json(&kind), name);
@@ -1008,6 +1032,17 @@ mod tests {
                 }),
             ),
             (WidgetKind::Todo, json!({ "items": [] })),
+            (
+                WidgetKind::Water,
+                json!({
+                    "goal": 8,
+                    "cup": 250,
+                    "remind": 0,
+                    "count": 0,
+                    "day": 0,
+                    "last": null
+                }),
+            ),
         ];
         for (kind, config) in cases {
             let instance = instance(WidgetConfig::default_for(kind));
@@ -1242,6 +1277,7 @@ mod tests {
             WidgetError::InvalidCountdown,
             WidgetError::InvalidPomodoro,
             WidgetError::InvalidTasks,
+            WidgetError::InvalidWater,
             WidgetError::NoteTooLarge,
             WidgetError::InvalidConfig,
             WidgetError::Unavailable,
@@ -1513,6 +1549,7 @@ mod tests {
             "invalidCountdown",
             "invalidPomodoro",
             "invalidTasks",
+            "invalidWater",
             "noteTooLarge",
             "invalidConfig",
             "unavailable",

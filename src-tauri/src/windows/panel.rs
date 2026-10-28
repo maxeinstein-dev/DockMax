@@ -158,6 +158,8 @@ impl Panel {
                 WidgetKind::Pomodoro => (300.0, 290.0),
                 // Title, a field to add, the tasks (they scroll), footer.
                 WidgetKind::Todo => (320.0, 420.0),
+                // Title, the cups, the buttons, footer.
+                WidgetKind::Water => (300.0, 250.0),
                 // Never opened in this phase: `toggle_panel` refuses kinds
                 // that can't be created. The Settings card, if one ever is.
                 WidgetKind::Shortcut | WidgetKind::Files => (320.0, 390.0),

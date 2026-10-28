@@ -44,7 +44,8 @@ export type WidgetKind =
   | "cycle"
   | "countdown"
   | "pomodoro"
-  | "todo";
+  | "todo"
+  | "water";
 
 /* Each closed set below has a tuple with every value, in the order of the
  * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
@@ -65,6 +66,7 @@ export const WIDGET_KINDS = [
   "countdown",
   "pomodoro",
   "todo",
+  "water",
 ] as const;
 
 /** The kinds `add_widget` accepts in this phase. */
@@ -84,6 +86,7 @@ export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "countdown",
   "pomodoro",
   "todo",
+  "water",
 ];
 
 /** Stable ID of an instance: a UUID v7 made in Rust, never reused and never
@@ -317,6 +320,26 @@ export interface TodoConfig {
 export const MAX_TASKS = 200;
 export const MAX_TASK_CHARS = 200;
 
+/** The Beber água (spec 0017 F3-2): the goal in cups (1 to 30), a cup in
+ * milliliters (50 to 1000), the reminder in minutes (0: off, or 15 to 240),
+ * and the cups of `day` (a local day number), the last at `last` (Unix
+ * seconds). Checked in Rust. */
+export interface WaterConfig {
+  goal: number;
+  cup: number;
+  remind: number;
+  count: number;
+  day: number;
+  last: number | null;
+}
+
+/** The values the Beber água's settings offer. */
+export const WATER_CHOICES = {
+  goal: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16],
+  cup: [150, 200, 250, 300, 350, 400, 500],
+  remind: [0, 30, 45, 60, 90, 120],
+} as const;
+
 /** The config of each kind. */
 export interface WidgetConfigs {
   clock: ClockConfig;
@@ -331,6 +354,7 @@ export interface WidgetConfigs {
   countdown: CountdownConfig;
   pomodoro: PomodoroConfig;
   todo: TodoConfig;
+  water: WaterConfig;
 }
 
 /** A kind's config tagged with the kind, as `update_widget` takes it:
@@ -412,6 +436,8 @@ export type WidgetErrorCode =
   /** A task empty, too long, with a control character or an ID used
    * twice, or too many tasks. */
   | "invalidTasks"
+  /** The goal, cup, reminder or count of the Beber água out of range. */
+  | "invalidWater"
   | "noteTooLarge"
   /** A stored config has another version or is not valid JSON, or the
    * config given to `update_widget` is not exactly the canonical one (a
@@ -442,6 +468,7 @@ export const WIDGET_ERROR_CODES: readonly WidgetErrorCode[] = Object.keys({
   invalidCountdown: true,
   invalidPomodoro: true,
   invalidTasks: true,
+  invalidWater: true,
   noteTooLarge: true,
   invalidConfig: true,
   unavailable: true,
