@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   ACTIVITY_SHOWS,
   ACTIVITY_STYLES,
+  CARD_PERIODS,
   CLOCK_ICON_STYLES,
   CREATABLE_KINDS,
   HOUR_CYCLES,
@@ -17,6 +18,7 @@ import {
   WIDGETS_CHANGED_EVENT,
   type ActivityShow,
   type ActivityStyle,
+  type CardPeriod,
   type ClockIconStyle,
   type HourCycle,
   type MoveDirection,
@@ -110,6 +112,7 @@ describe("widget closed sets", () => {
     expectTypeOf<ActivityStyle>().toEqualTypeOf<
       (typeof ACTIVITY_STYLES)[number]
     >();
+    expectTypeOf<CardPeriod>().toEqualTypeOf<(typeof CARD_PERIODS)[number]>();
   });
 
   it("matches the Rust enums, in the order of their ALL", () => {
@@ -125,6 +128,7 @@ describe("widget closed sets", () => {
       ShortcutTargetType: [...SHORTCUT_TARGET_TYPES],
       ActivityShow: [...ACTIVITY_SHOWS],
       ActivityStyle: [...ACTIVITY_STYLES],
+      CardPeriod: [...CARD_PERIODS],
       WidgetErrorCode: WIDGET_ERROR_CODES.filter((code) => code !== "notReady"),
     });
   });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { errorKind, log } from "./log";
 
 /* The Calendário's events (spec 0017 F2a), as the dock read them from the
@@ -67,7 +68,13 @@ export interface CalendarView {
   snapshot: CalendarSnapshot | null;
   /** Unix seconds when it was asked. */
   now: number;
+  /** An event to open on, once: a click on the card over the dock. */
+  open: string | null;
 }
+
+/** Event the open panel gets when an event of the card was clicked: it
+ * asks again, and the answer names the event. */
+export const CALENDAR_OPEN_EVENT = "calendar-open-event";
 
 /** How often an open panel asks again. */
 export const CALENDAR_EVERY_MS = 30_000;
@@ -112,10 +119,18 @@ export function useCalendar(): CalendarView | null {
     ask(true);
     const soon = window.setTimeout(() => ask(false), 3_000);
     const every = window.setInterval(() => ask(false), CALENDAR_EVERY_MS);
+    // Without the event the card's clicks open the list: never a failure.
+    const unlisten = listen(CALENDAR_OPEN_EVENT, () => ask(false)).catch(
+      (error: unknown) => {
+        log.warn(`calendar: listen failed: ${errorKind(error)}`);
+        return undefined;
+      },
+    );
     return () => {
       active = false;
       window.clearTimeout(soon);
       window.clearInterval(every);
+      void unlisten.then((stop) => stop?.());
     };
   }, []);
   return view;

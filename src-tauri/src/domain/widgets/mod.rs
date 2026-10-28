@@ -875,7 +875,14 @@ mod tests {
             (WidgetKind::Network, json!({ "width": 2 })),
             (
                 WidgetKind::Calendar,
-                json!({ "width": 2, "hidden": [], "tasks": true, "taskOrder": [] }),
+                json!({
+                    "width": 2,
+                    "hidden": [],
+                    "tasks": true,
+                    "taskOrder": [],
+                    "cardPeriod": "auto",
+                    "cardTasks": true
+                }),
             ),
         ];
         for (kind, config) in cases {

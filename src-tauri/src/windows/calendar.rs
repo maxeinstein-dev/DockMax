@@ -54,6 +54,26 @@ pub struct Snapshot {
 }
 
 static STATE: Mutex<Option<Snapshot>> = Mutex::new(None);
+/// The event the panel should open on (a click on the card, F2a-4): taken
+/// by the panel's next reading.
+static OPEN: Mutex<Option<String>> = Mutex::new(None);
+
+/// Event the panel gets when it is already open and an event of the card
+/// was clicked: it reads the event to show. Must match
+/// `CALENDAR_OPEN_EVENT` in `src/core/calendar.ts`.
+pub const OPEN_EVENT: &str = "calendar-open-event";
+
+/// The event the panel should show next (none: its list).
+pub fn open_event(event: Option<String>) {
+    *OPEN.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = event;
+}
+
+/// The event the panel should show, taken: it shows once.
+pub fn take_open_event() -> Option<String> {
+    OPEN.lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .take()
+}
 static SOURCES: Mutex<Option<(Instant, Vec<Source>)>> = Mutex::new(None);
 /// A task list with its account.
 type AccountList = (String, GoogleTaskList);
@@ -246,7 +266,10 @@ fn read() -> Snapshot {
         Err(GoogleError::SignInAgain) => return kept(Status::SignInAgain),
         Err(_) => return kept(Status::Offline),
     };
-    let (from, to) = calendar::window(now(), offset);
+    // A week and a day ahead: the card's longest period (F2a-4); the tile
+    // and the panel show only today and tomorrow of it.
+    let (from, _) = calendar::window(now(), offset);
+    let to = from + 8 * 24 * 3600;
     let mut events = Vec::new();
     let mut status = Status::Ok;
     for source in &sources {

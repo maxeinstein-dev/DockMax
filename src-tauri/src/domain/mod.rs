@@ -1,6 +1,7 @@
 //! Pure application rules: types, defaults and validation. Nothing here
 //! touches the file system, Tauri or Windows.
 
+pub mod agenda;
 pub mod apps;
 pub mod badges;
 pub mod browser_profile;

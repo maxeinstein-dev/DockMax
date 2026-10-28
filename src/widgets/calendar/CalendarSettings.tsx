@@ -1,5 +1,5 @@
 import { useCalendar } from "../../core/calendar";
-import { CALENDAR_WIDTHS } from "../../core/widgets";
+import { CALENDAR_WIDTHS, CARD_PERIODS } from "../../core/widgets";
 import { useT } from "../../i18n";
 import OptionGroup from "../../panel/OptionGroup";
 import PanelFooter from "../../panel/PanelFooter";
@@ -58,6 +58,27 @@ function CalendarSettings({
         selected={config.tasks ? "show" : "hide"}
         onSelect={(value) => settings.saveConfig({ tasks: value === "show" })}
       />
+      <OptionGroup
+        label={text.cardContent}
+        options={[
+          { value: "both", label: text.cardContents.both },
+          { value: "meetings", label: text.cardContents.meetings },
+        ]}
+        selected={config.cardTasks ? "both" : "meetings"}
+        onSelect={(value) =>
+          settings.saveConfig({ cardTasks: value === "both" })
+        }
+      />
+      <OptionGroup
+        label={text.cardPeriod}
+        options={CARD_PERIODS.map((value) => ({
+          value,
+          label: text.cardPeriods[value],
+        }))}
+        selected={config.cardPeriod}
+        onSelect={(cardPeriod) => settings.saveConfig({ cardPeriod })}
+      />
+      <p className="sys-hint">{text.cardHint}</p>
       <fieldset className="cal-sources">
         <legend>{text.calendars}</legend>
         {sources.length === 0 ? (

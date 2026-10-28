@@ -154,7 +154,13 @@ pub fn agenda(
                 .filter(|event| config.shows(&event.calendar))
                 .cloned()
                 .collect();
-            let next = calendar::upcoming(&shown, now);
+            // Only today's and tomorrow's: the reading looks a week ahead
+            // for the card.
+            let (_, tomorrow_ends) = calendar::window(now, snapshot.offset);
+            let next: Vec<_> = calendar::upcoming(&shown, now)
+                .into_iter()
+                .filter(|event| event.start < tomorrow_ends)
+                .collect();
             let say = |when: When, long: bool| match when {
                 When::Now => text.calendar_now.to_owned(),
                 When::In(minutes) if long => text.calendar_in.replace("{n}", &minutes.to_string()),
@@ -343,6 +349,7 @@ mod tests {
             hidden: hidden.iter().map(|id| id.to_string()).collect(),
             tasks: true,
             task_order: Vec::new(),
+            ..CalendarConfig::default()
         };
         match agenda(&config, snapshot, NOW, width == 3) {
             Face::Agenda { lines, .. } => lines.into_iter().map(|line| line.text).collect(),

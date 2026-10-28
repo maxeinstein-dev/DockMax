@@ -9,6 +9,27 @@ use super::WidgetError;
 /// read (the author, 2026-10-28); two grow to three under the pointer.
 pub const WIDTHS: std::ops::RangeInclusive<u8> = 1..=2;
 
+/// How far ahead the card looks (the widget's settings).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CardPeriod {
+    /// The day; after 18h, tomorrow until noon.
+    #[default]
+    Auto,
+    Day,
+    TwoDays,
+    ThreeDays,
+    Week,
+}
+
+closed_set!(CardPeriod {
+    Auto,
+    Day,
+    TwoDays,
+    ThreeDays,
+    Week,
+});
+
 /// Most calendars a config can hide.
 pub const MAX_HIDDEN: usize = 200;
 
@@ -31,6 +52,10 @@ pub struct CalendarConfig {
     /// that repeats every day keeps its title): these first, in this
     /// order, then the others in Google's.
     pub task_order: Vec<String>,
+    /// The card over the dock (F2a-4): how far ahead it looks, and
+    /// whether it lists the day's tasks under the meetings.
+    pub card_period: CardPeriod,
+    pub card_tasks: bool,
 }
 
 impl Default for CalendarConfig {
@@ -40,6 +65,8 @@ impl Default for CalendarConfig {
             hidden: Vec::new(),
             tasks: true,
             task_order: Vec::new(),
+            card_period: CardPeriod::Auto,
+            card_tasks: true,
         }
     }
 }
@@ -81,6 +108,8 @@ mod tests {
             hidden: vec!["pt-br.brazilian#holiday@group.v.calendar.google.com".into()],
             tasks: false,
             task_order: vec!["🪴 Regar Mini Samambaia".into(), "😷 Própolis".into()],
+            card_period: CardPeriod::Week,
+            card_tasks: false,
         };
         assert_eq!(config.validate(), Ok(()));
         assert!(!config.shows("pt-br.brazilian#holiday@group.v.calendar.google.com"));

@@ -80,6 +80,10 @@ const WARM_TIMER: usize = 3;
 /// 0015).
 const PREVIEW_TIMER: usize = 6;
 const STATUS_TIMER: usize = 4;
+/// The pointer rested on the Calendário: its card shows (spec 0017 F2a-4).
+const CARD_TIMER: usize = 8;
+/// How long the pointer rests before the Calendário's card shows.
+const CARD_DELAY: u32 = 450;
 /// Reads the processor, the memory and the network again while a system
 /// widget is on the dock (spec 0017 F1).
 const ACTIVITY_TIMER: usize = 7;
@@ -1934,10 +1938,121 @@ impl Dock {
         super::previews::shown_by() == Some(self.hwnd.0 as isize)
     }
 
+    /// The pointer is on the Calendário: its card shows after a moment, or
+    /// at once when it already shows (spec 0017 F2a-4).
+    fn arm_card(&mut self) {
+        let _ = unsafe { KillTimer(Some(self.hwnd), CARD_TIMER) };
+        let calendar = self.hovered.and_then(|index| self.items.get(index)).is_some_and(
+            |item| matches!(item, Item::Widget(widget) if matches!(widget.config, WidgetConfig::Calendar(_))),
+        );
+        if !calendar {
+            return;
+        }
+        if super::agenda::shown_by() == Some(self.hwnd.0 as isize) {
+            self.show_card();
+        } else {
+            unsafe { SetTimer(Some(self.hwnd), CARD_TIMER, CARD_DELAY, None) };
+        }
+    }
+
+    /// Shows the card of the Calendário under the pointer.
+    fn show_card(&mut self) {
+        let busy = self.press.is_some() || self.open.is_some() || self.menu_open || self.tucking;
+        let Some(index) = self.hovered.filter(|_| !busy) else {
+            return;
+        };
+        let Some(Item::Widget(widget)) = self.items.get(index) else {
+            return;
+        };
+        let WidgetConfig::Calendar(config) = &widget.config else {
+            return;
+        };
+        let Some(snapshot) = super::calendar::snapshot() else {
+            return;
+        };
+        let Some(area) = self.placement_now().tiles.get(index).copied() else {
+            return;
+        };
+        let now = super::calendar::now();
+        let shown: Vec<_> = snapshot
+            .events
+            .iter()
+            .filter(|event| config.shows(&event.calendar))
+            .collect();
+        let tasks = crate::domain::agenda::ordered(&snapshot.tasks, &config.task_order);
+        let words = &crate::i18n::messages().dock;
+        let rows = crate::domain::agenda::rows(
+            &shown,
+            &tasks,
+            config.card_tasks && config.tasks,
+            crate::domain::agenda::range(config.card_period, now, snapshot.offset),
+            now,
+            snapshot.offset,
+            &crate::domain::agenda::Words {
+                today: words.calendar_today,
+                tomorrow: words.calendar_tomorrow_title,
+                weekdays: words.weekdays,
+                all_day: words.calendar_all_day,
+                now: words.calendar_now,
+                busy: words.calendar_busy,
+                untitled: words.calendar_untitled,
+                tasks: words.calendar_tasks,
+                free: words.calendar_nothing,
+            },
+        );
+        let rect = self.monitor.rect;
+        super::agenda::show(super::agenda::Request {
+            owner: self.hwnd.0 as isize,
+            widget: widget.id.clone(),
+            tile: Area {
+                x: f64::from(self.window.x) + area.x * self.scale,
+                y: f64::from(self.window.y) + area.y * self.scale,
+                width: area.width * self.scale,
+                height: area.height * self.scale,
+            },
+            screen: Area {
+                x: f64::from(rect.x),
+                y: f64::from(rect.y),
+                width: f64::from(rect.width),
+                height: f64::from(rect.height),
+            },
+            edge: self.edge(),
+            scale: self.scale,
+            dark: self.dark_now(),
+            rows,
+        });
+    }
+
+    /// Opens the Calendário `widget`'s panel, on `event`'s details when
+    /// given (a click on the card).
+    fn open_calendar(&mut self, widget: &crate::domain::widgets::WidgetId, event: Option<String>) {
+        super::calendar::open_event(event);
+        let Some(index) = self
+            .items
+            .iter()
+            .position(|item| matches!(item, Item::Widget(each) if &each.id == widget))
+        else {
+            return;
+        };
+        let Some(item) = self.items.get(index).cloned() else {
+            return;
+        };
+        if self.open.as_ref() == Some(&panel_of(&item)) {
+            // Already open: it reads the event it should show.
+            self.effects.push(Box::new(|app| {
+                let _ = tauri::Emitter::emit(app, super::calendar::OPEN_EVENT, ());
+            }));
+            return;
+        }
+        let anchor = self.rest().items[index];
+        self.toggle(panel_of(&item), anchor);
+    }
+
     /// The pointer is on another item: with a card already shown it changes
     /// at once (spec 0015, proposal 1), else it shows after the delay. The
     /// card hides itself once the pointer has left the icon and the card.
     fn arm_preview(&mut self) {
+        self.arm_card();
         let _ = unsafe { KillTimer(Some(self.hwnd), PREVIEW_TIMER) };
         let settings = &self.data.settings.dock;
         let program = self
@@ -2012,6 +2127,11 @@ impl Dock {
         let _ = unsafe { KillTimer(Some(self.hwnd), PREVIEW_TIMER) };
         if self.previewing() {
             super::previews::hide();
+        }
+        // The Calendário's card goes the same way.
+        let _ = unsafe { KillTimer(Some(self.hwnd), CARD_TIMER) };
+        if super::agenda::shown_by() == Some(self.hwnd.0 as isize) {
+            super::agenda::hide();
         }
     }
 
@@ -2902,6 +3022,10 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
                 dock.arm_clock();
             }),
             STATUS_TIMER => with_dock(hwnd, Dock::read_system),
+            CARD_TIMER => with_dock(hwnd, |dock| {
+                let _ = unsafe { KillTimer(Some(dock.hwnd), CARD_TIMER) };
+                dock.show_card();
+            }),
             ACTIVITY_TIMER => with_dock(hwnd, Dock::read_activity),
             AUTO_HIDE_TIMER => with_dock(hwnd, Dock::watch_pointer),
             PREVIEW_TIMER => with_dock(hwnd, |dock| {
@@ -2969,6 +3093,16 @@ pub fn refresh() {
 /// The Calendário's events were read again: the docks repaint.
 pub fn calendar_changed() {
     post(Dock::paint);
+}
+
+/// A click on the Calendário's card: its panel opens on the dock `owner`,
+/// on `event`'s details when given.
+pub fn open_calendar(
+    owner: isize,
+    widget: crate::domain::widgets::WidgetId,
+    event: Option<String>,
+) {
+    post_to(owner, move |dock| dock.open_calendar(&widget, event));
 }
 
 /// The notification badges of the taskbar changed (spec 0016).

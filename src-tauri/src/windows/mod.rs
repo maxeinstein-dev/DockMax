@@ -1,4 +1,6 @@
 #[cfg(windows)]
+pub mod agenda;
+#[cfg(windows)]
 pub mod appbar;
 pub mod apps;
 pub mod autostart;
