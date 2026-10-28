@@ -13,7 +13,9 @@ pub struct OpenWindow {
     pub pid: u32,
     pub title: String,
     /// The AppID the program set for the window (`System.AppUserModel.ID`),
-    /// which is how the shell groups buttons; `None` when it set none.
+    /// which is how the shell groups buttons; for a folder window of File
+    /// Explorer, which sets none, the one the shell gives Explorer; `None`
+    /// when there is none.
     pub aumid: Option<String>,
     /// The program's file (the process image).
     pub exe: Option<PathBuf>,
@@ -163,12 +165,18 @@ mod imp {
         if pid == unsafe { GetCurrentProcessId() } {
             return true.into();
         }
+        let exe = exe_of(pid);
+        let windows_dir = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
         found.push(OpenWindow {
             hwnd: hwnd.0 as isize,
             pid,
             title,
-            aumid: aumid_of(hwnd, pid),
-            exe: exe_of(pid),
+            aumid: crate::domain::open_apps::shell_aumid(
+                aumid_of(hwnd, pid),
+                exe.as_deref().and_then(|path| path.to_str()),
+                &windows_dir,
+            ),
+            exe,
         });
         true.into()
     }
