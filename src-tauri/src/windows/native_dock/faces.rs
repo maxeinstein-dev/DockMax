@@ -306,6 +306,33 @@ pub fn pomodoro(
     }
 }
 
+/// The Lista de tarefas' face (spec 0017 F3): the tasks still open, large,
+/// and "abertas" under them; a check with none. The small size shows only
+/// the number.
+pub fn todo(config: &crate::domain::widgets::TodoConfig, size: DockSize) -> Face {
+    let text = &crate::i18n::messages().dock;
+    let line = |text: String, size: f64, strong: bool| AgendaLine { text, size, strong };
+    let open = config.open();
+    let lines = if open == 0 {
+        vec![line(text.todo_none.into(), 0.34, true)]
+    } else {
+        let mut lines = vec![line(open.to_string(), 0.34, true)];
+        if size != DockSize::Small {
+            let under = if open == 1 {
+                text.todo_open
+            } else {
+                text.todo_open_many
+            };
+            lines.push(line(under.into(), 0.15, false));
+        }
+        lines
+    };
+    Face::Agenda {
+        glaze: Glaze::TODO,
+        lines,
+    }
+}
+
 /// The face of `widget` at `now`, with the system's reading for the
 /// system widgets and the calendar's for the Calendário.
 pub fn widget(
@@ -383,6 +410,7 @@ pub fn widget(
         WidgetConfig::Cycle(config) => cycle(config, size),
         WidgetConfig::Countdown(config) => countdown(config, size),
         WidgetConfig::Pomodoro(config) => pomodoro(widget, config, size),
+        WidgetConfig::Todo(config) => todo(config, size),
         WidgetConfig::Calendar(config) => {
             agenda(config, calendar, crate::windows::calendar::now(), opened)
         }

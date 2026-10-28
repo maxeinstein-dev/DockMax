@@ -18,6 +18,7 @@ const INSTANCES = {
   cycle: WIDGET_FIXTURES["cycle-default"],
   countdown: WIDGET_FIXTURES["countdown-default"],
   pomodoro: WIDGET_FIXTURES["pomodoro-default"],
+  todo: WIDGET_FIXTURES["todo-default"],
 } as const;
 
 // 2026-10-15 18:07:05 UTC, a Thursday.

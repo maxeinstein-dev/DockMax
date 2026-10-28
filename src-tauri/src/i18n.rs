@@ -75,6 +75,12 @@ pub struct DockMessages {
     /// The Pomodoro's notice of Windows, when it asks for one.
     pub pomodoro_focus_done: &'static str,
     pub pomodoro_pause_done: &'static str,
+    pub todo: &'static str,
+    /// The Lista de tarefas' tile: under the number open, one or many.
+    pub todo_open: &'static str,
+    pub todo_open_many: &'static str,
+    /// The tile with none open.
+    pub todo_none: &'static str,
     /// The progress tile without a period running.
     pub no_value: &'static str,
     /// The Calendário's tile (spec 0017 F2a): no account, no meeting left,
@@ -195,6 +201,10 @@ const PT_BR: Messages = Messages {
         pomodoro: "Pomodoro",
         pomodoro_focus_done: "Fim do foco: hora da pausa.",
         pomodoro_pause_done: "Fim da pausa: hora de focar.",
+        todo: "Lista de tarefas",
+        todo_open: "aberta",
+        todo_open_many: "abertas",
+        todo_none: "✓",
         no_value: "–",
         calendar_connect: "Conectar",
         calendar_free: "Livre",

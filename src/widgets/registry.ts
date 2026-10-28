@@ -20,6 +20,9 @@ import PomodoroSettings from "./pomodoro/PomodoroSettings";
 import PomodoroTile from "./pomodoro/PomodoroTile";
 import CycleSettings from "./cycle/CycleSettings";
 import CycleTile from "./cycle/CycleTile";
+import TodoPanel from "./todo/TodoPanel";
+import TodoSettings from "./todo/TodoSettings";
+import TodoTile from "./todo/TodoTile";
 import ClockSettings from "./clock/ClockSettings";
 import ClockTile from "./clock/ClockTile";
 import type {
@@ -53,7 +56,8 @@ export type GlazeClass =
   | "t-calendar"
   | "t-cycle"
   | "t-countdown"
-  | "t-pomodoro";
+  | "t-pomodoro"
+  | "t-todo";
 
 export interface WidgetDefinition<K extends CreatableKind> {
   kind: K;
@@ -144,6 +148,14 @@ export const WIDGET_REGISTRY: {
     Tile: PomodoroTile,
     Panel: PomodoroPanel,
     Settings: PomodoroSettings,
+  },
+  todo: {
+    kind: "todo",
+    nameKey: "todo",
+    glaze: "t-todo",
+    Tile: TodoTile,
+    Panel: TodoPanel,
+    Settings: TodoSettings,
   },
 };
 

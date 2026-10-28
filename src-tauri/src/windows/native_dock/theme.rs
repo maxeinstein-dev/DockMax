@@ -181,6 +181,12 @@ impl Glaze {
         s: 58.0,
         l: 47.0,
     };
+    /// Folha: the Lista de tarefas.
+    pub const TODO: Glaze = Glaze {
+        h: 122.0,
+        s: 28.0,
+        l: 38.0,
+    };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {
         h: 222.0,
@@ -297,6 +303,7 @@ mod tests {
             ("t-cycle", Glaze::CYCLE),
             ("t-countdown", Glaze::COUNTDOWN),
             ("t-pomodoro", Glaze::POMODORO),
+            ("t-todo", Glaze::TODO),
         ];
         for (class, glaze) in glazes {
             let css_glaze = Glaze {

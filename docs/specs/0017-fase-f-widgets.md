@@ -94,6 +94,8 @@ Relógio e Nota ficam com 1 ícone.
 
 **Pomodoro (F2c-2).** O tempo roda no Rust (`windows/pomodoro.rs`), um por widget, em memória: continua com o painel fechado e recomeça se o app for reaberto. No dock, um anel da etapa e os minutos que faltam; o clique do meio inicia ou pausa. No painel, a etapa, o tempo (mm:ss), Iniciar/Pausar/Continuar, Pular, Reiniciar e os focos da rodada. Como no Ciclo, o fim de cada etapa aparece no dock (balanço e selo, que some ao abrir o painel), e a notificação do Windows é opção desligada: o autor não quer depender dela. Ajustes: foco, pausa, pausa longa, a cada quantos focos, e começar a próxima etapa sozinho. Esmalte Tomate (`.t-pomodoro`).
 
+**Lista de tarefas (F3-1).** As tarefas ficam na config do widget, no banco com as outras (até 200, de até 200 caracteres). O painel adiciona, marca, desmarca e remove, salvando a cada mudança; as feitas vão para baixo, riscadas. Nos Ajustes, "Limpar as feitas". No dock, o número de abertas e "abertas" embaixo; um ✓ sem nenhuma. Esmalte Folha (`.t-todo`).
+
 **Ciclo (F2b).** É um widget próprio, que pode ficar num espaço de trabalho fora do que o autor compartilha em reunião.
 - **Origem:** a noiva controla tudo pela agenda dela. Ela marca o primeiro dia com um evento de dia inteiro "🌸" (o símbolo se troca nos ajustes), por um Atalho de um toque no iPhone ou pela Siri. O DockMax lê esses eventos dos últimos 12 meses e não guarda nada em disco. No disco ficam só os ajustes do autor.
 - **Previsão:** o ciclo é a média dos últimos 6 (28 dias com menos de 2 registros). A menstruação dura a média dos eventos dela (5 dias sem histórico); ela corrige esticando ou encurtando o evento. Não há janela fértil nem ovulação.
