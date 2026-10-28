@@ -8,16 +8,17 @@
 
 use std::path::{Path, PathBuf};
 
-use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
+use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree, IDataObject};
 use windows::Win32::UI::Shell::Common::ITEMIDLIST;
 use windows::Win32::UI::Shell::{
-    ApplicationActivationManager, IApplicationActivationManager, IShellItemArray,
-    SHCreateShellItemArrayFromIDLists, SHParseDisplayName, ShellExecuteW,
+    ASSOC_FILTER_NONE, ApplicationActivationManager, BHID_DataObject,
+    IApplicationActivationManager, IAssocHandler, IObjectWithAppUserModelID, IShellItemArray,
+    SHAssocEnumHandlers, SHCreateShellItemArrayFromIDLists, SHParseDisplayName, ShellExecuteW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     DispatchMessageW, MSG, PM_REMOVE, PeekMessageW, SW_SHOWNORMAL, TranslateMessage,
 };
-use windows::core::{HSTRING, PCWSTR};
+use windows::core::{HSTRING, Interface, PCWSTR, PWSTR};
 
 /// A program that opens in a folder rather than with it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,6 +121,72 @@ fn items_of(paths: &[PathBuf]) -> windows::core::Result<IShellItemArray> {
     result
 }
 
+/// The extension the files of `paths` share, with its dot: none for a
+/// folder, or for files of different kinds.
+fn shared_extension(paths: &[PathBuf]) -> Option<String> {
+    let mut extensions = paths.iter().map(|path| {
+        path.is_file()
+            .then(|| path.extension())
+            .flatten()
+            .map(|extension| format!(".{}", extension.to_string_lossy().to_lowercase()))
+    });
+    let first = extensions.next()??;
+    extensions
+        .all(|each| each.as_deref() == Some(&first))
+        .then_some(first)
+}
+
+/// Opens the files of `paths` with the program `id` (running `target`) as
+/// "Abrir com" does: its handler for their kind, found by its AppID or its
+/// program. Whether it was one of them.
+fn open_with_handler(
+    id: &str,
+    target: Option<&Path>,
+    paths: &[PathBuf],
+) -> windows::core::Result<bool> {
+    let Some(extension) = shared_extension(paths) else {
+        return Ok(false);
+    };
+    let handlers = unsafe { SHAssocEnumHandlers(&HSTRING::from(extension), ASSOC_FILTER_NONE)? };
+    loop {
+        let mut found: [Option<IAssocHandler>; 1] = [None];
+        let mut got = 0;
+        if unsafe { handlers.Next(&mut found, Some(&mut got)) }.is_err() || got == 0 {
+            return Ok(false);
+        }
+        let Some(handler) = found[0].take() else {
+            return Ok(false);
+        };
+        let app = handler
+            .cast::<IObjectWithAppUserModelID>()
+            .ok()
+            .and_then(|object| unsafe { object.GetAppID() }.ok())
+            .and_then(taken);
+        let program = unsafe { handler.GetName() }.ok().and_then(taken);
+        let same_program = target
+            .zip(program.as_deref())
+            .is_some_and(|(target, program)| {
+                target
+                    .as_os_str()
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case(program)
+            });
+        if app.as_deref() == Some(id) || same_program {
+            let data: IDataObject =
+                unsafe { items_of(paths)?.BindToHandler(None, &BHID_DataObject)? };
+            unsafe { handler.Invoke(&data)? };
+            return Ok(true);
+        }
+    }
+}
+
+/// The text of a string the shell gave, freed.
+fn taken(text: PWSTR) -> Option<String> {
+    let value = unsafe { text.to_string() }.ok();
+    unsafe { CoTaskMemFree(Some(text.0.cast_const().cast())) };
+    value
+}
+
 /// Opens the Store app `id` with `paths`, as "Abrir com" does.
 fn activate_for_files(id: &str, paths: &[PathBuf]) -> windows::core::Result<()> {
     let manager: IApplicationActivationManager =
@@ -154,7 +221,13 @@ pub fn open(id: &str, paths: &[PathBuf]) -> Result<(), String> {
         }
         None => {}
     }
-    // A Store app opens the files as when they are opened with it.
+    // Files open with the program's handler for their kind, as "Abrir com"
+    // does: a Store app's too.
+    match open_with_handler(id, target.as_deref(), paths) {
+        Ok(true) => return Ok(()),
+        Ok(false) => {}
+        Err(error) => log::info!("open with: the handler did not open them: {error}"),
+    }
     if id.contains('!') {
         match activate_for_files(id, paths) {
             Ok(()) => return Ok(()),
@@ -265,11 +338,46 @@ mod tests {
     }
 
     #[test]
+    fn files_of_one_kind_share_their_extension() {
+        let here = std::env::temp_dir();
+        let a = here.join("dockmax-ext-a.TXT");
+        let b = here.join("dockmax-ext-b.txt");
+        let c = here.join("dockmax-ext-c.md");
+        for file in [&a, &b, &c] {
+            std::fs::write(file, "").unwrap();
+        }
+        assert_eq!(
+            shared_extension(&[a.clone(), b.clone()]).as_deref(),
+            Some(".txt")
+        );
+        assert_eq!(shared_extension(&[a.clone(), c.clone()]), None);
+        assert_eq!(shared_extension(std::slice::from_ref(&here)), None);
+        for file in [a, b, c] {
+            let _ = std::fs::remove_file(file);
+        }
+    }
+
+    #[test]
     fn a_file_opens_the_terminal_in_its_folder() {
         let here = std::env::temp_dir();
         assert_eq!(folder_of(std::slice::from_ref(&here)), Some(here.clone()));
         let file = here.join("dockmax-not-a-folder.txt");
         assert_eq!(folder_of(&[file]), Some(here));
         assert_eq!(folder_of(&[]), None);
+    }
+}
+
+#[cfg(test)]
+mod machine {
+    /// Opens a temporary text file with the Bloco de notas of this machine,
+    /// a Store app, as a drop on its tile does.
+    /// `cargo test -- --ignored notepad_opens_a_file`.
+    #[test]
+    #[ignore = "opens the Bloco de notas of this machine"]
+    fn notepad_opens_a_file() {
+        let file = std::env::temp_dir().join("teste-dockmax.txt");
+        std::fs::write(&file, "teste do DockMax").unwrap();
+        let id = "Microsoft.WindowsNotepad_8wekyb3d8bbwe!App";
+        assert_eq!(super::open(id, &[file]), Ok(()));
     }
 }
