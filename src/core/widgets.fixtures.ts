@@ -221,6 +221,20 @@ export const WIDGET_FIXTURES = {
     },
   } satisfies WidgetInstance<"cycle">,
 
+  "countdown-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6088",
+    label: null,
+    kind: "countdown",
+    config: { date: null, yearly: false },
+  } satisfies WidgetInstance<"countdown">,
+
+  "countdown-sample": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6089",
+    label: "Casamento",
+    kind: "countdown",
+    config: { date: "2027-05-22", yearly: true },
+  } satisfies WidgetInstance<"countdown">,
+
   "snapshot-sample": {
     storage: { state: "ok" },
     widgets: [CLOCK_DEFAULT, { ...NOTE_DEFAULT, label: "Mercado" }],

@@ -11,6 +11,9 @@ import CalendarPanel from "./calendar/CalendarPanel";
 import CalendarSettings from "./calendar/CalendarSettings";
 import CalendarTile from "./calendar/CalendarTile";
 import ClockPanel from "./clock/ClockPanel";
+import CountdownPanel from "./countdown/CountdownPanel";
+import CountdownSettings from "./countdown/CountdownSettings";
+import CountdownTile from "./countdown/CountdownTile";
 import CyclePanel from "./cycle/CyclePanel";
 import CycleSettings from "./cycle/CycleSettings";
 import CycleTile from "./cycle/CycleTile";
@@ -45,7 +48,8 @@ export type GlazeClass =
   | "t-activity"
   | "t-network"
   | "t-calendar"
-  | "t-cycle";
+  | "t-cycle"
+  | "t-countdown";
 
 export interface WidgetDefinition<K extends CreatableKind> {
   kind: K;
@@ -120,6 +124,14 @@ export const WIDGET_REGISTRY: {
     Tile: CycleTile,
     Panel: CyclePanel,
     Settings: CycleSettings,
+  },
+  countdown: {
+    kind: "countdown",
+    nameKey: "countdown",
+    glaze: "t-countdown",
+    Tile: CountdownTile,
+    Panel: CountdownPanel,
+    Settings: CountdownSettings,
   },
 };
 

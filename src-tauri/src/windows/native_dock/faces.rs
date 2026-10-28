@@ -252,6 +252,45 @@ pub fn cycle(config: &crate::domain::widgets::CycleConfig, size: DockSize) -> Fa
     }
 }
 
+/// The Contagem regressiva's face (spec 0017 F2c): the days left, large,
+/// and "dias" under them; "Hoje" on the day; the days gone, once it is.
+/// The small size shows only the number.
+pub fn countdown(config: &crate::domain::widgets::CountdownConfig, size: DockSize) -> Face {
+    use crate::domain::widgets::countdown;
+    let text = &crate::i18n::messages().dock;
+    let today = crate::domain::cycle::day_of(
+        crate::windows::calendar::now(),
+        crate::windows::calendar::offset(),
+    );
+    let line = |text: String, size: f64, strong: bool| AgendaLine { text, size, strong };
+    let small = size == DockSize::Small;
+    let lines = match countdown::days_left(config, today) {
+        None => vec![line(text.no_value.into(), 0.3, true)],
+        Some(0) => vec![line(text.countdown_today.into(), 0.24, true)],
+        Some(days) => {
+            let unit = if days.abs() == 1 {
+                text.countdown_day
+            } else {
+                text.countdown_days
+            };
+            let under = if days > 0 {
+                unit.to_owned()
+            } else {
+                format!("{unit} {}", text.countdown_ago)
+            };
+            let mut lines = vec![line(days.abs().to_string(), 0.34, true)];
+            if !small {
+                lines.push(line(under, 0.15, false));
+            }
+            lines
+        }
+    };
+    Face::Agenda {
+        glaze: Glaze::COUNTDOWN,
+        lines,
+    }
+}
+
 /// The face of `widget` at `now`, with the system's reading for the
 /// system widgets and the calendar's for the Calendário.
 pub fn widget(
@@ -327,6 +366,7 @@ pub fn widget(
         },
         WidgetConfig::Network(config) => rates(config.width, system),
         WidgetConfig::Cycle(config) => cycle(config, size),
+        WidgetConfig::Countdown(config) => countdown(config, size),
         WidgetConfig::Calendar(config) => {
             agenda(config, calendar, crate::windows::calendar::now(), opened)
         }

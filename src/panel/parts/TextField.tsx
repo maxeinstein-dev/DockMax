@@ -13,7 +13,7 @@ export interface TextFieldProps {
    * pressed. Where a field saves (the label), it saves here, not on every
    * keystroke. */
   onCommit?: () => void;
-  type?: "text" | "time" | "password";
+  type?: "text" | "time" | "date" | "password";
   placeholder?: string;
   /** Marks the field invalid (`aria-invalid`) and points at the text that
    * says why. No `maxLength`: the browser counts UTF-16 units, Rust counts

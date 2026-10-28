@@ -76,6 +76,7 @@ pub struct Names {
     pub network: &'static str,
     pub calendar: &'static str,
     pub cycle: &'static str,
+    pub countdown: &'static str,
 }
 
 impl Names {
@@ -95,6 +96,7 @@ impl Names {
                     WidgetKind::Network => self.network,
                     WidgetKind::Calendar => self.calendar,
                     WidgetKind::Cycle => self.cycle,
+                    WidgetKind::Countdown => self.countdown,
                 }
                 .to_string()
             }),
@@ -249,6 +251,7 @@ mod tests {
         network: "Atividade de rede",
         calendar: "Calendário",
         cycle: "Ciclo",
+        countdown: "Contagem regressiva",
     };
 
     fn id(n: u8) -> WidgetId {

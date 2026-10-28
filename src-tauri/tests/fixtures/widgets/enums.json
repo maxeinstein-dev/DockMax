@@ -8,7 +8,8 @@
     "activity",
     "network",
     "calendar",
-    "cycle"
+    "cycle",
+    "countdown"
   ],
   "HourCycle": [
     "h23",
@@ -82,6 +83,7 @@
     "invalidWidth",
     "invalidCalendars",
     "invalidCycle",
+    "invalidCountdown",
     "noteTooLarge",
     "invalidConfig",
     "unavailable",

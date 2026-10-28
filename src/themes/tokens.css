@@ -230,6 +230,13 @@
   --l: 40%;
 }
 
+/* Violeta: Contagem regressiva (spec 0017 F2c). */
+.t-countdown {
+  --h: 272;
+  --sat: 32%;
+  --l: 44%;
+}
+
 /* Argila. */
 .t-calendar {
   --h: 16;

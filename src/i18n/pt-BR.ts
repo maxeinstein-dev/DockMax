@@ -596,6 +596,7 @@ const messages = {
       network: "Atividade de rede",
       calendar: "Calendário",
       cycle: "Ciclo",
+      countdown: "Contagem regressiva",
     } satisfies Record<WidgetKind, string>,
     /** Short name of each kind on the add buttons of Itens do dock. */
     addNames: {
@@ -606,6 +607,7 @@ const messages = {
       network: "Rede",
       calendar: "Calendário",
       cycle: "Ciclo",
+      countdown: "Contagem regressiva",
     } satisfies Record<CreatableKind, string>,
     /** Parts every widget panel shares. */
     common: {
@@ -809,6 +811,8 @@ const messages = {
         calendar:
           "As próximas reuniões das suas agendas Google, com Entrar a um clique.",
         cycle: "Acompanha um ciclo marcado na agenda, com discrição no dock.",
+        countdown:
+          "Os dias que faltam para uma data, como um casamento ou as férias.",
       } satisfies Record<CreatableKind, string>,
       /** The add button of a card, and its accessible name. */
       add: "Adicionar",
@@ -876,6 +880,20 @@ const messages = {
       showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },
     /** The Ciclo (spec 0017 F2b): the panel says what the tile doesn't. */
+    /** The Contagem regressiva (spec 0017 F2c). */
+    countdown: {
+      settingsTitle: "Ajustes da contagem",
+      name: "Nome",
+      namePlaceholder: "Casamento",
+      date: "Data",
+      yearly: "Repetir todo ano",
+      yearlyHint: "Para aniversários: conta sempre até o próximo.",
+      noDate: "Escolha a data nos Ajustes.",
+      today: "É hoje!",
+      left: { one: "Falta {n} dia", other: "Faltam {n} dias" },
+      ago: { one: "Foi há {n} dia", other: "Foi há {n} dias" },
+      everyYear: "Todo ano",
+    },
     cycle: {
       settingsTitle: "Ajustes do ciclo",
       unknown: "Nenhuma marca encontrada ainda.",
@@ -1006,6 +1024,7 @@ const messages = {
         "Essa pasta não é aceita. Use o caminho completo de uma pasta do Windows.",
       invalidWidth: "Essa largura não vale para este widget.",
       invalidCalendars: "Não foi possível guardar os ajustes do calendário.",
+      invalidCountdown: "Escolha uma data válida.",
       invalidCycle:
         "Use um símbolo de até 16 caracteres, uma janela de 1 a 10 dias e até 10 lembretes de 120 caracteres.",
       noteTooLarge: "Passou de 64 KB e não foi salvo. Encurte o texto.",

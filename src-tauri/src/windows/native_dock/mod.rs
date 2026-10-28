@@ -637,6 +637,7 @@ fn names() -> Names {
         network: dock.network,
         calendar: dock.calendar,
         cycle: dock.cycle,
+        countdown: dock.countdown,
     }
 }
 
@@ -3368,6 +3369,7 @@ pub fn view() -> Option<View> {
                         crate::domain::widgets::WidgetConfig::Network(_) => "rates",
                         crate::domain::widgets::WidgetConfig::Calendar(_) => "agenda",
                         crate::domain::widgets::WidgetConfig::Cycle(_) => "ring",
+                        crate::domain::widgets::WidgetConfig::Countdown(_) => "agenda",
                         _ => "glyph",
                     },
                 };

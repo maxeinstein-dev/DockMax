@@ -169,6 +169,12 @@ impl Glaze {
         s: 18.0,
         l: 40.0,
     };
+    /// Violeta: the Contagem regressiva.
+    pub const COUNTDOWN: Glaze = Glaze {
+        h: 272.0,
+        s: 32.0,
+        l: 44.0,
+    };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {
         h: 222.0,
@@ -283,6 +289,7 @@ mod tests {
             ("t-network", Glaze::NETWORK),
             ("t-calendar", Glaze::CALENDAR),
             ("t-cycle", Glaze::CYCLE),
+            ("t-countdown", Glaze::COUNTDOWN),
         ];
         for (class, glaze) in glazes {
             let css_glaze = Glaze {
