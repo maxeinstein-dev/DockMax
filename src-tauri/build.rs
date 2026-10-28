@@ -35,6 +35,8 @@ fn main() {
             "complete_calendar_task",
             "cycle_status",
             "cycle_test_notice",
+            "pomodoro_status",
+            "pomodoro_act",
             "google_status",
             "set_google_client",
             "connect_google_account",

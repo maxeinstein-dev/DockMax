@@ -77,6 +77,7 @@ pub struct Names {
     pub calendar: &'static str,
     pub cycle: &'static str,
     pub countdown: &'static str,
+    pub pomodoro: &'static str,
 }
 
 impl Names {
@@ -97,6 +98,7 @@ impl Names {
                     WidgetKind::Calendar => self.calendar,
                     WidgetKind::Cycle => self.cycle,
                     WidgetKind::Countdown => self.countdown,
+                    WidgetKind::Pomodoro => self.pomodoro,
                 }
                 .to_string()
             }),
@@ -252,6 +254,7 @@ mod tests {
         calendar: "Calendário",
         cycle: "Ciclo",
         countdown: "Contagem regressiva",
+        pomodoro: "Pomodoro",
     };
 
     fn id(n: u8) -> WidgetId {

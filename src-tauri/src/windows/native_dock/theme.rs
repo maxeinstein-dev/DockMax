@@ -175,6 +175,12 @@ impl Glaze {
         s: 32.0,
         l: 44.0,
     };
+    /// Tomate: the Pomodoro.
+    pub const POMODORO: Glaze = Glaze {
+        h: 4.0,
+        s: 58.0,
+        l: 47.0,
+    };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {
         h: 222.0,
@@ -290,6 +296,7 @@ mod tests {
             ("t-calendar", Glaze::CALENDAR),
             ("t-cycle", Glaze::CYCLE),
             ("t-countdown", Glaze::COUNTDOWN),
+            ("t-pomodoro", Glaze::POMODORO),
         ];
         for (class, glaze) in glazes {
             let css_glaze = Glaze {

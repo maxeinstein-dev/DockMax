@@ -20,6 +20,7 @@ pub mod launcher_web;
 pub mod live_faces;
 pub mod menu;
 pub mod open_apps;
+pub mod pomodoro;
 pub mod previews;
 pub mod settings;
 pub mod system_activity;

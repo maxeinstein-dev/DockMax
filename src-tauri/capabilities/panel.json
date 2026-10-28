@@ -27,6 +27,8 @@
     "allow-complete-calendar-task",
     "allow-cycle-status",
     "allow-cycle-test-notice",
+    "allow-pomodoro-status",
+    "allow-pomodoro-act",
     "allow-tray-to-dock",
     "allow-list-apps",
     "allow-list-catalog",

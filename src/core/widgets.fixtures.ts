@@ -235,6 +235,34 @@ export const WIDGET_FIXTURES = {
     config: { date: "2027-05-22", yearly: true },
   } satisfies WidgetInstance<"countdown">,
 
+  "pomodoro-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6090",
+    label: null,
+    kind: "pomodoro",
+    config: {
+      focus: 25,
+      short: 5,
+      long: 15,
+      every: 4,
+      autoStart: false,
+      windows: false,
+    },
+  } satisfies WidgetInstance<"pomodoro">,
+
+  "pomodoro-sample": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6091",
+    label: null,
+    kind: "pomodoro",
+    config: {
+      focus: 50,
+      short: 10,
+      long: 30,
+      every: 3,
+      autoStart: true,
+      windows: true,
+    },
+  } satisfies WidgetInstance<"pomodoro">,
+
   "snapshot-sample": {
     storage: { state: "ok" },
     widgets: [CLOCK_DEFAULT, { ...NOTE_DEFAULT, label: "Mercado" }],

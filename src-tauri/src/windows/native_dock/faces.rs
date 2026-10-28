@@ -291,6 +291,21 @@ pub fn countdown(config: &crate::domain::widgets::CountdownConfig, size: DockSiz
     }
 }
 
+/// The Pomodoro's face (spec 0017 F2c-2): a ring of the stage gone and the
+/// minutes left; the small size shows only the ring.
+pub fn pomodoro(
+    widget: &WidgetInstance,
+    config: &crate::domain::widgets::PomodoroConfig,
+    size: DockSize,
+) -> Face {
+    let (fraction, minutes, _) = crate::windows::pomodoro::face(widget.id.as_str(), config);
+    Face::Ring {
+        glaze: Glaze::POMODORO,
+        fraction: Some(fraction),
+        text: (size != DockSize::Small).then(|| minutes.to_string()),
+    }
+}
+
 /// The face of `widget` at `now`, with the system's reading for the
 /// system widgets and the calendar's for the Calendário.
 pub fn widget(
@@ -367,6 +382,7 @@ pub fn widget(
         WidgetConfig::Network(config) => rates(config.width, system),
         WidgetConfig::Cycle(config) => cycle(config, size),
         WidgetConfig::Countdown(config) => countdown(config, size),
+        WidgetConfig::Pomodoro(config) => pomodoro(widget, config, size),
         WidgetConfig::Calendar(config) => {
             agenda(config, calendar, crate::windows::calendar::now(), opened)
         }

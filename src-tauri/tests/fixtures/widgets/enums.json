@@ -9,7 +9,8 @@
     "network",
     "calendar",
     "cycle",
-    "countdown"
+    "countdown",
+    "pomodoro"
   ],
   "HourCycle": [
     "h23",
@@ -84,6 +85,7 @@
     "invalidCalendars",
     "invalidCycle",
     "invalidCountdown",
+    "invalidPomodoro",
     "noteTooLarge",
     "invalidConfig",
     "unavailable",

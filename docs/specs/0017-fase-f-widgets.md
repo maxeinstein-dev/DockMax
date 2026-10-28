@@ -92,7 +92,7 @@ Relógio e Nota ficam com 1 ícone.
 
 **Contagem regressiva (F2c-1).** O nome é o Rótulo do widget ("Casamento"); a config tem só a data e "Repetir todo ano" (aniversários: conta até o próximo; 29 de fevereiro cai no dia 28 nos anos sem ele). No dock, os dias que faltam e "dias" embaixo; "Hoje" no dia; depois, os dias que passaram com "dias atrás". Sem data, um traço. Esmalte Violeta (`.t-countdown`), longe dos tons da Nota e da Rede.
 
-**Pomodoro (F2c-2).** Como no Ciclo, o fim de cada etapa aparece no dock (balanço e selo), e a notificação do Windows é opção desligada: o autor não quer depender dela.
+**Pomodoro (F2c-2).** O tempo roda no Rust (`windows/pomodoro.rs`), um por widget, em memória: continua com o painel fechado e recomeça se o app for reaberto. No dock, um anel da etapa e os minutos que faltam; o clique do meio inicia ou pausa. No painel, a etapa, o tempo (mm:ss), Iniciar/Pausar/Continuar, Pular, Reiniciar e os focos da rodada. Como no Ciclo, o fim de cada etapa aparece no dock (balanço e selo, que some ao abrir o painel), e a notificação do Windows é opção desligada: o autor não quer depender dela. Ajustes: foco, pausa, pausa longa, a cada quantos focos, e começar a próxima etapa sozinho. Esmalte Tomate (`.t-pomodoro`).
 
 **Ciclo (F2b).** É um widget próprio, que pode ficar num espaço de trabalho fora do que o autor compartilha em reunião.
 - **Origem:** a noiva controla tudo pela agenda dela. Ela marca o primeiro dia com um evento de dia inteiro "🌸" (o símbolo se troca nos ajustes), por um Atalho de um toque no iPhone ou pela Siri. O DockMax lê esses eventos dos últimos 12 meses e não guarda nada em disco. No disco ficam só os ajustes do autor.

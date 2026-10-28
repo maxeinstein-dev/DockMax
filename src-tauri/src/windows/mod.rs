@@ -42,6 +42,8 @@ pub mod openwin;
 pub mod panel;
 pub mod panel_window;
 #[cfg(windows)]
+pub mod pomodoro;
+#[cfg(windows)]
 pub mod popup_menu;
 #[cfg(windows)]
 pub mod previews;

@@ -1,0 +1,35 @@
+/* The Pomodoro's panel (spec 0017 F2c-2). Tokens of tokens.css only. */
+
+.pomodoro-stage {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.pomodoro-clock {
+  margin: 2px 0 12px;
+  font: 600 40px / 1.1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.pomodoro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.pomodoro-actions .pomodoro-main {
+  background: var(--accent);
+  color: #fff;
+}
+
+.pomodoro-actions .pomodoro-main:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 86%, #000);
+}
+
+.pomodoro-note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}
