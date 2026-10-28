@@ -1,5 +1,7 @@
 import { useCalendar } from "../../core/calendar";
+import { CALENDAR_WIDTHS } from "../../core/widgets";
 import { useT } from "../../i18n";
+import OptionGroup from "../../panel/OptionGroup";
 import PanelFooter from "../../panel/PanelFooter";
 import PanelHeader from "../../panel/parts/PanelHeader";
 import RemoveButton from "../../panel/parts/RemoveButton";
@@ -44,7 +46,17 @@ function CalendarSettings({
       />
       <WidthGroup
         width={config.width}
+        widths={CALENDAR_WIDTHS}
         onSelect={(width) => settings.saveConfig({ width })}
+      />
+      <OptionGroup
+        label={text.showTasks}
+        options={[
+          { value: "show", label: text.showTasksOptions.show },
+          { value: "hide", label: text.showTasksOptions.hide },
+        ]}
+        selected={config.tasks ? "show" : "hide"}
+        onSelect={(value) => settings.saveConfig({ tasks: value === "show" })}
       />
       <fieldset className="cal-sources">
         <legend>{text.calendars}</legend>

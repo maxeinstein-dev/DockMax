@@ -166,6 +166,9 @@ pub struct Tile {
     pub attention: bool,
     /// Being dragged: drawn above the others.
     pub dragging: bool,
+    /// Risen above the bar (a Calendário under the pointer): drawn above
+    /// the others, with no reflection.
+    pub raised: bool,
     /// The mark under it: its centre and opacity (0 for none).
     pub dot: Option<(f64, f32)>,
     /// The item's box (for the focus ring).
@@ -754,15 +757,25 @@ impl Painter {
             self.dot(dot);
         }
         if scene.look.reflections {
-            for tile in scene.tiles.iter().filter(|tile| !tile.dragging) {
+            for tile in scene
+                .tiles
+                .iter()
+                .filter(|tile| !tile.dragging && !tile.raised)
+            {
                 self.reflection(scene, tile);
             }
         }
-        // The dragged tile last, above the others.
+        // The risen and the dragged tiles last, above the others.
         let order = scene
             .tiles
             .iter()
-            .filter(|tile| !tile.dragging)
+            .filter(|tile| !tile.dragging && !tile.raised)
+            .chain(
+                scene
+                    .tiles
+                    .iter()
+                    .filter(|tile| tile.raised && !tile.dragging),
+            )
             .chain(scene.tiles.iter().filter(|tile| tile.dragging));
         for tile in order {
             self.tile(scene, tile);
@@ -1214,6 +1227,7 @@ impl Painter {
             pressed: false,
             attention: false,
             dragging: false,
+            raised: false,
             dot: None,
             item: tile.item,
             notice: None,

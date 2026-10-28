@@ -5,7 +5,9 @@
 use serde::{Deserialize, Serialize};
 
 use super::WidgetError;
-use super::system::check_width;
+/// The widths the Calendário takes, in icons: three was too small to
+/// read (the author, 2026-10-28); two grow to three under the pointer.
+pub const WIDTHS: std::ops::RangeInclusive<u8> = 1..=2;
 
 /// Most calendars a config can hide.
 pub const MAX_HIDDEN: usize = 200;
@@ -16,11 +18,19 @@ pub const MAX_ID_LEN: usize = 512;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct CalendarConfig {
-    /// In icons, 1 to 3: the time of the next meeting; the time and the
-    /// title; the title, when, and the one after.
+    /// In icons, 1 or 2: the time of the next meeting; the time and the
+    /// title. Two icons grow to three under the pointer, with the meeting
+    /// after it.
     pub width: u8,
     /// The ids of the calendars not shown, as Google names them.
     pub hidden: Vec<String>,
+    /// Whether the panel shows Google Tasks' tasks (F2a-3). A config
+    /// stored before it reads as `true`.
+    pub tasks: bool,
+    /// The tasks' order the author gave in the panel, by title (a task
+    /// that repeats every day keeps its title): these first, in this
+    /// order, then the others in Google's.
+    pub task_order: Vec<String>,
 }
 
 impl Default for CalendarConfig {
@@ -28,18 +38,26 @@ impl Default for CalendarConfig {
         CalendarConfig {
             width: 2,
             hidden: Vec::new(),
+            tasks: true,
+            task_order: Vec::new(),
         }
     }
 }
 
 impl CalendarConfig {
     pub fn validate(&self) -> Result<(), WidgetError> {
-        check_width(self.width)?;
-        let ids_ok = self.hidden.len() <= MAX_HIDDEN
-            && self.hidden.iter().all(|id| {
-                !id.is_empty() && id.len() <= MAX_ID_LEN && !id.chars().any(char::is_control)
-            });
-        if ids_ok {
+        if !WIDTHS.contains(&self.width) {
+            return Err(WidgetError::InvalidWidth);
+        }
+        let fits = |list: &[String]| {
+            list.len() <= MAX_HIDDEN
+                && list.iter().all(|text| {
+                    !text.is_empty()
+                        && text.len() <= MAX_ID_LEN
+                        && !text.chars().any(char::is_control)
+                })
+        };
+        if fits(&self.hidden) && fits(&self.task_order) {
             Ok(())
         } else {
             Err(WidgetError::InvalidCalendars)
@@ -59,15 +77,17 @@ mod tests {
     #[test]
     fn a_calendar_config_takes_a_width_and_hidden_calendars() {
         let config = CalendarConfig {
-            width: 3,
+            width: 2,
             hidden: vec!["pt-br.brazilian#holiday@group.v.calendar.google.com".into()],
+            tasks: false,
+            task_order: vec!["🪴 Regar Mini Samambaia".into(), "😷 Própolis".into()],
         };
         assert_eq!(config.validate(), Ok(()));
         assert!(!config.shows("pt-br.brazilian#holiday@group.v.calendar.google.com"));
         assert!(config.shows("max@example.com"));
 
         let wide = CalendarConfig {
-            width: 4,
+            width: 3,
             ..CalendarConfig::default()
         };
         assert_eq!(wide.validate(), Err(WidgetError::InvalidWidth));
@@ -83,5 +103,10 @@ mod tests {
             ..CalendarConfig::default()
         };
         assert_eq!(many.validate(), Err(WidgetError::InvalidCalendars));
+        let broken_order = CalendarConfig {
+            task_order: vec!["a\tb".into()],
+            ..CalendarConfig::default()
+        };
+        assert_eq!(broken_order.validate(), Err(WidgetError::InvalidCalendars));
     }
 }

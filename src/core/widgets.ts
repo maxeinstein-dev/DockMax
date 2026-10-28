@@ -179,12 +179,23 @@ export interface NetworkConfig {
 
 /** The Calendário (spec 0017 F2a): its width, and the calendars it leaves
  * out; every other calendar of the connected accounts shows. */
+/** The widths of the Calendário: three was too small to read; two rise
+ * to three under the pointer. */
+export const CALENDAR_WIDTHS = [1, 2] as const;
+
+export type CalendarWidth = (typeof CALENDAR_WIDTHS)[number];
+
 export interface CalendarConfig {
-  /** In icons: the next meeting's time; its time and title; its title,
-   * when, and the one after. */
-  width: WidgetWidth;
+  /** In icons: the next meeting's time; its time and title (rising to
+   * three icons under the pointer, with the one after). */
+  width: CalendarWidth;
   /** Google's ids of the calendars not shown; at most 200. */
   hidden: string[];
+  /** Whether the panel shows Google Tasks' tasks (F2a-3). */
+  tasks: boolean;
+  /** The tasks' order given in the panel, by title: these first, then
+   * the others in Google's order. */
+  taskOrder: string[];
 }
 
 /** The config of each kind. */
@@ -266,8 +277,8 @@ export type WidgetErrorCode =
   | "invalidFolder"
   /** A width the kind doesn't accept. */
   | "invalidWidth"
-  /** A hidden calendar empty, too long or with a control character, or
-   * too many. */
+  /** A hidden calendar or a task of the order empty, too long or with a
+   * control character, or too many. */
   | "invalidCalendars"
   | "noteTooLarge"
   /** A stored config has another version or is not valid JSON, or the

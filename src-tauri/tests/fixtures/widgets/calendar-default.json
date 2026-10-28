@@ -4,6 +4,8 @@
   "kind": "calendar",
   "config": {
     "width": 2,
-    "hidden": []
+    "hidden": [],
+    "tasks": true,
+    "taskOrder": []
   }
 }

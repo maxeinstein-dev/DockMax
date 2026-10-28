@@ -62,12 +62,15 @@ export function Sparkline({
 }
 
 /** The tile's width, 1 or 2 icons. */
-export function WidthGroup({
+export function WidthGroup<W extends WidgetWidth = WidgetWidth>({
   width,
+  widths = WIDGET_WIDTHS as unknown as readonly W[],
   onSelect,
 }: {
-  width: WidgetWidth;
-  onSelect: (width: WidgetWidth) => void;
+  width: W;
+  /** The widths the kind takes; all of them by default. */
+  widths?: readonly W[];
+  onSelect: (width: W) => void;
 }) {
   const t = useT();
   const text = t.widgets.system;
@@ -79,12 +82,12 @@ export function WidthGroup({
   return (
     <OptionGroup
       label={text.width}
-      options={WIDGET_WIDTHS.map((value) => ({
+      options={widths.map((value) => ({
         value: String(value),
         label: names[value],
       }))}
       selected={String(width)}
-      onSelect={(value) => onSelect(Number(value) as WidgetWidth)}
+      onSelect={(value) => onSelect(Number(value) as W)}
     />
   );
 }

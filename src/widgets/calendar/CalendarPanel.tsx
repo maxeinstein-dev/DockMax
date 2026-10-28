@@ -1,14 +1,18 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import {
   clockText,
+  completeTask,
   dayOf,
+  sortTasks,
   openCalendarLink,
   plainText,
   useCalendar,
   type CalendarEvent,
+  type CalendarTask,
 } from "../../core/calendar";
 import { format, useT } from "../../i18n";
 import PanelFooter from "../../panel/PanelFooter";
+import IconButton from "../../panel/parts/IconButton";
 import PanelHeader from "../../panel/parts/PanelHeader";
 import type { WidgetPanelProps } from "../contract";
 import { widgetName } from "../names";
@@ -24,6 +28,118 @@ function Dot({ color }: { color: string | null }) {
     }
   }, [color]);
   return <span ref={dot} className="cal-dot" aria-hidden="true" />;
+}
+
+/** An event's title; one without: "Ocupado" from a free/busy calendar,
+ * "(sem título)" otherwise. */
+function titleOf(
+  event: CalendarEvent,
+  text: { busy: string; noTitle: string },
+): string {
+  return event.title || (event.busy ? text.busy : text.noTitle);
+}
+
+/** Today's and late tasks, each ticked off with its box: it leaves the
+ * list at once, and comes back with a message if Google didn't take it. */
+function Tasks({
+  tasks,
+  order,
+  onOrder,
+}: {
+  /** In Google's order. */
+  tasks: CalendarTask[];
+  /** The order given in the panel, by title. */
+  order: string[];
+  /** Saves a new order; rejects when it was not kept. */
+  onOrder?: (order: string[]) => Promise<void>;
+}) {
+  const t = useT();
+  const text = t.widgets.calendar;
+  const [done, setDone] = useState<string[]>([]);
+  const [failed, setFailed] = useState<string | null>(null);
+  const key = (task: CalendarTask) => `${task.account}|${task.list}|${task.id}`;
+  const shown = sortTasks(
+    tasks.filter((task) => !done.includes(key(task))),
+    order,
+  );
+
+  function complete(task: CalendarTask) {
+    setFailed(null);
+    setDone((keys) => [...keys, key(task)]);
+    completeTask(task).catch(() => {
+      setDone((keys) => keys.filter((each) => each !== key(task)));
+      setFailed(text.completeFailed);
+    });
+  }
+
+  /** Moves `index` one place up or down; the whole order shown is kept,
+   * so the tasks moved before stay where they were put. */
+  function move(index: number, by: -1 | 1) {
+    if (!onOrder) return;
+    const titles = shown.map((task) => task.title);
+    const to = index + by;
+    if (to < 0 || to >= titles.length) return;
+    [titles[index], titles[to]] = [titles[to] ?? "", titles[index] ?? ""];
+    const kept = [...new Set([...titles, ...order])]
+      .filter((title) => title !== "")
+      .slice(0, 200);
+    setFailed(null);
+    onOrder(kept).catch(() => setFailed(t.widgets.errors.invalidCalendars));
+  }
+
+  return (
+    <section className="cal-day" aria-label={text.tasks}>
+      <h3 className="cal-day-name">{text.tasks}</h3>
+      {shown.length === 0 ? (
+        <p className="cal-empty">{text.noTasks}</p>
+      ) : (
+        <ul className="cal-list">
+          {shown.map((task, index) => (
+            <li key={key(task)}>
+              <label className="cal-task">
+                <input
+                  type="checkbox"
+                  aria-label={format(text.completeNamed, {
+                    title: task.title || text.noTitle,
+                  })}
+                  onChange={() => complete(task)}
+                />
+                <span className="cal-title">{task.title || text.noTitle}</span>
+                {task.late ? (
+                  <span className="cal-late">{text.late}</span>
+                ) : null}
+              </label>
+              {onOrder ? (
+                <span className="cal-move">
+                  <IconButton
+                    icon="up"
+                    label={format(text.moveUp, {
+                      title: task.title || text.noTitle,
+                    })}
+                    disabled={index === 0}
+                    onClick={() => move(index, -1)}
+                  />
+                  <IconButton
+                    icon="down"
+                    label={format(text.moveDown, {
+                      title: task.title || text.noTitle,
+                    })}
+                    disabled={index === shown.length - 1}
+                    onClick={() => move(index, 1)}
+                  />
+                </span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {failed ? (
+        <p className="cal-notice" role="alert">
+          {failed}
+        </p>
+      ) : null}
+    </section>
+  );
 }
 
 /** The event's subview: when, where, the calendar, the description, and
@@ -42,7 +158,7 @@ function Details({
 }) {
   const t = useT();
   const text = t.widgets.calendar;
-  const title = event.title || text.noTitle;
+  const title = titleOf(event, text);
   return (
     <>
       <PanelHeader title={title} onBack={onBack} focusAction />
@@ -106,6 +222,7 @@ function CalendarPanel({
   now: clock,
   onAdjust,
   returnedFromSettings,
+  onUpdate,
 }: WidgetPanelProps<"calendar">) {
   const t = useT();
   const text = t.widgets.calendar;
@@ -168,7 +285,7 @@ function CalendarPanel({
               ) : (
                 <ul className="cal-list">
                   {events.map((event) => {
-                    const title = event.title || text.noTitle;
+                    const title = titleOf(event, text);
                     const under = !event.allDay && event.start <= now;
                     return (
                       <li
@@ -211,6 +328,21 @@ function CalendarPanel({
           );
         })
       )}
+      {snapshot !== null && instance.config.tasks ? (
+        <Tasks
+          tasks={snapshot.tasks}
+          order={instance.config.taskOrder}
+          onOrder={
+            onUpdate
+              ? (taskOrder) =>
+                  onUpdate({
+                    label: instance.label,
+                    config: { ...instance.config, taskOrder },
+                  })
+              : undefined
+          }
+        />
+      ) : null}
       <PanelFooter>{text.footer}</PanelFooter>
     </>
   );

@@ -832,6 +832,8 @@ const messages = {
       where: "Local",
       calendar: "Agenda",
       noTitle: "(sem título)",
+      /** An event of a calendar shared as free/busy only. */
+      busy: "Ocupado",
       status: {
         noAccounts:
           "Nenhuma conta Google conectada. Conecte em Configurações › Contas.",
@@ -844,6 +846,16 @@ const messages = {
         "Uma agenda nova aparece sozinha; desmarque para esconder.",
       noCalendars: "As agendas aparecem aqui depois da primeira leitura.",
       footer: "Atualiza a cada minuto",
+      /** Google Tasks (F2a-3). */
+      tasks: "Tarefas",
+      late: "atrasada",
+      noTasks: "Nenhuma tarefa para hoje.",
+      completeNamed: "Concluir {title}",
+      moveUp: "Subir {title}",
+      moveDown: "Descer {title}",
+      completeFailed: "Não foi possível concluir a tarefa no Google.",
+      showTasks: "Tarefas do Google",
+      showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },
     items: {
       /** The navigation row in Configurações, and the subview's title. */
@@ -901,7 +913,7 @@ const messages = {
       invalidFolder:
         "Essa pasta não é aceita. Use o caminho completo de uma pasta do Windows.",
       invalidWidth: "Essa largura não vale para este widget.",
-      invalidCalendars: "Não foi possível guardar as agendas escolhidas.",
+      invalidCalendars: "Não foi possível guardar os ajustes do calendário.",
       noteTooLarge: "Passou de 64 KB e não foi salvo. Encurte o texto.",
       invalidConfig:
         "Não foi possível aplicar este ajuste. Feche o painel e tente de novo.",

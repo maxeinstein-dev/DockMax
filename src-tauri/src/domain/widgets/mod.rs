@@ -272,8 +272,8 @@ impl WidgetConfig {
             | WidgetConfig::Files(_) => 1..=1,
             WidgetConfig::TimeProgress(_)
             | WidgetConfig::Activity(_)
-            | WidgetConfig::Network(_)
-            | WidgetConfig::Calendar(_) => system::WIDTHS,
+            | WidgetConfig::Network(_) => system::WIDTHS,
+            WidgetConfig::Calendar(_) => calendar::WIDTHS,
         }
     }
 
@@ -569,7 +569,7 @@ pub enum WidgetError {
     InvalidFolder,
     #[error("invalid widget width")]
     InvalidWidth,
-    #[error("invalid hidden calendars")]
+    #[error("invalid calendar lists")]
     InvalidCalendars,
     #[error("note too large")]
     NoteTooLarge,
@@ -635,8 +635,8 @@ pub enum WidgetErrorCode {
     InvalidFolder,
     /// A width the kind doesn't accept.
     InvalidWidth,
-    /// A hidden calendar empty, too long or with a control character, or
-    /// too many of them.
+    /// A hidden calendar or a task of the order empty, too long or with a
+    /// control character, or too many of them.
     InvalidCalendars,
     /// The note is over [`MAX_NOTE_BYTES`].
     NoteTooLarge,
@@ -818,25 +818,20 @@ mod tests {
     fn only_the_kinds_that_show_more_take_another_width() {
         for kind in WidgetKind::ALL {
             let config = WidgetConfig::default_for(kind);
-            let wide = matches!(
-                kind,
-                WidgetKind::TimeProgress
-                    | WidgetKind::Activity
-                    | WidgetKind::Network
-                    | WidgetKind::Calendar
-            );
-            assert_eq!(config.widths(), if wide { 1..=3 } else { 1..=1 }, "{kind}");
-            assert_eq!(config.with_width(4), None, "{kind}");
+            let most = match kind {
+                WidgetKind::TimeProgress | WidgetKind::Activity | WidgetKind::Network => 3,
+                // Three was too small to read: two rise to three under
+                // the pointer instead.
+                WidgetKind::Calendar => 2,
+                _ => 1,
+            };
+            assert_eq!(config.widths(), 1..=most, "{kind}");
+            assert_eq!(config.with_width(most + 1), None, "{kind}");
             assert_eq!(config.with_width(0), None, "{kind}");
-            if wide {
-                let three = config.with_width(3).unwrap();
-                assert_eq!(three.width(), 3);
-                assert_eq!(three.span(), 3);
-                assert_eq!(three.validate(), Ok(()));
-            } else {
-                assert_eq!(config.with_width(2), None, "{kind}");
-                assert_eq!(config.with_width(1), Some(config.clone()));
-            }
+            let widest = config.with_width(most).unwrap();
+            assert_eq!(widest.width(), most);
+            assert_eq!(widest.span(), usize::from(most));
+            assert_eq!(widest.validate(), Ok(()));
         }
     }
 
@@ -878,7 +873,10 @@ mod tests {
                 json!({ "show": "both", "style": "bars", "width": 1 }),
             ),
             (WidgetKind::Network, json!({ "width": 2 })),
-            (WidgetKind::Calendar, json!({ "width": 2, "hidden": [] })),
+            (
+                WidgetKind::Calendar,
+                json!({ "width": 2, "hidden": [], "tasks": true, "taskOrder": [] }),
+            ),
         ];
         for (kind, config) in cases {
             let instance = instance(WidgetConfig::default_for(kind));

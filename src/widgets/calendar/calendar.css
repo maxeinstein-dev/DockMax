@@ -14,8 +14,15 @@
   text-transform: uppercase;
 }
 
+/* A long title never makes the panel wider than its card: the grid's
+   column and the items may shrink below their text. */
+.cal-day {
+  min-width: 0;
+}
+
 .cal-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
   margin: 0;
   padding: 0;
@@ -23,6 +30,7 @@
 }
 
 .cal-list li {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -73,12 +81,16 @@
   min-width: 0;
 }
 
+/* Up to two lines, then an ellipsis; the details show it whole. */
 .cal-title {
   flex: 1;
   min-width: 0;
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .cal-join {
@@ -130,8 +142,12 @@
   gap: 8px;
 }
 
+/* A fieldset is as wide as its content by default: with long e-mails it
+   made the whole Ajustes view wider than its card. */
 .cal-sources {
+  min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
   margin: 0;
   padding: 0;
@@ -146,9 +162,11 @@
 }
 
 .cal-source {
-  display: flex;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: baseline;
-  gap: 8px;
+  column-gap: 8px;
   font-size: 12.5px;
 }
 
@@ -164,8 +182,37 @@
 }
 
 .cal-source-account {
-  margin-left: auto;
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
   color: var(--ink-2);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-task {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+}
+
+.cal-task input {
+  accent-color: var(--accent);
+}
+
+.cal-move {
+  flex: none;
+  display: flex;
+}
+
+.cal-late {
+  flex: none;
+  color: var(--danger-ink);
   font-size: 11px;
 }
 

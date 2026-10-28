@@ -62,14 +62,25 @@ pub fn get(url: &str, bearer: Option<&str>) -> Result<Response, HttpError> {
 
 /// `POST url` with a form body (`application/x-www-form-urlencoded`).
 pub fn post_form(url: &str, form: &str) -> Result<Response, HttpError> {
-    request("POST", url, None, Some(form))
+    request(
+        "POST",
+        url,
+        None,
+        Some(("application/x-www-form-urlencoded", form)),
+    )
 }
 
+/// `PATCH url` with a JSON body, with `Authorization: Bearer <token>`.
+pub fn patch_json(url: &str, bearer: &str, json: &str) -> Result<Response, HttpError> {
+    request("PATCH", url, Some(bearer), Some(("application/json", json)))
+}
+
+/// `body`: its content type and the text.
 fn request(
     method: &str,
     url: &str,
     bearer: Option<&str>,
-    form: Option<&str>,
+    body: Option<(&str, &str)>,
 ) -> Result<Response, HttpError> {
     let url = Url::parse(url).map_err(|_| HttpError::NotHttps)?;
     if url.scheme() != "https" {
@@ -111,11 +122,11 @@ fn request(
     if let Some(token) = bearer {
         headers.push_str(&format!("Authorization: Bearer {token}\r\n"));
     }
-    if form.is_some() {
-        headers.push_str("Content-Type: application/x-www-form-urlencoded\r\n");
+    if let Some((content_type, _)) = body {
+        headers.push_str(&format!("Content-Type: {content_type}\r\n"));
     }
     let headers: Vec<u16> = headers.encode_utf16().collect();
-    let body = form.unwrap_or("").as_bytes();
+    let body = body.map_or("", |(_, text)| text).as_bytes();
     let length = u32::try_from(body.len()).map_err(|_| HttpError::TooLarge)?;
     unsafe {
         WinHttpSendRequest(

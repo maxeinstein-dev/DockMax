@@ -258,6 +258,9 @@ pub struct Dock {
     /// The last reading for the system widgets; `None` while none is on
     /// the dock, when nothing is read.
     activity: Option<crate::domain::system_activity::Reading>,
+    /// How far each item has risen above the bar, 0 to 1 (a Calendário
+    /// under the pointer).
+    widen: Vec<f64>,
     /// The tray icons' images, by icon key: the image they came from and
     /// the bitmap.
     tray_images: HashMap<String, (String, Option<ID2D1Bitmap>)>,
@@ -439,6 +442,7 @@ fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
         strip_hovered: None,
         system: Some(super::system_status::read()),
         activity: None,
+        widen: Vec::new(),
         tray_images: HashMap::new(),
         pressed: None,
         press: None,
@@ -665,6 +669,22 @@ impl Dock {
             f64::from(self.window.width) / self.scale,
             f64::from(self.window.height) / self.scale,
         )
+    }
+
+    /// The Calendário two icons wide under the pointer, which rises: not
+    /// while a panel is open or an item is dragged.
+    fn opened_calendar(&self) -> Option<usize> {
+        let dragging = self.press.is_some_and(|press| press.dragging);
+        if self.open.is_some() || dragging {
+            return None;
+        }
+        self.hovered.filter(|&index| {
+            matches!(
+                self.items.get(index),
+                Some(Item::Widget(widget))
+                    if matches!(&widget.config, WidgetConfig::Calendar(config) if config.width == 2)
+            )
+        })
     }
 
     /// The item magnified now: the one under the pointer, unless a panel is
@@ -1466,6 +1486,20 @@ impl Dock {
         let shape = self.shape();
         let magnified = self.magnified();
         let mut moving = false;
+        // A Calendário two icons wide rises above the bar under the
+        // pointer, as wide as three icons, to show the meeting after the
+        // next one (spec 0017 F2a); its neighbours stay where they are.
+        let opened = self.opened_calendar();
+        self.widen.resize(self.items.len(), 0.0);
+        for (index, now) in self.widen.iter_mut().enumerate() {
+            let target = if opened == Some(index) { 1.0 } else { 0.0 };
+            if !self.motion || (*now - target).abs() < 0.01 {
+                *now = target;
+            } else {
+                *now += (target - *now) * 0.3;
+                moving = true;
+            }
+        }
         for (index, now) in self.growth.iter_mut().enumerate() {
             let target = shape.hover.of_item(index, magnified);
             if !self.motion {
@@ -1610,6 +1644,21 @@ impl Dock {
                     height,
                 };
             }
+            let risen = self.widen.get(index).copied().unwrap_or(0.0);
+            if risen > 0.0 {
+                // A floor above the others: wider by an icon, and up.
+                let wide = area.width * (1.0 + 0.5 * risen);
+                let up = geometry.icon * 0.38 * risen;
+                area = Area {
+                    x: area.x - (wide - area.width) / 2.0,
+                    y: match edge {
+                        DockEdge::Bottom => area.y - up,
+                        DockEdge::Top => area.y + up,
+                    },
+                    width: wide,
+                    ..area
+                };
+            }
             if let Some(started) = self.opening.get(&item.key()) {
                 let (dx, dy, grow) = opening_offset(
                     settings.open_animation,
@@ -1639,6 +1688,7 @@ impl Dock {
                 pressed: self.pressed == Some(index) && !dragging,
                 attention: attention && matches!(item, Item::System(SystemItem::Settings)),
                 dragging,
+                raised: risen > 0.0,
                 dot: Some((box_area.center_x(), dot)),
                 item: box_area,
                 notice: self.notices.get(index).copied().flatten(),
@@ -1648,6 +1698,8 @@ impl Dock {
             .magnified()
             .or(self.hovered.filter(|_| self.open.is_none()))
             .filter(|_| drag.is_none())
+            // The risen Calendário says it all itself.
+            .filter(|&index| self.widen.get(index).copied().unwrap_or(0.0) == 0.0)
             .filter(|&index| {
                 self.items
                     .get(index)
@@ -1798,6 +1850,7 @@ impl Dock {
                     clock,
                     self.activity.as_ref(),
                     calendar.as_ref(),
+                    self.widen.get(index).copied().unwrap_or(0.0) > 0.5,
                 )
             }
             Item::System(SystemItem::Settings) => Face::Glyph {

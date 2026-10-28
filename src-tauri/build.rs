@@ -32,6 +32,7 @@ fn main() {
             "read_system_activity",
             "calendar_events",
             "open_calendar_link",
+            "complete_calendar_task",
             "google_status",
             "set_google_client",
             "connect_google_account",
