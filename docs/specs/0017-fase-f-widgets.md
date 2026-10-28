@@ -85,6 +85,11 @@ Relógio e Nota ficam com 1 ícone.
 - **Atualização:** a cada 1 minuto, e na hora ao abrir o painel, a partir de uma thread própria, só enquanto houver um Calendário no dock. Cada leitura pede de novo os dois dias de cada agenda (`timeMin`/`timeMax`, `singleEvents`). O `syncToken` incremental pensado no grilling não pode ser combinado com essa janela de tempo e a ordenação, e as respostas dos dois dias são pequenas. A lista de agendas é relida a cada 30 minutos. O push do Google exige um servidor público, então fica fora. Os eventos ficam só na memória, de nenhuma agenda vai nada para o disco; sem internet, o painel diz "sem conexão" e mostra a última leitura.
 - Os eventos do ciclo ("🌸") ficam **escondidos** no Calendário.
 
+**Cartão do Calendário (F2a-4; decisões do autor, 2026-10-28).** Com o mouse em cima, o Calendário levita (F2a-3) e mostra mais num **cartão próprio**, mais alto e mais largo que o tile, numa janela própria como o cartão das prévias da fase E, porque a janela do dock não tem altura para ele.
+- **Conteúdo:** reuniões e tarefas por padrão; os ajustes do widget escolhem só reuniões ou reuniões e tarefas.
+- **Período:** editável nos ajustes. O cartão rola entre as opções "o dia", "o dia e amanhã", "3 dias" e "a semana". O padrão é o dia; depois das 18h, as de amanhã até as 12h.
+- **Clique:** clicar numa reunião do cartão abre os detalhes no painel. Para entrar direto, vale o clique do meio no tile, como hoje.
+
 **Ciclo (F2b).** É um widget próprio, que pode ficar num espaço de trabalho fora do que o autor compartilha em reunião.
 - **Origem:** a noiva controla tudo pela agenda dela. Ela marca o primeiro dia com um evento de dia inteiro "🌸" (o símbolo se troca nos ajustes), por um Atalho de um toque no iPhone ou pela Siri. O DockMax lê esses eventos dos últimos 12 meses e não guarda nada em disco. No disco ficam só os ajustes do autor.
 - **Previsão:** o ciclo é a média dos últimos 6 (28 dias com menos de 2 registros). A menstruação dura a média dos eventos dela (5 dias sem histórico); ela corrige esticando ou encurtando o evento. Não há janela fértil nem ovulação.
