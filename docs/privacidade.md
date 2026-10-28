@@ -33,4 +33,6 @@ Em Configurações › Contas, use **Desconectar**: o DockMax revoga o acesso no
 
 ## Contato
 
-Dúvidas sobre esta política: abra uma issue em [github.com/maxeinstein-dev/DockMax](https://github.com/maxeinstein-dev/DockMax/issues).
+Dúvidas sobre esta política: [maxsueleinstein.dev@gmail.com](mailto:maxsueleinstein.dev@gmail.com) ou uma issue em [github.com/maxeinstein-dev/DockMax](https://github.com/maxeinstein-dev/DockMax/issues).
+
+Esta política também está publicada em [maxsueleinstein.dev/dockmax/privacidade](https://maxsueleinstein.dev/dockmax/privacidade/).
