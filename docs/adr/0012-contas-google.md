@@ -1,7 +1,7 @@
 # ADR 0012 — Contas Google: WinHTTP, cofre do Windows e login pelo navegador
 
 **Status:** aceito (2026-10-28).
-**Contexto:** [spec 0017](../specs/0017-fase-f-widgets.md) §6c, F2a: o Calendário lê as agendas e as tarefas das contas Google do autor, a dele, a da Alfama e a da noiva, só para leitura.
+**Contexto:** [spec 0017](../specs/0017-fase-f-widgets.md) §6c, F2a: o Calendário lê as agendas e as tarefas das contas Google do autor: a dele, a da Alfama e a da noiva. Mais tarde, também cria reuniões e conclui tarefas.
 
 ## Contexto
 
@@ -29,7 +29,7 @@ O orçamento de memória do roadmap continua valendo ([ADR 0010](0010-gpu-no-pro
    - A volta só é aceita com o mesmo `state`, e a escuta fecha depois de 5 minutos.
    - O PKCE (SHA-256) e os números aleatórios vêm do BCrypt do Windows.
 4. **Cliente OAuth do próprio autor:** o DockMax não traz um cliente embutido. O autor cria o projeto no Google Cloud (em produção e sem verificação, decisão da §6c) e cola o ID e o segredo em Configurações › Contas. Assim o segredo nunca vai para o repositório.
-5. **Escopos só de leitura:** `calendar.readonly` e `tasks.readonly`. O e-mail da conta vem da agenda principal (`calendarList`, `primary`), sem pedir `email` nem `openid`.
+5. **Escopos** (decisão do autor, 2026-10-28): `calendar.readonly` (as agendas e a lista delas, que o `calendar.events` não cobre), `calendar.events` (criar reuniões pelo dock) e `tasks` (concluir tarefas). Os ajustes e o compartilhamento das agendas ficam de fora. A escrita é pedida desde já para que a tela de criar reunião, quando chegar, não obrigue a reconectar as contas. O DockMax só escreve nas agendas do próprio autor e sempre confirma antes de salvar. O e-mail da conta vem da agenda principal (`calendarList`, `primary`), sem pedir `email` nem `openid`.
 6. **Desconectar** revoga o token no Google (`/revoke`) e apaga a credencial. Se a revogação falhar (sem internet), a credencial é apagada mesmo assim, e o registro (log) diz que a revogação não foi feita.
 
 ## Consequências

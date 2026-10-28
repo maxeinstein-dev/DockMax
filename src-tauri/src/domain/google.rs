@@ -15,9 +15,12 @@ pub const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 pub const REVOKE_URL: &str = "https://oauth2.googleapis.com/revoke";
 pub const CALENDAR_LIST_URL: &str = "https://www.googleapis.com/calendar/v3/users/me/calendarList";
 
-/// Read only: the calendars and the tasks (spec 0017 §6c).
+/// The calendars and their list, read; the events, to create meetings from
+/// the dock; and the tasks, to tick them off (spec 0017 §6c, decision of
+/// 2026-10-28). Never the calendars' settings or sharing.
 pub const SCOPES: &str = "https://www.googleapis.com/auth/calendar.readonly \
-                          https://www.googleapis.com/auth/tasks.readonly";
+                          https://www.googleapis.com/auth/calendar.events \
+                          https://www.googleapis.com/auth/tasks";
 
 /// The OAuth client the author made in Google Cloud (a "Desktop app"
 /// client). Kept in the Windows vault, never in a file or a log.
@@ -304,7 +307,7 @@ mod tests {
     }
 
     #[test]
-    fn the_sign_in_page_asks_for_reading_only_with_pkce() {
+    fn the_sign_in_page_asks_for_the_three_scopes_with_pkce() {
         let url = Url::parse(&auth_url(&client(), &redirect_uri(5123), "CH", "ST")).unwrap();
         let pairs: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
         assert_eq!(url.host_str(), Some("accounts.google.com"));
@@ -314,10 +317,14 @@ mod tests {
         assert_eq!(pairs["code_challenge_method"], "S256");
         assert_eq!(pairs["state"], "ST");
         assert_eq!(pairs["access_type"], "offline");
-        assert!(
-            pairs["scope"]
-                .split(' ')
-                .all(|scope| scope.ends_with(".readonly"))
+        let scopes: Vec<_> = pairs["scope"].split(' ').collect();
+        assert_eq!(
+            scopes,
+            [
+                "https://www.googleapis.com/auth/calendar.readonly",
+                "https://www.googleapis.com/auth/calendar.events",
+                "https://www.googleapis.com/auth/tasks",
+            ]
         );
         // The secret never goes to the browser.
         assert!(!url.as_str().contains("GOCSPX"));

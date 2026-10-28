@@ -126,7 +126,7 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-share-widget",
             // Configurações › Contas (spec 0017 F2a, ADR 0012): the OAuth
             // client, connecting and disconnecting Google accounts and
-            // their calendars, read only. Never the panel or the dock.
+            // their calendars. Never the panel or the dock.
             "allow-google-status",
             "allow-set-google-client",
             "allow-connect-google-account",

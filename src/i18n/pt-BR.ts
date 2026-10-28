@@ -99,7 +99,7 @@ const messages = {
         look: "Deixe o dock com a sua cara.",
         apps: "Os programas fixados no dock de cada espaço.",
         items: "Escolha no catálogo e arrume os do dock de cada espaço.",
-        accounts: "As agendas que os widgets mostram, só para leitura.",
+        accounts: "As agendas e as tarefas que os widgets mostram.",
         about: "Versão, licença e onde ficam os seus dados.",
       },
       /** The titles of the groups of Geral and Aparência. */

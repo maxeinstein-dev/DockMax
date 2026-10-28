@@ -235,7 +235,7 @@ function AccountRow({
 /**
  * Configurações › Contas (spec 0017 F2a, ADR 0012): the Google app the
  * author made, and the accounts connected through the browser, with their
- * calendars. Everything is read only; the tokens stay in the Windows vault.
+ * calendars. The tokens stay in the Windows vault.
  */
 function AccountsPanel() {
   const t = useT();

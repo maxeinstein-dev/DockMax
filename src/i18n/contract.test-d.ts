@@ -65,7 +65,7 @@ export const otherText: Messages = {
         look: "Make the dock yours.",
         apps: "The programs pinned to each workspace's dock.",
         items: "The widgets of each workspace's dock.",
-        accounts: "The calendars the widgets show, read only.",
+        accounts: "The calendars and tasks the widgets show.",
         about: "Version, license and where your data lives.",
       },
       groups: {
