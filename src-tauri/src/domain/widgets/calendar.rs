@@ -21,6 +21,9 @@ pub struct CalendarConfig {
     pub width: u8,
     /// The ids of the calendars not shown, as Google names them.
     pub hidden: Vec<String>,
+    /// Whether the panel shows Google Tasks' tasks (F2a-3). A config
+    /// stored before it reads as `true`.
+    pub tasks: bool,
 }
 
 impl Default for CalendarConfig {
@@ -28,6 +31,7 @@ impl Default for CalendarConfig {
         CalendarConfig {
             width: 2,
             hidden: Vec::new(),
+            tasks: true,
         }
     }
 }
@@ -61,6 +65,7 @@ mod tests {
         let config = CalendarConfig {
             width: 3,
             hidden: vec!["pt-br.brazilian#holiday@group.v.calendar.google.com".into()],
+            tasks: false,
         };
         assert_eq!(config.validate(), Ok(()));
         assert!(!config.shows("pt-br.brazilian#holiday@group.v.calendar.google.com"));

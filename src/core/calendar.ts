@@ -36,10 +36,26 @@ export interface CalendarEvent {
   link: string | null;
 }
 
+/** A Google Tasks task due today or late, not done (F2a-3). */
+export interface CalendarTask {
+  account: string;
+  list: string;
+  listName: string;
+  id: string;
+  title: string;
+  notes: string | null;
+  /** `2026-10-28`. */
+  due: string;
+  /** Due before today. */
+  late: boolean;
+  link: string | null;
+}
+
 export interface CalendarSnapshot {
   status: CalendarStatus;
   events: CalendarEvent[];
   sources: CalendarSource[];
+  tasks: CalendarTask[];
   /** Seconds from UTC of the local time. */
   offset: number;
 }
@@ -62,6 +78,16 @@ export function calendarEvents(fresh: boolean): Promise<CalendarView> {
 export function openCalendarLink(url: string): Promise<void> {
   return invoke<void>("open_calendar_link", { url }).catch((error: unknown) => {
     log.warn(`calendar: a link was not opened: ${errorKind(error)}`);
+  });
+}
+
+/** Ticks off a task of the last reading; rejects when Google didn't
+ * take it. */
+export function completeTask(task: CalendarTask): Promise<void> {
+  return invoke<void>("complete_calendar_task", {
+    account: task.account,
+    list: task.list,
+    id: task.id,
   });
 }
 

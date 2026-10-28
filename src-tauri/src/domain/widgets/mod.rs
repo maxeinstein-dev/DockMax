@@ -878,7 +878,10 @@ mod tests {
                 json!({ "show": "both", "style": "bars", "width": 1 }),
             ),
             (WidgetKind::Network, json!({ "width": 2 })),
-            (WidgetKind::Calendar, json!({ "width": 2, "hidden": [] })),
+            (
+                WidgetKind::Calendar,
+                json!({ "width": 2, "hidden": [], "tasks": true }),
+            ),
         ];
         for (kind, config) in cases {
             let instance = instance(WidgetConfig::default_for(kind));

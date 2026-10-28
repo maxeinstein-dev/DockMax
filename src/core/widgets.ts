@@ -185,6 +185,8 @@ export interface CalendarConfig {
   width: WidgetWidth;
   /** Google's ids of the calendars not shown; at most 200. */
   hidden: string[];
+  /** Whether the panel shows Google Tasks' tasks (F2a-3). */
+  tasks: boolean;
 }
 
 /** The config of each kind. */

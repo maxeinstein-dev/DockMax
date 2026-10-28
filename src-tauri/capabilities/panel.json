@@ -24,6 +24,7 @@
     "allow-read-system-activity",
     "allow-calendar-events",
     "allow-open-calendar-link",
+    "allow-complete-calendar-task",
     "allow-tray-to-dock",
     "allow-list-apps",
     "allow-list-catalog",

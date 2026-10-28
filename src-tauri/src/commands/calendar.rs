@@ -44,6 +44,26 @@ pub fn calendar_events(window: WebviewWindow, fresh: bool) -> Result<CalendarVie
     })
 }
 
+/// Ticks off a task the panel shows (F2a-3): Google keeps it done. Only
+/// a task of the last reading is accepted.
+#[cfg(windows)]
+#[tauri::command]
+pub async fn complete_calendar_task(
+    window: WebviewWindow,
+    account: String,
+    list: String,
+    id: String,
+) -> Result<(), String> {
+    only_panel(&window)?;
+    tauri::async_runtime::spawn_blocking(move || calendar::complete(&account, &list, &id))
+        .await
+        .map_err(|_| "the task could not be ticked off".to_string())?
+        .map_err(|error| {
+            log::warn!("calendar: a task was not ticked off: {error:?}");
+            "the task could not be ticked off".to_string()
+        })
+}
+
 /// Whether `url` is an event's page in Google Agenda.
 fn is_calendar_page(url: &str) -> bool {
     let Ok(url) = url::Url::parse(url) else {

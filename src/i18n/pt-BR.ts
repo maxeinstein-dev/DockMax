@@ -844,6 +844,14 @@ const messages = {
         "Uma agenda nova aparece sozinha; desmarque para esconder.",
       noCalendars: "As agendas aparecem aqui depois da primeira leitura.",
       footer: "Atualiza a cada minuto",
+      /** Google Tasks (F2a-3). */
+      tasks: "Tarefas",
+      late: "atrasada",
+      noTasks: "Nenhuma tarefa para hoje.",
+      completeNamed: "Concluir {title}",
+      completeFailed: "Não foi possível concluir a tarefa no Google.",
+      showTasks: "Tarefas do Google",
+      showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },
     items: {
       /** The navigation row in Configurações, and the subview's title. */

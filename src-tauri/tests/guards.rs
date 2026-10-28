@@ -47,6 +47,9 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // Agenda, nothing else.
             "allow-calendar-events",
             "allow-open-calendar-link",
+            // Ticking off a task the panel shows (F2a-3), and only one of
+            // those.
+            "allow-complete-calendar-task",
             // Dragging a tray icon onto the dock keeps it there; the command
             // names an icon the list gave and a point on the screen.
             "allow-tray-to-dock",

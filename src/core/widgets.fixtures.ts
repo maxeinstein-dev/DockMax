@@ -169,7 +169,7 @@ export const WIDGET_FIXTURES = {
     id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6084",
     label: null,
     kind: "calendar",
-    config: { width: 2, hidden: [] },
+    config: { width: 2, hidden: [], tasks: true },
   } satisfies WidgetInstance<"calendar">,
 
   "calendar-sample": {
@@ -179,6 +179,7 @@ export const WIDGET_FIXTURES = {
     config: {
       width: 3,
       hidden: ["pt-br.brazilian#holiday@group.v.calendar.google.com"],
+      tasks: false,
     },
   } satisfies WidgetInstance<"calendar">,
 

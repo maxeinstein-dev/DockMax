@@ -310,6 +310,7 @@ mod tests {
             status: Status::Ok,
             events,
             sources: Vec::new(),
+            tasks: Vec::new(),
             offset: BRT,
         }
     }
@@ -318,6 +319,7 @@ mod tests {
         let config = CalendarConfig {
             width,
             hidden: hidden.iter().map(|id| id.to_string()).collect(),
+            tasks: true,
         };
         match agenda(&config, snapshot, NOW) {
             Face::Agenda { lines, .. } => lines.into_iter().map(|line| line.text).collect(),

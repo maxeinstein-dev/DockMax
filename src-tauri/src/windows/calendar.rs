@@ -18,6 +18,7 @@ use windows::Win32::System::SystemInformation::{GetLocalTime, GetSystemTime};
 
 use super::google::{self, GoogleError};
 use crate::domain::calendar::{self, Event, EventsPage, Source};
+use crate::domain::tasks::{self, GoogleTaskList, GoogleTaskLists, GoogleTasks, Task};
 
 /// How often the events are read again.
 const EVERY: Duration = Duration::from_secs(60);
@@ -46,12 +47,19 @@ pub struct Snapshot {
     pub events: Vec<Event>,
     /// Every calendar of the accounts, for the widget's settings.
     pub sources: Vec<Source>,
+    /// Google Tasks' tasks due today or late, not done (F2a-3).
+    pub tasks: Vec<Task>,
     /// Seconds from UTC of the local time, when it was read.
     pub offset: i64,
 }
 
 static STATE: Mutex<Option<Snapshot>> = Mutex::new(None);
 static SOURCES: Mutex<Option<(Instant, Vec<Source>)>> = Mutex::new(None);
+/// A task list with its account.
+type AccountList = (String, GoogleTaskList);
+
+/// Each account's task lists, read again with the calendars.
+static LISTS: Mutex<Option<(Instant, Vec<AccountList>)>> = Mutex::new(None);
 /// The docks (by window) that have a Calendário: read while any has.
 static WANTERS: Mutex<Vec<isize>> = Mutex::new(Vec::new());
 static WANTED: AtomicBool = AtomicBool::new(false);
@@ -211,6 +219,7 @@ fn read() -> Snapshot {
             status: Status::NoAccounts,
             events: Vec::new(),
             sources: Vec::new(),
+            tasks: Vec::new(),
             offset,
         };
     }
@@ -223,6 +232,10 @@ fn read() -> Snapshot {
         sources: before
             .as_ref()
             .map(|before| before.sources.clone())
+            .unwrap_or_default(),
+        tasks: before
+            .as_ref()
+            .map(|before| before.tasks.clone())
             .unwrap_or_default(),
         offset,
     };
@@ -244,12 +257,92 @@ fn read() -> Snapshot {
             Err(_) => return kept(Status::Offline),
         }
     }
+    let tasks = match read_tasks(&accounts, offset) {
+        Ok(tasks) => tasks,
+        Err(GoogleError::SignInAgain) => {
+            status = Status::SignInAgain;
+            Vec::new()
+        }
+        Err(_) => before.map(|before| before.tasks).unwrap_or_default(),
+    };
     Snapshot {
         status,
         events: calendar::merge(events),
         sources,
+        tasks,
         offset,
     }
+}
+
+/// Every account's task lists, each with its account.
+fn task_lists(accounts: &[String]) -> Result<Vec<AccountList>, GoogleError> {
+    {
+        let cached = LISTS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some((at, lists)) = cached.as_ref()
+            && at.elapsed() < SOURCES_EVERY
+        {
+            return Ok(lists.clone());
+        }
+    }
+    let mut lists = Vec::new();
+    for account in accounts {
+        let read: GoogleTaskLists = google::get_json(account, tasks::LISTS_URL)?;
+        lists.extend(read.items.into_iter().map(|list| (account.clone(), list)));
+    }
+    *LISTS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some((Instant::now(), lists.clone()));
+    Ok(lists)
+}
+
+/// The tasks due today or late, not done, of every list.
+fn read_tasks(accounts: &[String], offset: i64) -> Result<Vec<Task>, GoogleError> {
+    let Some(today) = tasks::today(now(), offset) else {
+        return Ok(Vec::new());
+    };
+    let mut all = Vec::new();
+    for (account, list) in task_lists(accounts)? {
+        let read: GoogleTasks = google::get_json(&account, &tasks::tasks_url(&list.id, today))?;
+        all.extend(tasks::read_tasks(read.items, &account, &list, today));
+    }
+    Ok(tasks::sort(all))
+}
+
+/// Why a task was not ticked off.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompleteError {
+    /// Not one of the tasks shown.
+    Unknown,
+    Google(GoogleError),
+}
+
+/// Ticks off a task the panel shows: Google keeps it done, and it leaves
+/// the list at once.
+pub fn complete(account: &str, list: &str, id: &str) -> Result<(), CompleteError> {
+    let shown = snapshot().is_some_and(|snapshot| {
+        snapshot
+            .tasks
+            .iter()
+            .any(|task| task.account == account && task.list == list && task.id == id)
+    });
+    if !shown {
+        return Err(CompleteError::Unknown);
+    }
+    google::patch_json(account, &tasks::task_url(list, id), tasks::COMPLETED)
+        .map_err(CompleteError::Google)?;
+    if let Some(snapshot) = STATE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .as_mut()
+    {
+        snapshot
+            .tasks
+            .retain(|task| !(task.account == account && task.list == list && task.id == id));
+    }
+    read_now();
+    Ok(())
 }
 
 #[cfg(test)]

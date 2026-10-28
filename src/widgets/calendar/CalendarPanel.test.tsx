@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { CalendarEvent, CalendarView } from "../../core/calendar";
+import type {
+  CalendarEvent,
+  CalendarTask,
+  CalendarView,
+} from "../../core/calendar";
 import { clockText, plainText } from "../../core/calendar";
 import type { WidgetInstance } from "../../core/widgets";
 import { ptBR } from "../../i18n/pt-BR";
@@ -38,7 +42,7 @@ function instance(hidden: string[] = []): WidgetInstance<"calendar"> {
     id: "c",
     label: null,
     kind: "calendar",
-    config: { width: 2, hidden },
+    config: { width: 2, hidden, tasks: true },
   };
 }
 
@@ -50,12 +54,17 @@ function answer(view: CalendarView) {
   );
 }
 
-function view(events: CalendarEvent[], status = "ok"): CalendarView {
+function view(
+  events: CalendarEvent[],
+  status = "ok",
+  tasks: CalendarTask[] = [],
+): CalendarView {
   return {
     snapshot: {
       status: status as "ok",
       events,
       sources: [],
+      tasks,
       offset: BRT,
     },
     now: NOW,
@@ -155,6 +164,88 @@ describe("CalendarPanel", () => {
     expect(
       await screen.findByRole("region", { name: text.today }),
     ).toBeInTheDocument();
+  });
+
+  it("ticks off a late task and drops it from the list", async () => {
+    const task: CalendarTask = {
+      account: "max@example.com",
+      list: "L1",
+      listName: "Minhas tarefas",
+      id: "t1",
+      title: "Pagar boleto",
+      notes: null,
+      due: "2026-10-27",
+      late: true,
+      link: null,
+    };
+    invoke.mockImplementation((command: string) => {
+      if (command === "calendar_events")
+        return Promise.resolve(view([], "ok", [task]));
+      if (command === "complete_calendar_task") return Promise.resolve();
+      return Promise.resolve();
+    });
+    show();
+
+    const box = await screen.findByRole("checkbox", {
+      name: "Concluir Pagar boleto",
+    });
+    expect(screen.getByText(text.late)).toBeInTheDocument();
+    fireEvent.click(box);
+    expect(invoke).toHaveBeenCalledWith("complete_calendar_task", {
+      account: "max@example.com",
+      list: "L1",
+      id: "t1",
+    });
+    expect(await screen.findByText(text.noTasks)).toBeInTheDocument();
+  });
+
+  it("brings a task back with a message when Google refuses", async () => {
+    const task: CalendarTask = {
+      account: "a",
+      list: "L",
+      id: "t",
+      listName: "",
+      title: "Ligar",
+      notes: null,
+      due: "2026-10-28",
+      late: false,
+      link: null,
+    };
+    invoke.mockImplementation((command: string) =>
+      command === "calendar_events"
+        ? Promise.resolve(view([], "ok", [task]))
+        : command === "complete_calendar_task"
+          ? Promise.reject("no")
+          : Promise.resolve(),
+    );
+    show();
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Concluir Ligar" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      text.completeFailed,
+    );
+    expect(
+      screen.getByRole("checkbox", { name: "Concluir Ligar" }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the tasks when the widget says so", async () => {
+    answer(view([], "ok"));
+    render(
+      <CalendarPanel
+        instance={{
+          ...instance(),
+          config: { width: 2, hidden: [], tasks: false },
+        }}
+        now={new Date(NOW * 1000)}
+        onAdjust={() => undefined}
+        returnedFromSettings={false}
+      />,
+    );
+    await screen.findByRole("region", { name: text.today });
+    expect(screen.queryByRole("region", { name: text.tasks })).toBeNull();
   });
 
   it("says when there is no account", async () => {

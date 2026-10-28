@@ -332,6 +332,20 @@ pub fn get_json<T: serde::de::DeserializeOwned>(email: &str, url: &str) -> Resul
     }
 }
 
+/// `PATCH url` for `email`'s account with `json`: whether Google took it.
+pub fn patch_json(email: &str, url: &str, json: &str) -> Result<(), GoogleError> {
+    let token = access_token(email)?;
+    let response = http::patch_json(url, &token, json)?;
+    match response.status {
+        200 => Ok(()),
+        401 => {
+            forget_access(email);
+            Err(GoogleError::SignInAgain)
+        }
+        _ => Err(GoogleError::Unexpected),
+    }
+}
+
 fn forget_access(email: &str) {
     let mut access = ACCESS
         .lock()

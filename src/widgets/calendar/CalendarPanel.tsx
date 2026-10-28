@@ -1,11 +1,13 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import {
   clockText,
+  completeTask,
   dayOf,
   openCalendarLink,
   plainText,
   useCalendar,
   type CalendarEvent,
+  type CalendarTask,
 } from "../../core/calendar";
 import { format, useT } from "../../i18n";
 import PanelFooter from "../../panel/PanelFooter";
@@ -24,6 +26,60 @@ function Dot({ color }: { color: string | null }) {
     }
   }, [color]);
   return <span ref={dot} className="cal-dot" aria-hidden="true" />;
+}
+
+/** Today's and late tasks, each ticked off with its box: it leaves the
+ * list at once, and comes back with a message if Google didn't take it. */
+function Tasks({ tasks }: { tasks: CalendarTask[] }) {
+  const t = useT();
+  const text = t.widgets.calendar;
+  const [done, setDone] = useState<string[]>([]);
+  const [failed, setFailed] = useState(false);
+  const key = (task: CalendarTask) => `${task.account}|${task.list}|${task.id}`;
+  const shown = tasks.filter((task) => !done.includes(key(task)));
+
+  function complete(task: CalendarTask) {
+    setFailed(false);
+    setDone((keys) => [...keys, key(task)]);
+    completeTask(task).catch(() => {
+      setDone((keys) => keys.filter((each) => each !== key(task)));
+      setFailed(true);
+    });
+  }
+
+  return (
+    <section className="cal-day" aria-label={text.tasks}>
+      <h3 className="cal-day-name">{text.tasks}</h3>
+      {shown.length === 0 ? (
+        <p className="cal-empty">{text.noTasks}</p>
+      ) : (
+        <ul className="cal-list">
+          {shown.map((task) => (
+            <li key={key(task)}>
+              <label className="cal-task">
+                <input
+                  type="checkbox"
+                  aria-label={format(text.completeNamed, {
+                    title: task.title || text.noTitle,
+                  })}
+                  onChange={() => complete(task)}
+                />
+                <span className="cal-title">{task.title || text.noTitle}</span>
+                {task.late ? (
+                  <span className="cal-late">{text.late}</span>
+                ) : null}
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+      {failed ? (
+        <p className="cal-notice" role="alert">
+          {text.completeFailed}
+        </p>
+      ) : null}
+    </section>
+  );
 }
 
 /** The event's subview: when, where, the calendar, the description, and
@@ -211,6 +267,9 @@ function CalendarPanel({
           );
         })
       )}
+      {snapshot !== null && instance.config.tasks ? (
+        <Tasks tasks={snapshot.tasks} />
+      ) : null}
       <PanelFooter>{text.footer}</PanelFooter>
     </>
   );
