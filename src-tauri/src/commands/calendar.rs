@@ -120,12 +120,28 @@ pub fn cycle_status(
 /// of the widget's settings).
 #[cfg(windows)]
 #[tauri::command]
-pub fn cycle_test_notice(window: WebviewWindow) -> Result<(), String> {
+pub fn cycle_test_notice(
+    window: WebviewWindow,
+    widget: String,
+    windows: bool,
+) -> Result<(), String> {
     only_panel(&window)?;
-    crate::windows::toast::cycle_notice().map_err(|error| {
-        log::warn!("cycle: the test notice was not shown: {error}");
-        "the notice could not be shown".to_string()
-    })
+    let widget = crate::domain::widgets::WidgetId::parse(&widget)
+        .map_err(|_| "unknown widget".to_string())?;
+    // As a day's notice: the badge and the bounce of the tile.
+    calendar::nudge(vec![widget.as_str().to_owned()]);
+    if !windows {
+        return Ok(());
+    }
+    match crate::windows::toast::cycle_notice() {
+        Ok(true) => Ok(()),
+        // The panel tells it apart: Windows has the notices off.
+        Ok(false) => Err("notificationsOff".into()),
+        Err(error) => {
+            log::warn!("cycle: the test notice was not shown: {error}");
+            Err("the notice could not be shown".into())
+        }
+    }
 }
 
 /// Whether `url` is an event's page in Google Agenda.

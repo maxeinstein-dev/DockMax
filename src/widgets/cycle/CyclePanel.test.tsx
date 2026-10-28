@@ -21,7 +21,7 @@ const instance: WidgetInstance<"cycle"> = {
     symbol: "🌸",
     calendar: "noiva@example.com",
     sensitive: 5,
-    notices: { sensitive: true, eve: true, day: true },
+    notices: { sensitive: true, eve: true, day: true, windows: true },
     reminders: [],
   },
 };

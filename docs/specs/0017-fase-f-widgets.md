@@ -2,7 +2,7 @@
 
 Fase F da [spec 0004](0004-paridade-primodock.md) (§3.5), depois da fase E. Referência do PrimoDock em [`docs/reference/primodock/interface.md`](../reference/primodock/interface.md) (aba Widgets: catálogo, "Em uso", largura do tile) e [`settings-e-dados.md`](../reference/primodock/settings-e-dados.md).
 
-**Status:** em andamento: F1 (PR #52), F1b (#53), F2a-1 (Contas Google, #54 e #55, [ADR 0012](../adr/0012-contas-google.md)), F2a-2 (Calendário, #57), F2a-3 (Tasks, #58) e F2a-4 (cartão, #59) entregues; F2b-1 (o widget Ciclo, com o [guia do Atalho do iPhone](../guia-atalho-ciclo.md)) em curso; F2b-2 (avisos e lembretes do Ciclo), F2c a F5 a fazer; o iCal ficou para depois.
+**Status:** em andamento: F1 (PR #52), F1b (#53), F2a-1 (Contas Google, #54 e #55, [ADR 0012](../adr/0012-contas-google.md)), F2a-2 (Calendário, #57), F2a-3 (Tasks, #58) e F2a-4 (cartão, #59) entregues; F2b-1 (o widget Ciclo, com o [guia do Atalho do iPhone](../guia-atalho-ciclo.md), #60), F2b-2 (avisos e lembretes, #61) e F2b-3 (o aviso no dock) entregues; F2c a F5 a fazer; o iCal ficou para depois.
 
 ## 1. Decisões do autor (2026-10-27)
 
@@ -94,7 +94,7 @@ Relógio e Nota ficam com 1 ícone.
 - **Origem:** a noiva controla tudo pela agenda dela. Ela marca o primeiro dia com um evento de dia inteiro "🌸" (o símbolo se troca nos ajustes), por um Atalho de um toque no iPhone ou pela Siri. O DockMax lê esses eventos dos últimos 12 meses e não guarda nada em disco. No disco ficam só os ajustes do autor.
 - **Previsão:** o ciclo é a média dos últimos 6 (28 dias com menos de 2 registros). A menstruação dura a média dos eventos dela (5 dias sem histórico); ela corrige esticando ou encurtando o evento. Não há janela fértil nem ovulação.
 - **Discrição:** o tile não usa as palavras "menstruação" ou "TPM"; mostra só um ícone neutro e uma cor ou contagem. Os detalhes ficam no painel.
-- **Avisos editáveis:** a TPM começa N dias antes (5 por padrão; o autor ajusta para os meses seguintes), a véspera e o dia previsto, mais lembretes livres do autor (um texto, N dias antes ou depois de uma fase). O aviso do Windows tem texto neutro ("Lembrete do Ciclo"), e o texto dele só aparece ao abrir. Não há aviso de atraso.
+- **Avisos editáveis:** a TPM começa N dias antes (5 por padrão; o autor ajusta para os meses seguintes), a véspera e o dia previsto, mais lembretes livres do autor (um texto, N dias antes ou depois de uma fase). O aviso aparece no próprio dock (F2b-3): a partir das 9h o bloco do Ciclo ganha um selo e balança como um app abrindo; o selo some quando o painel abre, e o que é o aviso só aparece lá, na seção "Hoje". O autor não quer depender das notificações do Windows: a notificação de texto neutro ("Lembrete do Ciclo") é uma opção, desligada por padrão. Não há aviso de atraso.
 - O passo a passo do Atalho do iPhone vai junto do F2b.
 
 ## 7. Verificação

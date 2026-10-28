@@ -914,17 +914,23 @@ const messages = {
         eve: "A menstruação deve vir amanhã.",
         day: "A menstruação deve vir hoje.",
       },
-      noticesTitle: "Avisos do Windows",
+      noticesTitle: "Avisos",
       noticeToggles: {
         sensitive: "Quando a TPM começar",
         eve: "Na véspera da menstruação",
         day: "No dia da menstruação",
+        windows: "Também no Windows",
       },
       noticesHint:
-        "A partir das 9h, um aviso discreto “Lembrete do Ciclo”, sem detalhes. O que é fica no painel.",
+        "A partir das 9h o Ciclo ganha um selo no dock e dá um balanço. O que é aparece só no painel, e o selo some ao abri-lo.",
+      windowsHint:
+        "Uma notificação discreta “Lembrete do Ciclo”, sem detalhes. Precisa das notificações do Windows ligadas.",
       testNotice: "Enviar aviso de teste",
-      testSent: "Aviso enviado.",
-      testFailed: "O Windows não mostrou o aviso.",
+      testResult: {
+        sent: "Pronto: o selo fica no Ciclo até você abrir o painel de novo.",
+        off: "As notificações do Windows estão desligadas. Ative em Configurações › Sistema › Notificações.",
+        failed: "O Windows não mostrou o aviso.",
+      },
       remindersTitle: "Lembretes",
       noReminders: "Nenhum lembrete ainda.",
       remindersHint:

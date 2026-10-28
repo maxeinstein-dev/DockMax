@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useCalendar } from "../../core/calendar";
-import { cycleTestNotice } from "../../core/cycle";
-import { errorKind, log } from "../../core/log";
+import { cycleTestNotice, type TestNotice } from "../../core/cycle";
 import {
   CYCLE_WINDOWS,
   MAX_REMINDER_CHARS,
@@ -65,7 +64,7 @@ function CycleSettings({
   const [reminderAnchor, setReminderAnchor] =
     useState<ReminderAnchor>("sensitive");
   const [reminderDays, setReminderDays] = useState(-1);
-  const [testSent, setTestSent] = useState<"sent" | "failed" | null>(null);
+  const [testSent, setTestSent] = useState<TestNotice | null>(null);
 
   // Characters as Rust counts them.
   const tooLong = [...reminderText.trim()].length > MAX_REMINDER_CHARS;
@@ -94,13 +93,7 @@ function CycleSettings({
   }
 
   function sendTest() {
-    cycleTestNotice().then(
-      () => setTestSent("sent"),
-      (error: unknown) => {
-        log.warn(`cycle: test notice failed: ${errorKind(error)}`);
-        setTestSent("failed");
-      },
-    );
+    void cycleTestNotice(instance.id, config.notices.windows).then(setTestSent);
   }
 
   function commitSymbol() {
@@ -175,13 +168,19 @@ function CycleSettings({
           onChange={(day) => saveNotices({ day })}
         />
         <p className="sys-hint">{text.noticesHint}</p>
+        <ToggleField
+          label={text.noticeToggles.windows}
+          hint={text.windowsHint}
+          checked={config.notices.windows}
+          onChange={(windows) => saveNotices({ windows })}
+        />
         <div className="cycle-test">
           <button type="button" className="secondary-button" onClick={sendTest}>
             {text.testNotice}
           </button>
           {testSent ? (
             <span role="status" className="sys-hint">
-              {testSent === "sent" ? text.testSent : text.testFailed}
+              {text.testResult[testSent]}
             </span>
           ) : null}
         </div>

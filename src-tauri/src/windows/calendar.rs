@@ -84,11 +84,18 @@ type AccountList = (String, GoogleTaskList);
 static LISTS: Mutex<Option<(Instant, Vec<AccountList>)>> = Mutex::new(None);
 /// The docks (by window) that have a Calendário, and the symbols of their
 /// Ciclos: read while any has one.
-static WANTERS: Mutex<Vec<(isize, bool, Vec<CycleConfig>)>> = Mutex::new(Vec::new());
+static WANTERS: Mutex<Vec<(isize, bool, Vec<Ciclo>)>> = Mutex::new(Vec::new());
 
-/// The Ciclo's notices already shown, by day, symbol, calendar and notice:
-/// each once a day. In memory: one may show again after a restart.
+/// A Ciclo on a dock: its widget's ID and config.
+pub type Ciclo = (String, CycleConfig);
+
+/// The Ciclo's notices already given, by day, widget and notice: each once
+/// a day. In memory: one may come again after a restart.
 static FIRED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// The Ciclos (by widget ID) with a notice not seen yet: a badge on their
+/// tile until their panel opens (F2b-3).
+static PENDING: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 /// The local hour from which the day's notices show.
 const NOTICE_HOUR: i64 = 9;
@@ -143,7 +150,7 @@ pub fn snapshot() -> Option<Snapshot> {
 /// Whether the dock `dock` has a Calendário, and its Ciclos' symbols: the
 /// reading starts (its thread, the first time) while any dock has one, and
 /// stops when none has.
-pub fn want(dock: isize, calendar: bool, cycles: Vec<CycleConfig>) {
+pub fn want(dock: isize, calendar: bool, cycles: Vec<Ciclo>) {
     let on = {
         let mut wanters = WANTERS
             .lock()
@@ -174,34 +181,80 @@ pub fn read_now() {
     wake.notify_all();
 }
 
-/// Whether a dock has a Calendário, and every Ciclo's config.
-fn wanted() -> (bool, Vec<CycleConfig>) {
+/// Whether a dock has a Calendário, and every Ciclo.
+fn wanted() -> (bool, Vec<Ciclo>) {
     let wanters = WANTERS
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let calendar = wanters.iter().any(|(_, calendar, _)| *calendar);
-    let mut cycles: Vec<CycleConfig> = wanters
+    let cycles: Vec<Ciclo> = wanters
         .iter()
         .flat_map(|(_, _, cycles)| cycles.iter().cloned())
         .collect();
-    cycles.dedup();
     (calendar, cycles)
 }
 
 /// Every Ciclo's symbol, each once.
-fn symbols_of(cycles: &[CycleConfig]) -> Vec<String> {
+fn symbols_of(cycles: &[Ciclo]) -> Vec<String> {
     let mut symbols: Vec<String> = cycles
         .iter()
-        .map(|cycle| cycle.symbol.trim().to_owned())
+        .map(|(_, cycle)| cycle.symbol.trim().to_owned())
         .collect();
     symbols.sort();
     symbols.dedup();
     symbols
 }
 
-/// Shows the day's notices of the Ciclos not shown yet, from 9h: one
-/// neutral Windows notice for all of them.
-fn notify(cycles: &[CycleConfig]) {
+/// Whether the Ciclo `widget` has a notice not seen yet: its badge.
+pub fn pending(widget: &str) -> bool {
+    PENDING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .iter()
+        .any(|each| each == widget)
+}
+
+/// The Ciclo `widget`'s panel opened: its notices were seen. Whether it had
+/// a badge.
+pub fn seen(widget: &str) -> bool {
+    let mut pending = PENDING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let before = pending.len();
+    pending.retain(|each| each != widget);
+    pending.len() != before
+}
+
+/// The Ciclos `widgets` have a notice: a badge on their tile until their
+/// panel opens, and a bounce of it now.
+pub fn nudge(widgets: Vec<String>) {
+    {
+        let mut pending = PENDING
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for widget in &widgets {
+            if !pending.contains(widget) {
+                pending.push(widget.clone());
+            }
+        }
+    }
+    super::native_dock::cycle_nudged(widgets);
+}
+
+/// The keys of `new` not in `fired`, added to it; `fired` keeps only
+/// `today`'s.
+fn unfired(fired: &mut Vec<String>, today: i64, new: Vec<String>) -> Vec<String> {
+    // Yesterday's are no use any more.
+    fired.retain(|key| key.starts_with(&format!("{today}|")));
+    let unseen: Vec<String> = new.into_iter().filter(|key| !fired.contains(key)).collect();
+    fired.extend(unseen.iter().cloned());
+    unseen
+}
+
+/// Gives the day's notices of the Ciclos not given yet, from 9h: a badge
+/// and a bounce of their tile, and one neutral Windows notice when a Ciclo
+/// asks for it.
+fn notify(cycles: &[Ciclo]) {
     use crate::domain::cycle;
     let offset = offset();
     let now = now();
@@ -210,7 +263,7 @@ fn notify(cycles: &[CycleConfig]) {
         return;
     }
     let mut new = Vec::new();
-    for config in cycles {
+    for (widget, config) in cycles {
         let Some(marks) = cycle_marks(config.symbol.trim(), |id| config.reads(id)) else {
             continue;
         };
@@ -220,28 +273,39 @@ fn notify(cycles: &[CycleConfig]) {
             i64::from(config.sensitive),
         );
         for notice in cycle::notices(&status, config, today) {
-            new.push(format!(
-                "{today}|{}|{}|{}",
-                config.symbol.trim(),
-                config.calendar.as_deref().unwrap_or(""),
-                notice.key()
-            ));
+            new.push(format!("{today}|{widget}|{}", notice.key()));
         }
     }
-    let unseen: Vec<String> = {
-        let mut fired = FIRED
+    let unseen = unfired(
+        &mut FIRED
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        // Yesterday's are no use any more.
-        fired.retain(|key| key.starts_with(&format!("{today}|")));
-        let unseen: Vec<String> = new.into_iter().filter(|key| !fired.contains(key)).collect();
-        fired.extend(unseen.iter().cloned());
-        unseen
-    };
-    if !unseen.is_empty()
-        && let Err(error) = super::toast::cycle_notice()
-    {
-        log::warn!("cycle: the notice was not shown: {error}");
+            .unwrap_or_else(|poisoned| poisoned.into_inner()),
+        today,
+        new,
+    );
+    let nudged: Vec<String> = cycles
+        .iter()
+        .map(|(widget, _)| widget.clone())
+        .filter(|widget| {
+            unseen
+                .iter()
+                .any(|key| key.split('|').nth(1) == Some(widget))
+        })
+        .collect();
+    if nudged.is_empty() {
+        return;
+    }
+    let windows = cycles
+        .iter()
+        .any(|(widget, config)| config.notices.windows && nudged.contains(widget));
+    nudge(nudged);
+    if windows {
+        match super::toast::cycle_notice() {
+            Ok(true) => {}
+            // The panel still says them under "Hoje".
+            Ok(false) => log::info!("cycle: Windows has the notices off"),
+            Err(error) => log::warn!("cycle: the notice was not shown: {error}"),
+        }
     }
 }
 
@@ -549,6 +613,20 @@ pub fn complete(account: &str, list: &str, id: &str) -> Result<(), CompleteError
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn each_notice_is_given_once_a_day() {
+        let mut fired = vec!["9|w|eve".to_string()];
+        let first = unfired(
+            &mut fired,
+            10,
+            vec!["10|w|day".into(), "10|w|reminder:x".into()],
+        );
+        assert_eq!(first, ["10|w|day", "10|w|reminder:x"]);
+        // Yesterday's went; today's stay given.
+        assert_eq!(fired, ["10|w|day", "10|w|reminder:x"]);
+        assert!(unfired(&mut fired, 10, vec!["10|w|day".into()]).is_empty());
+    }
 
     #[test]
     fn the_events_address_names_the_calendar_and_the_two_days() {

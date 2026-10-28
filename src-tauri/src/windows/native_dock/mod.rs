@@ -862,6 +862,13 @@ impl Dock {
         self.items
             .iter()
             .map(|item| {
+                // A Ciclo's notice not seen yet (F2b-3): whatever the
+                // setting, it is the dock's own.
+                if let Item::Widget(widget) = item
+                    && matches!(widget.config, WidgetConfig::Cycle(_))
+                {
+                    return super::calendar::pending(widget.id.as_str()).then_some(Badge::Dot);
+                }
                 if buttons.is_empty() {
                     return None;
                 }
@@ -932,7 +939,9 @@ impl Dock {
             .iter()
             .filter_map(|item| match item {
                 Item::Widget(widget) => match &widget.config {
-                    WidgetConfig::Cycle(config) => Some(config.clone()),
+                    WidgetConfig::Cycle(config) => {
+                        Some((widget.id.as_str().to_owned(), config.clone()))
+                    }
                     _ => None,
                 },
                 _ => None,
@@ -2485,10 +2494,30 @@ impl Dock {
                 }));
             }
             _ => {
+                if let Item::Widget(widget) = &item
+                    && super::calendar::seen(widget.id.as_str())
+                {
+                    post(Dock::notices_changed);
+                }
                 let anchor = self.rest().items[index];
                 self.toggle(panel_of(&item), anchor);
             }
         }
+    }
+
+    /// The Ciclos `widgets` have a notice (F2b-3): their badge, and their
+    /// tile bounces as a program's does when it opens.
+    fn cycle_nudged(&mut self, widgets: &[String]) {
+        let now = Instant::now();
+        for item in &self.items {
+            if let Item::Widget(widget) = item
+                && widgets.iter().any(|each| each == widget.id.as_str())
+            {
+                self.opening.insert(item.key(), now);
+            }
+        }
+        self.notices = self.read_notices();
+        self.animate();
     }
 
     fn toggle(&mut self, panel: PanelId, anchor: Area) {
@@ -3217,6 +3246,11 @@ pub fn open_calendar(
     event: Option<String>,
 ) {
     post_to(owner, move |dock| dock.open_calendar(&widget, event));
+}
+
+/// The Ciclos `widgets` have a notice not seen yet (F2b-3).
+pub fn cycle_nudged(widgets: Vec<String>) {
+    post(move |dock| dock.cycle_nudged(&widgets));
 }
 
 /// Files dragged over the dock `hwnd` at the screen point `at`, or gone
