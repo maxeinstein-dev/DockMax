@@ -16,8 +16,8 @@ use crate::domain::apps::is_valid_app_id;
 use ::windows::Win32::Foundation::{PROPERTYKEY, SIZE};
 #[cfg(windows)]
 use ::windows::Win32::Graphics::Gdi::{
-    BI_RGB, BITMAP, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS, DeleteObject, GetDC, GetDIBits,
-    GetObjectW, HBITMAP, HGDIOBJ, ReleaseDC,
+    BI_RGB, BITMAP, BITMAPINFO, BITMAPINFOHEADER, CreateBitmap, DIB_RGB_COLORS, DeleteObject,
+    GetDC, GetDIBits, GetObjectW, HBITMAP, HGDIOBJ, ReleaseDC,
 };
 #[cfg(windows)]
 use ::windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoTaskMemFree};
@@ -32,7 +32,9 @@ use ::windows::Win32::UI::Shell::{
     SIGDN_PARENTRELATIVEPARSING, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY, ShellExecuteW,
 };
 #[cfg(windows)]
-use ::windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+use ::windows::Win32::UI::WindowsAndMessaging::{
+    CreateIconIndirect, HCURSOR, ICONINFO, SW_SHOWNORMAL,
+};
 #[cfg(windows)]
 use ::windows::core::{HSTRING, PCWSTR, PWSTR};
 
@@ -114,7 +116,7 @@ fn apps_folder_item(id: &str) -> Result<IShellItem, String> {
 /// was dropped on the dock and the Apps folder doesn't list, its file (the id
 /// is then the path, see `domain::apps::is_pinnable_path`).
 #[cfg(windows)]
-fn item_of(id: &str) -> Result<IShellItem, String> {
+pub(super) fn item_of(id: &str) -> Result<IShellItem, String> {
     apps_folder_item(id).or_else(|error| {
         let path = file_of(id).ok_or(error)?;
         let name = HSTRING::from(path.as_os_str());
@@ -210,6 +212,30 @@ pub fn target_of(id: &str) -> Option<std::path::PathBuf> {
 #[cfg(not(windows))]
 pub fn target_of(_id: &str) -> Option<std::path::PathBuf> {
     None
+}
+
+/// `System.Link.Arguments`: what a shortcut of the Apps folder adds to its
+/// program's command line.
+#[cfg(windows)]
+const PKEY_LINK_ARGUMENTS: PROPERTYKEY = PROPERTYKEY {
+    fmtid: ::windows::core::GUID::from_u128(0x436f2667_14e2_4feb_b30a_146c53b5b674),
+    pid: 100,
+};
+
+/// The arguments the shortcut of the item `id` of the Apps folder gives its
+/// program (a Chrome profile, say); `None` when it gives none.
+#[cfg(windows)]
+pub fn arguments_of(id: &str) -> Option<String> {
+    if !is_valid_app_id(id) {
+        return None;
+    }
+    init_com();
+    let name = HSTRING::from(format!("shell:AppsFolder\\{id}"));
+    unsafe { SHGetPropertyStoreFromParsingName::<_, _, IPropertyStore>(&name, None, GPS_DEFAULT) }
+        .ok()
+        .and_then(|store| unsafe { store.GetValue(&PKEY_LINK_ARGUMENTS) }.ok())
+        .map(|value| value.to_string())
+        .filter(|text| !text.trim().is_empty())
 }
 
 /// The path of the program's file, when its id is that path (a classic
@@ -360,6 +386,30 @@ pub fn launch(id: &str) -> Result<(), String> {
     } else {
         Err(format!("ShellExecute answered {}", result.0 as usize))
     }
+}
+
+/// A cursor of the program's icon, `size` pixels a side, its point in the
+/// middle: what a tile dragged out of the dock shows (spec 0018). The
+/// caller destroys it.
+#[cfg(windows)]
+pub fn drag_cursor(id: &str, size: i32) -> Option<HCURSOR> {
+    let item = item_of(id).ok()?;
+    let factory: IShellItemImageFactory = windows_core_cast(&item)?;
+    let bitmap = unsafe { factory.GetImage(SIZE { cx: size, cy: size }, SIIGBF_ICONONLY) }.ok()?;
+    let mask = unsafe { CreateBitmap(size, size, 1, 1, None) };
+    let info = ICONINFO {
+        fIcon: false.into(),
+        xHotspot: (size / 2) as u32,
+        yHotspot: (size / 2) as u32,
+        hbmMask: mask,
+        hbmColor: bitmap,
+    };
+    let icon = unsafe { CreateIconIndirect(&info) }.ok();
+    unsafe {
+        let _ = DeleteObject(HGDIOBJ(mask.0));
+        let _ = DeleteObject(HGDIOBJ(bitmap.0));
+    }
+    icon.map(|icon| HCURSOR(icon.0))
 }
 
 /// The program's icon as a PNG of `size` pixels a side, or `None` when

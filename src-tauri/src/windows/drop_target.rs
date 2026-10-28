@@ -1,9 +1,12 @@
-//! Takes the files dropped on the dock (spec 0006 B2, drop to pin).
+//! Takes the files dropped on the dock: on a program's tile they open with
+//! it (spec 0018); anywhere else, a program among them is pinned (spec 0006
+//! B2, drop to pin).
 //!
 //! The dock's window (spec 0011 H3: native) takes the drop itself. The paths
-//! come from the drop, so only what the user really dropped can be pinned.
+//! come from the drop, so only what the user really dropped can be pinned
+//! or opened.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
@@ -63,6 +66,26 @@ struct DockDropTarget {
     hwnd: isize,
     /// What is over the dock has something that can be pinned.
     accepts: Cell<bool>,
+    /// The paths dragged over the dock.
+    paths: RefCell<Vec<PathBuf>>,
+}
+
+impl DockDropTarget_Impl {
+    /// What a drop at `at` does: open with the program under it, pin, or
+    /// nothing.
+    fn effect_at(&self, at: &POINTL) -> (Option<String>, DROPEFFECT) {
+        let program = if self.paths.borrow().is_empty() {
+            None
+        } else {
+            super::native_dock::drop_over(self.hwnd, Some((at.x, at.y)))
+        };
+        let effect = if program.is_some() {
+            DROPEFFECT_COPY
+        } else {
+            effect_for(self.accepts.get())
+        };
+        (program, effect)
+    }
 }
 
 #[allow(non_snake_case)]
@@ -71,29 +94,33 @@ impl IDropTarget_Impl for DockDropTarget_Impl {
         &self,
         pDataObj: Ref<'_, IDataObject>,
         _grfKeyState: MODIFIERKEYS_FLAGS,
-        _pt: &POINTL,
+        pt: &POINTL,
         pdwEffect: *mut DROPEFFECT,
     ) -> windows::core::Result<()> {
-        let accepts = pDataObj
-            .as_ref()
-            .is_some_and(|data| !commands::apps::droppable(&paths_of(data)).is_empty());
-        self.accepts.set(accepts);
-        unsafe { *pdwEffect = effect_for(accepts) };
+        let paths = pDataObj.as_ref().map(paths_of).unwrap_or_default();
+        self.accepts
+            .set(!commands::apps::droppable(&paths).is_empty());
+        *self.paths.borrow_mut() = paths;
+        let (_, effect) = self.effect_at(pt);
+        unsafe { *pdwEffect = effect };
         Ok(())
     }
 
     fn DragOver(
         &self,
         _grfKeyState: MODIFIERKEYS_FLAGS,
-        _pt: &POINTL,
+        pt: &POINTL,
         pdwEffect: *mut DROPEFFECT,
     ) -> windows::core::Result<()> {
-        unsafe { *pdwEffect = effect_for(self.accepts.get()) };
+        let (_, effect) = self.effect_at(pt);
+        unsafe { *pdwEffect = effect };
         Ok(())
     }
 
     fn DragLeave(&self) -> windows::core::Result<()> {
         self.accepts.set(false);
+        self.paths.borrow_mut().clear();
+        super::native_dock::drop_over(self.hwnd, None);
         Ok(())
     }
 
@@ -101,10 +128,19 @@ impl IDropTarget_Impl for DockDropTarget_Impl {
         &self,
         pDataObj: Ref<'_, IDataObject>,
         _grfKeyState: MODIFIERKEYS_FLAGS,
-        _pt: &POINTL,
+        pt: &POINTL,
         pdwEffect: *mut DROPEFFECT,
     ) -> windows::core::Result<()> {
+        let (program, effect) = self.effect_at(pt);
+        super::native_dock::drop_over(self.hwnd, None);
+        let paths = std::mem::take(&mut *self.paths.borrow_mut());
         let accepts = self.accepts.replace(false);
+        if let Some(program) = program {
+            // On a program's tile: it opens them.
+            super::open_with::open_off_thread(program, paths);
+            unsafe { *pdwEffect = effect };
+            return Ok(());
+        }
         if let (true, Some(data)) = (accepts, pDataObj.as_ref()) {
             commands::apps::pin_dropped(
                 &self.app,
@@ -124,6 +160,7 @@ pub fn install(app: &AppHandle, hwnd: HWND) {
         app: app.clone(),
         hwnd: hwnd.0 as isize,
         accepts: Cell::new(false),
+        paths: RefCell::new(Vec::new()),
     }
     .into();
     if let Err(error) = unsafe { RegisterDragDrop(hwnd, &target) } {

@@ -34,14 +34,15 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     ReleaseCapture, SetCapture, TME_LEAVE, TRACKMOUSEEVENT, TrackMouseEvent,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CS_DBLCLKS, CreateWindowExW, DefWindowProcW, DestroyWindow, HWND_MESSAGE, HWND_TOPMOST,
-    IDC_ARROW, KillTimer, LoadCursorW, PostMessageW, RegisterClassW, SPI_GETCLIENTAREAANIMATION,
-    SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SetTimer, SetWindowPos, ShowWindow, SystemParametersInfoW,
-    WM_APP, WM_CAPTURECHANGED, WM_CLOSE, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_GETOBJECT, WM_HOTKEY,
-    WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE,
-    WM_MOUSEWHEEL, WM_RBUTTONUP, WM_SETTINGCHANGE, WM_TIMER, WNDCLASSW, WS_EX_LAYERED,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CS_DBLCLKS, CreateWindowExW, DefWindowProcW, DestroyCursor, DestroyWindow, GetWindowRect,
+    HCURSOR, HWND_MESSAGE, HWND_TOPMOST, IDC_ARROW, KillTimer, LoadCursorW, PostMessageW,
+    RegisterClassW, SPI_GETCLIENTAREAANIMATION, SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE,
+    SWP_NOMOVE, SWP_NOSIZE, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SetCursor, SetTimer, SetWindowPos,
+    ShowWindow, SystemParametersInfoW, WM_APP, WM_CAPTURECHANGED, WM_CLOSE, WM_DISPLAYCHANGE,
+    WM_DPICHANGED, WM_GETOBJECT, WM_HOTKEY, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP,
+    WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONUP, WM_SETTINGCHANGE,
+    WM_TIMER, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_POPUP,
 };
 use windows::core::{PCWSTR, w};
 
@@ -180,6 +181,8 @@ struct Press {
     group: (usize, usize),
     start_x: f64,
     dragging: bool,
+    /// Off the dock: a program's tile on its way to a folder (spec 0018).
+    out: bool,
 }
 
 /// A drag let go that moved its item: the item stays where it was let go,
@@ -273,6 +276,10 @@ pub struct Dock {
     press: Option<Press>,
     /// While dragging: the pointer's x.
     drag_x: f64,
+    /// The icon the pointer shows while a program's tile is off the dock.
+    drag_cursor: Option<HCURSOR>,
+    /// The tile under files dragged over the dock (spec 0018).
+    drop_hover: Option<usize>,
     landing: Option<Landing>,
     /// How far each item is drawn from its place at rest, sideways: the
     /// room made for a dragged item, or the way to a new place, eased.
@@ -451,6 +458,8 @@ fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
         pressed: None,
         press: None,
         drag_x: 0.0,
+        drag_cursor: None,
+        drop_hover: None,
         landing: None,
         slide: Vec::new(),
         open: None,
@@ -1908,14 +1917,23 @@ impl Dock {
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.track();
+        let program = self
+            .press
+            .is_some_and(|press| self.program_id(press.index).is_some());
+        // A program pulled straight off the dock is dragged too.
+        let off = program && pointer_off(self.hwnd);
         if let Some(press) = self.press.as_mut() {
-            if !press.dragging && (x - press.start_x).abs() >= DRAG_THRESHOLD {
+            if !press.dragging && ((x - press.start_x).abs() >= DRAG_THRESHOLD || off) {
                 press.dragging = true;
                 self.hovered = None;
                 self.pressed = None;
             }
             if press.dragging {
-                self.drag_x = x;
+                let index = press.index;
+                let out = off;
+                press.out = out;
+                self.drag_x = if out { press.start_x } else { x };
+                self.show_drag_cursor(out.then_some(index));
                 self.animate();
                 return;
             }
@@ -2246,7 +2264,12 @@ impl Dock {
         shared().clicked = Some(Instant::now());
         let index = self.hit(x, y);
         self.pressed = index;
-        if let Some((index, group)) = index.and_then(|index| Some((index, self.group_of(index)?)))
+        // A program alone in its group still goes out to a folder.
+        let group = |index: usize| {
+            self.group_of(index)
+                .or_else(|| self.program_id(index).map(|_| (index, 1)))
+        };
+        if let Some((index, group)) = index.and_then(|index| Some((index, group(index)?)))
             && self.open.is_none()
         {
             self.press = Some(Press {
@@ -2254,6 +2277,7 @@ impl Dock {
                 group,
                 start_x: x,
                 dragging: false,
+                out: false,
             });
             self.drag_x = x;
             unsafe { SetCapture(self.hwnd) };
@@ -2266,6 +2290,20 @@ impl Dock {
         let pressed = self.pressed.take();
         if press.is_some() {
             let _ = unsafe { ReleaseCapture() };
+        }
+        self.show_drag_cursor(None);
+        if let Some(press) = press.filter(|press| press.dragging && press.out) {
+            // Let go off the dock: the program opens with what is there.
+            if let Some(id) = self.program_id(press.index) {
+                let mut at = POINT::default();
+                let _ = unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut at) };
+                self.effects.push(Box::new(move |_| {
+                    super::open_with::open_at(id, at.x, at.y);
+                }));
+            }
+            self.animate();
+            self.paint();
+            return;
         }
         if let Some(press) = press.filter(|press| press.dragging) {
             if self.drop_at(press, x) {
@@ -2300,6 +2338,69 @@ impl Dock {
             self.click(index);
         }
         self.paint();
+    }
+
+    /// The id in the Apps folder of the program at `index`: a pinned one or
+    /// an open one. What a folder or files open with (spec 0018).
+    fn program_id(&self, index: usize) -> Option<String> {
+        match self.items.get(index)? {
+            Item::App(app) => Some(app.app_id.clone()),
+            Item::Other(other) => Some(other.app_id.clone()).filter(|id| !id.is_empty()),
+            _ => None,
+        }
+    }
+
+    /// The pointer shows the icon of the program at `index` while its tile
+    /// is off the dock, and the arrow again with `None`.
+    fn show_drag_cursor(&mut self, index: Option<usize>) {
+        match index {
+            Some(index) => {
+                if self.drag_cursor.is_none() {
+                    let side = (48.0 * self.scale).round() as i32;
+                    self.drag_cursor = self
+                        .program_id(index)
+                        .and_then(|id| super::apps::drag_cursor(&id, side));
+                }
+                let cursor = self
+                    .drag_cursor
+                    .or_else(|| unsafe { LoadCursorW(None, IDC_ARROW) }.ok());
+                unsafe { SetCursor(cursor) };
+            }
+            None => {
+                if let Some(cursor) = self.drag_cursor.take() {
+                    unsafe {
+                        SetCursor(LoadCursorW(None, IDC_ARROW).ok());
+                        let _ = DestroyCursor(cursor);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Files dragged over the dock at the screen point `at` (physical
+    /// pixels), or gone with `None`: the program under them is shown as
+    /// under the pointer. Its id, when there is one.
+    fn drop_over(&mut self, at: Option<(i32, i32)>) -> Option<String> {
+        let index = at.and_then(|(x, y)| {
+            let mut point = POINT { x, y };
+            unsafe { windows::Win32::Graphics::Gdi::ScreenToClient(self.hwnd, &mut point) }
+                .as_bool()
+                .then(|| {
+                    self.hit(
+                        f64::from(point.x) / self.scale,
+                        f64::from(point.y) / self.scale,
+                    )
+                })
+                .flatten()
+                .filter(|&index| self.program_id(index).is_some())
+        });
+        if index != self.drop_hover {
+            self.drop_hover = index;
+            self.hovered = index;
+            self.animate();
+            self.paint();
+        }
+        index.and_then(|index| self.program_id(index))
     }
 
     /// The group an item can be dragged in, as its first index and its size:
@@ -3050,6 +3151,7 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
         }),
         WM_CAPTURECHANGED => with_dock(hwnd, |dock| {
             // The capture went elsewhere: the drag is over.
+            dock.show_drag_cursor(None);
             if dock.press.take().is_some() {
                 dock.pressed = None;
                 dock.animate();
@@ -3149,6 +3251,28 @@ pub fn open_calendar(
 /// The Ciclos `widgets` have a notice not seen yet (F2b-3).
 pub fn cycle_nudged(widgets: Vec<String>) {
     post(move |dock| dock.cycle_nudged(&widgets));
+}
+
+/// Files dragged over the dock `hwnd` at the screen point `at`, or gone
+/// with `None` (spec 0018): the id of the program under them.
+pub fn drop_over(hwnd: isize, at: Option<(i32, i32)>) -> Option<String> {
+    let mut found = None;
+    with_dock(HWND(hwnd as _), |dock| found = dock.drop_over(at));
+    found
+}
+
+/// Whether the pointer is off the dock's window.
+fn pointer_off(hwnd: HWND) -> bool {
+    let mut at = POINT::default();
+    let mut window = windows::Win32::Foundation::RECT::default();
+    unsafe {
+        if windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut at).is_err()
+            || GetWindowRect(hwnd, &mut window).is_err()
+        {
+            return false;
+        }
+    }
+    at.x < window.left || at.x >= window.right || at.y < window.top || at.y >= window.bottom
 }
 
 /// The notification badges of the taskbar changed (spec 0016).
