@@ -32,6 +32,10 @@ pub struct GoogleTask {
     pub due: Option<String>,
     pub status: Option<String>,
     pub web_view_link: Option<String>,
+    /// Its place in the list, as the person ordered it in Google Tasks:
+    /// text that sorts in that order.
+    #[serde(default)]
+    pub position: String,
     #[serde(default)]
     pub deleted: bool,
     #[serde(default)]
@@ -60,6 +64,9 @@ pub struct Task {
     pub late: bool,
     /// The task in Google Tasks.
     pub link: Option<String>,
+    /// Its place in its list ([`GoogleTask::position`]).
+    #[serde(skip)]
+    pub position: String,
 }
 
 /// The local day of `now`, at `offset` seconds from UTC.
@@ -127,15 +134,19 @@ pub fn read_tasks(
                 due: due.to_string(),
                 late: due < today,
                 link: task.web_view_link,
+                position: task.position,
             })
         })
         .collect()
 }
 
-/// All the accounts' tasks in the order the panel shows them.
+/// All the accounts' tasks in the order the panel shows them: the late
+/// ones first, by day; then, in each list, the order the person gave them
+/// in Google Tasks. The API gives no time of day (Google keeps only the
+/// date), so the list's order is the closest to the day's order.
 pub fn sort(mut tasks: Vec<Task>) -> Vec<Task> {
     tasks.sort_by(|a, b| {
-        (!a.late, &a.due, a.title.to_lowercase()).cmp(&(!b.late, &b.due, b.title.to_lowercase()))
+        (!a.late, &a.due, &a.list, &a.position).cmp(&(!b.late, &b.due, &b.list, &b.position))
     });
     tasks
 }
@@ -173,6 +184,22 @@ mod tests {
         assert_eq!(shown, [("Pagar boleto", true), ("Ligar", false)]);
         assert_eq!(tasks[1].notes, None);
         assert_eq!(tasks[1].list_name, "Minhas tarefas");
+    }
+
+    #[test]
+    fn todays_tasks_keep_the_order_of_their_list() {
+        let items: GoogleTasks = serde_json::from_str(
+            r#"{"items":[
+            {"id":"a","title":"Academia (20h)","due":"2026-10-28T00:00:00.000Z","position":"00000000000000000002"},
+            {"id":"b","title":"Reunião (9h)","due":"2026-10-28T00:00:00.000Z","position":"00000000000000000000"},
+            {"id":"c","title":"Almoço (12h)","due":"2026-10-28T00:00:00.000Z","position":"00000000000000000001"}
+        ]}"#,
+        )
+        .unwrap();
+        let today: jiff::civil::Date = "2026-10-28".parse().unwrap();
+        let tasks = sort(read_tasks(items.items, "max@example.com", &list(), today));
+        let titles: Vec<_> = tasks.iter().map(|task| task.title.as_str()).collect();
+        assert_eq!(titles, ["Reunião (9h)", "Almoço (12h)", "Academia (20h)"]);
     }
 
     #[test]

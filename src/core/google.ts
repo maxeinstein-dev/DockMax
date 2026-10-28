@@ -53,6 +53,8 @@ export interface GoogleCalendar {
   /** `#rrggbb`, as chosen in Google Agenda. */
   color: string | null;
   primary: boolean;
+  /** `owner`, `writer`, `reader` or `freeBusyReader`. */
+  access: string | null;
 }
 
 /** Event every window gets when an account comes or goes. */

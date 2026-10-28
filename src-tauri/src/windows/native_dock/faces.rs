@@ -157,6 +157,15 @@ pub fn agenda(config: &CalendarConfig, snapshot: Option<&Snapshot>, now: i64) ->
                 When::Tomorrow(time) if long => format!("{} · {time}", text.calendar_tomorrow),
                 When::Tomorrow(_) => text.calendar_tomorrow.to_owned(),
             };
+            let title = |event: &calendar::Event| {
+                if !event.title.is_empty() {
+                    event.title.clone()
+                } else if event.busy {
+                    text.calendar_busy.to_owned()
+                } else {
+                    text.calendar_untitled.to_owned()
+                }
+            };
             match next.first() {
                 None => vec![line(text.calendar_free.into(), 0.2, true)],
                 Some(first) => {
@@ -165,11 +174,11 @@ pub fn agenda(config: &CalendarConfig, snapshot: Option<&Snapshot>, now: i64) ->
                         1 => vec![line(say(when, false), 0.22, true)],
                         2 => vec![
                             line(say(when, true), 0.2, true),
-                            line(first.title.clone(), 0.15, false),
+                            line(title(first), 0.15, false),
                         ],
                         _ => {
                             let mut lines = vec![
-                                line(first.title.clone(), 0.17, true),
+                                line(title(first), 0.17, true),
                                 line(say(when, true), 0.14, false),
                             ];
                             if let Some(then) = next.get(1) {
@@ -178,7 +187,7 @@ pub fn agenda(config: &CalendarConfig, snapshot: Option<&Snapshot>, now: i64) ->
                                         "{} {} {}",
                                         text.calendar_then,
                                         calendar::clock(then.start, snapshot.offset),
-                                        then.title
+                                        title(then)
                                     ),
                                     0.13,
                                     false,
@@ -301,6 +310,7 @@ mod tests {
             description: None,
             join: None,
             link: None,
+            busy: false,
             key: title.into(),
         }
     }

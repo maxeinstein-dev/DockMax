@@ -73,6 +73,9 @@ pub struct DockMessages {
     pub calendar_in: &'static str,
     pub calendar_minutes: &'static str,
     pub calendar_tomorrow: &'static str,
+    /// A meeting with no title: from a free/busy calendar, or untitled.
+    pub calendar_busy: &'static str,
+    pub calendar_untitled: &'static str,
     /// Before the meeting after the next one: `Depois 15:00 Daily`.
     pub calendar_then: &'static str,
     /// The periods' names on a wide progress tile, in the order of
@@ -166,6 +169,8 @@ const PT_BR: Messages = Messages {
         calendar_in: "em {n} min",
         calendar_minutes: "{n} min",
         calendar_tomorrow: "amanhã",
+        calendar_busy: "Ocupado",
+        calendar_untitled: "(sem título)",
         calendar_then: "Depois",
         periods: ["Dia", "Semana", "Mês", "Ano", "Expediente"],
         with_notice: "{name} (com aviso)",

@@ -14,8 +14,15 @@
   text-transform: uppercase;
 }
 
+/* A long title never makes the panel wider than its card: the grid's
+   column and the items may shrink below their text. */
+.cal-day {
+  min-width: 0;
+}
+
 .cal-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
   margin: 0;
   padding: 0;
@@ -23,6 +30,7 @@
 }
 
 .cal-list li {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -73,12 +81,16 @@
   min-width: 0;
 }
 
+/* Up to two lines, then an ellipsis; the details show it whole. */
 .cal-title {
   flex: 1;
   min-width: 0;
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .cal-join {

@@ -28,6 +28,15 @@ function Dot({ color }: { color: string | null }) {
   return <span ref={dot} className="cal-dot" aria-hidden="true" />;
 }
 
+/** An event's title; one without: "Ocupado" from a free/busy calendar,
+ * "(sem título)" otherwise. */
+function titleOf(
+  event: CalendarEvent,
+  text: { busy: string; noTitle: string },
+): string {
+  return event.title || (event.busy ? text.busy : text.noTitle);
+}
+
 /** Today's and late tasks, each ticked off with its box: it leaves the
  * list at once, and comes back with a message if Google didn't take it. */
 function Tasks({ tasks }: { tasks: CalendarTask[] }) {
@@ -98,7 +107,7 @@ function Details({
 }) {
   const t = useT();
   const text = t.widgets.calendar;
-  const title = event.title || text.noTitle;
+  const title = titleOf(event, text);
   return (
     <>
       <PanelHeader title={title} onBack={onBack} focusAction />
@@ -224,7 +233,7 @@ function CalendarPanel({
               ) : (
                 <ul className="cal-list">
                   {events.map((event) => {
-                    const title = event.title || text.noTitle;
+                    const title = titleOf(event, text);
                     const under = !event.allDay && event.start <= now;
                     return (
                       <li

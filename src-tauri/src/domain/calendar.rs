@@ -21,6 +21,32 @@ pub struct Source {
     pub name: String,
     /// `#rrggbb`.
     pub color: Option<String>,
+    /// How much the account sees of it ([`access_rank`]).
+    #[serde(skip)]
+    pub access: u8,
+}
+
+/// How much an `accessRole` sees: the owner most, the free/busy reader
+/// (no titles) least.
+pub fn access_rank(role: Option<&str>) -> u8 {
+    match role {
+        Some("owner") => 3,
+        Some("writer") => 2,
+        Some("reader") => 1,
+        _ => 0,
+    }
+}
+
+/// Adds `source` to `sources`, or puts it in place of the same calendar
+/// seen through another account that sees less of it: the Alfama's
+/// calendar, shared as free/busy with the personal account, is read
+/// through the Alfama's account, with its titles.
+pub fn keep_best(sources: &mut Vec<Source>, source: Source) {
+    match sources.iter_mut().find(|known| known.id == source.id) {
+        Some(known) if known.access < source.access => *known = source,
+        Some(_) => {}
+        None => sources.push(source),
+    }
 }
 
 /// An event as the widget shows it.
@@ -42,6 +68,8 @@ pub struct Event {
     pub join: Option<String>,
     /// The event in Google Agenda.
     pub link: Option<String>,
+    /// Shown only as busy, with no title (a free/busy calendar).
+    pub busy: bool,
     /// The same event in another calendar has this key too.
     #[serde(skip)]
     pub key: String,
@@ -205,6 +233,10 @@ pub fn read_events(items: Vec<GoogleEvent>, source: &Source, offset: i64) -> Vec
                 (None, None) => return None,
             };
             let join = join_link(&event);
+            let title = event
+                .summary
+                .filter(|title| !title.trim().is_empty())
+                .unwrap_or_default();
             let key = format!(
                 "{}|{start}",
                 event.ical_uid.clone().unwrap_or_else(|| event.id.clone())
@@ -214,10 +246,8 @@ pub fn read_events(items: Vec<GoogleEvent>, source: &Source, offset: i64) -> Vec
                 calendar: source.id.clone(),
                 calendar_name: source.name.clone(),
                 color: source.color.clone(),
-                title: event
-                    .summary
-                    .filter(|title| !title.trim().is_empty())
-                    .unwrap_or_default(),
+                busy: title.is_empty() && source.access == 0,
+                title,
                 start,
                 end,
                 all_day,
@@ -233,9 +263,16 @@ pub fn read_events(items: Vec<GoogleEvent>, source: &Source, offset: i64) -> Vec
 
 /// The events in order of start, each meeting once: the same one in two
 /// calendars (the author's and the fiancée's, or two accounts) keeps the
-/// first calendar's.
+/// copy with a title, else the first calendar's.
 pub fn merge(mut events: Vec<Event>) -> Vec<Event> {
-    events.sort_by(|a, b| (a.start, a.all_day, &a.title).cmp(&(b.start, b.all_day, &b.title)));
+    events.sort_by(|a, b| {
+        (a.start, a.all_day, a.title.is_empty(), &a.title).cmp(&(
+            b.start,
+            b.all_day,
+            b.title.is_empty(),
+            &b.title,
+        ))
+    });
     let mut seen = std::collections::HashSet::new();
     events.retain(|event| seen.insert(event.key.clone()));
     events
@@ -311,6 +348,7 @@ mod tests {
             id: "max@example.com".into(),
             name: "Max".into(),
             color: Some("#9fc6e7".into()),
+            access: 3,
         }
     }
 
@@ -411,6 +449,46 @@ mod tests {
     }
 
     #[test]
+    fn a_calendar_two_accounts_see_is_read_through_the_one_that_sees_more() {
+        let through = |account: &str, role: &str| Source {
+            account: account.into(),
+            id: "maxsuelm@alfamaweb.com.br".into(),
+            name: "Alfama".into(),
+            color: None,
+            access: access_rank(Some(role)),
+        };
+        let mut sources = Vec::new();
+        keep_best(&mut sources, through("pessoal@gmail.com", "freeBusyReader"));
+        keep_best(&mut sources, through("maxsuelm@alfamaweb.com.br", "owner"));
+        keep_best(&mut sources, through("outra@gmail.com", "reader"));
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].account, "maxsuelm@alfamaweb.com.br");
+        assert_eq!(access_rank(None), 0);
+    }
+
+    #[test]
+    fn a_free_busy_event_is_busy_and_the_titled_copy_wins() {
+        let json = r#"{"items":[{"id":"a","iCalUID":"same",
+            "start":{"dateTime":"2026-10-28T18:00:00Z"},"end":{"dateTime":"2026-10-28T19:00:00Z"}}]}"#;
+        let busy_only = Source {
+            access: 0,
+            ..source()
+        };
+        let hidden = read_events(items(json), &busy_only, BRT);
+        assert!(hidden[0].busy);
+        assert_eq!(hidden[0].title, "");
+
+        let titled_json = json.replace(r#""id":"a","#, r#""id":"a","summary":"Sprint review","#);
+        let titled = read_events(items(&titled_json), &source(), BRT);
+        assert!(!titled[0].busy);
+        let mut all = hidden;
+        all.extend(titled);
+        let merged = merge(all);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].title, "Sprint review");
+    }
+
+    #[test]
     fn the_window_is_today_and_tomorrow_in_local_time() {
         // 2026-10-28 01:30 in Brasília is still 04:30 UTC of the same day.
         let now = 1_793_163_000;
@@ -435,6 +513,7 @@ mod tests {
             description: None,
             join: Some("https://meet.google.com/x".into()),
             link: None,
+            busy: false,
             key: String::new(),
         };
         let now = 1_793_188_800;

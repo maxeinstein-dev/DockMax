@@ -832,6 +832,8 @@ const messages = {
       where: "Local",
       calendar: "Agenda",
       noTitle: "(sem título)",
+      /** An event of a calendar shared as free/busy only. */
+      busy: "Ocupado",
       status: {
         noAccounts:
           "Nenhuma conta Google conectada. Conecte em Configurações › Contas.",

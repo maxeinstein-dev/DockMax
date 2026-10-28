@@ -9,6 +9,7 @@ import { clockText, plainText } from "../../core/calendar";
 import type { WidgetInstance } from "../../core/widgets";
 import { ptBR } from "../../i18n/pt-BR";
 import CalendarPanel from "./CalendarPanel";
+import css from "./calendar.css?raw";
 
 const text = ptBR.widgets.calendar;
 
@@ -33,6 +34,7 @@ function event(partial: Partial<CalendarEvent>): CalendarEvent {
     description: null,
     join: "https://meet.google.com/abc",
     link: "https://www.google.com/calendar/event?eid=x",
+    busy: false,
     ...partial,
   };
 }
@@ -246,6 +248,30 @@ describe("CalendarPanel", () => {
     );
     await screen.findByRole("region", { name: text.today });
     expect(screen.queryByRole("region", { name: text.tasks })).toBeNull();
+  });
+
+  it("names an event with no title: busy or untitled", async () => {
+    answer(
+      view([
+        event({ id: "a", title: "", busy: true, join: null }),
+        event({ id: "b", title: "", start: NOW + 3600, end: NOW + 7200 }),
+      ]),
+    );
+    show();
+
+    expect(await screen.findByText(text.busy)).toBeInTheDocument();
+    expect(screen.getByText(text.noTitle)).toBeInTheDocument();
+  });
+
+  it("never grows wider than its card for a long title", () => {
+    // jsdom has no layout: the rules that keep a long title inside are
+    // checked as text. Without them the list widened the panel, cutting
+    // the title and pushing Ajustes out of the card.
+    expect(css).toMatch(
+      /\.cal-list \{[^}]*grid-template-columns: minmax\(0, 1fr\)/,
+    );
+    expect(css).toMatch(/\.cal-list li \{[^}]*min-width: 0/);
+    expect(css).toMatch(/\.cal-title \{[^}]*-webkit-line-clamp: 2/);
   });
 
   it("says when there is no account", async () => {

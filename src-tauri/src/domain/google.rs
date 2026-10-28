@@ -231,6 +231,10 @@ pub struct CalendarEntry {
     pub color: Option<String>,
     #[serde(default)]
     pub primary: bool,
+    /// What the account may see of it: `owner`, `writer`, `reader` or
+    /// `freeBusyReader` (only when each event is, with no title).
+    #[serde(default, rename(deserialize = "accessRole"))]
+    pub access: Option<String>,
 }
 
 /// A page of `calendarList`.

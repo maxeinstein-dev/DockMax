@@ -171,14 +171,16 @@ fn sources(accounts: &[String]) -> Result<Vec<Source>, GoogleError> {
     let mut sources: Vec<Source> = Vec::new();
     for account in accounts {
         for entry in google::calendars(account)? {
-            if !sources.iter().any(|source| source.id == entry.id) {
-                sources.push(Source {
+            calendar::keep_best(
+                &mut sources,
+                Source {
                     account: account.clone(),
+                    access: calendar::access_rank(entry.access.as_deref()),
                     id: entry.id,
                     name: entry.name,
                     color: entry.color,
-                });
-            }
+                },
+            );
         }
     }
     *SOURCES
@@ -356,6 +358,7 @@ mod tests {
             id: "pt-br.brazilian#holiday@group.v.calendar.google.com".into(),
             name: "Feriados".into(),
             color: None,
+            access: 1,
         };
         let url = url::Url::parse(&events_url(&source, 1_793_156_400, 1_793_329_200)).unwrap();
         assert_eq!(

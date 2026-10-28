@@ -34,6 +34,8 @@ export interface CalendarEvent {
   join: string | null;
   /** The event in Google Agenda. */
   link: string | null;
+  /** Shown only as busy, with no title (a free/busy calendar). */
+  busy: boolean;
 }
 
 /** A Google Tasks task due today or late, not done (F2a-3). */
