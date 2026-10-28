@@ -78,6 +78,9 @@ pub struct CycleView {
     /// Today, as a local day number (days since 1970-01-01).
     pub today: i64,
     pub accounts: bool,
+    /// Today's notices and reminders (F2b-2): the panel says the
+    /// reminders' text, which the Windows notice never shows.
+    pub notices: Vec<crate::domain::cycle::Notice>,
 }
 
 /// The Ciclo of the widget `config` the panel shows.
@@ -85,17 +88,10 @@ pub struct CycleView {
 #[tauri::command]
 pub fn cycle_status(
     window: WebviewWindow,
-    symbol: String,
-    calendar: Option<String>,
-    sensitive: u8,
+    config: crate::domain::widgets::CycleConfig,
 ) -> Result<CycleView, String> {
     use crate::domain::cycle;
     only_panel(&window)?;
-    let config = crate::domain::widgets::CycleConfig {
-        symbol,
-        calendar,
-        sensitive,
-    };
     if config.validate().is_err() {
         return Err("invalid cycle settings".into());
     }
@@ -108,10 +104,27 @@ pub fn cycle_status(
             i64::from(config.sensitive),
         )
     });
+    let notices = status
+        .as_ref()
+        .map(|status| cycle::notices(status, &config, today))
+        .unwrap_or_default();
     Ok(CycleView {
         status,
         today,
         accounts: !google::accounts().is_empty(),
+        notices,
+    })
+}
+
+/// Sends a notice like the Ciclo's, to see that Windows shows it (a button
+/// of the widget's settings).
+#[cfg(windows)]
+#[tauri::command]
+pub fn cycle_test_notice(window: WebviewWindow) -> Result<(), String> {
+    only_panel(&window)?;
+    crate::windows::toast::cycle_notice().map_err(|error| {
+        log::warn!("cycle: the test notice was not shown: {error}");
+        "the notice could not be shown".to_string()
     })
 }
 

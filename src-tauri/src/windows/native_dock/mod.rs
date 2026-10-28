@@ -918,18 +918,18 @@ impl Dock {
         let calendar = self.items.iter().any(|item| {
             matches!(item, Item::Widget(widget) if matches!(widget.config, WidgetConfig::Calendar(_)))
         });
-        let symbols: Vec<String> = self
+        let cycles: Vec<_> = self
             .items
             .iter()
             .filter_map(|item| match item {
                 Item::Widget(widget) => match &widget.config {
-                    WidgetConfig::Cycle(config) => Some(config.symbol.trim().to_owned()),
+                    WidgetConfig::Cycle(config) => Some(config.clone()),
                     _ => None,
                 },
                 _ => None,
             })
             .collect();
-        super::calendar::want(self.hwnd.0 as isize, calendar, symbols);
+        super::calendar::want(self.hwnd.0 as isize, calendar, cycles);
         let wanted = self.items.iter().any(|item| {
             matches!(
                 item,

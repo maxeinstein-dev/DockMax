@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 
 use super::calendar::CardPeriod;
 use super::clock::{ClockIconStyle, HourCycle};
+use super::cycle::Anchor;
 use super::shortcut::ShortcutTarget;
 use super::system::{ActivityShow, ActivityStyle};
 use super::time_progress::{Period, WeekStart};
@@ -189,6 +190,7 @@ fn the_enum_fixture_is_every_value_of_each_closed_set_in_order() {
         "ActivityShow": ActivityShow::ALL,
         "ActivityStyle": ActivityStyle::ALL,
         "CardPeriod": CardPeriod::ALL,
+        "ReminderAnchor": Anchor::ALL,
         "WidgetErrorCode": WidgetErrorCode::ALL,
     });
     assert_eq!(enums, expected, "{ENUMS} doesn't match the Rust enums");
@@ -204,5 +206,6 @@ fn the_enum_fixture_is_every_value_of_each_closed_set_in_order() {
     assert_closed_set(&enums, "ActivityShow", &ActivityShow::ALL);
     assert_closed_set(&enums, "ActivityStyle", &ActivityStyle::ALL);
     assert_closed_set(&enums, "CardPeriod", &CardPeriod::ALL);
+    assert_closed_set(&enums, "ReminderAnchor", &Anchor::ALL);
     assert_closed_set(&enums, "WidgetErrorCode", &WidgetErrorCode::ALL);
 }

@@ -83,6 +83,9 @@ pub struct DockMessages {
     pub calendar_tasks: &'static str,
     pub calendar_late: &'static str,
     pub calendar_nothing: &'static str,
+    /// The Ciclo's Windows notice (F2b-2): neutral, the same for all.
+    pub cycle_notice_title: &'static str,
+    pub cycle_notice_line: &'static str,
     /// A meeting with no title: from a free/busy calendar, or untitled.
     pub calendar_busy: &'static str,
     pub calendar_untitled: &'static str,
@@ -187,6 +190,8 @@ const PT_BR: Messages = Messages {
         calendar_tasks: "Tarefas",
         calendar_late: "atrasada",
         calendar_nothing: "Nada marcado",
+        cycle_notice_title: "Lembrete do Ciclo",
+        cycle_notice_line: "Abra o Ciclo no DockMax para ver.",
         calendar_busy: "Ocupado",
         calendar_untitled: "(sem título)",
         calendar_then: "Depois",

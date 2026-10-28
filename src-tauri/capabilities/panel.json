@@ -26,6 +26,7 @@
     "allow-open-calendar-link",
     "allow-complete-calendar-task",
     "allow-cycle-status",
+    "allow-cycle-test-notice",
     "allow-tray-to-dock",
     "allow-list-apps",
     "allow-list-catalog",
