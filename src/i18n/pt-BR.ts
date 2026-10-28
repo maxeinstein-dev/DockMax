@@ -28,6 +28,7 @@ import type {
   WidgetErrorCode,
   WidgetKind,
 } from "../core/widgets";
+import type { GoogleErrorCode } from "../core/google";
 import type { AutosaveState } from "../widgets/notes/autosave";
 import type { RemainingUnit } from "../widgets/time-progress/progress";
 
@@ -86,6 +87,7 @@ const messages = {
         look: "Aparência do dock",
         apps: "Apps do dock",
         items: "Widgets",
+        accounts: "Contas",
         about: "Sobre",
       },
       /** The top of the side bar (spec 0014 R1). */
@@ -97,6 +99,7 @@ const messages = {
         look: "Deixe o dock com a sua cara.",
         apps: "Os programas fixados no dock de cada espaço.",
         items: "Escolha no catálogo e arrume os do dock de cada espaço.",
+        accounts: "As agendas e as tarefas que os widgets mostram.",
         about: "Versão, licença e onde ficam os seus dados.",
       },
       /** The titles of the groups of Geral and Aparência. */
@@ -516,6 +519,65 @@ const messages = {
       notReady:
         "Os apps não estão disponíveis agora. Reinicie o DockMax e tente de novo.",
     } satisfies Record<AppErrorCode, string>,
+  },
+  /** Configurações › Contas (spec 0017 F2a, ADR 0012). */
+  accounts: {
+    client: {
+      title: "App do Google",
+      /** Before a client is set: what to do, in short. */
+      intro:
+        'Para ler as suas agendas, o DockMax usa um app que você cria no Google Cloud, só para você. Crie um cliente do tipo "App para computador" e cole aqui o ID e o segredo.',
+      id: "ID do cliente",
+      secret: "Segredo do cliente",
+      save: "Salvar",
+      /** With a client set: its id. */
+      current: "Cliente: {id}",
+      change: "Trocar",
+      cancel: "Cancelar",
+      /** The secret stays in the Windows vault. */
+      hint: "O segredo fica no cofre de credenciais do Windows e não aparece de novo.",
+    },
+    list: {
+      title: "Contas Google",
+      empty: "Nenhuma conta conectada.",
+      connect: "Conectar conta Google",
+      /** While the browser is open on Google's page. */
+      waiting: "Termine o login no navegador…",
+      /** Before a client is set. */
+      needsClient: "Salve o app do Google acima para conectar uma conta.",
+      calendars: "Agendas",
+      showCalendars: "Ver agendas de {email}",
+      hideCalendars: "Ocultar agendas de {email}",
+      loading: "Lendo as agendas…",
+      noCalendars: "Nenhuma agenda nesta conta.",
+      primary: "principal",
+      disconnect: "Desconectar",
+      disconnectNamed: "Desconectar {email}",
+      confirmDisconnect: {
+        title: "Desconectar esta conta?",
+        detail: "As agendas dela somem dos widgets. Dá para conectar de novo.",
+        cancel: "Cancelar",
+        confirm: "Desconectar",
+      },
+      /** Said once an account was connected. */
+      connected: "{email} foi conectada.",
+    },
+    errors: {
+      noClient: "Salve o app do Google antes de conectar uma conta.",
+      invalidClientId:
+        "Esse ID não parece de um cliente Google. Ele termina em .apps.googleusercontent.com.",
+      invalidClientSecret: "Cole o segredo do cliente, numa linha só.",
+      refused: "O login foi cancelado no Google.",
+      timedOut: "O login demorou mais de 5 minutos. Tente de novo.",
+      offline: "Sem conexão com o Google agora.",
+      signInAgain:
+        "O Google não aceita mais esta conta. Desconecte e conecte de novo.",
+      notConnected: "Esta conta não está mais conectada.",
+      unexpected: "O Google respondeu algo inesperado. O motivo está no log.",
+      vault: "Não foi possível guardar no cofre de credenciais do Windows.",
+      notAllowed: "Esta janela não pode mexer nas contas.",
+      notReady: "As contas não estão disponíveis agora. Reinicie o DockMax.",
+    } satisfies Record<GoogleErrorCode, string>,
   },
   widgets: {
     /** Name of each kind: the dock item's name and the panel title when the

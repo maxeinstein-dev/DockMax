@@ -7,6 +7,7 @@ pub mod browser_profile;
 pub mod dock_items;
 pub mod dock_layout;
 pub mod fullscreen;
+pub mod google;
 pub mod hotkey;
 pub mod icon_pack;
 pub mod launcher;
