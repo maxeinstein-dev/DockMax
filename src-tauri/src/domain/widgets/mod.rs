@@ -234,17 +234,55 @@ impl WidgetConfig {
     }
 
     /// How many icons wide the widget is in the dock (spec 0017: 1 to 4).
-    /// The widgets of the first phases are all one icon wide.
     pub fn span(&self) -> usize {
+        usize::from(self.width())
+    }
+
+    /// The width in icons, as the config keeps it; 1 for the kinds that
+    /// have only one.
+    pub fn width(&self) -> u8 {
         match self {
             WidgetConfig::Clock(_)
-            | WidgetConfig::TimeProgress(_)
             | WidgetConfig::Note(_)
             | WidgetConfig::Shortcut(_)
             | WidgetConfig::Files(_) => 1,
-            WidgetConfig::Activity(config) => usize::from(config.width),
-            WidgetConfig::Network(config) => usize::from(config.width),
+            WidgetConfig::TimeProgress(config) => config.width,
+            WidgetConfig::Activity(config) => config.width,
+            WidgetConfig::Network(config) => config.width,
         }
+    }
+
+    /// The widths the kind takes (spec 0017 F1b): only the kinds that show
+    /// something more when wider take more than one.
+    pub fn widths(&self) -> std::ops::RangeInclusive<u8> {
+        match self {
+            WidgetConfig::Clock(_)
+            | WidgetConfig::Note(_)
+            | WidgetConfig::Shortcut(_)
+            | WidgetConfig::Files(_) => 1..=1,
+            WidgetConfig::TimeProgress(_)
+            | WidgetConfig::Activity(_)
+            | WidgetConfig::Network(_) => system::WIDTHS,
+        }
+    }
+
+    /// The same config at `width` icons; `None` for a width the kind
+    /// doesn't take.
+    pub fn with_width(&self, width: u8) -> Option<WidgetConfig> {
+        if !self.widths().contains(&width) {
+            return None;
+        }
+        let mut config = self.clone();
+        match &mut config {
+            WidgetConfig::TimeProgress(config) => config.width = width,
+            WidgetConfig::Activity(config) => config.width = width,
+            WidgetConfig::Network(config) => config.width = width,
+            WidgetConfig::Clock(_)
+            | WidgetConfig::Note(_)
+            | WidgetConfig::Shortcut(_)
+            | WidgetConfig::Files(_) => {}
+        }
+        Some(config)
     }
 
     /// The config a new instance of `kind` gets, and the one an instance
@@ -752,6 +790,44 @@ mod tests {
     }
 
     #[test]
+    fn only_the_kinds_that_show_more_take_another_width() {
+        for kind in WidgetKind::ALL {
+            let config = WidgetConfig::default_for(kind);
+            let wide = matches!(
+                kind,
+                WidgetKind::TimeProgress | WidgetKind::Activity | WidgetKind::Network
+            );
+            assert_eq!(config.widths(), if wide { 1..=3 } else { 1..=1 }, "{kind}");
+            assert_eq!(config.with_width(4), None, "{kind}");
+            assert_eq!(config.with_width(0), None, "{kind}");
+            if wide {
+                let three = config.with_width(3).unwrap();
+                assert_eq!(three.width(), 3);
+                assert_eq!(three.span(), 3);
+                assert_eq!(three.validate(), Ok(()));
+            } else {
+                assert_eq!(config.with_width(2), None, "{kind}");
+                assert_eq!(config.with_width(1), Some(config.clone()));
+            }
+        }
+    }
+
+    #[test]
+    fn a_progress_stored_before_its_width_reads_one_icon_wide() {
+        let read = decode_config(
+            WidgetKind::TimeProgress,
+            1,
+            r#"{"periods":["day"],"weekStart":"monday","workday":{"start":"09:00","end":"18:00"}}"#,
+        )
+        .unwrap();
+        assert_eq!(read.width(), 1);
+        assert_eq!(
+            decode_config(WidgetKind::TimeProgress, 1, r#"{"width":4}"#),
+            Err(WidgetError::InvalidWidth)
+        );
+    }
+
+    #[test]
     fn default_configs_serialize_to_the_contract() {
         let cases = [
             (
@@ -759,7 +835,8 @@ mod tests {
                 json!({
                     "periods": ["day", "week", "month", "year"],
                     "weekStart": "monday",
-                    "workday": { "start": "09:00", "end": "18:00" }
+                    "workday": { "start": "09:00", "end": "18:00" },
+                    "width": 1
                 }),
             ),
             (WidgetKind::Note, json!({})),
@@ -806,7 +883,9 @@ mod tests {
             periods: vec![Period::Workday, Period::Day],
             week_start: WeekStart::Sunday,
             workday: Workday::default(),
+            width: 3,
         };
+        assert_eq!(to_json(&progress)["width"], 3);
         assert_eq!(to_json(&progress)["periods"], json!(["workday", "day"]));
         assert_eq!(to_json(&progress)["weekStart"], "sunday");
 

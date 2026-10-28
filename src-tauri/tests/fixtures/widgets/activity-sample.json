@@ -5,6 +5,6 @@
   "config": {
     "show": "cpu",
     "style": "rings",
-    "width": 2
+    "width": 3
   }
 }

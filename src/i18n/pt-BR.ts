@@ -620,6 +620,9 @@ const messages = {
       workdayStart: "Início do expediente",
       workdayEnd: "Fim do expediente",
       ringHint: "O primeiro período é o do anel no ícone.",
+      /** Under the width: what each width shows (spec 0017 F1b). */
+      widthHint:
+        "Com 2 ícones, os dois primeiros períodos em anéis; com 3, os três primeiros em barras.",
       weekStart: "Semana começa",
       weekStarts: {
         monday: "Segunda",
@@ -673,7 +676,7 @@ const messages = {
     system: {
       /** The tile's width in icons. */
       width: "Largura no dock",
-      widths: { one: "1 ícone", two: "2 ícones" },
+      widths: { one: "1 ícone", two: "2 ícones", three: "3 ícones" },
       /** While the first reading is not in. */
       reading: "Lendo…",
       /** A share: `42%`. */
@@ -699,6 +702,8 @@ const messages = {
         rings: "Anéis",
         numbers: "Números",
       } satisfies Record<ActivityStyle, string>,
+      widthHint:
+        "Com 3 ícones, o dock mostra também o processador no último minuto.",
       footer: "Atualiza a cada 2 segundos",
     },
     network: {
@@ -707,7 +712,8 @@ const messages = {
       up: "Upload",
       /** The graph of the last minute. */
       history: "Rede no último minuto",
-      widthHint: "Com 2 ícones, o dock mostra o gráfico do último minuto.",
+      widthHint:
+        "Com 2 ícones, o dock mostra o gráfico do último minuto; com 3, maior.",
       footer: "Placas de rede ligadas · a cada 2 segundos",
     },
     /** Configurações › Widgets (spec 0017): the catalog of every kind. */

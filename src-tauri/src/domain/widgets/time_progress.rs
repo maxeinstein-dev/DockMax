@@ -20,6 +20,9 @@ pub struct TimeProgressConfig {
     pub week_start: WeekStart,
     /// Used only when `periods` has [`Period::Workday`].
     pub workday: Workday,
+    /// In icons, 1 to 3 (spec 0017 F1b): the ring of the first period, two
+    /// rings, or three bars. A config stored before it reads as 1.
+    pub width: u8,
 }
 
 impl Default for TimeProgressConfig {
@@ -28,6 +31,7 @@ impl Default for TimeProgressConfig {
             periods: vec![Period::Day, Period::Week, Period::Month, Period::Year],
             week_start: WeekStart::default(),
             workday: Workday::default(),
+            width: 1,
         }
     }
 }
@@ -44,7 +48,8 @@ impl TimeProgressConfig {
         if !(1..=MAX_PERIODS).contains(&count) || repeats {
             return Err(WidgetError::InvalidPeriods);
         }
-        self.workday.validate()
+        self.workday.validate()?;
+        super::system::check_width(self.width)
     }
 }
 

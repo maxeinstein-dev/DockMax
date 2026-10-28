@@ -1016,7 +1016,7 @@ impl Dock {
                     }
                 }));
             }
-            _ => self.dock_menu(),
+            _ => self.dock_menu(None),
         }
     }
 
@@ -2260,7 +2260,13 @@ impl Dock {
     /// the tray icon's menu has (author's decision, 2026-10-26: Configurações
     /// left the dock's items; the Task Manager as in the taskbar's menu).
     /// Shown once the dock's state is let go: the menu runs a loop of its own.
-    fn dock_menu(&mut self) {
+    /// The dock's menu; on a widget that takes more than one width
+    /// (`index`), the widths come first.
+    fn dock_menu(&mut self, index: Option<usize>) {
+        let widget = index.and_then(|index| match self.items.get(index) {
+            Some(Item::Widget(widget)) => Some(widget.clone()),
+            _ => None,
+        });
         self.hovered = None;
         self.animate();
         self.paint();
@@ -2277,11 +2283,16 @@ impl Dock {
                 shown: Some(&w.id) == shown.as_ref(),
             })
             .collect();
-        let items = dock_menu_items(
+        let mut items = widget
+            .as_ref()
+            .map(|widget| width_items(widget.config.widths(), widget.config.width()))
+            .unwrap_or_default();
+        items.extend(dock_menu_items(
             self.data.settings.dock.auto_hide,
             &workspaces,
             crate::commands::workspaces::can_create(&self.data.workspaces),
-        );
+        ));
+        let widget = widget.map(|widget| widget.id);
         let monitor = self.monitor.key.clone();
         let ids: Vec<String> = self.data.workspaces.iter().map(|w| w.id.clone()).collect();
         // Up, under its menu, until it closes.
@@ -2290,7 +2301,7 @@ impl Dock {
             let chosen = show_dock_menu(edge, items);
             post_to(hwnd, |dock: &mut Dock| dock.menu_open = false);
             if let Some(choice) = chosen {
-                act(app, choice, &monitor, &ids);
+                act(app, choice, &monitor, &ids, widget.as_ref());
             }
         }));
     }
@@ -2518,6 +2529,8 @@ enum MenuChoice {
     /// Show the workspace at this index (spec 0013).
     Workspace(usize),
     NewWorkspace,
+    /// The widget clicked becomes this many icons wide (spec 0017 F1b).
+    Width(u8),
 }
 
 /// One line of the dock's menu: what it does and how it shows (spec 0014
@@ -2626,6 +2639,33 @@ fn dock_menu_items(
     items
 }
 
+/// Glyph of the widths in a widget's menu.
+const SIZE_GLYPH: char = '\u{E8A9}';
+
+/// What the dock's menu starts with when it opens on a widget that takes
+/// more than one width (spec 0017 F1b): the widths under a title, the one
+/// in use checked, then a separator. Nothing for the other widgets.
+fn width_items(widths: std::ops::RangeInclusive<u8>, current: u8) -> Vec<MenuEntry> {
+    if widths.start() == widths.end() {
+        return Vec::new();
+    }
+    let text = &crate::i18n::messages().tray;
+    let mut items = vec![MenuEntry::title(text.size)];
+    for width in widths {
+        let label = if width == 1 {
+            text.one_icon.to_owned()
+        } else {
+            text.icons.replace("{n}", &width.to_string())
+        };
+        items.push(MenuEntry::item(
+            MenuChoice::Width(width),
+            menu::Item::new(&label, SIZE_GLYPH).checked(width == current),
+        ));
+    }
+    items.push(MenuEntry::separator());
+    items
+}
+
 /// Shows the menu `items` at the pointer, opening away from the screen edge,
 /// and returns what was chosen.
 fn show_dock_menu(edge: DockEdge, items: Vec<MenuEntry>) -> Option<MenuChoice> {
@@ -2648,13 +2688,20 @@ pub fn tray_menu(app: &AppHandle) {
         show();
     }
     if let Some(choice) = chosen {
-        act(app, choice, "", &[]);
+        act(app, choice, "", &[], None);
     }
 }
 
 /// Does what was chosen in the dock's menu (or the tray icon's): `monitor`
-/// and `ids` are where the workspaces switch and which they are.
-fn act(app: &AppHandle, choice: MenuChoice, monitor: &str, ids: &[String]) {
+/// and `ids` are where the workspaces switch and which they are; `widget`
+/// is the widget the menu opened on, if any.
+fn act(
+    app: &AppHandle,
+    choice: MenuChoice,
+    monitor: &str,
+    ids: &[String],
+    widget: Option<&crate::domain::widgets::WidgetId>,
+) {
     match choice {
         MenuChoice::TaskManager => {
             if let Err(error) = super::apps::open_task_manager() {
@@ -2683,6 +2730,11 @@ fn act(app: &AppHandle, choice: MenuChoice, monitor: &str, ids: &[String]) {
         }
         MenuChoice::NewWorkspace => {
             crate::commands::workspaces::create_and_switch(app, monitor);
+        }
+        MenuChoice::Width(width) => {
+            if let Some(id) = widget {
+                crate::commands::widgets::resize(app, id, width);
+            }
         }
     }
 }
@@ -2736,8 +2788,9 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
                 Some(index) if dock.items.get(index).is_some_and(Item::is_program) => {
                     dock.right_click(index);
                 }
-                // Anywhere else on the dock: its own menu.
-                _ => dock.dock_menu(),
+                // Anywhere else on the dock, a widget too: its own menu,
+                // with the widget's widths first.
+                hit => dock.dock_menu(hit),
             }
         }),
         WM_CAPTURECHANGED => with_dock(hwnd, |dock| {
@@ -2905,7 +2958,9 @@ pub fn view() -> Option<View> {
                                 crate::domain::widgets::clock::ClockIconStyle::Digital => "time",
                             }
                         }
-                        crate::domain::widgets::WidgetConfig::TimeProgress(_) => "ring",
+                        crate::domain::widgets::WidgetConfig::TimeProgress(progress) => {
+                            if progress.width > 1 { "meters" } else { "ring" }
+                        }
                         crate::domain::widgets::WidgetConfig::Activity(_) => "meters",
                         crate::domain::widgets::WidgetConfig::Network(_) => "rates",
                         _ => "glyph",
@@ -3205,6 +3260,18 @@ mod tests {
         assert_eq!(focus.shortcut.as_deref(), Some("Ctrl+Alt+2"));
         // A title chooses nothing.
         assert_eq!(items[3].choice, None);
+    }
+
+    #[test]
+    fn a_widget_that_takes_widths_lists_them_first() {
+        let items = width_items(1..=3, 2);
+        assert_eq!(
+            labels(&items),
+            ["# Tamanho", "1 ícone", "2 ícones ✓", "3 ícones", "—"]
+        );
+        assert_eq!(items[3].choice, Some(MenuChoice::Width(3)));
+        // One width: nothing to choose.
+        assert!(width_items(1..=1, 1).is_empty());
     }
 
     #[test]

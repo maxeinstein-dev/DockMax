@@ -1,15 +1,16 @@
 //! The system widgets' configs (spec 0017 F1): Atividade (the processor and
 //! the memory) and Atividade de rede (the rates down and up). Both can be
-//! one or two icons wide.
+//! one to three icons wide (F1b).
 
 use serde::{Deserialize, Serialize};
 
 use super::WidgetError;
 
-/// The widths, in icons, the system widgets accept.
-pub const WIDTHS: std::ops::RangeInclusive<u8> = 1..=2;
+/// The widths, in icons, the widgets that show more when wider accept
+/// (spec 0017 F1b): the system widgets and the time progress.
+pub const WIDTHS: std::ops::RangeInclusive<u8> = 1..=3;
 
-fn check_width(width: u8) -> Result<(), WidgetError> {
+pub(super) fn check_width(width: u8) -> Result<(), WidgetError> {
     if WIDTHS.contains(&width) {
         Ok(())
     } else {
@@ -22,7 +23,7 @@ fn check_width(width: u8) -> Result<(), WidgetError> {
 pub struct ActivityConfig {
     pub show: ActivityShow,
     pub style: ActivityStyle,
-    /// In icons: 1 or 2.
+    /// In icons: 1 to 3.
     pub width: u8,
 }
 
@@ -70,12 +71,12 @@ closed_set!(ActivityStyle {
     Numbers
 });
 
-/// Atividade de rede: one icon shows the two rates; two icons add the graph
-/// of the last minute.
+/// Atividade de rede: one icon shows the two rates; two add the graph of
+/// the last minute; three give the graph the most room.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct NetworkConfig {
-    /// In icons: 1 or 2.
+    /// In icons: 1 to 3.
     pub width: u8,
 }
 
@@ -96,8 +97,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_system_widgets_are_one_or_two_icons_wide() {
-        for width in [1, 2] {
+    fn the_system_widgets_are_one_to_three_icons_wide() {
+        for width in [1, 2, 3] {
             let activity = ActivityConfig {
                 width,
                 ..ActivityConfig::default()
@@ -105,7 +106,7 @@ mod tests {
             assert_eq!(activity.validate(), Ok(()));
             assert_eq!(NetworkConfig { width }.validate(), Ok(()));
         }
-        for width in [0, 3, 4] {
+        for width in [0, 4] {
             let activity = ActivityConfig {
                 width,
                 ..ActivityConfig::default()

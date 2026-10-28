@@ -2,7 +2,7 @@
 
 Fase F da [spec 0004](0004-paridade-primodock.md) (§3.5), depois da fase E. Referência do PrimoDock em [`docs/reference/primodock/interface.md`](../reference/primodock/interface.md) (aba Widgets: catálogo, "Em uso", largura do tile) e [`settings-e-dados.md`](../reference/primodock/settings-e-dados.md).
 
-**Status:** em andamento: F1 implementado (PR a abrir); F2 a F5 a fazer.
+**Status:** em andamento: F1 entregue (PR #52); F1b em curso; F2a a F5 a fazer.
 
 ## 1. Decisões do autor (2026-10-27)
 
@@ -33,7 +33,10 @@ Fase F da [spec 0004](0004-paridade-primodock.md) (§3.5), depois da fase E. Ref
 | Recorte | Entrega |
 |---|---|
 | **F1. Base, catálogo e sistema** | A largura do tile; o provedor de sistema; **Atividade** (CPU e memória, em barras, anéis ou números; 1 ou 2 ícones) e **Atividade de rede** (descida e subida; com gráfico em 2 ícones); a **aba Widgets** de Configurações (catálogo por categoria com miniatura, busca, adicionar ao espaço em uso; "Em uso" com largura, estilo e espaços), no lugar dos botões de Itens do dock. |
-| **F2. Tempo** | **Calendário** (as próximas reuniões do Google Agenda, como o widget do celular; ver §6.5), **Contagem regressiva** (dias até uma data, com nome) e **Pomodoro / timer de foco** (foco e pausa, com o tempo restante no ícone; o estado fica em Rust, então continua contando com o painel fechado; aviso do Windows no fim). |
+| **F1b. Tamanho no dock** | Um item "Tamanho" no clique direito do widget (e nos Ajustes), só para os tipos que mostram algo a mais: Progresso do tempo, Atividade e Rede de 1 a 3 ícones (§6c). Relógio e Nota ficam com 1. |
+| **F2a. Calendário** | As agendas Google (várias contas, login só de leitura) e por endereço iCal, com as tasks do Google Tasks; ver §6c. |
+| **F2b. Ciclo** | O ciclo da noiva do autor, lido da agenda dela; ver §6c. |
+| **F2c. Tempo** | **Contagem regressiva** (dias até uma data, com nome) e **Pomodoro / timer de foco** (foco e pausa, com o tempo restante no ícone; o estado fica em Rust, então continua contando com o painel fechado; aviso do Windows no fim). |
 | **F3. Produtividade** | **Lista de tarefas** (tarefas com marca, guardadas no banco, o número de abertas no ícone) e **Beber água** (copos do dia, meta, lembrete opcional a cada N minutos, zera à meia-noite). |
 | **F4. Mídia** | **Tocando agora**: a sessão de mídia do Windows (`GlobalSystemMediaTransportControlsSessionManager`), com capa, título e artista; tocar/pausar, anterior e próxima no painel e no ícone largo. |
 | **F5. Fontes externas** | **Clima** (Open-Meteo, cidade digitada) e **Uso do Claude** (o Claude Code, pelos registros locais), como decidido na §6. |
@@ -60,6 +63,34 @@ Pilhas de widgets (vários num lugar, trocados pela roda), espaçadores, "Widget
 - **Provedor:** um amostrador único (`windows/system_activity.rs`) lê CPU, memória e rede. O dock liga um timer de 2 s só enquanto um desses widgets está nele; sem eles, nada é lido. Leituras com menos de 1,5 s de diferença reaproveitam a última, então dois monitores e o painel leem o sistema uma vez.
 - **Painel:** em vez do evento `widget-data` da §3, o painel aberto pede a leitura a cada 2 s (`read_system_activity`, só na janela do painel) e para ao fechar.
 - **Aba Widgets:** substitui "Itens do dock" em Configurações (o id da seção continua `items`). Em cima, "Em uso" (a lista do espaço, com subir, descer, remover e os widgets de outros espaços); embaixo, o catálogo, com busca sem acentos e prateleiras Sistema, Tempo e Produtividade. **Largura e estilo** se ajustam nos Ajustes de cada widget (pelo painel), não na linha de "Em uso"; levar isso para a linha fica para depois, se fizer falta.
+
+## 6c. Decisões do grilling de 2026-10-28
+
+**Tamanho no dock (F1b).** Como no PrimoDock, o tamanho se troca no próprio dock, pelo clique direito ("Tamanho"), e também nos Ajustes. Só os tipos que ganham algo:
+
+| Tipo | 1 ícone | 2 ícones | 3 ícones |
+|---|---|---|---|
+| Progresso do tempo | o anel | dois anéis (os dois primeiros períodos) | três barras com o nome do período |
+| Atividade | barras, anéis ou números | como no F1 | processador e memória com o gráfico do último minuto |
+| Atividade de rede | as taxas curtas | taxas e gráfico | o gráfico maior com as taxas por extenso |
+| Calendário (F2a) | a hora da próxima reunião | a hora e o começo do título | o título, "em 10 min" e a reunião seguinte |
+
+Relógio e Nota ficam com 1 ícone.
+
+**Calendário (F2a).**
+- **Fontes:** contas Google, quantas o autor conectar, como no Google Agenda: as dele, a da Alfama e a da noiva, que ele já acessa e que entra inteira, para ver se os compromissos dela batem com os dele. Também agendas assinadas por endereço iCal. A Microsoft fica para quando fizer falta. Cada agenda tem a sua cor e se liga e desliga nos ajustes.
+- **Login:** OAuth do Google só de leitura (Agenda e Tasks). O projeto no Google Cloud fica na conta pessoal do autor, em produção e sem verificação: uma tela de "app não verificado" no primeiro login, e o login não cai a cada 7 dias. Os tokens ficam no cofre de credenciais do Windows. Se a Alfama bloquear apps de fora, essa conta entra pelo endereço iCal.
+- **Tasks:** do Google Tasks, só para ver (as do dia e as atrasadas). Marcar como feita, criar reunião pelo widget e o Notion (talvez como widget próprio) ficam para depois.
+- **Painel:** hoje e amanhã, com os eventos de dia inteiro numa faixa no topo e os recusados escondidos. "Entrar" na linha da reunião (Meet, Teams, Zoom). Clicar num evento abre os detalhes no próprio painel: hora, local, descrição, participantes, Entrar e "Abrir no Google Agenda". O clique do meio no tile entra na próxima reunião, se ela começa em até 10 min.
+- **Atualização:** busca incremental (`syncToken`) a cada 1 minuto, e na hora ao abrir o painel e ao acordar o PC. O push do Google exige um servidor público, então fica fora. Os eventos ficam só na memória, de nenhuma agenda vai nada para o disco; sem internet, o widget diz "sem conexão".
+- Os eventos do ciclo ("🌸") ficam **escondidos** no Calendário.
+
+**Ciclo (F2b).** É um widget próprio, que pode ficar num espaço de trabalho fora do que o autor compartilha em reunião.
+- **Origem:** a noiva controla tudo pela agenda dela. Ela marca o primeiro dia com um evento de dia inteiro "🌸" (o símbolo se troca nos ajustes), por um Atalho de um toque no iPhone ou pela Siri. O DockMax lê esses eventos dos últimos 12 meses e não guarda nada em disco. No disco ficam só os ajustes do autor.
+- **Previsão:** o ciclo é a média dos últimos 6 (28 dias com menos de 2 registros). A menstruação dura a média dos eventos dela (5 dias sem histórico); ela corrige esticando ou encurtando o evento. Não há janela fértil nem ovulação.
+- **Discrição:** o tile não usa as palavras "menstruação" ou "TPM"; mostra só um ícone neutro e uma cor ou contagem. Os detalhes ficam no painel.
+- **Avisos editáveis:** a TPM começa N dias antes (5 por padrão; o autor ajusta para os meses seguintes), a véspera e o dia previsto, mais lembretes livres do autor (um texto, N dias antes ou depois de uma fase). O aviso do Windows tem texto neutro ("Lembrete do Ciclo"), e o texto dele só aparece ao abrir. Não há aviso de atraso.
+- O passo a passo do Atalho do iPhone vai junto do F2b.
 
 ## 7. Verificação
 

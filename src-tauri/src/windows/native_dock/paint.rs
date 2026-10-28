@@ -102,11 +102,14 @@ pub enum Face {
         fraction: Option<f32>,
         text: Option<String>,
     },
-    /// The Atividade: one or two meters as bars, rings or figures.
+    /// The Atividade (and the time progress when wide): one to three
+    /// meters as bars, rings or figures; with `graph`, the processor's last
+    /// minute (0–1) beside them.
     Meters {
         glaze: Glaze,
         style: ActivityStyle,
         meters: Vec<Meter>,
+        graph: Option<Vec<f32>>,
     },
     /// The Atividade de rede: the rates and, on a wide tile, the graph.
     Rates {
@@ -1169,10 +1172,12 @@ impl Painter {
                     glaze,
                     style,
                     meters,
+                    graph,
                 } => Face::Meters {
                     glaze: *glaze,
                     style: *style,
                     meters: meters.clone(),
+                    graph: graph.clone(),
                 },
                 Face::Rates {
                     glaze,
@@ -1284,9 +1289,30 @@ impl Painter {
                 glaze,
                 style,
                 meters,
+                graph,
             } => {
                 self.glaze(area, *glaze, tile.pressed);
-                self.meters(area, *style, meters);
+                match graph {
+                    // Three icons: the meters on the left, the graph on the
+                    // right.
+                    Some(graph) => {
+                        let u = area.height;
+                        let left = Area {
+                            width: area.width * 0.56,
+                            ..area
+                        };
+                        self.meters(left, *style, meters);
+                        let plot = Area {
+                            x: area.x + area.width * 0.56,
+                            y: area.y + u * 0.2,
+                            width: area.width * 0.44 - u * 0.16,
+                            height: u * 0.6,
+                        };
+                        self.graph_line(plot, graph, true);
+                        self.graph_line(plot, graph, false);
+                    }
+                    None => self.meters(area, *style, meters),
+                }
             }
             Face::Rates {
                 glaze,
@@ -1368,12 +1394,29 @@ impl Painter {
                 let top = area.y + (u - row * count) / 2.0;
                 let left = area.x + u * 0.14;
                 let right = area.x + area.width - u * 0.14;
+                // The bars start after the longest name and end before the
+                // widest figure, so no text runs under a bar.
+                let widest = |painter: &mut Self, texts: &mut dyn Iterator<Item = &str>| {
+                    texts.fold(0.0_f64, |most, text| {
+                        most.max(painter.text_width(text, size, 600, true))
+                    })
+                };
+                // Less than two icons of room (beside a graph): the short names.
+                let name = |meter: &Meter| {
+                    if area.width < u * 2.0 {
+                        meter.short
+                    } else {
+                        meter.label
+                    }
+                };
+                let names = widest(self, &mut meters.iter().map(name));
+                let figures = widest(self, &mut meters.iter().map(|meter| meter.text.as_str()));
+                let start = left + names + u * 0.1;
+                let end = right - figures - u * 0.1;
                 for (index, meter) in meters.iter().enumerate() {
                     let cy = top + row * (index as f64 + 0.5);
-                    self.text_from(meter.label, left, cy, size, faint);
+                    self.text_from(name(meter), left, cy, size, faint);
                     self.text_to(&meter.text, right, cy, size, Color::WHITE);
-                    let start = left + u * 0.42;
-                    let end = right - u * 0.42;
                     let bar = Area {
                         x: start,
                         y: cy - u * 0.04,
@@ -1489,6 +1532,26 @@ impl Painter {
             }
             return;
         };
+        if area.width > u * 2.5 {
+            // Three icons: the rates one over the other on the left, the
+            // graph as tall as the tile beside them.
+            let size = u * 0.18;
+            for (index, (arrow, rate)) in rows.into_iter().enumerate() {
+                let cy = area.y + u * (0.33 + 0.34 * index as f64);
+                let x = area.x + u * 0.16;
+                let width = self.text_from(arrow, x, cy, size, faint);
+                self.text_from(rate, x + width + u * 0.04, cy, size, Color::WHITE);
+            }
+            let plot = Area {
+                x: area.x + area.width * 0.48,
+                y: area.y + u * 0.18,
+                width: area.width * 0.52 - u * 0.16,
+                height: u * 0.64,
+            };
+            self.graph_line(plot, &graph.down, true);
+            self.graph_line(plot, &graph.up, false);
+            return;
+        }
         let plot = Area {
             x: area.x + u * 0.12,
             y: area.y + u * 0.46,
