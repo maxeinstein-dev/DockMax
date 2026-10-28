@@ -5,6 +5,8 @@ pub mod autostart;
 #[cfg(windows)]
 pub mod badges;
 #[cfg(windows)]
+pub mod calendar;
+#[cfg(windows)]
 pub mod credentials;
 pub mod dock;
 #[cfg(windows)]

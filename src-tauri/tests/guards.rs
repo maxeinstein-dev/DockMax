@@ -42,6 +42,11 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // The panels of the system widgets read the processor, the
             // memory and the network (spec 0017 F1); nothing is sent.
             "allow-read-system-activity",
+            // The Calendário's panel (spec 0017 F2a): the events the dock
+            // read, and opening a meeting or an event's page in Google
+            // Agenda, nothing else.
+            "allow-calendar-events",
+            "allow-open-calendar-link",
             // Dragging a tray icon onto the dock keeps it there; the command
             // names an icon the list gave and a point on the screen.
             "allow-tray-to-dock",

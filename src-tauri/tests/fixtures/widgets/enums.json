@@ -6,7 +6,8 @@
     "shortcut",
     "files",
     "activity",
-    "network"
+    "network",
+    "calendar"
   ],
   "HourCycle": [
     "h23",
@@ -67,6 +68,7 @@
     "invalidTarget",
     "invalidFolder",
     "invalidWidth",
+    "invalidCalendars",
     "noteTooLarge",
     "invalidConfig",
     "unavailable",

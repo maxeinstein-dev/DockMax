@@ -157,6 +157,12 @@ impl Glaze {
         s: 24.0,
         l: 40.0,
     };
+    /// Argila: the Calendário.
+    pub const CALENDAR: Glaze = Glaze {
+        h: 16.0,
+        s: 40.0,
+        l: 44.0,
+    };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {
         h: 222.0,
@@ -269,6 +275,7 @@ mod tests {
             ("t-settings", Glaze::SETTINGS),
             ("t-activity", Glaze::ACTIVITY),
             ("t-network", Glaze::NETWORK),
+            ("t-calendar", Glaze::CALENDAR),
         ];
         for (class, glaze) in glazes {
             let css_glaze = Glaze {

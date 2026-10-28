@@ -1,0 +1,176 @@
+/* The Calendário's panel (spec 0017 F2a). Tokens of tokens.css only, plus
+   `--dot`, a calendar's color, set through the CSSOM (strict CSP). */
+
+.cal-day + .cal-day {
+  margin-top: 12px;
+}
+
+.cal-day-name {
+  margin: 0 0 6px;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cal-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cal-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal-event {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-event:hover {
+  background: var(--accent-soft);
+}
+
+.cal-event:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.cal-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dot, var(--accent));
+}
+
+.cal-time {
+  flex: none;
+  min-width: 40px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.all-day .cal-time {
+  min-width: 0;
+}
+
+.cal-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-join {
+  flex: none;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.cal-empty,
+.cal-notice {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.cal-notice {
+  margin-bottom: 10px;
+}
+
+.cal-details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0 0 10px;
+  font-size: 12.5px;
+}
+
+.cal-details dt {
+  color: var(--ink-2);
+}
+
+.cal-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.cal-description {
+  max-height: 140px;
+  overflow: auto;
+  margin: 0 0 10px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cal-sources {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cal-sources legend {
+  margin-bottom: 4px;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.cal-source {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.cal-source input {
+  accent-color: var(--accent);
+}
+
+.cal-source-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-source-account {
+  margin-left: auto;
+  color: var(--ink-2);
+  font-size: 11px;
+}
+
+@media (forced-colors: active) {
+  .cal-dot {
+    background: CanvasText;
+  }
+}

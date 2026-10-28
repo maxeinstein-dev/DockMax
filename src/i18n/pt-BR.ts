@@ -593,6 +593,7 @@ const messages = {
       files: "Arquivos",
       activity: "Atividade",
       network: "Atividade de rede",
+      calendar: "Calendário",
     } satisfies Record<WidgetKind, string>,
     /** Short name of each kind on the add buttons of Itens do dock. */
     addNames: {
@@ -601,6 +602,7 @@ const messages = {
       note: "Nota",
       activity: "Atividade",
       network: "Rede",
+      calendar: "Calendário",
     } satisfies Record<CreatableKind, string>,
     /** Parts every widget panel shares. */
     common: {
@@ -800,12 +802,48 @@ const messages = {
         note: "Um bloco de notas a um clique, que salva sozinho.",
         activity: "Processador e memória em barras, anéis ou números.",
         network: "Download e upload agora, com o gráfico do último minuto.",
+        calendar:
+          "As próximas reuniões das suas agendas Google, com Entrar a um clique.",
       } satisfies Record<CreatableKind, string>,
       /** The add button of a card, and its accessible name. */
       add: "Adicionar",
       addNamed: "Adicionar {name}",
       /** Said once a widget went to the dock. */
       added: "{name} foi para o dock.",
+    },
+    /** The Calendário (spec 0017 F2a). */
+    calendar: {
+      settingsTitle: "Ajustes do calendário",
+      today: "Hoje",
+      tomorrow: "Amanhã",
+      allDay: "Dia inteiro",
+      free: "Nada marcado.",
+      /** While the first reading is not in. */
+      loading: "Lendo as agendas…",
+      /** A meeting under way. */
+      now: "agora",
+      /** `09:00–09:30`. */
+      range: "{start}–{end}",
+      join: "Entrar",
+      joinNamed: "Entrar em {title}",
+      openInGoogle: "Abrir no Google Agenda",
+      /** The event's subview. */
+      when: "Quando",
+      where: "Local",
+      calendar: "Agenda",
+      noTitle: "(sem título)",
+      status: {
+        noAccounts:
+          "Nenhuma conta Google conectada. Conecte em Configurações › Contas.",
+        offline: "Sem conexão: mostrando a última leitura.",
+        signInAgain:
+          "Uma conta precisa ser conectada de novo em Configurações › Contas.",
+      },
+      calendars: "Agendas mostradas",
+      calendarsHint:
+        "Uma agenda nova aparece sozinha; desmarque para esconder.",
+      noCalendars: "As agendas aparecem aqui depois da primeira leitura.",
+      footer: "Atualiza a cada minuto",
     },
     items: {
       /** The navigation row in Configurações, and the subview's title. */
@@ -863,6 +901,7 @@ const messages = {
       invalidFolder:
         "Essa pasta não é aceita. Use o caminho completo de uma pasta do Windows.",
       invalidWidth: "Essa largura não vale para este widget.",
+      invalidCalendars: "Não foi possível guardar as agendas escolhidas.",
       noteTooLarge: "Passou de 64 KB e não foi salvo. Encurte o texto.",
       invalidConfig:
         "Não foi possível aplicar este ajuste. Feche o painel e tente de novo.",

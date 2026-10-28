@@ -39,7 +39,8 @@ export type WidgetKind =
   | "shortcut"
   | "files"
   | "activity"
-  | "network";
+  | "network"
+  | "calendar";
 
 /* Each closed set below has a tuple with every value, in the order of the
  * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
@@ -55,6 +56,7 @@ export const WIDGET_KINDS = [
   "files",
   "activity",
   "network",
+  "calendar",
 ] as const;
 
 /** The kinds `add_widget` accepts in this phase. */
@@ -69,6 +71,7 @@ export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "note",
   "activity",
   "network",
+  "calendar",
 ];
 
 /** Stable ID of an instance: a UUID v7 made in Rust, never reused and never
@@ -174,6 +177,16 @@ export interface NetworkConfig {
   width: WidgetWidth;
 }
 
+/** The Calendário (spec 0017 F2a): its width, and the calendars it leaves
+ * out; every other calendar of the connected accounts shows. */
+export interface CalendarConfig {
+  /** In icons: the next meeting's time; its time and title; its title,
+   * when, and the one after. */
+  width: WidgetWidth;
+  /** Google's ids of the calendars not shown; at most 200. */
+  hidden: string[];
+}
+
 /** The config of each kind. */
 export interface WidgetConfigs {
   clock: ClockConfig;
@@ -183,6 +196,7 @@ export interface WidgetConfigs {
   files: FilesConfig;
   activity: ActivityConfig;
   network: NetworkConfig;
+  calendar: CalendarConfig;
 }
 
 /** A kind's config tagged with the kind, as `update_widget` takes it:
@@ -252,6 +266,9 @@ export type WidgetErrorCode =
   | "invalidFolder"
   /** A width the kind doesn't accept. */
   | "invalidWidth"
+  /** A hidden calendar empty, too long or with a control character, or
+   * too many. */
+  | "invalidCalendars"
   | "noteTooLarge"
   /** A stored config has another version or is not valid JSON, or the
    * config given to `update_widget` is not exactly the canonical one (a
@@ -277,6 +294,7 @@ export const WIDGET_ERROR_CODES: readonly WidgetErrorCode[] = Object.keys({
   invalidTarget: true,
   invalidFolder: true,
   invalidWidth: true,
+  invalidCalendars: true,
   noteTooLarge: true,
   invalidConfig: true,
   unavailable: true,

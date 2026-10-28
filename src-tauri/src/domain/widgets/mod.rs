@@ -26,6 +26,7 @@ macro_rules! closed_set {
     };
 }
 
+pub mod calendar;
 pub mod clock;
 #[cfg(test)]
 mod contract_tests;
@@ -42,6 +43,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
+pub use calendar::CalendarConfig;
 pub use clock::ClockConfig;
 pub use files::FilesConfig;
 pub use note::NoteConfig;
@@ -81,6 +83,7 @@ pub enum WidgetKind {
     Files,
     Activity,
     Network,
+    Calendar,
 }
 
 closed_set!(WidgetKind {
@@ -91,6 +94,7 @@ closed_set!(WidgetKind {
     Files,
     Activity,
     Network,
+    Calendar,
 });
 
 impl WidgetKind {
@@ -102,7 +106,8 @@ impl WidgetKind {
             | WidgetKind::TimeProgress
             | WidgetKind::Note
             | WidgetKind::Activity
-            | WidgetKind::Network => true,
+            | WidgetKind::Network
+            | WidgetKind::Calendar => true,
             WidgetKind::Shortcut | WidgetKind::Files => false,
         }
     }
@@ -117,7 +122,8 @@ impl WidgetKind {
             | WidgetKind::Shortcut
             | WidgetKind::Files
             | WidgetKind::Activity
-            | WidgetKind::Network => 1,
+            | WidgetKind::Network
+            | WidgetKind::Calendar => 1,
         }
     }
 
@@ -131,6 +137,7 @@ impl WidgetKind {
             WidgetKind::Files => "files",
             WidgetKind::Activity => "activity",
             WidgetKind::Network => "network",
+            WidgetKind::Calendar => "calendar",
         }
     }
 
@@ -218,6 +225,7 @@ pub enum WidgetConfig {
     Files(FilesConfig),
     Activity(ActivityConfig),
     Network(NetworkConfig),
+    Calendar(CalendarConfig),
 }
 
 impl WidgetConfig {
@@ -230,6 +238,7 @@ impl WidgetConfig {
             WidgetConfig::Files(_) => WidgetKind::Files,
             WidgetConfig::Activity(_) => WidgetKind::Activity,
             WidgetConfig::Network(_) => WidgetKind::Network,
+            WidgetConfig::Calendar(_) => WidgetKind::Calendar,
         }
     }
 
@@ -249,6 +258,7 @@ impl WidgetConfig {
             WidgetConfig::TimeProgress(config) => config.width,
             WidgetConfig::Activity(config) => config.width,
             WidgetConfig::Network(config) => config.width,
+            WidgetConfig::Calendar(config) => config.width,
         }
     }
 
@@ -262,7 +272,8 @@ impl WidgetConfig {
             | WidgetConfig::Files(_) => 1..=1,
             WidgetConfig::TimeProgress(_)
             | WidgetConfig::Activity(_)
-            | WidgetConfig::Network(_) => system::WIDTHS,
+            | WidgetConfig::Network(_)
+            | WidgetConfig::Calendar(_) => system::WIDTHS,
         }
     }
 
@@ -277,6 +288,7 @@ impl WidgetConfig {
             WidgetConfig::TimeProgress(config) => config.width = width,
             WidgetConfig::Activity(config) => config.width = width,
             WidgetConfig::Network(config) => config.width = width,
+            WidgetConfig::Calendar(config) => config.width = width,
             WidgetConfig::Clock(_)
             | WidgetConfig::Note(_)
             | WidgetConfig::Shortcut(_)
@@ -296,6 +308,7 @@ impl WidgetConfig {
             WidgetKind::Files => WidgetConfig::Files(FilesConfig::default()),
             WidgetKind::Activity => WidgetConfig::Activity(ActivityConfig::default()),
             WidgetKind::Network => WidgetConfig::Network(NetworkConfig::default()),
+            WidgetKind::Calendar => WidgetConfig::Calendar(CalendarConfig::default()),
         }
     }
 
@@ -309,6 +322,7 @@ impl WidgetConfig {
             WidgetConfig::Files(config) => config.validate(),
             WidgetConfig::Activity(config) => config.validate(),
             WidgetConfig::Network(config) => config.validate(),
+            WidgetConfig::Calendar(config) => config.validate(),
         }
     }
 }
@@ -412,6 +426,7 @@ pub fn encode_config(config: &WidgetConfig) -> String {
         WidgetConfig::Files(config) => serde_json::to_string(config),
         WidgetConfig::Activity(config) => serde_json::to_string(config),
         WidgetConfig::Network(config) => serde_json::to_string(config),
+        WidgetConfig::Calendar(config) => serde_json::to_string(config),
     };
     // Plain structs with string keys: serializing them can't fail.
     json.expect("widget configs always serialize")
@@ -442,6 +457,7 @@ pub fn decode_config(
         WidgetKind::Files => serde_json::from_str(json).map(WidgetConfig::Files),
         WidgetKind::Activity => serde_json::from_str(json).map(WidgetConfig::Activity),
         WidgetKind::Network => serde_json::from_str(json).map(WidgetConfig::Network),
+        WidgetKind::Calendar => serde_json::from_str(json).map(WidgetConfig::Calendar),
     }
     .map_err(|_| WidgetError::InvalidConfig)?;
     config.validate()?;
@@ -553,6 +569,8 @@ pub enum WidgetError {
     InvalidFolder,
     #[error("invalid widget width")]
     InvalidWidth,
+    #[error("invalid hidden calendars")]
+    InvalidCalendars,
     #[error("note too large")]
     NoteTooLarge,
     #[error("widget config could not be read")]
@@ -579,6 +597,7 @@ impl WidgetError {
             WidgetError::InvalidTarget => WidgetErrorCode::InvalidTarget,
             WidgetError::InvalidFolder => WidgetErrorCode::InvalidFolder,
             WidgetError::InvalidWidth => WidgetErrorCode::InvalidWidth,
+            WidgetError::InvalidCalendars => WidgetErrorCode::InvalidCalendars,
             WidgetError::NoteTooLarge => WidgetErrorCode::NoteTooLarge,
             WidgetError::InvalidConfig => WidgetErrorCode::InvalidConfig,
             WidgetError::Unavailable => WidgetErrorCode::Unavailable,
@@ -616,6 +635,9 @@ pub enum WidgetErrorCode {
     InvalidFolder,
     /// A width the kind doesn't accept.
     InvalidWidth,
+    /// A hidden calendar empty, too long or with a control character, or
+    /// too many of them.
+    InvalidCalendars,
     /// The note is over [`MAX_NOTE_BYTES`].
     NoteTooLarge,
     /// A stored config has another version or is not valid JSON, or the
@@ -640,6 +662,7 @@ closed_set!(WidgetErrorCode {
     InvalidTarget,
     InvalidFolder,
     InvalidWidth,
+    InvalidCalendars,
     NoteTooLarge,
     InvalidConfig,
     Unavailable,
@@ -683,7 +706,8 @@ mod tests {
                 WidgetKind::TimeProgress,
                 WidgetKind::Note,
                 WidgetKind::Activity,
-                WidgetKind::Network
+                WidgetKind::Network,
+                WidgetKind::Calendar
             ]
         );
     }
@@ -705,6 +729,7 @@ mod tests {
             "files",
             "activity",
             "network",
+            "calendar",
         ];
         for (kind, name) in WidgetKind::ALL.into_iter().zip(names) {
             assert_eq!(to_json(&kind), name);
@@ -795,7 +820,10 @@ mod tests {
             let config = WidgetConfig::default_for(kind);
             let wide = matches!(
                 kind,
-                WidgetKind::TimeProgress | WidgetKind::Activity | WidgetKind::Network
+                WidgetKind::TimeProgress
+                    | WidgetKind::Activity
+                    | WidgetKind::Network
+                    | WidgetKind::Calendar
             );
             assert_eq!(config.widths(), if wide { 1..=3 } else { 1..=1 }, "{kind}");
             assert_eq!(config.with_width(4), None, "{kind}");
@@ -850,6 +878,7 @@ mod tests {
                 json!({ "show": "both", "style": "bars", "width": 1 }),
             ),
             (WidgetKind::Network, json!({ "width": 2 })),
+            (WidgetKind::Calendar, json!({ "width": 2, "hidden": [] })),
         ];
         for (kind, config) in cases {
             let instance = instance(WidgetConfig::default_for(kind));
@@ -1079,6 +1108,7 @@ mod tests {
             WidgetError::InvalidTarget,
             WidgetError::InvalidFolder,
             WidgetError::InvalidWidth,
+            WidgetError::InvalidCalendars,
             WidgetError::NoteTooLarge,
             WidgetError::InvalidConfig,
             WidgetError::Unavailable,
@@ -1345,6 +1375,7 @@ mod tests {
             "invalidTarget",
             "invalidFolder",
             "invalidWidth",
+            "invalidCalendars",
             "noteTooLarge",
             "invalidConfig",
             "unavailable",
