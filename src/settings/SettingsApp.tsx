@@ -9,6 +9,7 @@ import { useWorkspaces } from "../core/workspaces";
 import { useT } from "../i18n";
 import AboutPanel from "../panel/AboutPanel";
 import AppsPanel from "../panel/AppsPanel";
+import AccountsPanel from "./AccountsPanel";
 import WidgetCatalog from "./WidgetCatalog";
 import DockItems from "../panel/DockItems";
 import LookPanel from "../panel/LookPanel";
@@ -36,6 +37,7 @@ const PLATES: Readonly<Record<Section, string>> = {
   look: "t-music",
   apps: "t-files",
   items: "t-notes",
+  accounts: "t-calendar",
   about: "t-about",
 };
 
@@ -194,6 +196,7 @@ function SettingsApp() {
                 <WidgetCatalog snapshot={widgets} workspace={editing} />
               </>
             ) : null}
+            {section === "accounts" ? <AccountsPanel /> : null}
             {section === "about" ? <AboutPanel /> : null}
           </NamedBySection.Provider>
         </section>

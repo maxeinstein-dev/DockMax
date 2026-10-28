@@ -4,6 +4,8 @@ pub mod apps;
 pub mod autostart;
 #[cfg(windows)]
 pub mod badges;
+#[cfg(windows)]
+pub mod credentials;
 pub mod dock;
 #[cfg(windows)]
 pub mod drop_target;
@@ -11,6 +13,10 @@ pub mod drop_target;
 pub mod flyout;
 #[cfg(windows)]
 pub mod fullscreen;
+#[cfg(windows)]
+pub mod google;
+#[cfg(windows)]
+pub mod http;
 pub mod jumplist;
 #[cfg(windows)]
 pub mod launcher;

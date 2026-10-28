@@ -12,6 +12,7 @@ pub enum Section {
     Look,
     Apps,
     Items,
+    Accounts,
     About,
 }
 
@@ -24,6 +25,7 @@ impl Section {
             Section::Look => "look",
             Section::Apps => "apps",
             Section::Items => "items",
+            Section::Accounts => "accounts",
             Section::About => "about",
         }
     }
@@ -301,6 +303,12 @@ pub const PAGES: &[Page] = &[
         Section::Items,
     ),
     dockmax(
+        "dockmax-accounts",
+        "Contas do DockMax",
+        &["contas google", "google agenda", "conectar conta", "agenda"],
+        Section::Accounts,
+    ),
+    dockmax(
         "dockmax-about",
         "Sobre o DockMax",
         &["versao do dockmax"],
@@ -372,6 +380,7 @@ mod tests {
             Section::Look,
             Section::Apps,
             Section::Items,
+            Section::Accounts,
             Section::About,
         ] {
             assert!(

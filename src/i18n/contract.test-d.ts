@@ -55,6 +55,7 @@ export const otherText: Messages = {
         look: "Dock look",
         apps: "Dock apps",
         items: "Dock items",
+        accounts: "Accounts",
         about: "About",
       },
       brand: "Settings",
@@ -64,6 +65,7 @@ export const otherText: Messages = {
         look: "Make the dock yours.",
         apps: "The programs pinned to each workspace's dock.",
         items: "The widgets of each workspace's dock.",
+        accounts: "The calendars the widgets show, read only.",
         about: "Version, license and where your data lives.",
       },
       groups: {
@@ -365,6 +367,7 @@ export const otherText: Messages = {
       notReady: "a",
     },
   },
+  accounts: ptBR.accounts,
   widgets: ptBR.widgets,
 };
 

@@ -1,0 +1,114 @@
+/* Configurações › Contas (spec 0017 F2a). Tokens of tokens.css only, plus
+   `--swatch`, a calendar's color, set through the CSSOM (strict CSP). */
+
+.account-client {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.account-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.account {
+  display: grid;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.account-client + .account-row,
+.settings-group-card > .account-row {
+  padding: 10px 14px;
+}
+
+.account-email,
+.account-id {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-email {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-text,
+.account-hint {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.settings-group-card > .account-text {
+  padding: 8px 14px;
+}
+
+.settings-group-card > .account-text:empty {
+  display: none;
+}
+
+.account-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px 4px;
+}
+
+.account-client .account-actions {
+  padding: 0;
+}
+
+.account-calendars {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 4px;
+  list-style: none;
+  font-size: 12.5px;
+}
+
+.account-calendars li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--swatch, var(--ink-2));
+}
+
+.account-tag {
+  color: var(--ink-2);
+}
+
+.account-error {
+  margin: 0;
+  padding: 0 14px 10px;
+  color: var(--danger-ink);
+  font-size: 12px;
+}
+
+@media (forced-colors: active) {
+  .account-swatch {
+    background: CanvasText;
+  }
+}

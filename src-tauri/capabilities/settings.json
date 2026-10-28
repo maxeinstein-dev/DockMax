@@ -35,6 +35,11 @@
     "allow-move-workspace",
     "allow-delete-workspace",
     "allow-share-widget",
+    "allow-google-status",
+    "allow-set-google-client",
+    "allow-connect-google-account",
+    "allow-google-calendars",
+    "allow-disconnect-google-account",
     "log:allow-log"
   ]
 }

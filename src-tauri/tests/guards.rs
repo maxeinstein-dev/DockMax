@@ -124,6 +124,14 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-delete-workspace",
             // A widget shown in another workspace too (spec 0013 C3).
             "allow-share-widget",
+            // Configurações › Contas (spec 0017 F2a, ADR 0012): the OAuth
+            // client, connecting and disconnecting Google accounts and
+            // their calendars, read only. Never the panel or the dock.
+            "allow-google-status",
+            "allow-set-google-client",
+            "allow-connect-google-account",
+            "allow-google-calendars",
+            "allow-disconnect-google-account",
             "log:allow-log",
         ],
     ),

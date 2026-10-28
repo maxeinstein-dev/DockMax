@@ -1,4 +1,5 @@
 pub mod apps;
+pub mod google;
 pub mod icons;
 pub mod launcher;
 pub mod panel;

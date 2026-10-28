@@ -84,6 +84,7 @@ describe("SettingsApp", () => {
       "Aparência do dock",
       "Apps do dock",
       "Widgets",
+      "Contas",
       "Sobre",
     ]);
     expect(sectionButton("Geral")).toHaveAttribute("aria-current", "page");
