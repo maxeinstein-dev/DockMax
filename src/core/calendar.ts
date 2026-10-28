@@ -119,12 +119,18 @@ export function useCalendar(): CalendarView | null {
     ask(true);
     const soon = window.setTimeout(() => ask(false), 3_000);
     const every = window.setInterval(() => ask(false), CALENDAR_EVERY_MS);
-    const unlisten = listen(CALENDAR_OPEN_EVENT, () => ask(false));
+    // Without the event the card's clicks open the list: never a failure.
+    const unlisten = listen(CALENDAR_OPEN_EVENT, () => ask(false)).catch(
+      (error: unknown) => {
+        log.warn(`calendar: listen failed: ${errorKind(error)}`);
+        return undefined;
+      },
+    );
     return () => {
       active = false;
       window.clearTimeout(soon);
       window.clearInterval(every);
-      void unlisten.then((stop) => stop());
+      void unlisten.then((stop) => stop?.());
     };
   }, []);
   return view;
