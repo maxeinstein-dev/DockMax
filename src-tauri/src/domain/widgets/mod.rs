@@ -915,7 +915,7 @@ mod tests {
                     "symbol": "🌸",
                     "calendar": null,
                     "sensitive": 5,
-                    "notices": { "sensitive": true, "eve": true, "day": true },
+                    "notices": { "sensitive": true, "eve": true, "day": true, "windows": false },
                     "reminders": []
                 }),
             ),

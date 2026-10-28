@@ -44,9 +44,13 @@ export interface CycleView {
  * where it would take the notice and show nothing. */
 export type TestNotice = "sent" | "off" | "failed";
 
-/** Sends the neutral Windows notice once, to see it arrives. */
-export function cycleTestNotice(): Promise<TestNotice> {
-  return invoke<void>("cycle_test_notice").then(
+/** Gives the Ciclo `widget` a notice now, to see it: the badge and the
+ * bounce on the dock, and the Windows notice when `windows`. */
+export function cycleTestNotice(
+  widget: string,
+  windows: boolean,
+): Promise<TestNotice> {
+  return invoke<void>("cycle_test_notice", { widget, windows }).then(
     () => "sent" as const,
     (error: unknown) => {
       if (error === "notificationsOff") return "off" as const;

@@ -20,14 +20,17 @@ pub const MAX_REMINDERS: usize = 10;
 pub const MAX_REMINDER_CHARS: usize = 120;
 pub const REMINDER_DAYS: std::ops::RangeInclusive<i8> = -10..=10;
 
-/// The Windows notices the author keeps (F2b-2): when the sensitive window
-/// opens, the eve of the expected start, and the day itself.
+/// The notices the author keeps (F2b-2): when the sensitive window opens,
+/// the eve of the expected start, and the day itself. They show on the dock
+/// (a badge and a bounce of the tile, F2b-3); `windows` adds a notice of
+/// Windows, off by default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Notices {
     pub sensitive: bool,
     pub eve: bool,
     pub day: bool,
+    pub windows: bool,
 }
 
 impl Default for Notices {
@@ -36,6 +39,7 @@ impl Default for Notices {
             sensitive: true,
             eve: true,
             day: true,
+            windows: false,
         }
     }
 }

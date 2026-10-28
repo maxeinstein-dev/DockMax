@@ -233,12 +233,14 @@ export interface CycleConfig {
 /** The sensitive windows the settings offer, in days. */
 export const CYCLE_WINDOWS = [3, 4, 5, 6, 7] as const;
 
-/** The Ciclo's Windows notices: when the sensitive window opens, the eve
- * of the expected start, and the day itself. */
+/** The Ciclo's notices: when the sensitive window opens, the eve of the
+ * expected start, and the day itself. They show on the dock (a badge and a
+ * bounce of the tile); `windows` adds a notice of Windows, off by default. */
 export interface CycleNotices {
   sensitive: boolean;
   eve: boolean;
   day: boolean;
+  windows: boolean;
 }
 
 /** What a reminder counts from. Must match `Anchor` in Rust. */

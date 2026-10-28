@@ -17,7 +17,7 @@ const CONFIG: CycleConfig = {
   symbol: "🌸",
   calendar: null,
   sensitive: 5,
-  notices: { sensitive: true, eve: true, day: true },
+  notices: { sensitive: true, eve: true, day: true, windows: true },
   reminders: [{ text: "Paciência", anchor: "period", days: 1 }],
 };
 
@@ -30,11 +30,11 @@ const cycle: WidgetInstance<"cycle"> = {
 
 type OnUpdate = (update: WidgetUpdate<"cycle">) => Promise<void>;
 
-function show() {
+function show(instance = cycle) {
   const onUpdate = vi.fn<OnUpdate>(() => Promise.resolve());
   render(
     <CycleSettings
-      instance={cycle}
+      instance={instance}
       onUpdate={onUpdate}
       onRemove={() => Promise.resolve()}
       onBack={() => undefined}
@@ -49,6 +49,23 @@ beforeEach(() => {
 });
 
 describe("CycleSettings", () => {
+  it("turns the Windows notice on", () => {
+    const onUpdate = show({
+      ...cycle,
+      config: { ...CONFIG, notices: { ...CONFIG.notices, windows: false } },
+    });
+    fireEvent.click(
+      screen.getByRole("switch", { name: text.noticeToggles.windows }),
+    );
+    expect(onUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          notices: { sensitive: true, eve: true, day: true, windows: true },
+        }) as CycleConfig,
+      }),
+    );
+  });
+
   it("says when Windows has the notices off", async () => {
     invoke.mockImplementation(() => Promise.reject("notificationsOff"));
     show();
@@ -66,7 +83,7 @@ describe("CycleSettings", () => {
     expect(onUpdate).toHaveBeenLastCalledWith(
       expect.objectContaining({
         config: expect.objectContaining({
-          notices: { sensitive: true, eve: false, day: true },
+          notices: { sensitive: true, eve: false, day: true, windows: true },
         }) as CycleConfig,
       }),
     );
@@ -125,7 +142,10 @@ describe("CycleSettings", () => {
   it("sends a test notice and says so", async () => {
     show();
     fireEvent.click(screen.getByRole("button", { name: text.testNotice }));
-    expect(invoke).toHaveBeenCalledWith("cycle_test_notice");
+    expect(invoke).toHaveBeenCalledWith("cycle_test_notice", {
+      widget: "c",
+      windows: true,
+    });
     expect(await screen.findByRole("status")).toHaveTextContent(
       text.testResult.sent,
     );
