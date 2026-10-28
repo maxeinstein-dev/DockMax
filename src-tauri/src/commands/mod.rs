@@ -4,6 +4,7 @@ pub mod google;
 pub mod icons;
 pub mod launcher;
 pub mod panel;
+pub mod pomodoro;
 pub mod settings;
 pub mod system;
 pub mod tray;

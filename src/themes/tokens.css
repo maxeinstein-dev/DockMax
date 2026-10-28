@@ -237,6 +237,13 @@
   --l: 44%;
 }
 
+/* Tomate: Pomodoro (spec 0017 F2c). */
+.t-pomodoro {
+  --h: 4;
+  --sat: 58%;
+  --l: 47%;
+}
+
 /* Argila. */
 .t-calendar {
   --h: 16;

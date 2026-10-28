@@ -15,6 +15,9 @@ import CountdownPanel from "./countdown/CountdownPanel";
 import CountdownSettings from "./countdown/CountdownSettings";
 import CountdownTile from "./countdown/CountdownTile";
 import CyclePanel from "./cycle/CyclePanel";
+import PomodoroPanel from "./pomodoro/PomodoroPanel";
+import PomodoroSettings from "./pomodoro/PomodoroSettings";
+import PomodoroTile from "./pomodoro/PomodoroTile";
 import CycleSettings from "./cycle/CycleSettings";
 import CycleTile from "./cycle/CycleTile";
 import ClockSettings from "./clock/ClockSettings";
@@ -49,7 +52,8 @@ export type GlazeClass =
   | "t-network"
   | "t-calendar"
   | "t-cycle"
-  | "t-countdown";
+  | "t-countdown"
+  | "t-pomodoro";
 
 export interface WidgetDefinition<K extends CreatableKind> {
   kind: K;
@@ -132,6 +136,14 @@ export const WIDGET_REGISTRY: {
     Tile: CountdownTile,
     Panel: CountdownPanel,
     Settings: CountdownSettings,
+  },
+  pomodoro: {
+    kind: "pomodoro",
+    nameKey: "pomodoro",
+    glaze: "t-pomodoro",
+    Tile: PomodoroTile,
+    Panel: PomodoroPanel,
+    Settings: PomodoroSettings,
   },
 };
 

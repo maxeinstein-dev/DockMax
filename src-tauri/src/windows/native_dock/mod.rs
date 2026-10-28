@@ -638,6 +638,7 @@ fn names() -> Names {
         calendar: dock.calendar,
         cycle: dock.cycle,
         countdown: dock.countdown,
+        pomodoro: dock.pomodoro,
     }
 }
 
@@ -865,10 +866,19 @@ impl Dock {
             .map(|item| {
                 // A Ciclo's notice not seen yet (F2b-3): whatever the
                 // setting, it is the dock's own.
-                if let Item::Widget(widget) = item
-                    && matches!(widget.config, WidgetConfig::Cycle(_))
-                {
-                    return super::calendar::pending(widget.id.as_str()).then_some(Badge::Dot);
+                if let Item::Widget(widget) = item {
+                    match widget.config {
+                        WidgetConfig::Cycle(_) => {
+                            return super::calendar::pending(widget.id.as_str())
+                                .then_some(Badge::Dot);
+                        }
+                        // A stage of the Pomodoro ended (F2c-2).
+                        WidgetConfig::Pomodoro(_) => {
+                            return super::pomodoro::pending(widget.id.as_str())
+                                .then_some(Badge::Dot);
+                        }
+                        _ => {}
+                    }
                 }
                 if buttons.is_empty() {
                     return None;
@@ -2496,7 +2506,8 @@ impl Dock {
             }
             _ => {
                 if let Item::Widget(widget) = &item
-                    && super::calendar::seen(widget.id.as_str())
+                    && (super::calendar::seen(widget.id.as_str())
+                        | super::pomodoro::seen(widget.id.as_str()))
                 {
                     post(Dock::notices_changed);
                 }
@@ -2506,9 +2517,10 @@ impl Dock {
         }
     }
 
-    /// The Ciclos `widgets` have a notice (F2b-3): their badge, and their
-    /// tile bounces as a program's does when it opens.
-    fn cycle_nudged(&mut self, widgets: &[String]) {
+    /// The widgets `widgets` have a notice (a Ciclo's, F2b-3; a Pomodoro's
+    /// stage ended, F2c-2): their badge, and their tile bounces as a
+    /// program's does when it opens.
+    fn nudged(&mut self, widgets: &[String]) {
         let now = Instant::now();
         for item in &self.items {
             if let Item::Widget(widget) = item
@@ -2573,6 +2585,22 @@ impl Dock {
                 {
                     log::warn!("calendar: the meeting could not be opened: {error}");
                 }
+            }));
+            return;
+        }
+        // The Pomodoro starts or pauses (spec 0017 F2c-2).
+        if let Some(Item::Widget(widget)) = self.items.get(index)
+            && let WidgetConfig::Pomodoro(config) = &widget.config
+        {
+            let (id, config) = (widget.id.as_str().to_owned(), config.clone());
+            self.effects.push(Box::new(move |_| {
+                use super::pomodoro::{Action, act, view};
+                let action = if view(&id, &config).running {
+                    Action::Pause
+                } else {
+                    Action::Start
+                };
+                act(&id, &config, action);
             }));
             return;
         }
@@ -3249,9 +3277,10 @@ pub fn open_calendar(
     post_to(owner, move |dock| dock.open_calendar(&widget, event));
 }
 
-/// The Ciclos `widgets` have a notice not seen yet (F2b-3).
-pub fn cycle_nudged(widgets: Vec<String>) {
-    post(move |dock| dock.cycle_nudged(&widgets));
+/// The widgets `widgets` have a notice not seen yet: a Ciclo's (F2b-3) or
+/// a Pomodoro's (F2c-2).
+pub fn nudged(widgets: Vec<String>) {
+    post(move |dock| dock.nudged(&widgets));
 }
 
 /// Files dragged over the dock `hwnd` at the screen point `at`, or gone
@@ -3370,6 +3399,7 @@ pub fn view() -> Option<View> {
                         crate::domain::widgets::WidgetConfig::Calendar(_) => "agenda",
                         crate::domain::widgets::WidgetConfig::Cycle(_) => "ring",
                         crate::domain::widgets::WidgetConfig::Countdown(_) => "agenda",
+                        crate::domain::widgets::WidgetConfig::Pomodoro(_) => "ring",
                         _ => "glyph",
                     },
                 };

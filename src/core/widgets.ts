@@ -42,7 +42,8 @@ export type WidgetKind =
   | "network"
   | "calendar"
   | "cycle"
-  | "countdown";
+  | "countdown"
+  | "pomodoro";
 
 /* Each closed set below has a tuple with every value, in the order of the
  * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
@@ -61,6 +62,7 @@ export const WIDGET_KINDS = [
   "calendar",
   "cycle",
   "countdown",
+  "pomodoro",
 ] as const;
 
 /** The kinds `add_widget` accepts in this phase. */
@@ -78,6 +80,7 @@ export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "calendar",
   "cycle",
   "countdown",
+  "pomodoro",
 ];
 
 /** Stable ID of an instance: a UUID v7 made in Rust, never reused and never
@@ -273,6 +276,26 @@ export interface CountdownConfig {
   yearly: boolean;
 }
 
+/** The Pomodoro (spec 0017 F2c-2): minutes of focus (1 to 120), of a pause
+ * and of the long one (1 to 60), focuses before it (2 to 8), whether the
+ * next stage starts by itself, and the notice of Windows. Checked in Rust. */
+export interface PomodoroConfig {
+  focus: number;
+  short: number;
+  long: number;
+  every: number;
+  autoStart: boolean;
+  windows: boolean;
+}
+
+/** The values the Pomodoro's settings offer. */
+export const POMODORO_CHOICES = {
+  focus: [15, 20, 25, 30, 40, 45, 50, 60, 90],
+  short: [3, 5, 10, 15],
+  long: [10, 15, 20, 30],
+  every: [2, 3, 4, 5, 6],
+} as const;
+
 /** The config of each kind. */
 export interface WidgetConfigs {
   clock: ClockConfig;
@@ -285,6 +308,7 @@ export interface WidgetConfigs {
   calendar: CalendarConfig;
   cycle: CycleConfig;
   countdown: CountdownConfig;
+  pomodoro: PomodoroConfig;
 }
 
 /** A kind's config tagged with the kind, as `update_widget` takes it:
@@ -361,6 +385,8 @@ export type WidgetErrorCode =
   | "invalidCycle"
   /** The date of the Contagem regressiva not a day written `2026-12-20`. */
   | "invalidCountdown"
+  /** The times of the Pomodoro out of their ranges. */
+  | "invalidPomodoro"
   | "noteTooLarge"
   /** A stored config has another version or is not valid JSON, or the
    * config given to `update_widget` is not exactly the canonical one (a
@@ -389,6 +415,7 @@ export const WIDGET_ERROR_CODES: readonly WidgetErrorCode[] = Object.keys({
   invalidCalendars: true,
   invalidCycle: true,
   invalidCountdown: true,
+  invalidPomodoro: true,
   noteTooLarge: true,
   invalidConfig: true,
   unavailable: true,

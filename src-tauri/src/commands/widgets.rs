@@ -581,6 +581,7 @@ mod tests {
             (WidgetError::InvalidCalendars, "invalidCalendars"),
             (WidgetError::InvalidCycle, "invalidCycle"),
             (WidgetError::InvalidCountdown, "invalidCountdown"),
+            (WidgetError::InvalidPomodoro, "invalidPomodoro"),
             (WidgetError::NoteTooLarge, "noteTooLarge"),
             (WidgetError::InvalidConfig, "invalidConfig"),
             (WidgetError::Unavailable, "unavailable"),

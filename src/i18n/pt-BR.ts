@@ -597,6 +597,7 @@ const messages = {
       calendar: "Calendário",
       cycle: "Ciclo",
       countdown: "Contagem regressiva",
+      pomodoro: "Pomodoro",
     } satisfies Record<WidgetKind, string>,
     /** Short name of each kind on the add buttons of Itens do dock. */
     addNames: {
@@ -608,6 +609,7 @@ const messages = {
       calendar: "Calendário",
       cycle: "Ciclo",
       countdown: "Contagem regressiva",
+      pomodoro: "Pomodoro",
     } satisfies Record<CreatableKind, string>,
     /** Parts every widget panel shares. */
     common: {
@@ -811,6 +813,8 @@ const messages = {
         calendar:
           "As próximas reuniões das suas agendas Google, com Entrar a um clique.",
         cycle: "Acompanha um ciclo marcado na agenda, com discrição no dock.",
+        pomodoro:
+          "Foco e pausa com o tempo no dock; continua contando com o painel fechado.",
         countdown:
           "Os dias que faltam para uma data, como um casamento ou as férias.",
       } satisfies Record<CreatableKind, string>,
@@ -880,6 +884,30 @@ const messages = {
       showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },
     /** The Ciclo (spec 0017 F2b): the panel says what the tile doesn't. */
+    /** The Pomodoro (spec 0017 F2c-2). */
+    pomodoro: {
+      settingsTitle: "Ajustes do Pomodoro",
+      loading: "Carregando…",
+      stages: { focus: "Foco", short: "Pausa", long: "Pausa longa" },
+      start: "Iniciar",
+      pause: "Pausar",
+      resume: "Continuar",
+      skip: "Pular",
+      reset: "Reiniciar",
+      round: "{done} de {every} focos até a pausa longa",
+      footer: "Continua contando com o painel fechado",
+      focus: "Foco",
+      short: "Pausa",
+      long: "Pausa longa",
+      every: "Pausa longa a cada",
+      minutes: "{n} min",
+      focuses: "{n} focos",
+      autoStart: "Começar a próxima etapa sozinho",
+      autoStartHint: "Sem isso, a etapa seguinte espera o Iniciar.",
+      windows: "Também no Windows",
+      windowsHint:
+        "No fim de cada etapa o Pomodoro balança no dock e ganha um selo; isto soma uma notificação do Windows, que precisa estar ligada.",
+    },
     /** The Contagem regressiva (spec 0017 F2c). */
     countdown: {
       settingsTitle: "Ajustes da contagem",
@@ -1025,6 +1053,7 @@ const messages = {
       invalidWidth: "Essa largura não vale para este widget.",
       invalidCalendars: "Não foi possível guardar os ajustes do calendário.",
       invalidCountdown: "Escolha uma data válida.",
+      invalidPomodoro: "Não foi possível guardar os tempos do Pomodoro.",
       invalidCycle:
         "Use um símbolo de até 16 caracteres, uma janela de 1 a 10 dias e até 10 lembretes de 120 caracteres.",
       noteTooLarge: "Passou de 64 KB e não foi salvo. Encurte o texto.",

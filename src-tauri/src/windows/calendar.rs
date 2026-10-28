@@ -238,7 +238,7 @@ pub fn nudge(widgets: Vec<String>) {
             }
         }
     }
-    super::native_dock::cycle_nudged(widgets);
+    super::native_dock::nudged(widgets);
 }
 
 /// The keys of `new` not in `fired`, added to it; `fired` keeps only
