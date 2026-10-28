@@ -543,6 +543,8 @@ const messages = {
       connect: "Conectar conta Google",
       /** While the browser is open on Google's page. */
       waiting: "Termine o login no navegador…",
+      /** Ends the wait, for a browser closed halfway. */
+      cancel: "Cancelar login",
       /** Before a client is set. */
       needsClient: "Salve o app do Google acima para conectar uma conta.",
       calendars: "Agendas",
@@ -569,6 +571,7 @@ const messages = {
       invalidClientSecret: "Cole o segredo do cliente, numa linha só.",
       refused: "O login foi cancelado no Google.",
       timedOut: "O login demorou mais de 5 minutos. Tente de novo.",
+      cancelled: "O login foi cancelado.",
       offline: "Sem conexão com o Google agora.",
       signInAgain:
         "O Google não aceita mais esta conta. Desconecte e conecte de novo.",

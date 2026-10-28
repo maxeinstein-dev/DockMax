@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import {
+  cancelGoogleSignIn,
   connectGoogleAccount,
   disconnectGoogleAccount,
   googleCalendars,
@@ -259,9 +260,17 @@ function AccountsPanel() {
       },
       (reason: unknown) => {
         setConnecting(false);
-        setError(codeOf(reason));
+        const code = codeOf(reason);
+        // Cancelar (or a new sign-in): nothing went wrong.
+        if (code !== "cancelled") setError(code);
       },
     );
+  }
+
+  function cancel() {
+    // The wait ends and `connect` settles with `cancelled`; if the call
+    // itself fails, the button comes back anyway.
+    cancelGoogleSignIn().catch(() => setConnecting(false));
   }
 
   return (
@@ -278,6 +287,11 @@ function AccountsPanel() {
           </ul>
         )}
         <div className="account-actions">
+          {connecting ? (
+            <button type="button" className="quiet-button" onClick={cancel}>
+              {text.cancel}
+            </button>
+          ) : null}
           <button
             type="button"
             className="secondary-button"

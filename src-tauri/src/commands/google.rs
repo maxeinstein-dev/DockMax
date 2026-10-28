@@ -26,6 +26,8 @@ pub enum GoogleErrorCode {
     InvalidClientSecret,
     Refused,
     TimedOut,
+    /// Cancelar, or a new sign-in started: not shown as an error.
+    Cancelled,
     Offline,
     SignInAgain,
     NotConnected,
@@ -41,6 +43,7 @@ impl From<GoogleError> for GoogleErrorCode {
             GoogleError::NoClient => GoogleErrorCode::NoClient,
             GoogleError::Refused => GoogleErrorCode::Refused,
             GoogleError::TimedOut => GoogleErrorCode::TimedOut,
+            GoogleError::Cancelled => GoogleErrorCode::Cancelled,
             GoogleError::Offline => GoogleErrorCode::Offline,
             GoogleError::SignInAgain => GoogleErrorCode::SignInAgain,
             GoogleError::Unexpected => GoogleErrorCode::Unexpected,
@@ -125,6 +128,16 @@ pub async fn connect_google_account(
     .await?;
     let _ = app.emit(ACCOUNTS_EVENT, ());
     Ok(email)
+}
+
+/// Ends the sign-in waiting for the browser (Cancelar): its
+/// `connect_google_account` answers `cancelled`.
+#[cfg(windows)]
+#[tauri::command]
+pub fn cancel_google_sign_in(window: WebviewWindow) -> Result<(), GoogleErrorCode> {
+    only_settings(&window)?;
+    google::cancel_sign_in();
+    Ok(())
 }
 
 /// The calendars of a connected account.

@@ -33,6 +33,7 @@ fn main() {
             "google_status",
             "set_google_client",
             "connect_google_account",
+            "cancel_google_sign_in",
             "google_calendars",
             "disconnect_google_account",
             "tray_to_dock",
