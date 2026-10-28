@@ -194,6 +194,20 @@ export const WIDGET_FIXTURES = {
     },
   } satisfies WidgetInstance<"calendar">,
 
+  "cycle-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6086",
+    label: null,
+    kind: "cycle",
+    config: { symbol: "🌸", calendar: null, sensitive: 5 },
+  } satisfies WidgetInstance<"cycle">,
+
+  "cycle-sample": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6087",
+    label: null,
+    kind: "cycle",
+    config: { symbol: "🌸", calendar: "noiva@example.com", sensitive: 3 },
+  } satisfies WidgetInstance<"cycle">,
+
   "snapshot-sample": {
     storage: { state: "ok" },
     widgets: [CLOCK_DEFAULT, { ...NOTE_DEFAULT, label: "Mercado" }],

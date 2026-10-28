@@ -223,6 +223,13 @@
   --l: 40%;
 }
 
+/* Ardósia rosada: Ciclo (spec 0017 F2b), discreet. */
+.t-cycle {
+  --h: 335;
+  --sat: 18%;
+  --l: 40%;
+}
+
 /* Argila. */
 .t-calendar {
   --h: 16;

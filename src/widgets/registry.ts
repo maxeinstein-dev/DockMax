@@ -11,6 +11,9 @@ import CalendarPanel from "./calendar/CalendarPanel";
 import CalendarSettings from "./calendar/CalendarSettings";
 import CalendarTile from "./calendar/CalendarTile";
 import ClockPanel from "./clock/ClockPanel";
+import CyclePanel from "./cycle/CyclePanel";
+import CycleSettings from "./cycle/CycleSettings";
+import CycleTile from "./cycle/CycleTile";
 import ClockSettings from "./clock/ClockSettings";
 import ClockTile from "./clock/ClockTile";
 import type {
@@ -41,7 +44,8 @@ export type GlazeClass =
   | "t-notes"
   | "t-activity"
   | "t-network"
-  | "t-calendar";
+  | "t-calendar"
+  | "t-cycle";
 
 export interface WidgetDefinition<K extends CreatableKind> {
   kind: K;
@@ -108,6 +112,14 @@ export const WIDGET_REGISTRY: {
     Tile: CalendarTile,
     Panel: CalendarPanel,
     Settings: CalendarSettings,
+  },
+  cycle: {
+    kind: "cycle",
+    nameKey: "cycle",
+    glaze: "t-cycle",
+    Tile: CycleTile,
+    Panel: CyclePanel,
+    Settings: CycleSettings,
   },
 };
 

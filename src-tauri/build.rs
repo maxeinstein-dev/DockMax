@@ -33,6 +33,7 @@ fn main() {
             "calendar_events",
             "open_calendar_link",
             "complete_calendar_task",
+            "cycle_status",
             "google_status",
             "set_google_client",
             "connect_google_account",

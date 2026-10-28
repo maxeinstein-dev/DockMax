@@ -50,6 +50,9 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // Ticking off a task the panel shows (F2a-3), and only one of
             // those.
             "allow-complete-calendar-task",
+            // The Ciclo's panel (spec 0017 F2b): where the cycle is,
+            // computed from the marks, which never reach the page.
+            "allow-cycle-status",
             // Dragging a tray icon onto the dock keeps it there; the command
             // names an icon the list gave and a point on the screen.
             "allow-tray-to-dock",

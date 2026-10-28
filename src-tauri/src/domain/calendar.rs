@@ -155,6 +155,47 @@ fn midnight(text: &str, offset: i64) -> Option<i64> {
     Some(utc - offset)
 }
 
+/// When `event` is: its start and end in Unix seconds, and whether it is
+/// all-day (then from local midnight to local midnight).
+pub fn span(event: &GoogleEvent, offset: i64) -> Option<(i64, i64, bool)> {
+    match (&event.start.date_time, &event.start.date) {
+        (Some(start), _) => Some((
+            instant(start)?,
+            event.end.date_time.as_deref().and_then(instant)?,
+            false,
+        )),
+        (None, Some(day)) => Some((
+            midnight(day, offset)?,
+            event
+                .end
+                .date
+                .as_deref()
+                .and_then(|day| midnight(day, offset))?,
+            true,
+        )),
+        (None, None) => None,
+    }
+}
+
+/// The cycle's marks among `items` (spec 0017 F2b): the events whose title
+/// has `symbol`, not cancelled.
+pub fn read_marks(items: &[GoogleEvent], symbol: &str, offset: i64) -> Vec<super::cycle::Mark> {
+    items
+        .iter()
+        .filter(|event| event.status.as_deref() != Some("cancelled"))
+        .filter(|event| {
+            event
+                .summary
+                .as_deref()
+                .is_some_and(|title| title.contains(symbol))
+        })
+        .filter_map(|event| {
+            let (start, end, _) = span(event, offset)?;
+            Some(super::cycle::Mark { start, end })
+        })
+        .collect()
+}
+
 /// The address to join a meeting: Meet's, the conference's video entry,
 /// or a Teams or Zoom address written in the place or the description.
 pub fn join_link(event: &GoogleEvent) -> Option<String> {
@@ -215,23 +256,7 @@ pub fn read_events(items: Vec<GoogleEvent>, source: &Source, offset: i64) -> Vec
                 .is_some_and(|title| title.contains(CYCLE_SYMBOL))
         })
         .filter_map(|event| {
-            let (start, end, all_day) = match (&event.start.date_time, &event.start.date) {
-                (Some(start), _) => (
-                    instant(start)?,
-                    event.end.date_time.as_deref().and_then(instant)?,
-                    false,
-                ),
-                (None, Some(day)) => (
-                    midnight(day, offset)?,
-                    event
-                        .end
-                        .date
-                        .as_deref()
-                        .and_then(|day| midnight(day, offset))?,
-                    true,
-                ),
-                (None, None) => return None,
-            };
+            let (start, end, all_day) = span(&event, offset)?;
             let join = join_link(&event);
             let title = event
                 .summary

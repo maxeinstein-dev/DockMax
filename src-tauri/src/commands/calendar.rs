@@ -67,6 +67,54 @@ pub async fn complete_calendar_task(
         })
 }
 
+/// What the Ciclo's panel shows (spec 0017 F2b): where the cycle is, from
+/// the marks the dock read; never the marks themselves.
+#[cfg(windows)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CycleView {
+    /// `None` until the marks were read.
+    pub status: Option<crate::domain::cycle::Status>,
+    /// Today, as a local day number (days since 1970-01-01).
+    pub today: i64,
+    pub accounts: bool,
+}
+
+/// The Ciclo of the widget `config` the panel shows.
+#[cfg(windows)]
+#[tauri::command]
+pub fn cycle_status(
+    window: WebviewWindow,
+    symbol: String,
+    calendar: Option<String>,
+    sensitive: u8,
+) -> Result<CycleView, String> {
+    use crate::domain::cycle;
+    only_panel(&window)?;
+    let config = crate::domain::widgets::CycleConfig {
+        symbol,
+        calendar,
+        sensitive,
+    };
+    if config.validate().is_err() {
+        return Err("invalid cycle settings".into());
+    }
+    let offset = calendar::offset();
+    let today = cycle::day_of(calendar::now(), offset);
+    let status = calendar::cycle_marks(config.symbol.trim(), |id| config.reads(id)).map(|marks| {
+        cycle::status(
+            &cycle::periods(&marks, offset),
+            today,
+            i64::from(config.sensitive),
+        )
+    });
+    Ok(CycleView {
+        status,
+        today,
+        accounts: !google::accounts().is_empty(),
+    })
+}
+
 /// Whether `url` is an event's page in Google Agenda.
 fn is_calendar_page(url: &str) -> bool {
     let Ok(url) = url::Url::parse(url) else {

@@ -150,6 +150,8 @@ impl Panel {
                 // Title, the all-day strip, today's and tomorrow's meetings,
                 // footer.
                 WidgetKind::Calendar => (340.0, 440.0),
+                // Title, the phase, the next start, the averages, footer.
+                WidgetKind::Cycle => (320.0, 300.0),
                 // Never opened in this phase: `toggle_panel` refuses kinds
                 // that can't be created. The Settings card, if one ever is.
                 WidgetKind::Shortcut | WidgetKind::Files => (320.0, 390.0),

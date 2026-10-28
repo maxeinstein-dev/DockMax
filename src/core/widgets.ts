@@ -40,7 +40,8 @@ export type WidgetKind =
   | "files"
   | "activity"
   | "network"
-  | "calendar";
+  | "calendar"
+  | "cycle";
 
 /* Each closed set below has a tuple with every value, in the order of the
  * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
@@ -57,6 +58,7 @@ export const WIDGET_KINDS = [
   "activity",
   "network",
   "calendar",
+  "cycle",
 ] as const;
 
 /** The kinds `add_widget` accepts in this phase. */
@@ -72,6 +74,7 @@ export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "activity",
   "network",
   "calendar",
+  "cycle",
 ];
 
 /** Stable ID of an instance: a UUID v7 made in Rust, never reused and never
@@ -214,6 +217,18 @@ export interface CalendarConfig {
   cardTasks: boolean;
 }
 
+/** The Ciclo (spec 0017 F2b): the symbol of the marks in her calendar, the
+ * calendar (null: all of them) and the sensitive window, in days. */
+export interface CycleConfig {
+  symbol: string;
+  calendar: string | null;
+  /** 1 to 10; checked in Rust. */
+  sensitive: number;
+}
+
+/** The sensitive windows the settings offer, in days. */
+export const CYCLE_WINDOWS = [3, 4, 5, 6, 7] as const;
+
 /** The config of each kind. */
 export interface WidgetConfigs {
   clock: ClockConfig;
@@ -224,6 +239,7 @@ export interface WidgetConfigs {
   activity: ActivityConfig;
   network: NetworkConfig;
   calendar: CalendarConfig;
+  cycle: CycleConfig;
 }
 
 /** A kind's config tagged with the kind, as `update_widget` takes it:
@@ -296,6 +312,8 @@ export type WidgetErrorCode =
   /** A hidden calendar or a task of the order empty, too long or with a
    * control character, or too many. */
   | "invalidCalendars"
+  /** The Ciclo's symbol, calendar or window out of bounds. */
+  | "invalidCycle"
   | "noteTooLarge"
   /** A stored config has another version or is not valid JSON, or the
    * config given to `update_widget` is not exactly the canonical one (a
@@ -322,6 +340,7 @@ export const WIDGET_ERROR_CODES: readonly WidgetErrorCode[] = Object.keys({
   invalidFolder: true,
   invalidWidth: true,
   invalidCalendars: true,
+  invalidCycle: true,
   noteTooLarge: true,
   invalidConfig: true,
   unavailable: true,

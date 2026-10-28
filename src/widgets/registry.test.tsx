@@ -15,6 +15,7 @@ const INSTANCES = {
   activity: WIDGET_FIXTURES["activity-default"],
   network: WIDGET_FIXTURES["network-default"],
   calendar: WIDGET_FIXTURES["calendar-default"],
+  cycle: WIDGET_FIXTURES["cycle-default"],
 } as const;
 
 // 2026-10-15 18:07:05 UTC, a Thursday.
