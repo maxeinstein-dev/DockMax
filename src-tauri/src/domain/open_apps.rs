@@ -41,6 +41,29 @@ pub struct WindowFacts {
     pub exe: Option<String>,
 }
 
+/// The AppID the shell gives File Explorer: the id of its item in the Apps
+/// folder, the one the dock pins.
+pub const EXPLORER_APP_ID: &str = "Microsoft.Windows.Explorer";
+
+/// The AppID the shell groups the window by: the one it `declared`, else, for
+/// a folder window of File Explorer (the `explorer.exe` in `windows_dir`,
+/// which sets none), Explorer's own. Another window of that process that
+/// declares an AppID keeps it, and an `explorer.exe` elsewhere is another
+/// program.
+pub fn shell_aumid(
+    declared: Option<String>,
+    exe: Option<&str>,
+    windows_dir: &str,
+) -> Option<String> {
+    if declared.as_deref().is_some_and(|aumid| !aumid.is_empty()) {
+        return declared;
+    }
+    let explorer = format!("{}\\explorer.exe", windows_dir.trim_end_matches('\\'));
+    exe.filter(|exe| exe.eq_ignore_ascii_case(&explorer))
+        .map(|_| EXPLORER_APP_ID.to_owned())
+        .or(declared)
+}
+
 /// Whether the window belongs to the program: it declares one of the
 /// program's AppIDs, or it runs the program's file.
 pub fn matches(window: &WindowFacts, identity: &Identity) -> bool {
@@ -420,6 +443,75 @@ mod tests {
                     hwnds: vec![3]
                 },
             ]
+        );
+    }
+
+    const EXPLORER_EXE: &str = r"C:\Windows\explorer.exe";
+
+    #[test]
+    fn a_folder_window_of_file_explorer_has_explorers_appid() {
+        let windows_dir = r"C:\WINDOWS\";
+
+        assert_eq!(
+            shell_aumid(None, Some(EXPLORER_EXE), windows_dir).as_deref(),
+            Some(EXPLORER_APP_ID)
+        );
+        assert_eq!(
+            shell_aumid(Some(String::new()), Some(EXPLORER_EXE), windows_dir).as_deref(),
+            Some(EXPLORER_APP_ID)
+        );
+        // A window of Explorer's process that declares an AppID keeps it.
+        assert_eq!(
+            shell_aumid(
+                Some("Microsoft.Windows.ControlPanel".into()),
+                Some(EXPLORER_EXE),
+                windows_dir
+            )
+            .as_deref(),
+            Some("Microsoft.Windows.ControlPanel")
+        );
+        // An `explorer.exe` outside Windows is another program.
+        assert_eq!(
+            shell_aumid(None, Some(r"C:\Apps\explorer.exe"), windows_dir),
+            None
+        );
+        assert_eq!(shell_aumid(None, Some(CHROME_EXE), windows_dir), None);
+        assert_eq!(shell_aumid(None, None, windows_dir), None);
+    }
+
+    #[test]
+    fn a_pinned_file_explorer_claims_its_folder_windows() {
+        // As the shell gives them: the pinned item has no file, and the folder
+        // window declares no AppID of its own.
+        let programs = vec![(
+            "explorer".to_owned(),
+            Identity::new([EXPLORER_APP_ID, EXPLORER_APP_ID], None),
+        )];
+        let windows: Vec<WindowFacts> = [(1, None, EXPLORER_EXE), (2, None, CHROME_EXE)]
+            .into_iter()
+            .map(|(hwnd, declared, exe)| WindowFacts {
+                hwnd,
+                aumid: shell_aumid(declared, Some(exe), r"C:\Windows"),
+                exe: Some(exe.to_owned()),
+            })
+            .collect();
+
+        let found = summarize(&programs, &windows, Some(1));
+
+        assert_eq!(
+            found,
+            vec![Found {
+                id: "explorer".into(),
+                hwnds: vec![1],
+                active: true,
+            }]
+        );
+        assert_eq!(
+            others(&windows, &found, &[]),
+            vec![Group {
+                key: CHROME_EXE.to_lowercase(),
+                hwnds: vec![2]
+            }]
         );
     }
 
