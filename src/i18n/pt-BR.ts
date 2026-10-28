@@ -900,7 +900,7 @@ const messages = {
         one: "Com base no último ciclo.",
         other: "Com base nos últimos {n} ciclos.",
       },
-      footer: "Lido dos eventos “{symbol}” · nada fica guardado",
+      footer: "Lido dos eventos “{symbol}”, sem guardar",
       noAccounts: "Conecte a conta Google em Configurações › Contas.",
       loading: "Lendo as marcas…",
       symbol: "Símbolo das marcas",
