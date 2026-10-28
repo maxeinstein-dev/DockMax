@@ -36,6 +36,8 @@ pub mod native_dock;
 #[cfg(windows)]
 pub mod open_apps;
 #[cfg(windows)]
+pub mod open_with;
+#[cfg(windows)]
 pub mod openwin;
 pub mod panel;
 pub mod panel_window;
@@ -48,6 +50,8 @@ pub mod profiles;
 #[cfg(windows)]
 pub mod recovery;
 pub mod settings_window;
+#[cfg(windows)]
+pub mod shell_target;
 #[cfg(windows)]
 pub mod system_activity;
 #[cfg(windows)]
