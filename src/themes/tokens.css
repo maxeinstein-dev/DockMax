@@ -230,6 +230,13 @@
   --l: 40%;
 }
 
+/* Mel: Contagem regressiva (spec 0017 F2c). */
+.t-countdown {
+  --h: 38;
+  --sat: 45%;
+  --l: 40%;
+}
+
 /* Argila. */
 .t-calendar {
   --h: 16;

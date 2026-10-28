@@ -64,6 +64,13 @@ pub struct DockMessages {
     pub network: &'static str,
     pub calendar: &'static str,
     pub cycle: &'static str,
+    pub countdown: &'static str,
+    /// The Contagem regressiva's tile: under the days, on the day, and
+    /// once it is gone.
+    pub countdown_days: &'static str,
+    pub countdown_day: &'static str,
+    pub countdown_today: &'static str,
+    pub countdown_ago: &'static str,
     /// The progress tile without a period running.
     pub no_value: &'static str,
     /// The Calendário's tile (spec 0017 F2a): no account, no meeting left,
@@ -176,6 +183,11 @@ const PT_BR: Messages = Messages {
         network: "Atividade de rede",
         calendar: "Calendário",
         cycle: "Ciclo",
+        countdown: "Contagem regressiva",
+        countdown_days: "dias",
+        countdown_day: "dia",
+        countdown_today: "Hoje",
+        countdown_ago: "atrás",
         no_value: "–",
         calendar_connect: "Conectar",
         calendar_free: "Livre",

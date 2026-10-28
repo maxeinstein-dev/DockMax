@@ -179,6 +179,7 @@ describe("widget contract constants", () => {
       "network",
       "calendar",
       "cycle",
+      "countdown",
     ]);
     expect(CREATABLE_KINDS.every((kind) => WIDGET_KINDS.includes(kind))).toBe(
       true,

@@ -30,6 +30,7 @@ pub mod calendar;
 pub mod clock;
 #[cfg(test)]
 mod contract_tests;
+pub mod countdown;
 pub mod cycle;
 pub mod files;
 pub mod note;
@@ -46,6 +47,7 @@ use uuid::Uuid;
 
 pub use calendar::CalendarConfig;
 pub use clock::ClockConfig;
+pub use countdown::CountdownConfig;
 pub use cycle::CycleConfig;
 pub use files::FilesConfig;
 pub use note::NoteConfig;
@@ -87,6 +89,7 @@ pub enum WidgetKind {
     Network,
     Calendar,
     Cycle,
+    Countdown,
 }
 
 closed_set!(WidgetKind {
@@ -99,6 +102,7 @@ closed_set!(WidgetKind {
     Network,
     Calendar,
     Cycle,
+    Countdown,
 });
 
 impl WidgetKind {
@@ -112,7 +116,8 @@ impl WidgetKind {
             | WidgetKind::Activity
             | WidgetKind::Network
             | WidgetKind::Calendar
-            | WidgetKind::Cycle => true,
+            | WidgetKind::Cycle
+            | WidgetKind::Countdown => true,
             WidgetKind::Shortcut | WidgetKind::Files => false,
         }
     }
@@ -129,7 +134,8 @@ impl WidgetKind {
             | WidgetKind::Activity
             | WidgetKind::Network
             | WidgetKind::Calendar
-            | WidgetKind::Cycle => 1,
+            | WidgetKind::Cycle
+            | WidgetKind::Countdown => 1,
         }
     }
 
@@ -145,6 +151,7 @@ impl WidgetKind {
             WidgetKind::Network => "network",
             WidgetKind::Calendar => "calendar",
             WidgetKind::Cycle => "cycle",
+            WidgetKind::Countdown => "countdown",
         }
     }
 
@@ -234,6 +241,7 @@ pub enum WidgetConfig {
     Network(NetworkConfig),
     Calendar(CalendarConfig),
     Cycle(CycleConfig),
+    Countdown(CountdownConfig),
 }
 
 impl WidgetConfig {
@@ -248,6 +256,7 @@ impl WidgetConfig {
             WidgetConfig::Network(_) => WidgetKind::Network,
             WidgetConfig::Calendar(_) => WidgetKind::Calendar,
             WidgetConfig::Cycle(_) => WidgetKind::Cycle,
+            WidgetConfig::Countdown(_) => WidgetKind::Countdown,
         }
     }
 
@@ -264,7 +273,8 @@ impl WidgetConfig {
             | WidgetConfig::Note(_)
             | WidgetConfig::Shortcut(_)
             | WidgetConfig::Files(_)
-            | WidgetConfig::Cycle(_) => 1,
+            | WidgetConfig::Cycle(_)
+            | WidgetConfig::Countdown(_) => 1,
             WidgetConfig::TimeProgress(config) => config.width,
             WidgetConfig::Activity(config) => config.width,
             WidgetConfig::Network(config) => config.width,
@@ -280,7 +290,8 @@ impl WidgetConfig {
             | WidgetConfig::Note(_)
             | WidgetConfig::Shortcut(_)
             | WidgetConfig::Files(_)
-            | WidgetConfig::Cycle(_) => 1..=1,
+            | WidgetConfig::Cycle(_)
+            | WidgetConfig::Countdown(_) => 1..=1,
             WidgetConfig::TimeProgress(_)
             | WidgetConfig::Activity(_)
             | WidgetConfig::Network(_) => system::WIDTHS,
@@ -304,7 +315,8 @@ impl WidgetConfig {
             | WidgetConfig::Note(_)
             | WidgetConfig::Shortcut(_)
             | WidgetConfig::Files(_)
-            | WidgetConfig::Cycle(_) => {}
+            | WidgetConfig::Cycle(_)
+            | WidgetConfig::Countdown(_) => {}
         }
         Some(config)
     }
@@ -322,6 +334,7 @@ impl WidgetConfig {
             WidgetKind::Network => WidgetConfig::Network(NetworkConfig::default()),
             WidgetKind::Calendar => WidgetConfig::Calendar(CalendarConfig::default()),
             WidgetKind::Cycle => WidgetConfig::Cycle(CycleConfig::default()),
+            WidgetKind::Countdown => WidgetConfig::Countdown(CountdownConfig::default()),
         }
     }
 
@@ -337,6 +350,7 @@ impl WidgetConfig {
             WidgetConfig::Network(config) => config.validate(),
             WidgetConfig::Calendar(config) => config.validate(),
             WidgetConfig::Cycle(config) => config.validate(),
+            WidgetConfig::Countdown(config) => config.validate(),
         }
     }
 }
@@ -442,6 +456,7 @@ pub fn encode_config(config: &WidgetConfig) -> String {
         WidgetConfig::Network(config) => serde_json::to_string(config),
         WidgetConfig::Calendar(config) => serde_json::to_string(config),
         WidgetConfig::Cycle(config) => serde_json::to_string(config),
+        WidgetConfig::Countdown(config) => serde_json::to_string(config),
     };
     // Plain structs with string keys: serializing them can't fail.
     json.expect("widget configs always serialize")
@@ -474,6 +489,7 @@ pub fn decode_config(
         WidgetKind::Network => serde_json::from_str(json).map(WidgetConfig::Network),
         WidgetKind::Calendar => serde_json::from_str(json).map(WidgetConfig::Calendar),
         WidgetKind::Cycle => serde_json::from_str(json).map(WidgetConfig::Cycle),
+        WidgetKind::Countdown => serde_json::from_str(json).map(WidgetConfig::Countdown),
     }
     .map_err(|_| WidgetError::InvalidConfig)?;
     config.validate()?;
@@ -589,6 +605,8 @@ pub enum WidgetError {
     InvalidCalendars,
     #[error("invalid cycle settings")]
     InvalidCycle,
+    #[error("invalid countdown date")]
+    InvalidCountdown,
     #[error("note too large")]
     NoteTooLarge,
     #[error("widget config could not be read")]
@@ -617,6 +635,7 @@ impl WidgetError {
             WidgetError::InvalidWidth => WidgetErrorCode::InvalidWidth,
             WidgetError::InvalidCalendars => WidgetErrorCode::InvalidCalendars,
             WidgetError::InvalidCycle => WidgetErrorCode::InvalidCycle,
+            WidgetError::InvalidCountdown => WidgetErrorCode::InvalidCountdown,
             WidgetError::NoteTooLarge => WidgetErrorCode::NoteTooLarge,
             WidgetError::InvalidConfig => WidgetErrorCode::InvalidConfig,
             WidgetError::Unavailable => WidgetErrorCode::Unavailable,
@@ -660,6 +679,8 @@ pub enum WidgetErrorCode {
     /// The Ciclo's symbol empty, too long or with a control character, its
     /// calendar empty, or its window out of 1 to 10 days.
     InvalidCycle,
+    /// The Contagem regressiva's date not a day written `2026-12-20`.
+    InvalidCountdown,
     /// The note is over [`MAX_NOTE_BYTES`].
     NoteTooLarge,
     /// A stored config has another version or is not valid JSON, or the
@@ -686,6 +707,7 @@ closed_set!(WidgetErrorCode {
     InvalidWidth,
     InvalidCalendars,
     InvalidCycle,
+    InvalidCountdown,
     NoteTooLarge,
     InvalidConfig,
     Unavailable,
@@ -731,7 +753,8 @@ mod tests {
                 WidgetKind::Activity,
                 WidgetKind::Network,
                 WidgetKind::Calendar,
-                WidgetKind::Cycle
+                WidgetKind::Cycle,
+                WidgetKind::Countdown
             ]
         );
     }
@@ -755,6 +778,7 @@ mod tests {
             "network",
             "calendar",
             "cycle",
+            "countdown",
         ];
         for (kind, name) in WidgetKind::ALL.into_iter().zip(names) {
             assert_eq!(to_json(&kind), name);
@@ -918,6 +942,10 @@ mod tests {
                     "notices": { "sensitive": true, "eve": true, "day": true, "windows": false },
                     "reminders": []
                 }),
+            ),
+            (
+                WidgetKind::Countdown,
+                json!({ "date": null, "yearly": false }),
             ),
         ];
         for (kind, config) in cases {
@@ -1150,6 +1178,7 @@ mod tests {
             WidgetError::InvalidWidth,
             WidgetError::InvalidCalendars,
             WidgetError::InvalidCycle,
+            WidgetError::InvalidCountdown,
             WidgetError::NoteTooLarge,
             WidgetError::InvalidConfig,
             WidgetError::Unavailable,
@@ -1418,6 +1447,7 @@ mod tests {
             "invalidWidth",
             "invalidCalendars",
             "invalidCycle",
+            "invalidCountdown",
             "noteTooLarge",
             "invalidConfig",
             "unavailable",

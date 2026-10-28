@@ -41,7 +41,8 @@ export type WidgetKind =
   | "activity"
   | "network"
   | "calendar"
-  | "cycle";
+  | "cycle"
+  | "countdown";
 
 /* Each closed set below has a tuple with every value, in the order of the
  * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
@@ -59,6 +60,7 @@ export const WIDGET_KINDS = [
   "network",
   "calendar",
   "cycle",
+  "countdown",
 ] as const;
 
 /** The kinds `add_widget` accepts in this phase. */
@@ -75,6 +77,7 @@ export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "network",
   "calendar",
   "cycle",
+  "countdown",
 ];
 
 /** Stable ID of an instance: a UUID v7 made in Rust, never reused and never
@@ -262,6 +265,14 @@ export const MAX_REMINDER_CHARS = 120;
 /** How far from its phase a reminder may fall, in days. */
 export const REMINDER_DAYS = 10;
 
+/** The Contagem regressiva (spec 0017 F2c): the day, written `2026-12-20`
+ * (null until picked), and whether it comes back every year. Its name is
+ * the widget's label. */
+export interface CountdownConfig {
+  date: string | null;
+  yearly: boolean;
+}
+
 /** The config of each kind. */
 export interface WidgetConfigs {
   clock: ClockConfig;
@@ -273,6 +284,7 @@ export interface WidgetConfigs {
   network: NetworkConfig;
   calendar: CalendarConfig;
   cycle: CycleConfig;
+  countdown: CountdownConfig;
 }
 
 /** A kind's config tagged with the kind, as `update_widget` takes it:
@@ -347,6 +359,8 @@ export type WidgetErrorCode =
   | "invalidCalendars"
   /** The Ciclo's symbol, calendar or window out of bounds. */
   | "invalidCycle"
+  /** The date of the Contagem regressiva not a day written `2026-12-20`. */
+  | "invalidCountdown"
   | "noteTooLarge"
   /** A stored config has another version or is not valid JSON, or the
    * config given to `update_widget` is not exactly the canonical one (a
@@ -374,6 +388,7 @@ export const WIDGET_ERROR_CODES: readonly WidgetErrorCode[] = Object.keys({
   invalidWidth: true,
   invalidCalendars: true,
   invalidCycle: true,
+  invalidCountdown: true,
   noteTooLarge: true,
   invalidConfig: true,
   unavailable: true,

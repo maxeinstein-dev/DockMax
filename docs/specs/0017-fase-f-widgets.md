@@ -2,7 +2,7 @@
 
 Fase F da [spec 0004](0004-paridade-primodock.md) (§3.5), depois da fase E. Referência do PrimoDock em [`docs/reference/primodock/interface.md`](../reference/primodock/interface.md) (aba Widgets: catálogo, "Em uso", largura do tile) e [`settings-e-dados.md`](../reference/primodock/settings-e-dados.md).
 
-**Status:** em andamento: F1 (PR #52), F1b (#53), F2a-1 (Contas Google, #54 e #55, [ADR 0012](../adr/0012-contas-google.md)), F2a-2 (Calendário, #57), F2a-3 (Tasks, #58) e F2a-4 (cartão, #59) entregues; F2b-1 (o widget Ciclo, com o [guia do Atalho do iPhone](../guia-atalho-ciclo.md), #60), F2b-2 (avisos e lembretes, #61) e F2b-3 (o aviso no dock) entregues; F2c a F5 a fazer; o iCal ficou para depois.
+**Status:** em andamento: F1 (PR #52), F1b (#53), F2a-1 (Contas Google, #54 e #55, [ADR 0012](../adr/0012-contas-google.md)), F2a-2 (Calendário, #57), F2a-3 (Tasks, #58) e F2a-4 (cartão, #59) entregues; F2b-1 (o widget Ciclo, com o [guia do Atalho do iPhone](../guia-atalho-ciclo.md), #60), F2b-2 (avisos e lembretes, #61) e F2b-3 (o aviso no dock, #62) entregues; F2c-1 (Contagem regressiva) em curso; F2c-2 (Pomodoro) a F5 a fazer; o iCal ficou para depois.
 
 ## 1. Decisões do autor (2026-10-27)
 
@@ -89,6 +89,10 @@ Relógio e Nota ficam com 1 ícone.
 - **Conteúdo:** reuniões e tarefas por padrão; os ajustes do widget escolhem só reuniões ou reuniões e tarefas.
 - **Período:** editável nos ajustes. O cartão rola entre as opções "o dia", "o dia e amanhã", "3 dias" e "a semana". O padrão é o dia; depois das 18h, as de amanhã até as 12h.
 - **Clique:** clicar numa reunião do cartão abre os detalhes no painel. Para entrar direto, vale o clique do meio no tile, como hoje.
+
+**Contagem regressiva (F2c-1).** O nome é o Rótulo do widget ("Casamento"); a config tem só a data e "Repetir todo ano" (aniversários: conta até o próximo; 29 de fevereiro cai no dia 28 nos anos sem ele). No dock, os dias que faltam e "dias" embaixo; "Hoje" no dia; depois, os dias que passaram com "dias atrás". Sem data, um traço. Esmalte Mel (`.t-countdown`).
+
+**Pomodoro (F2c-2).** Como no Ciclo, o fim de cada etapa aparece no dock (balanço e selo), e a notificação do Windows é opção desligada: o autor não quer depender dela.
 
 **Ciclo (F2b).** É um widget próprio, que pode ficar num espaço de trabalho fora do que o autor compartilha em reunião.
 - **Origem:** a noiva controla tudo pela agenda dela. Ela marca o primeiro dia com um evento de dia inteiro "🌸" (o símbolo se troca nos ajustes), por um Atalho de um toque no iPhone ou pela Siri. O DockMax lê esses eventos dos últimos 12 meses e não guarda nada em disco. No disco ficam só os ajustes do autor.
