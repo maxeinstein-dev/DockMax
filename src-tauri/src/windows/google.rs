@@ -6,7 +6,8 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use thiserror::Error;
@@ -41,6 +42,8 @@ pub enum GoogleError {
     Refused,
     #[error("the sign-in took too long")]
     TimedOut,
+    #[error("the sign-in was cancelled in the DockMax")]
+    Cancelled,
     #[error("no connection to Google")]
     Offline,
     #[error("Google no longer accepts this account: it must sign in again")]
@@ -59,6 +62,33 @@ impl From<HttpError> for GoogleError {
 
 /// The access tokens of this run, by e-mail, with when each ends.
 static ACCESS: Mutex<Option<HashMap<String, (String, Instant)>>> = Mutex::new(None);
+
+/// The flag of the sign-in waiting for the browser, if any: set, it ends
+/// the wait. A new sign-in sets the one before it, so closing the browser
+/// halfway never leaves Configurações stuck for the 5 minutes.
+static SIGN_IN: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
+
+/// Starts a sign-in: the one waiting before it, if any, ends.
+fn begin_sign_in() -> Arc<AtomicBool> {
+    let flag = Arc::new(AtomicBool::new(false));
+    let mut current = SIGN_IN
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(before) = current.replace(flag.clone()) {
+        before.store(true, Ordering::Relaxed);
+    }
+    flag
+}
+
+/// Ends the sign-in waiting for the browser, if any (Cancelar).
+pub fn cancel_sign_in() {
+    let current = SIGN_IN
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(flag) = current.as_ref() {
+        flag.store(true, Ordering::Relaxed);
+    }
+}
 
 fn random<const N: usize>() -> [u8; N] {
     let mut bytes = [0u8; N];
@@ -133,13 +163,21 @@ fn answer(stream: &mut TcpStream, done: bool) {
     );
 }
 
-/// Waits for the browser's request that answers this sign-in.
-fn wait_for_code(listener: &TcpListener, state: &str) -> Result<String, GoogleError> {
+/// Waits for the browser's request that answers this sign-in, until
+/// `cancelled` is set or [`SIGN_IN_WAIT`] passes.
+fn wait_for_code(
+    listener: &TcpListener,
+    state: &str,
+    cancelled: &AtomicBool,
+) -> Result<String, GoogleError> {
     listener
         .set_nonblocking(true)
         .map_err(|_| GoogleError::Unexpected)?;
     let deadline = Instant::now() + SIGN_IN_WAIT;
     while Instant::now() < deadline {
+        if cancelled.load(Ordering::Relaxed) {
+            return Err(GoogleError::Cancelled);
+        }
         let mut stream = match listener.accept() {
             Ok((stream, _)) => stream,
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
@@ -216,8 +254,9 @@ pub fn connect() -> Result<String, GoogleError> {
     let verifier = google::verifier(&random::<32>());
     let challenge = google::challenge(&sha256(verifier.as_bytes()));
     let state = google::state(&random::<16>());
+    let cancelled = begin_sign_in();
     open_browser(&google::auth_url(&client, &redirect, &challenge, &state))?;
-    let code = wait_for_code(&listener, &state)?;
+    let code = wait_for_code(&listener, &state, &cancelled)?;
     drop(listener);
 
     let response = http::post_form(
@@ -333,6 +372,26 @@ mod tests {
         // RFC 7636, appendix B.
         let challenge = google::challenge(&sha256(b"dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"));
         assert_eq!(challenge, "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+    }
+
+    #[test]
+    fn cancelar_ends_the_wait_and_a_new_sign_in_ends_the_one_before() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let first = begin_sign_in();
+        let second = begin_sign_in();
+        assert!(
+            first.load(Ordering::Relaxed),
+            "the new sign-in ends the old"
+        );
+        assert!(!second.load(Ordering::Relaxed));
+
+        cancel_sign_in();
+        let started = Instant::now();
+        assert_eq!(
+            wait_for_code(&listener, "ST", &second),
+            Err(GoogleError::Cancelled)
+        );
+        assert!(started.elapsed() < Duration::from_secs(1));
     }
 
     #[test]

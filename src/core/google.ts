@@ -14,6 +14,8 @@ export type GoogleErrorCode =
   | "invalidClientSecret"
   | "refused"
   | "timedOut"
+  /** Cancelar, or a new sign-in started: not an error to show. */
+  | "cancelled"
   | "offline"
   | "signInAgain"
   | "notConnected"
@@ -29,6 +31,7 @@ const CODES: ReadonlySet<string> = new Set<GoogleErrorCode>([
   "invalidClientSecret",
   "refused",
   "timedOut",
+  "cancelled",
   "offline",
   "signInAgain",
   "notConnected",
@@ -59,6 +62,7 @@ export const GOOGLE_COMMANDS = {
   status: "google_status",
   setClient: "set_google_client",
   connect: "connect_google_account",
+  cancel: "cancel_google_sign_in",
   calendars: "google_calendars",
   disconnect: "disconnect_google_account",
 } as const;
@@ -89,6 +93,12 @@ export function setGoogleClient(id: string, secret: string): Promise<void> {
  * e-mail once it came back (up to 5 minutes). */
 export function connectGoogleAccount(): Promise<string> {
   return run(GOOGLE_COMMANDS.connect);
+}
+
+/** Ends the sign-in waiting for the browser: `connectGoogleAccount`
+ * rejects with `cancelled`. */
+export function cancelGoogleSignIn(): Promise<void> {
+  return run(GOOGLE_COMMANDS.cancel);
 }
 
 export function googleCalendars(email: string): Promise<GoogleCalendar[]> {

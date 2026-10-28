@@ -118,6 +118,42 @@ describe("AccountsPanel", () => {
     );
   });
 
+  it("cancels a sign-in left halfway, without an error", async () => {
+    let settle: (reason: string) => void = () => undefined;
+    invoke.mockImplementation((command: string) => {
+      if (command === "google_status")
+        return Promise.resolve({
+          clientId: "1.apps.googleusercontent.com",
+          accounts: [],
+        });
+      if (command === "connect_google_account")
+        return new Promise((_, reject) => {
+          settle = reject;
+        });
+      if (command === "cancel_google_sign_in") {
+        settle("cancelled");
+        return Promise.resolve();
+      }
+      return Promise.resolve();
+    });
+    render(<AccountsPanel />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: text.list.connect }),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(text.list.waiting);
+    fireEvent.click(screen.getByRole("button", { name: text.list.cancel }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: text.list.connect }),
+      ).toBeEnabled(),
+    );
+    expect(invoke).toHaveBeenCalledWith("cancel_google_sign_in", {});
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("button", { name: text.list.cancel })).toBeNull();
+  });
+
   it("asks before disconnecting", async () => {
     answer({
       google_status: {
