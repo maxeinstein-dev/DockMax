@@ -179,10 +179,16 @@ export interface NetworkConfig {
 
 /** The Calendário (spec 0017 F2a): its width, and the calendars it leaves
  * out; every other calendar of the connected accounts shows. */
+/** The widths of the Calendário: three was too small to read; two rise
+ * to three under the pointer. */
+export const CALENDAR_WIDTHS = [1, 2] as const;
+
+export type CalendarWidth = (typeof CALENDAR_WIDTHS)[number];
+
 export interface CalendarConfig {
-  /** In icons: the next meeting's time; its time and title; its title,
-   * when, and the one after. */
-  width: WidgetWidth;
+  /** In icons: the next meeting's time; its time and title (rising to
+   * three icons under the pointer, with the one after). */
+  width: CalendarWidth;
   /** Google's ids of the calendars not shown; at most 200. */
   hidden: string[];
   /** Whether the panel shows Google Tasks' tasks (F2a-3). */

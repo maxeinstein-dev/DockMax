@@ -131,11 +131,17 @@ pub fn rates(width: u8, reading: Option<&Reading>) -> Face {
 }
 
 /// The Calendário's face (spec 0017 F2a): the next meeting of the
-/// calendars it shows, as wide as it is.
-pub fn agenda(config: &CalendarConfig, snapshot: Option<&Snapshot>, now: i64) -> Face {
+/// calendars it shows, as wide as it is; `opened`, grown under the
+/// pointer, with the one after it too.
+pub fn agenda(
+    config: &CalendarConfig,
+    snapshot: Option<&Snapshot>,
+    now: i64,
+    opened: bool,
+) -> Face {
     let text = &crate::i18n::messages().dock;
     let line = |text: String, size: f64, strong: bool| AgendaLine { text, size, strong };
-    let width = config.width;
+    let width = if opened { 3 } else { config.width };
     let lines = match snapshot {
         None => vec![line(text.no_value.into(), 0.24, true)],
         Some(snapshot) if snapshot.status == Status::NoAccounts => {
@@ -176,11 +182,14 @@ pub fn agenda(config: &CalendarConfig, snapshot: Option<&Snapshot>, now: i64) ->
                             line(say(when, true), 0.2, true),
                             line(title(first), 0.15, false),
                         ],
+                        // Grown: two lines, as large as two icons' — when
+                        // and the title, then the one after.
                         _ => {
-                            let mut lines = vec![
-                                line(title(first), 0.17, true),
-                                line(say(when, true), 0.14, false),
-                            ];
+                            let mut lines = vec![line(
+                                format!("{} {}", say(when, true), title(first)),
+                                0.19,
+                                true,
+                            )];
                             if let Some(then) = next.get(1) {
                                 lines.push(line(
                                     format!(
@@ -189,7 +198,7 @@ pub fn agenda(config: &CalendarConfig, snapshot: Option<&Snapshot>, now: i64) ->
                                         calendar::clock(then.start, snapshot.offset),
                                         title(then)
                                     ),
-                                    0.13,
+                                    0.16,
                                     false,
                                 ));
                             }
@@ -214,6 +223,7 @@ pub fn widget(
     now: &SYSTEMTIME,
     system: Option<&Reading>,
     calendar: Option<&Snapshot>,
+    opened: bool,
 ) -> Face {
     match &widget.config {
         WidgetConfig::Clock(config) => {
@@ -279,7 +289,9 @@ pub fn widget(
             }),
         },
         WidgetConfig::Network(config) => rates(config.width, system),
-        WidgetConfig::Calendar(config) => agenda(config, calendar, crate::windows::calendar::now()),
+        WidgetConfig::Calendar(config) => {
+            agenda(config, calendar, crate::windows::calendar::now(), opened)
+        }
         // Never on the dock in this phase (`dock_items` leaves them out).
         WidgetConfig::Shortcut(_) | WidgetConfig::Files(_) => Face::Glyph {
             glaze: Glaze::FILES,
@@ -331,7 +343,7 @@ mod tests {
             hidden: hidden.iter().map(|id| id.to_string()).collect(),
             tasks: true,
         };
-        match agenda(&config, snapshot, NOW) {
+        match agenda(&config, snapshot, NOW, width == 3) {
             Face::Agenda { lines, .. } => lines.into_iter().map(|line| line.text).collect(),
             _ => panic!("not the Calendário's face"),
         }
@@ -345,9 +357,10 @@ mod tests {
         ]);
         assert_eq!(lines(1, &[], Some(&day)), ["9 min"]);
         assert_eq!(lines(2, &[], Some(&day)), ["em 9 min", "Daily"]);
+        // Grown under the pointer: when and the title, then the one after.
         assert_eq!(
             lines(3, &[], Some(&day)),
-            ["Daily", "em 9 min", "Depois 11:00 Revisão"]
+            ["em 9 min Daily", "Depois 11:00 Revisão"]
         );
     }
 

@@ -73,7 +73,7 @@ Pilhas de widgets (vários num lugar, trocados pela roda), espaçadores, "Widget
 | Progresso do tempo | o anel | dois anéis (os dois primeiros períodos) | três barras com o nome do período |
 | Atividade | barras, anéis ou números | como no F1 | processador e memória com o gráfico do último minuto |
 | Atividade de rede | as taxas curtas | taxas e gráfico | o gráfico maior com as taxas por extenso |
-| Calendário (F2a) | a hora da próxima reunião | a hora e o começo do título | o título, "em 10 min" e a reunião seguinte |
+| Calendário (F2a) | quando é a próxima reunião | quando e o título; **com o mouse em cima, levita** num andar acima do dock, da largura de 3 ícones, por cima dos vizinhos (que não se mexem), com "15:00 Alinhamento" e "Depois 20:00 Jiu Jitsu" | — (pequeno demais para ler, decisão do autor de 2026-10-28) |
 
 Relógio e Nota ficam com 1 ícone.
 

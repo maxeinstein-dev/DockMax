@@ -177,7 +177,7 @@ export const WIDGET_FIXTURES = {
     label: null,
     kind: "calendar",
     config: {
-      width: 3,
+      width: 1,
       hidden: ["pt-br.brazilian#holiday@group.v.calendar.google.com"],
       tasks: false,
     },

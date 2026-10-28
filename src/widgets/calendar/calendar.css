@@ -142,8 +142,12 @@
   gap: 8px;
 }
 
+/* A fieldset is as wide as its content by default: with long e-mails it
+   made the whole Ajustes view wider than its card. */
 .cal-sources {
+  min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
   margin: 0;
   padding: 0;
@@ -158,9 +162,11 @@
 }
 
 .cal-source {
-  display: flex;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: baseline;
-  gap: 8px;
+  column-gap: 8px;
   font-size: 12.5px;
 }
 
@@ -176,9 +182,13 @@
 }
 
 .cal-source-account {
-  margin-left: auto;
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
   color: var(--ink-2);
   font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cal-task {

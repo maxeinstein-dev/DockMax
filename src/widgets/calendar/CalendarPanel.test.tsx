@@ -272,6 +272,10 @@ describe("CalendarPanel", () => {
     );
     expect(css).toMatch(/\.cal-list li \{[^}]*min-width: 0/);
     expect(css).toMatch(/\.cal-title \{[^}]*-webkit-line-clamp: 2/);
+    // The Ajustes view: a fieldset is as wide as its longest e-mail unless
+    // told otherwise.
+    expect(css).toMatch(/\.cal-sources \{[^}]*min-width: 0/);
+    expect(css).toMatch(/\.cal-source-account \{[^}]*text-overflow: ellipsis/);
   });
 
   it("says when there is no account", async () => {

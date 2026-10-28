@@ -1,4 +1,5 @@
 import { useCalendar } from "../../core/calendar";
+import { CALENDAR_WIDTHS } from "../../core/widgets";
 import { useT } from "../../i18n";
 import OptionGroup from "../../panel/OptionGroup";
 import PanelFooter from "../../panel/PanelFooter";
@@ -45,6 +46,7 @@ function CalendarSettings({
       />
       <WidthGroup
         width={config.width}
+        widths={CALENDAR_WIDTHS}
         onSelect={(width) => settings.saveConfig({ width })}
       />
       <OptionGroup
