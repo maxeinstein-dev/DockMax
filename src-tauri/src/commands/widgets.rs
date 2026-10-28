@@ -223,6 +223,38 @@ pub fn update(
     widgets_repo::update(conn, &id, label, config)
 }
 
+/// Sets how many icons wide the instance `id` is, keeping the rest of its
+/// label and config (spec 0017 F1b). A width its kind doesn't take is
+/// [`WidgetError::InvalidWidth`].
+pub fn set_width(
+    storage: &mut Storage,
+    id: &WidgetId,
+    width: u8,
+) -> Result<WidgetInstance, WidgetError> {
+    let instance = storage
+        .snapshot()?
+        .widgets
+        .into_iter()
+        .find(|instance| &instance.id == id)
+        .ok_or(WidgetError::NotFound)?;
+    let config = instance
+        .config
+        .with_width(width)
+        .ok_or(WidgetError::InvalidWidth)?;
+    config.validate()?;
+    widgets_repo::update(storage.connection()?, id, instance.label, config)
+}
+
+/// The width chosen in the dock's menu: saved, and every window and dock
+/// told. A refusal is only logged; the dock stays as it was.
+pub fn resize(app: &AppHandle, id: &WidgetId, width: u8) {
+    let state = app.state::<Mutex<Storage>>();
+    // `change` logs a refusal.
+    let _ = change(app, &state, "resize", |storage| {
+        set_width(storage, id, width)
+    });
+}
+
 /// The text of the note `id`.
 pub fn read_note(storage: &mut Storage, id: &str) -> Result<String, WidgetError> {
     let conn = storage.connection()?;
@@ -909,6 +941,30 @@ mod tests {
 
         assert_eq!(
             result.map(|changed| changed.value),
+            Err(WidgetError::NotFound)
+        );
+    }
+
+    #[test]
+    fn the_width_changes_only_to_one_the_kind_takes() {
+        let dir = tempdir().unwrap();
+        let (mut storage, [clock, progress, _]) = open(&dir);
+        let parse = |id: &str| WidgetId::parse(id).unwrap();
+
+        let wider = set_width(&mut storage, &parse(&progress), 3).unwrap();
+        assert_eq!(wider.config.width(), 3);
+        assert_eq!(snapshot(&storage).unwrap().widgets[1].config.width(), 3);
+
+        assert_eq!(
+            set_width(&mut storage, &parse(&progress), 4),
+            Err(WidgetError::InvalidWidth)
+        );
+        assert_eq!(
+            set_width(&mut storage, &parse(&clock), 2),
+            Err(WidgetError::InvalidWidth)
+        );
+        assert_eq!(
+            set_width(&mut storage, &WidgetId::new(), 2),
             Err(WidgetError::NotFound)
         );
     }

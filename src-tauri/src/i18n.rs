@@ -64,6 +64,9 @@ pub struct DockMessages {
     pub network: &'static str,
     /// The progress tile without a period running.
     pub no_value: &'static str,
+    /// The periods' names on a wide progress tile, in the order of
+    /// `Period::ALL`.
+    pub periods: [&'static str; 5],
     /// An item's name while it carries the attention badge; `{name}` is
     /// replaced.
     pub with_notice: &'static str,
@@ -112,6 +115,11 @@ pub struct TrayMessages {
     pub new_workspace: &'static str,
     /// The title over the workspaces in the dock's menu (spec 0014 R3).
     pub workspaces: &'static str,
+    /// The title over a widget's widths in the dock's menu (spec 0017
+    /// F1b), and each width: `{n}` is the number of icons.
+    pub size: &'static str,
+    pub one_icon: &'static str,
+    pub icons: &'static str,
 }
 
 const PT_BR: Messages = Messages {
@@ -123,6 +131,9 @@ const PT_BR: Messages = Messages {
         quit: "Sair",
         new_workspace: "Novo espaço",
         workspaces: "Espaços de trabalho",
+        size: "Tamanho",
+        one_icon: "1 ícone",
+        icons: "{n} ícones",
     },
     settings: SettingsMessages {
         window_title: "Configurações do DockMax",
@@ -137,6 +148,7 @@ const PT_BR: Messages = Messages {
         activity: "Atividade",
         network: "Atividade de rede",
         no_value: "–",
+        periods: ["Dia", "Semana", "Mês", "Ano", "Expediente"],
         with_notice: "{name} (com aviso)",
         workspace: "Espaço {name}",
         workspace_shown: "Espaço {name} (mostrado)",

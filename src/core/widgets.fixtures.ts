@@ -96,6 +96,7 @@ export const WIDGET_FIXTURES = {
       periods: ["day", "week", "month", "year"],
       weekStart: "monday",
       workday: { start: "09:00", end: "18:00" },
+      width: 1,
     },
   } satisfies WidgetInstance<"time-progress">,
 
@@ -107,6 +108,7 @@ export const WIDGET_FIXTURES = {
       periods: ["workday", "week", "year"],
       weekStart: "sunday",
       workday: { start: "08:30", end: "17:15" },
+      width: 3,
     },
   } satisfies WidgetInstance<"time-progress">,
 
@@ -146,7 +148,7 @@ export const WIDGET_FIXTURES = {
     id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6081",
     label: null,
     kind: "activity",
-    config: { show: "cpu", style: "rings", width: 2 },
+    config: { show: "cpu", style: "rings", width: 3 },
   } satisfies WidgetInstance<"activity">,
 
   "network-default": {

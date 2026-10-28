@@ -318,6 +318,23 @@ describe("ProgressSettings", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("chooses how many icons wide the tile is", async () => {
+    const { onUpdate } = settings();
+    const group = screen.getByRole("group", { name: "Largura no dock" });
+
+    expect(
+      within(group).getByRole("button", { name: "1 ícone" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(within(group).getByRole("button", { name: "3 ícones" }));
+    await flush();
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({ width: 3 }),
+      }),
+    );
+  });
+
   describe("a refused change", () => {
     it("shows the error's message and goes back to the instance", async () => {
       const { onUpdate } = settings({

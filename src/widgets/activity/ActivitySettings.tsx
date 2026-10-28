@@ -55,6 +55,7 @@ function ActivitySettings({
         width={config.width}
         onSelect={(width) => settings.saveConfig({ width })}
       />
+      <p className="sys-hint">{text.widthHint}</p>
       <RemoveButton
         onClick={() => void settings.remove()}
         disabled={settings.removing}

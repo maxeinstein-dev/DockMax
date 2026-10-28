@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from "react";
-import { SYSTEM_WIDTHS, type SystemWidth } from "../../core/widgets";
+import { WIDGET_WIDTHS, type WidgetWidth } from "../../core/widgets";
 import { useT } from "../../i18n";
 import OptionGroup from "../../panel/OptionGroup";
 import "./system.css";
@@ -66,24 +66,25 @@ export function WidthGroup({
   width,
   onSelect,
 }: {
-  width: SystemWidth;
-  onSelect: (width: SystemWidth) => void;
+  width: WidgetWidth;
+  onSelect: (width: WidgetWidth) => void;
 }) {
   const t = useT();
   const text = t.widgets.system;
-  const names: Record<SystemWidth, string> = {
+  const names: Record<WidgetWidth, string> = {
     1: text.widths.one,
     2: text.widths.two,
+    3: text.widths.three,
   };
   return (
     <OptionGroup
       label={text.width}
-      options={SYSTEM_WIDTHS.map((value) => ({
+      options={WIDGET_WIDTHS.map((value) => ({
         value: String(value),
         label: names[value],
       }))}
       selected={String(width)}
-      onSelect={(value) => onSelect(Number(value) as SystemWidth)}
+      onSelect={(value) => onSelect(Number(value) as WidgetWidth)}
     />
   );
 }

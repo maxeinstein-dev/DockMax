@@ -3,11 +3,16 @@
   "label": "Trabalho",
   "kind": "time-progress",
   "config": {
-    "periods": ["workday", "week", "year"],
+    "periods": [
+      "workday",
+      "week",
+      "year"
+    ],
     "weekStart": "sunday",
     "workday": {
       "start": "08:30",
       "end": "17:15"
-    }
+    },
+    "width": 3
   }
 }

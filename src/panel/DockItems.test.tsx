@@ -51,6 +51,7 @@ const PROGRESS: WidgetInstance = {
     periods: ["day", "week"],
     weekStart: "monday",
     workday: { start: "09:00", end: "18:00" },
+    width: 1,
   },
 };
 

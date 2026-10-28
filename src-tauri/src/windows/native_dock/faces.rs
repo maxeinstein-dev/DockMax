@@ -9,7 +9,8 @@ use crate::domain::dock_layout::DockSize;
 use crate::domain::live_faces::{self, Wall};
 use crate::domain::system_activity::{self, Reading};
 use crate::domain::widgets::clock::{ClockConfig, ClockIconStyle};
-use crate::domain::widgets::system::{ActivityConfig, ActivityShow};
+use crate::domain::widgets::system::{ActivityConfig, ActivityShow, ActivityStyle};
+use crate::domain::widgets::time_progress::{Period, TimeProgressConfig};
 use crate::domain::widgets::{WidgetConfig, WidgetInstance};
 
 /// The wall clock of the system's zone.
@@ -34,6 +35,32 @@ fn clock_time(config: &ClockConfig, now: &SYSTEMTIME) -> (u8, u8) {
         Some((at.hour() as u8, at.minute() as u8))
     });
     zoned.unwrap_or((now.wHour as u8, now.wMinute as u8))
+}
+
+/// The first `count` periods of a time progress as meters, named.
+fn periods(config: &TimeProgressConfig, count: usize, now: &SYSTEMTIME) -> Vec<Meter> {
+    let names = &crate::i18n::messages().dock.periods;
+    config
+        .periods
+        .iter()
+        .take(count)
+        .map(|period| {
+            let fraction = live_faces::progress(*period, &wall(now), config);
+            let name = names[Period::ALL
+                .iter()
+                .position(|each| each == period)
+                .unwrap_or(0)];
+            Meter {
+                label: name,
+                short: name,
+                fraction: fraction.map(|fraction| fraction as f32),
+                text: match fraction {
+                    Some(fraction) => format!("{}%", live_faces::percent(fraction)),
+                    None => crate::i18n::messages().dock.no_value.to_string(),
+                },
+            }
+        })
+        .collect()
 }
 
 /// The figure of a share, 0–100, as `42%`; the "no value" mark without one.
@@ -123,6 +150,17 @@ pub fn widget(
                 },
             }
         }
+        WidgetConfig::TimeProgress(config) if config.width > 1 => Face::Meters {
+            glaze: Glaze::PROGRESS,
+            // Two icons: a ring per period; three: a bar per period, named.
+            style: if config.width == 2 {
+                ActivityStyle::Rings
+            } else {
+                ActivityStyle::Bars
+            },
+            meters: periods(config, usize::from(config.width), now),
+            graph: None,
+        },
         WidgetConfig::TimeProgress(config) => {
             let fraction = config
                 .periods
@@ -147,6 +185,18 @@ pub fn widget(
             glaze: Glaze::ACTIVITY,
             style: config.style,
             meters: meters(config, system),
+            // Three icons: the processor's last minute too.
+            graph: (config.width >= 3).then(|| {
+                system
+                    .map(|reading| {
+                        reading
+                            .cpu_history
+                            .iter()
+                            .map(|value| (value / 100.0) as f32)
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            }),
         },
         WidgetConfig::Network(config) => rates(config.width, system),
         // Never on the dock in this phase (`dock_items` leaves them out).

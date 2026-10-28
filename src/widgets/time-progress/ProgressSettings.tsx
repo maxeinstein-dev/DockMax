@@ -18,6 +18,7 @@ import RemoveButton from "../../panel/parts/RemoveButton";
 import TextField from "../../panel/parts/TextField";
 import { labelFromDraft } from "../../panel/parts/label";
 import type { WidgetSettingsProps, WidgetUpdate } from "../contract";
+import { WidthGroup } from "../system/parts";
 import "./time-progress.css";
 
 type Update = WidgetUpdate<"time-progress">;
@@ -285,6 +286,13 @@ function ProgressSettings({
           void save({ ...shown, config: { ...shown.config, weekStart } })
         }
       />
+      <WidthGroup
+        width={shown.config.width}
+        onSelect={(width) =>
+          void save({ ...shown, config: { ...shown.config, width } })
+        }
+      />
+      <p className="progress-hint">{text.widthHint}</p>
       <RemoveButton onClick={() => void remove()} disabled={removing} />
       <PanelFooter alert={error ? t.widgets.errors[error] : null}>
         {t.widgets.common.footer}

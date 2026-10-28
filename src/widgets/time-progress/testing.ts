@@ -22,6 +22,7 @@ export function progressInstance(
       periods: ["day", "week", "month", "year"],
       weekStart: "monday",
       workday: { start: "09:00", end: "18:00" },
+      width: 1,
       ...config,
     },
   };

@@ -120,6 +120,8 @@ export interface TimeProgressConfig {
   weekStart: WeekStart;
   /** Used only when `periods` has `workday`. */
   workday: Workday;
+  /** In icons: the first period's ring, two rings, or three bars. */
+  width: WidgetWidth;
 }
 
 /** A note has nothing to set: its text is read with `get_note`. Always
@@ -152,22 +154,24 @@ export type ActivityStyle = "bars" | "rings" | "numbers";
 
 export const ACTIVITY_STYLES = ["bars", "rings", "numbers"] as const;
 
-/** The widths, in icons, the system widgets accept; checked in Rust. */
-export const SYSTEM_WIDTHS = [1, 2] as const;
+/** The widths, in icons, of the kinds that show more when wider: time
+ * progress, Atividade and Atividade de rede (spec 0017 F1b); checked in
+ * Rust. The others are always 1 icon wide. */
+export const WIDGET_WIDTHS = [1, 2, 3] as const;
 
-export type SystemWidth = (typeof SYSTEM_WIDTHS)[number];
+export type WidgetWidth = (typeof WIDGET_WIDTHS)[number];
 
 export interface ActivityConfig {
   show: ActivityShow;
   style: ActivityStyle;
   /** In icons. */
-  width: SystemWidth;
+  width: WidgetWidth;
 }
 
 /** Atividade de rede: one icon shows the two rates, two add the graph. */
 export interface NetworkConfig {
   /** In icons. */
-  width: SystemWidth;
+  width: WidgetWidth;
 }
 
 /** The config of each kind. */
