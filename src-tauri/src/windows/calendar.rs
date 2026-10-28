@@ -18,6 +18,7 @@ use windows::Win32::System::SystemInformation::{GetLocalTime, GetSystemTime};
 
 use super::google::{self, GoogleError};
 use crate::domain::calendar::{self, Event, EventsPage, Source};
+use crate::domain::cycle::Mark;
 use crate::domain::tasks::{self, GoogleTaskList, GoogleTaskLists, GoogleTasks, Task};
 
 /// How often the events are read again.
@@ -80,8 +81,25 @@ type AccountList = (String, GoogleTaskList);
 
 /// Each account's task lists, read again with the calendars.
 static LISTS: Mutex<Option<(Instant, Vec<AccountList>)>> = Mutex::new(None);
-/// The docks (by window) that have a Calendário: read while any has.
-static WANTERS: Mutex<Vec<isize>> = Mutex::new(Vec::new());
+/// The docks (by window) that have a Calendário, and the symbols of their
+/// Ciclos: read while any has one.
+static WANTERS: Mutex<Vec<(isize, bool, Vec<String>)>> = Mutex::new(Vec::new());
+
+/// The Ciclo's marks (spec 0017 F2b): each symbol's, by calendar, read
+/// again every half hour. Only the events with the symbol are asked for
+/// (Google's `q`), so nothing else of her calendar reaches the computer;
+/// and they stay in memory only.
+struct CycleMarks {
+    at: Instant,
+    symbols: Vec<String>,
+    marks: Vec<(String, String, Mark)>,
+}
+
+static CYCLE: Mutex<Option<CycleMarks>> = Mutex::new(None);
+
+/// How far back the Ciclo looks: a year and a month.
+const CYCLE_BACK: i64 = 400 * 24 * 3600;
+const CYCLE_EVERY: Duration = Duration::from_secs(30 * 60);
 static WANTED: AtomicBool = AtomicBool::new(false);
 static STARTED: Once = Once::new();
 /// Set to read again now, with the thread woken.
@@ -114,16 +132,17 @@ pub fn snapshot() -> Option<Snapshot> {
         .clone()
 }
 
-/// Whether the dock `dock` has a Calendário: the reading starts (its
-/// thread, the first time) while any dock has one, and stops when none has.
-pub fn want(dock: isize, has: bool) {
+/// Whether the dock `dock` has a Calendário, and its Ciclos' symbols: the
+/// reading starts (its thread, the first time) while any dock has one, and
+/// stops when none has.
+pub fn want(dock: isize, calendar: bool, symbols: Vec<String>) {
     let on = {
         let mut wanters = WANTERS
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        wanters.retain(|each| *each != dock);
-        if has {
-            wanters.push(dock);
+        wanters.retain(|(each, _, _)| *each != dock);
+        if calendar || !symbols.is_empty() {
+            wanters.push((dock, calendar, symbols));
         }
         !wanters.is_empty()
     };
@@ -147,9 +166,93 @@ pub fn read_now() {
     wake.notify_all();
 }
 
+/// Whether a dock has a Calendário, and every Ciclo's symbol, each once.
+fn wanted() -> (bool, Vec<String>) {
+    let wanters = WANTERS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let calendar = wanters.iter().any(|(_, calendar, _)| *calendar);
+    let mut symbols: Vec<String> = wanters
+        .iter()
+        .flat_map(|(_, _, symbols)| symbols.iter().cloned())
+        .collect();
+    symbols.sort();
+    symbols.dedup();
+    (calendar, symbols)
+}
+
+/// The marks of `symbol` in the calendars `reads` takes, as the last
+/// reading found them; `None` until the first.
+pub fn cycle_marks(symbol: &str, reads: impl Fn(&str) -> bool) -> Option<Vec<Mark>> {
+    let cycle = CYCLE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let cycle = cycle.as_ref()?;
+    cycle.symbols.iter().any(|each| each == symbol).then(|| {
+        cycle
+            .marks
+            .iter()
+            .filter(|(each, calendar, _)| each == symbol && reads(calendar))
+            .map(|(_, _, mark)| *mark)
+            .collect()
+    })
+}
+
+/// Reads the Ciclo's marks again when half an hour passed or the symbols
+/// changed. Whether they changed.
+fn read_cycle(symbols: &[String]) -> bool {
+    {
+        let cycle = CYCLE
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(cycle) = cycle.as_ref()
+            && cycle.symbols == symbols
+            && cycle.at.elapsed() < CYCLE_EVERY
+        {
+            return false;
+        }
+    }
+    let offset = offset();
+    let accounts = google::accounts();
+    let Ok(sources) = sources(&accounts) else {
+        // No connection: the marks read before stay.
+        return false;
+    };
+    let now = now();
+    let mut marks = Vec::new();
+    for source in &sources {
+        for symbol in symbols {
+            let url = events_url(source, now - CYCLE_BACK, now + 60 * 24 * 3600, Some(symbol));
+            match google::get_json::<EventsPage>(&source.account, &url) {
+                Ok(page) => marks.extend(
+                    calendar::read_marks(&page.items, symbol, offset)
+                        .into_iter()
+                        .map(|mark| (symbol.clone(), source.id.clone(), mark)),
+                ),
+                Err(GoogleError::Unexpected) => {}
+                Err(_) => return false,
+            }
+        }
+    }
+    let mut cycle = CYCLE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let changed = cycle.as_ref().is_none_or(|before| before.marks != marks);
+    *cycle = Some(CycleMarks {
+        at: Instant::now(),
+        symbols: symbols.to_vec(),
+        marks,
+    });
+    changed
+}
+
 fn run() {
     loop {
-        if WANTED.load(Ordering::Relaxed) {
+        let (calendar, symbols) = wanted();
+        if !symbols.is_empty() && read_cycle(&symbols) {
+            super::native_dock::calendar_changed();
+        }
+        if calendar {
             let read = read();
             let changed = {
                 let mut state = STATE
@@ -209,7 +312,9 @@ fn sources(accounts: &[String]) -> Result<Vec<Source>, GoogleError> {
     Ok(sources)
 }
 
-fn events_url(source: &Source, from: i64, to: i64) -> String {
+/// The events of `source` between `from` and `to`; with `query`, only those
+/// that have it (Google's `q`).
+fn events_url(source: &Source, from: i64, to: i64, query: Option<&str>) -> String {
     let stamp = |at: i64| {
         jiff::Timestamp::from_second(at)
             .map(|at| at.to_string())
@@ -228,6 +333,9 @@ fn events_url(source: &Source, from: i64, to: i64) -> String {
         .append_pair("singleEvents", "true")
         .append_pair("orderBy", "startTime")
         .append_pair("maxResults", "250");
+    if let Some(query) = query {
+        url.query_pairs_mut().append_pair("q", query);
+    }
     url.into()
 }
 
@@ -273,7 +381,7 @@ fn read() -> Snapshot {
     let mut events = Vec::new();
     let mut status = Status::Ok;
     for source in &sources {
-        match google::get_json::<EventsPage>(&source.account, &events_url(source, from, to)) {
+        match google::get_json::<EventsPage>(&source.account, &events_url(source, from, to, None)) {
             Ok(page) => events.extend(calendar::read_events(page.items, source, offset)),
             Err(GoogleError::SignInAgain) => status = Status::SignInAgain,
             // A calendar that can't be read (no longer shared): the others
@@ -383,7 +491,13 @@ mod tests {
             color: None,
             access: 1,
         };
-        let url = url::Url::parse(&events_url(&source, 1_793_156_400, 1_793_329_200)).unwrap();
+        let url = url::Url::parse(&events_url(
+            &source,
+            1_793_156_400,
+            1_793_329_200,
+            Some("🌸"),
+        ))
+        .unwrap();
         assert_eq!(
             url.path(),
             "/calendar/v3/calendars/pt-br.brazilian%23holiday@group.v.calendar.google.com/events"
@@ -392,6 +506,8 @@ mod tests {
         assert_eq!(pairs["timeMin"], "2026-10-28T03:00:00Z");
         assert_eq!(pairs["timeMax"], "2026-10-30T03:00:00Z");
         assert_eq!(pairs["singleEvents"], "true");
+        // The Ciclo asks only for the events with its symbol.
+        assert_eq!(pairs["q"], "🌸");
     }
 
     #[test]

@@ -12,13 +12,14 @@ import { format, useT } from "../i18n";
 import { MiniTile } from "../panel/DockItems";
 import "./WidgetCatalog.css";
 
-type Category = "system" | "time" | "productivity";
+type Category = "system" | "time" | "productivity" | "personal";
 
 /** The catalog's shelves, in order, with their kinds. */
 const SHELVES: readonly { category: Category; kinds: CreatableKind[] }[] = [
   { category: "system", kinds: ["activity", "network"] },
   { category: "time", kinds: ["calendar", "clock", "time-progress"] },
   { category: "productivity", kinds: ["note"] },
+  { category: "personal", kinds: ["cycle"] },
 ];
 
 /** How many icons wide a new instance of each kind is (its default). */
@@ -29,6 +30,7 @@ const WIDTHS: Readonly<Record<CreatableKind, number>> = {
   activity: 1,
   network: 2,
   calendar: 2,
+  cycle: 1,
 };
 
 /** Text compared without case or accents: "relogio" finds "Relógio". */

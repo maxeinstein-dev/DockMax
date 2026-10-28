@@ -595,6 +595,7 @@ const messages = {
       activity: "Atividade",
       network: "Atividade de rede",
       calendar: "Calendário",
+      cycle: "Ciclo",
     } satisfies Record<WidgetKind, string>,
     /** Short name of each kind on the add buttons of Itens do dock. */
     addNames: {
@@ -604,6 +605,7 @@ const messages = {
       activity: "Atividade",
       network: "Rede",
       calendar: "Calendário",
+      cycle: "Ciclo",
     } satisfies Record<CreatableKind, string>,
     /** Parts every widget panel shares. */
     common: {
@@ -796,6 +798,7 @@ const messages = {
         system: "Sistema",
         time: "Tempo",
         productivity: "Produtividade",
+        personal: "Pessoal",
       },
       descriptions: {
         clock: "A hora no ícone, digital ou de ponteiros, em qualquer fuso.",
@@ -805,6 +808,7 @@ const messages = {
         network: "Download e upload agora, com o gráfico do último minuto.",
         calendar:
           "As próximas reuniões das suas agendas Google, com Entrar a um clique.",
+        cycle: "Acompanha um ciclo marcado na agenda, com discrição no dock.",
       } satisfies Record<CreatableKind, string>,
       /** The add button of a card, and its accessible name. */
       add: "Adicionar",
@@ -871,6 +875,40 @@ const messages = {
       showTasks: "Tarefas do Google",
       showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },
+    /** The Ciclo (spec 0017 F2b): the panel says what the tile doesn't. */
+    cycle: {
+      settingsTitle: "Ajustes do ciclo",
+      unknown: "Nenhuma marca encontrada ainda.",
+      period: "Menstruação · dia {day}",
+      sensitive: {
+        one: "TPM · a menstruação deve vir em {n} dia",
+        other: "TPM · a menstruação deve vir em {n} dias",
+      },
+      between: {
+        one: "Próxima menstruação em {n} dia",
+        other: "Próxima menstruação em {n} dias",
+      },
+      due: "A próxima está prevista para estes dias.",
+      next: "Próxima prevista",
+      last: "Última",
+      cycleLength: "Ciclo médio",
+      periodLength: "Duração média",
+      days: "{n} dias",
+      defaults:
+        "Com menos de duas marcas, a previsão usa 28 dias de ciclo e 5 de duração. Cada marca é um evento “{symbol}” de dia inteiro no primeiro dia.",
+      basedOn: {
+        one: "Com base no último ciclo.",
+        other: "Com base nos últimos {n} ciclos.",
+      },
+      footer: "Lido dos eventos “{symbol}”, sem guardar",
+      noAccounts: "Conecte a conta Google em Configurações › Contas.",
+      loading: "Lendo as marcas…",
+      symbol: "Símbolo das marcas",
+      calendar: "Agenda das marcas",
+      allCalendars: "Todas as agendas",
+      window: "TPM: dias antes",
+      windowHint: "Quantos dias antes da menstruação prevista a TPM começa.",
+    },
     items: {
       /** The navigation row in Configurações, and the subview's title. */
       title: "Itens do dock",
@@ -928,6 +966,8 @@ const messages = {
         "Essa pasta não é aceita. Use o caminho completo de uma pasta do Windows.",
       invalidWidth: "Essa largura não vale para este widget.",
       invalidCalendars: "Não foi possível guardar os ajustes do calendário.",
+      invalidCycle:
+        "Use um símbolo de até 16 caracteres e uma janela de 1 a 10 dias.",
       noteTooLarge: "Passou de 64 KB e não foi salvo. Encurte o texto.",
       invalidConfig:
         "Não foi possível aplicar este ajuste. Feche o painel e tente de novo.",

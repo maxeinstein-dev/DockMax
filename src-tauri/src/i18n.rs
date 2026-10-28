@@ -63,6 +63,7 @@ pub struct DockMessages {
     pub activity: &'static str,
     pub network: &'static str,
     pub calendar: &'static str,
+    pub cycle: &'static str,
     /// The progress tile without a period running.
     pub no_value: &'static str,
     /// The Calendário's tile (spec 0017 F2a): no account, no meeting left,
@@ -171,6 +172,7 @@ const PT_BR: Messages = Messages {
         activity: "Atividade",
         network: "Atividade de rede",
         calendar: "Calendário",
+        cycle: "Ciclo",
         no_value: "–",
         calendar_connect: "Conectar",
         calendar_free: "Livre",

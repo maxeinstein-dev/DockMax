@@ -163,6 +163,12 @@ impl Glaze {
         s: 40.0,
         l: 44.0,
     };
+    /// Ardósia rosada: the Ciclo, discreet.
+    pub const CYCLE: Glaze = Glaze {
+        h: 335.0,
+        s: 18.0,
+        l: 40.0,
+    };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {
         h: 222.0,
@@ -276,6 +282,7 @@ mod tests {
             ("t-activity", Glaze::ACTIVITY),
             ("t-network", Glaze::NETWORK),
             ("t-calendar", Glaze::CALENDAR),
+            ("t-cycle", Glaze::CYCLE),
         ];
         for (class, glaze) in glazes {
             let css_glaze = Glaze {

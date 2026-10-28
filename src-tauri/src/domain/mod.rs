@@ -6,6 +6,7 @@ pub mod apps;
 pub mod badges;
 pub mod browser_profile;
 pub mod calendar;
+pub mod cycle;
 pub mod dock_items;
 pub mod dock_layout;
 pub mod fullscreen;

@@ -75,6 +75,7 @@ pub struct Names {
     pub activity: &'static str,
     pub network: &'static str,
     pub calendar: &'static str,
+    pub cycle: &'static str,
 }
 
 impl Names {
@@ -93,6 +94,7 @@ impl Names {
                     WidgetKind::Activity => self.activity,
                     WidgetKind::Network => self.network,
                     WidgetKind::Calendar => self.calendar,
+                    WidgetKind::Cycle => self.cycle,
                 }
                 .to_string()
             }),
@@ -246,6 +248,7 @@ mod tests {
         activity: "Atividade",
         network: "Atividade de rede",
         calendar: "Calendário",
+        cycle: "Ciclo",
     };
 
     fn id(n: u8) -> WidgetId {

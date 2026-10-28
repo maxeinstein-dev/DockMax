@@ -2,7 +2,7 @@
 
 Fase F da [spec 0004](0004-paridade-primodock.md) (§3.5), depois da fase E. Referência do PrimoDock em [`docs/reference/primodock/interface.md`](../reference/primodock/interface.md) (aba Widgets: catálogo, "Em uso", largura do tile) e [`settings-e-dados.md`](../reference/primodock/settings-e-dados.md).
 
-**Status:** em andamento: F1 (PR #52), F1b (PR #53), F2a-1 (Contas Google, PR #54 e #55, [ADR 0012](../adr/0012-contas-google.md)) e F2a-2 (o widget Calendário, PR #57) entregues; F2a-3 (Tasks) em curso; o iCal ficou para depois; F2b a F5 a fazer.
+**Status:** em andamento: F1 (PR #52), F1b (#53), F2a-1 (Contas Google, #54 e #55, [ADR 0012](../adr/0012-contas-google.md)), F2a-2 (Calendário, #57), F2a-3 (Tasks, #58) e F2a-4 (cartão, #59) entregues; F2b-1 (o widget Ciclo, com o [guia do Atalho do iPhone](../guia-atalho-ciclo.md)) em curso; F2b-2 (avisos e lembretes do Ciclo), F2c a F5 a fazer; o iCal ficou para depois.
 
 ## 1. Decisões do autor (2026-10-27)
 

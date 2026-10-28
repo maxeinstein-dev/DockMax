@@ -627,6 +627,7 @@ fn names() -> Names {
         activity: dock.activity,
         network: dock.network,
         calendar: dock.calendar,
+        cycle: dock.cycle,
     }
 }
 
@@ -917,7 +918,18 @@ impl Dock {
         let calendar = self.items.iter().any(|item| {
             matches!(item, Item::Widget(widget) if matches!(widget.config, WidgetConfig::Calendar(_)))
         });
-        super::calendar::want(self.hwnd.0 as isize, calendar);
+        let symbols: Vec<String> = self
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Widget(widget) => match &widget.config {
+                    WidgetConfig::Cycle(config) => Some(config.symbol.trim().to_owned()),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect();
+        super::calendar::want(self.hwnd.0 as isize, calendar, symbols);
         let wanted = self.items.iter().any(|item| {
             matches!(
                 item,
@@ -3197,6 +3209,7 @@ pub fn view() -> Option<View> {
                         crate::domain::widgets::WidgetConfig::Activity(_) => "meters",
                         crate::domain::widgets::WidgetConfig::Network(_) => "rates",
                         crate::domain::widgets::WidgetConfig::Calendar(_) => "agenda",
+                        crate::domain::widgets::WidgetConfig::Cycle(_) => "ring",
                         _ => "glyph",
                     },
                 };

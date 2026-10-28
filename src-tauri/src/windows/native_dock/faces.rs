@@ -221,6 +221,37 @@ pub fn agenda(
     }
 }
 
+/// The Ciclo's face (spec 0017 F2b), discreet: a ring of the cycle and a
+/// number, the days to the next start, or `•2` on the period's second day.
+/// No word on the tile: the panel says what it is.
+pub fn cycle(config: &crate::domain::widgets::CycleConfig, size: DockSize) -> Face {
+    use crate::domain::cycle::{self, Phase};
+    let offset = crate::windows::calendar::offset();
+    let today = cycle::day_of(crate::windows::calendar::now(), offset);
+    let marks = crate::windows::calendar::cycle_marks(config.symbol.trim(), |calendar| {
+        config.reads(calendar)
+    });
+    let status = marks.map(|marks| {
+        cycle::status(
+            &cycle::periods(&marks, offset),
+            today,
+            i64::from(config.sensitive),
+        )
+    });
+    let no_value = crate::i18n::messages().dock.no_value.to_string();
+    let text = match status.map(|status| status.phase) {
+        Some(Phase::Period { day }) => format!("•{day}"),
+        Some(Phase::Sensitive { days } | Phase::Between { days }) => days.max(0).to_string(),
+        Some(Phase::Unknown) | None => no_value,
+    };
+    Face::Ring {
+        glaze: Glaze::CYCLE,
+        fraction: status.as_ref().and_then(cycle::fraction),
+        // The small size shows only the ring.
+        text: (size != DockSize::Small).then_some(text),
+    }
+}
+
 /// The face of `widget` at `now`, with the system's reading for the
 /// system widgets and the calendar's for the Calendário.
 pub fn widget(
@@ -295,6 +326,7 @@ pub fn widget(
             }),
         },
         WidgetConfig::Network(config) => rates(config.width, system),
+        WidgetConfig::Cycle(config) => cycle(config, size),
         WidgetConfig::Calendar(config) => {
             agenda(config, calendar, crate::windows::calendar::now(), opened)
         }
