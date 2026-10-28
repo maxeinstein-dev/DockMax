@@ -74,6 +74,7 @@ pub struct Names {
     pub files: &'static str,
     pub activity: &'static str,
     pub network: &'static str,
+    pub calendar: &'static str,
 }
 
 impl Names {
@@ -91,6 +92,7 @@ impl Names {
                     WidgetKind::Files => self.files,
                     WidgetKind::Activity => self.activity,
                     WidgetKind::Network => self.network,
+                    WidgetKind::Calendar => self.calendar,
                 }
                 .to_string()
             }),
@@ -243,6 +245,7 @@ mod tests {
         files: "Arquivos",
         activity: "Atividade",
         network: "Atividade de rede",
+        calendar: "Calendário",
     };
 
     fn id(n: u8) -> WidgetId {

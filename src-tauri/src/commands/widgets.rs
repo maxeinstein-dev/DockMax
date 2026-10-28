@@ -578,6 +578,7 @@ mod tests {
             (WidgetError::InvalidTarget, "invalidTarget"),
             (WidgetError::InvalidFolder, "invalidFolder"),
             (WidgetError::InvalidWidth, "invalidWidth"),
+            (WidgetError::InvalidCalendars, "invalidCalendars"),
             (WidgetError::NoteTooLarge, "noteTooLarge"),
             (WidgetError::InvalidConfig, "invalidConfig"),
             (WidgetError::Unavailable, "unavailable"),

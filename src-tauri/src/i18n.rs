@@ -62,8 +62,19 @@ pub struct DockMessages {
     pub files: &'static str,
     pub activity: &'static str,
     pub network: &'static str,
+    pub calendar: &'static str,
     /// The progress tile without a period running.
     pub no_value: &'static str,
+    /// The Calendário's tile (spec 0017 F2a): no account, no meeting left,
+    /// and when the next one is (`{n}` minutes).
+    pub calendar_connect: &'static str,
+    pub calendar_free: &'static str,
+    pub calendar_now: &'static str,
+    pub calendar_in: &'static str,
+    pub calendar_minutes: &'static str,
+    pub calendar_tomorrow: &'static str,
+    /// Before the meeting after the next one: `Depois 15:00 Daily`.
+    pub calendar_then: &'static str,
     /// The periods' names on a wide progress tile, in the order of
     /// `Period::ALL`.
     pub periods: [&'static str; 5],
@@ -147,7 +158,15 @@ const PT_BR: Messages = Messages {
         files: "Arquivos",
         activity: "Atividade",
         network: "Atividade de rede",
+        calendar: "Calendário",
         no_value: "–",
+        calendar_connect: "Conectar",
+        calendar_free: "Livre",
+        calendar_now: "agora",
+        calendar_in: "em {n} min",
+        calendar_minutes: "{n} min",
+        calendar_tomorrow: "amanhã",
+        calendar_then: "Depois",
         periods: ["Dia", "Semana", "Mês", "Ano", "Expediente"],
         with_notice: "{name} (com aviso)",
         workspace: "Espaço {name}",

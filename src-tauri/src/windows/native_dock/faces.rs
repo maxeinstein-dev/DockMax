@@ -3,15 +3,18 @@
 
 use windows::Win32::Foundation::SYSTEMTIME;
 
-use super::paint::{self, Face, Graph, Meter};
+use super::paint::{self, AgendaLine, Face, Graph, Meter};
 use super::theme::Glaze;
+use crate::domain::calendar::{self, When};
 use crate::domain::dock_layout::DockSize;
 use crate::domain::live_faces::{self, Wall};
 use crate::domain::system_activity::{self, Reading};
+use crate::domain::widgets::calendar::CalendarConfig;
 use crate::domain::widgets::clock::{ClockConfig, ClockIconStyle};
 use crate::domain::widgets::system::{ActivityConfig, ActivityShow, ActivityStyle};
 use crate::domain::widgets::time_progress::{Period, TimeProgressConfig};
 use crate::domain::widgets::{WidgetConfig, WidgetInstance};
+use crate::windows::calendar::{Snapshot, Status};
 
 /// The wall clock of the system's zone.
 pub fn wall(now: &SYSTEMTIME) -> Wall {
@@ -127,13 +130,81 @@ pub fn rates(width: u8, reading: Option<&Reading>) -> Face {
     }
 }
 
+/// The Calendário's face (spec 0017 F2a): the next meeting of the
+/// calendars it shows, as wide as it is.
+pub fn agenda(config: &CalendarConfig, snapshot: Option<&Snapshot>, now: i64) -> Face {
+    let text = &crate::i18n::messages().dock;
+    let line = |text: String, size: f64, strong: bool| AgendaLine { text, size, strong };
+    let width = config.width;
+    let lines = match snapshot {
+        None => vec![line(text.no_value.into(), 0.24, true)],
+        Some(snapshot) if snapshot.status == Status::NoAccounts => {
+            vec![line(text.calendar_connect.into(), 0.16, true)]
+        }
+        Some(snapshot) => {
+            let shown: Vec<_> = snapshot
+                .events
+                .iter()
+                .filter(|event| config.shows(&event.calendar))
+                .cloned()
+                .collect();
+            let next = calendar::upcoming(&shown, now);
+            let say = |when: When, long: bool| match when {
+                When::Now => text.calendar_now.to_owned(),
+                When::In(minutes) if long => text.calendar_in.replace("{n}", &minutes.to_string()),
+                When::In(minutes) => text.calendar_minutes.replace("{n}", &minutes.to_string()),
+                When::At(time) => time,
+                When::Tomorrow(time) if long => format!("{} · {time}", text.calendar_tomorrow),
+                When::Tomorrow(_) => text.calendar_tomorrow.to_owned(),
+            };
+            match next.first() {
+                None => vec![line(text.calendar_free.into(), 0.2, true)],
+                Some(first) => {
+                    let when = calendar::when(first, now, snapshot.offset);
+                    match width {
+                        1 => vec![line(say(when, false), 0.22, true)],
+                        2 => vec![
+                            line(say(when, true), 0.2, true),
+                            line(first.title.clone(), 0.15, false),
+                        ],
+                        _ => {
+                            let mut lines = vec![
+                                line(first.title.clone(), 0.17, true),
+                                line(say(when, true), 0.14, false),
+                            ];
+                            if let Some(then) = next.get(1) {
+                                lines.push(line(
+                                    format!(
+                                        "{} {} {}",
+                                        text.calendar_then,
+                                        calendar::clock(then.start, snapshot.offset),
+                                        then.title
+                                    ),
+                                    0.13,
+                                    false,
+                                ));
+                            }
+                            lines
+                        }
+                    }
+                }
+            }
+        }
+    };
+    Face::Agenda {
+        glaze: Glaze::CALENDAR,
+        lines,
+    }
+}
+
 /// The face of `widget` at `now`, with the system's reading for the
-/// system widgets.
+/// system widgets and the calendar's for the Calendário.
 pub fn widget(
     widget: &WidgetInstance,
     size: DockSize,
     now: &SYSTEMTIME,
     system: Option<&Reading>,
+    calendar: Option<&Snapshot>,
 ) -> Face {
     match &widget.config {
         WidgetConfig::Clock(config) => {
@@ -199,10 +270,90 @@ pub fn widget(
             }),
         },
         WidgetConfig::Network(config) => rates(config.width, system),
+        WidgetConfig::Calendar(config) => agenda(config, calendar, crate::windows::calendar::now()),
         // Never on the dock in this phase (`dock_items` leaves them out).
         WidgetConfig::Shortcut(_) | WidgetConfig::Files(_) => Face::Glyph {
             glaze: Glaze::FILES,
             paths: paint::NOTE_GLYPH,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::calendar::Event;
+
+    const NOW: i64 = 1_793_188_800; // 2026-10-28 09:00 in Brasília.
+    const BRT: i64 = -3 * 3600;
+
+    fn event(title: &str, calendar: &str, start: i64) -> Event {
+        Event {
+            id: title.into(),
+            calendar: calendar.into(),
+            calendar_name: String::new(),
+            color: None,
+            title: title.into(),
+            start,
+            end: start + 1800,
+            all_day: false,
+            location: None,
+            description: None,
+            join: None,
+            link: None,
+            key: title.into(),
+        }
+    }
+
+    fn snapshot(events: Vec<Event>) -> Snapshot {
+        Snapshot {
+            status: Status::Ok,
+            events,
+            sources: Vec::new(),
+            offset: BRT,
+        }
+    }
+
+    fn lines(width: u8, hidden: &[&str], snapshot: Option<&Snapshot>) -> Vec<String> {
+        let config = CalendarConfig {
+            width,
+            hidden: hidden.iter().map(|id| id.to_string()).collect(),
+        };
+        match agenda(&config, snapshot, NOW) {
+            Face::Agenda { lines, .. } => lines.into_iter().map(|line| line.text).collect(),
+            _ => panic!("not the Calendário's face"),
+        }
+    }
+
+    #[test]
+    fn the_calendar_tile_says_more_the_wider_it_is() {
+        let day = snapshot(vec![
+            event("Daily", "max", NOW + 9 * 60),
+            event("Revisão", "max", NOW + 2 * 3600),
+        ]);
+        assert_eq!(lines(1, &[], Some(&day)), ["9 min"]);
+        assert_eq!(lines(2, &[], Some(&day)), ["em 9 min", "Daily"]);
+        assert_eq!(
+            lines(3, &[], Some(&day)),
+            ["Daily", "em 9 min", "Depois 11:00 Revisão"]
+        );
+    }
+
+    #[test]
+    fn the_calendar_tile_leaves_hidden_calendars_out_and_says_when_free() {
+        let day = snapshot(vec![event("Plantão", "noiva", NOW + 600)]);
+        assert_eq!(lines(2, &["noiva"], Some(&day)), ["Livre"]);
+        let tomorrow = snapshot(vec![event("Dentista", "max", NOW + 24 * 3600)]);
+        assert_eq!(lines(1, &[], Some(&tomorrow)), ["amanhã"]);
+        assert_eq!(
+            lines(2, &[], Some(&tomorrow)),
+            ["amanhã · 09:00", "Dentista"]
+        );
+        let none = Snapshot {
+            status: Status::NoAccounts,
+            ..snapshot(vec![])
+        };
+        assert_eq!(lines(2, &[], Some(&none)), ["Conectar"]);
+        assert_eq!(lines(2, &[], None), ["–"]);
     }
 }

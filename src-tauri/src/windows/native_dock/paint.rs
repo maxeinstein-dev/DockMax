@@ -111,6 +111,12 @@ pub enum Face {
         meters: Vec<Meter>,
         graph: Option<Vec<f32>>,
     },
+    /// The Calendário (spec 0017 F2a): lines of text, the first one the
+    /// strongest, left-aligned on a wide tile and centered on a square one.
+    Agenda {
+        glaze: Glaze,
+        lines: Vec<AgendaLine>,
+    },
     /// The Atividade de rede: the rates and, on a wide tile, the graph.
     Rates {
         glaze: Glaze,
@@ -130,6 +136,16 @@ pub struct Meter {
     pub fraction: Option<f32>,
     /// The figure, as `42%`.
     pub text: String,
+}
+
+/// A line of the Calendário's tile.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AgendaLine {
+    pub text: String,
+    /// The text's size, as a share of the tile's height.
+    pub size: f64,
+    /// White and bold; the others are fainter.
+    pub strong: bool,
 }
 
 /// The network's last minute, each value 0–1 of the graph's height.
@@ -1179,6 +1195,10 @@ impl Painter {
                     meters: meters.clone(),
                     graph: graph.clone(),
                 },
+                Face::Agenda { glaze, lines } => Face::Agenda {
+                    glaze: *glaze,
+                    lines: lines.clone(),
+                },
                 Face::Rates {
                     glaze,
                     down,
@@ -1313,6 +1333,10 @@ impl Painter {
                     }
                     None => self.meters(area, *style, meters),
                 }
+            }
+            Face::Agenda { glaze, lines } => {
+                self.glaze(area, *glaze, tile.pressed);
+                self.agenda(area, lines);
             }
             Face::Rates {
                 glaze,
@@ -1513,6 +1537,57 @@ impl Painter {
                     );
                 }
             }
+        }
+    }
+
+    /// `text`, cut with an ellipsis until it is at most `room` wide.
+    fn fit(&mut self, text: &str, room: f64, size: f64, weight: i32) -> String {
+        if self.text_width(text, size, weight, true) <= room {
+            return text.to_owned();
+        }
+        let mut chars: Vec<char> = text.chars().collect();
+        while !chars.is_empty() {
+            chars.pop();
+            let cut: String = chars.iter().collect::<String>().trim_end().to_owned() + "…";
+            if self.text_width(&cut, size, weight, true) <= room {
+                return cut;
+            }
+        }
+        String::new()
+    }
+
+    /// The Calendário's lines, one under the other, the block centered on
+    /// the tile's height.
+    fn agenda(&mut self, area: Area, lines: &[AgendaLine]) {
+        let u = area.height;
+        let wide = area.width > u * 1.2;
+        let inset = u * if wide { 0.16 } else { 0.08 };
+        let room = area.width - 2.0 * inset;
+        let heights: Vec<f64> = lines.iter().map(|line| u * line.size * 1.3).collect();
+        let mut y = area.y + (u - heights.iter().sum::<f64>()) / 2.0;
+        for (line, height) in lines.iter().zip(heights) {
+            let size = u * line.size;
+            let weight = if line.strong { 600 } else { 500 };
+            let text = self.fit(&line.text, room, size, weight);
+            let ink = if line.strong {
+                Color::WHITE
+            } else {
+                Color::WHITE.with_alpha(0.78)
+            };
+            if wide {
+                let width = self.text_width(&text, size, weight, true);
+                let place = Area {
+                    x: area.x + inset,
+                    y,
+                    width,
+                    height,
+                };
+                self.text(&text, place, size, weight, true, ink);
+            } else {
+                let place = Area { y, height, ..area };
+                self.text(&text, place, size, weight, true, ink);
+            }
+            y += height;
         }
     }
 

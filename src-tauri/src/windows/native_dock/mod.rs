@@ -618,6 +618,7 @@ fn names() -> Names {
         files: dock.files,
         activity: dock.activity,
         network: dock.network,
+        calendar: dock.calendar,
     }
 }
 
@@ -889,6 +890,10 @@ impl Dock {
     /// Reads the system for its widgets every [`ACTIVITY_EVERY`] while one
     /// is on the dock, and stops when none is: then nothing is read.
     fn arm_activity(&mut self) {
+        let calendar = self.items.iter().any(|item| {
+            matches!(item, Item::Widget(widget) if matches!(widget.config, WidgetConfig::Calendar(_)))
+        });
+        super::calendar::want(self.hwnd.0 as isize, calendar);
         let wanted = self.items.iter().any(|item| {
             matches!(
                 item,
@@ -1783,7 +1788,18 @@ impl Dock {
         match item {
             Item::App(app) => program(&app.app_id, None),
             Item::Other(other) => program(&other.app_id, other.badge.then_some(other.key.as_str())),
-            Item::Widget(widget) => faces::widget(widget, size, clock, self.activity.as_ref()),
+            Item::Widget(widget) => {
+                let calendar = matches!(widget.config, WidgetConfig::Calendar(_))
+                    .then(super::calendar::snapshot)
+                    .flatten();
+                faces::widget(
+                    widget,
+                    size,
+                    clock,
+                    self.activity.as_ref(),
+                    calendar.as_ref(),
+                )
+            }
             Item::System(SystemItem::Settings) => Face::Glyph {
                 glaze: theme::Glaze::SETTINGS,
                 paths: paint::SETTINGS_GLYPH,
@@ -2219,6 +2235,31 @@ impl Dock {
     }
 
     fn middle_click(&mut self, index: usize) {
+        // The Calendário joins the meeting that starts within 10 minutes
+        // (spec 0017 F2a), whatever the programs' middle click does.
+        if let Some(Item::Widget(widget)) = self.items.get(index)
+            && let WidgetConfig::Calendar(config) = &widget.config
+        {
+            let config = config.clone();
+            self.effects.push(Box::new(move |_| {
+                let Some(snapshot) = super::calendar::snapshot() else {
+                    return;
+                };
+                let shown: Vec<_> = snapshot
+                    .events
+                    .into_iter()
+                    .filter(|event| config.shows(&event.calendar))
+                    .collect();
+                let now = super::calendar::now();
+                if let Some(join) = crate::domain::calendar::joinable(&shown, now)
+                    .and_then(|event| event.join.clone())
+                    && let Err(error) = super::google::open_meeting(&join)
+                {
+                    log::warn!("calendar: the meeting could not be opened: {error}");
+                }
+            }));
+            return;
+        }
         if self.data.settings.dock.middle_click != MiddleClick::NewInstance {
             return;
         }
@@ -2872,6 +2913,11 @@ pub fn refresh() {
     post(Dock::reload);
 }
 
+/// The Calendário's events were read again: the docks repaint.
+pub fn calendar_changed() {
+    post(Dock::paint);
+}
+
 /// The notification badges of the taskbar changed (spec 0016).
 pub fn badges_changed() {
     post(Dock::notices_changed);
@@ -2963,6 +3009,7 @@ pub fn view() -> Option<View> {
                         }
                         crate::domain::widgets::WidgetConfig::Activity(_) => "meters",
                         crate::domain::widgets::WidgetConfig::Network(_) => "rates",
+                        crate::domain::widgets::WidgetConfig::Calendar(_) => "agenda",
                         _ => "glyph",
                     },
                 };

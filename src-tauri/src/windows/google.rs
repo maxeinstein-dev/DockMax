@@ -125,6 +125,16 @@ pub fn accounts() -> Vec<String> {
         .collect()
 }
 
+/// Opens a meeting's address (Meet, Teams, Zoom) in the default browser,
+/// or in the app that takes it. Any other address is refused.
+pub fn open_meeting(url: &str) -> Result<(), GoogleError> {
+    if crate::domain::calendar::is_meeting_address(url) {
+        open_browser(url)
+    } else {
+        Err(GoogleError::Unexpected)
+    }
+}
+
 /// Opens `url` in the default browser.
 fn open_browser(url: &str) -> Result<(), GoogleError> {
     let result = unsafe {
@@ -299,6 +309,22 @@ pub fn access_token(email: &str) -> Result<String, GoogleError> {
     )?)?;
     remember(email, &tokens);
     Ok(tokens.access_token)
+}
+
+/// `GET url` for `email`'s account, JSON back. A 401 means the token went
+/// before its time (revoked): sign in again. Any other refusal (a calendar
+/// no longer shared) is [`GoogleError::Unexpected`].
+pub fn get_json<T: serde::de::DeserializeOwned>(email: &str, url: &str) -> Result<T, GoogleError> {
+    let token = access_token(email)?;
+    let response = http::get(url, Some(&token))?;
+    match response.status {
+        200 => serde_json::from_slice(&response.body).map_err(|_| GoogleError::Unexpected),
+        401 => {
+            forget_access(email);
+            Err(GoogleError::SignInAgain)
+        }
+        _ => Err(GoogleError::Unexpected),
+    }
 }
 
 fn forget_access(email: &str) {
