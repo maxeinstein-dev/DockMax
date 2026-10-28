@@ -169,11 +169,11 @@ impl Glaze {
         s: 18.0,
         l: 40.0,
     };
-    /// Mel: the Contagem regressiva.
+    /// Violeta: the Contagem regressiva.
     pub const COUNTDOWN: Glaze = Glaze {
-        h: 38.0,
-        s: 45.0,
-        l: 40.0,
+        h: 272.0,
+        s: 32.0,
+        l: 44.0,
     };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {

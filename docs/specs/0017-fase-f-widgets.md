@@ -90,7 +90,7 @@ Relógio e Nota ficam com 1 ícone.
 - **Período:** editável nos ajustes. O cartão rola entre as opções "o dia", "o dia e amanhã", "3 dias" e "a semana". O padrão é o dia; depois das 18h, as de amanhã até as 12h.
 - **Clique:** clicar numa reunião do cartão abre os detalhes no painel. Para entrar direto, vale o clique do meio no tile, como hoje.
 
-**Contagem regressiva (F2c-1).** O nome é o Rótulo do widget ("Casamento"); a config tem só a data e "Repetir todo ano" (aniversários: conta até o próximo; 29 de fevereiro cai no dia 28 nos anos sem ele). No dock, os dias que faltam e "dias" embaixo; "Hoje" no dia; depois, os dias que passaram com "dias atrás". Sem data, um traço. Esmalte Mel (`.t-countdown`).
+**Contagem regressiva (F2c-1).** O nome é o Rótulo do widget ("Casamento"); a config tem só a data e "Repetir todo ano" (aniversários: conta até o próximo; 29 de fevereiro cai no dia 28 nos anos sem ele). No dock, os dias que faltam e "dias" embaixo; "Hoje" no dia; depois, os dias que passaram com "dias atrás". Sem data, um traço. Esmalte Violeta (`.t-countdown`), longe dos tons da Nota e da Rede.
 
 **Pomodoro (F2c-2).** Como no Ciclo, o fim de cada etapa aparece no dock (balanço e selo), e a notificação do Windows é opção desligada: o autor não quer depender dela.
 
