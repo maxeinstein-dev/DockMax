@@ -406,6 +406,7 @@ mod tests {
                 sensitive: false,
                 eve: false,
                 day: false,
+                windows: true,
             },
             ..config.clone()
         };

@@ -9,7 +9,8 @@
     "notices": {
       "sensitive": true,
       "eve": true,
-      "day": true
+      "day": true,
+      "windows": false
     },
     "reminders": []
   }
