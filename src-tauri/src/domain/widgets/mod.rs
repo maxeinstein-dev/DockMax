@@ -911,7 +911,13 @@ mod tests {
             ),
             (
                 WidgetKind::Cycle,
-                json!({ "symbol": "🌸", "calendar": null, "sensitive": 5 }),
+                json!({
+                    "symbol": "🌸",
+                    "calendar": null,
+                    "sensitive": 5,
+                    "notices": { "sensitive": true, "eve": true, "day": true },
+                    "reminders": []
+                }),
             ),
         ];
         for (kind, config) in cases {

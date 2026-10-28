@@ -5,6 +5,18 @@
   "config": {
     "symbol": "🌸",
     "calendar": "noiva@example.com",
-    "sensitive": 3
+    "sensitive": 3,
+    "notices": {
+      "sensitive": true,
+      "eve": false,
+      "day": true
+    },
+    "reminders": [
+      {
+        "text": "Comprar chocolate",
+        "anchor": "sensitive",
+        "days": -1
+      }
+    ]
   }
 }

@@ -17,7 +17,13 @@ const instance: WidgetInstance<"cycle"> = {
   id: "c",
   label: null,
   kind: "cycle",
-  config: { symbol: "🌸", calendar: "noiva@example.com", sensitive: 5 },
+  config: {
+    symbol: "🌸",
+    calendar: "noiva@example.com",
+    sensitive: 5,
+    notices: { sensitive: true, eve: true, day: true },
+    reminders: [],
+  },
 };
 
 function status(phase: CycleStatus["phase"], cycles = 6): CycleStatus {
@@ -56,6 +62,7 @@ describe("CyclePanel", () => {
       status: status({ phase: "between", in: 17 }),
       today: TODAY,
       accounts: true,
+      notices: [],
     });
     show();
 
@@ -68,10 +75,25 @@ describe("CyclePanel", () => {
       screen.getByText("Com base nos últimos 6 ciclos."),
     ).toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("cycle_status", {
-      symbol: "🌸",
-      calendar: "noiva@example.com",
-      sensitive: 5,
+      config: instance.config,
     });
+    expect(screen.queryByText(text.today)).not.toBeInTheDocument();
+  });
+
+  it("lists today's notices, with the reminders' text", async () => {
+    answer({
+      status: status({ phase: "sensitive", in: 5 }),
+      today: TODAY,
+      accounts: true,
+      notices: [
+        { kind: "sensitive" },
+        { kind: "reminder", text: "Comprar chocolate" },
+      ],
+    });
+    show();
+    const today = await screen.findByRole("region", { name: text.today });
+    expect(today).toHaveTextContent(text.notices.sensitive);
+    expect(today).toHaveTextContent("Comprar chocolate");
   });
 
   it("names the period's day and the sensitive window", async () => {
@@ -79,6 +101,7 @@ describe("CyclePanel", () => {
       status: status({ phase: "period", day: 2 }),
       today: TODAY,
       accounts: true,
+      notices: [],
     });
     show();
     expect(await screen.findByText("Menstruação · dia 2")).toBeInTheDocument();
@@ -89,6 +112,7 @@ describe("CyclePanel", () => {
       status: status({ phase: "sensitive", in: 1 }),
       today: TODAY,
       accounts: true,
+      notices: [],
     });
     show();
     expect(
@@ -101,6 +125,7 @@ describe("CyclePanel", () => {
       status: status({ phase: "unknown" }, 0),
       today: TODAY,
       accounts: true,
+      notices: [],
     });
     show();
     expect(await screen.findByText(text.unknown)).toBeInTheDocument();
@@ -108,7 +133,7 @@ describe("CyclePanel", () => {
   });
 
   it("asks for a Google account when there is none", async () => {
-    answer({ status: null, today: TODAY, accounts: false });
+    answer({ status: null, today: TODAY, accounts: false, notices: [] });
     show();
     expect(await screen.findByText(text.noAccounts)).toBeInTheDocument();
   });

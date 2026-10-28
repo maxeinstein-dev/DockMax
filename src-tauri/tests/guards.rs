@@ -53,6 +53,8 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // The Ciclo's panel (spec 0017 F2b): where the cycle is,
             // computed from the marks, which never reach the page.
             "allow-cycle-status",
+            // A test of the Ciclo's neutral Windows notice (F2b-2).
+            "allow-cycle-test-notice",
             // Dragging a tray icon onto the dock keeps it there; the command
             // names an icon the list gave and a point on the screen.
             "allow-tray-to-dock",

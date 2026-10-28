@@ -24,28 +24,38 @@ export interface CycleStatus {
   marks: number;
 }
 
+/** A notice of today (F2b-2). Must match `Notice` in `domain/cycle.rs`. */
+export type CycleNotice =
+  | { kind: "sensitive" }
+  | { kind: "eve" }
+  | { kind: "day" }
+  | { kind: "reminder"; text: string };
+
 export interface CycleView {
   /** null until the marks were read. */
   status: CycleStatus | null;
   today: number;
   accounts: boolean;
+  /** Today's notices and reminders; the Windows notice never says them. */
+  notices: CycleNotice[];
+}
+
+/** Sends the neutral Windows notice once, to see it arrives. */
+export function cycleTestNotice(): Promise<void> {
+  return invoke<void>("cycle_test_notice");
 }
 
 /** How often an open panel asks again. */
 export const CYCLE_EVERY_MS = 60_000;
 
 export function cycleStatus(config: CycleConfig): Promise<CycleView> {
-  return invoke<CycleView>("cycle_status", {
-    symbol: config.symbol,
-    calendar: config.calendar,
-    sensitive: config.sensitive,
-  });
+  return invoke<CycleView>("cycle_status", { config });
 }
 
 /** The cycle of `config`, asked again every minute while mounted. */
 export function useCycle(config: CycleConfig): CycleView | null {
   const [view, setView] = useState<CycleView | null>(null);
-  const key = `${config.symbol}|${config.calendar ?? ""}|${config.sensitive}`;
+  const key = JSON.stringify(config);
   useEffect(() => {
     let active = true;
     const ask = () => {

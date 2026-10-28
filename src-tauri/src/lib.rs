@@ -126,6 +126,7 @@ macro_rules! handler {
             commands::calendar::open_calendar_link,
             commands::calendar::complete_calendar_task,
             commands::calendar::cycle_status,
+            commands::calendar::cycle_test_notice,
             commands::google::google_status,
             commands::google::set_google_client,
             commands::google::connect_google_account,
@@ -196,6 +197,7 @@ macro_rules! handler {
             commands::calendar::open_calendar_link,
             commands::calendar::complete_calendar_task,
             commands::calendar::cycle_status,
+            commands::calendar::cycle_test_notice,
             commands::google::google_status,
             commands::google::set_google_client,
             commands::google::connect_google_account,
@@ -281,6 +283,9 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // The name of the DockMax's Windows notices (spec 0017 F2b-2).
+            #[cfg(windows)]
+            windows::toast::set_identifier(&app.config().identifier);
             commands::settings::sync_launch_at_login(app.handle());
             windows::dock::setup(app.handle())?;
             #[cfg(windows)]

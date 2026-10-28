@@ -5,6 +5,12 @@
   "config": {
     "symbol": "🌸",
     "calendar": null,
-    "sensitive": 5
+    "sensitive": 5,
+    "notices": {
+      "sensitive": true,
+      "eve": true,
+      "day": true
+    },
+    "reminders": []
   }
 }

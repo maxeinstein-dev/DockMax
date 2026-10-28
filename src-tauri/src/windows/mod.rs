@@ -55,6 +55,8 @@ pub mod system_status;
 #[cfg(windows)]
 pub mod taskbar;
 #[cfg(windows)]
+pub mod toast;
+#[cfg(windows)]
 pub mod tray_host;
 #[cfg(windows)]
 pub mod window_spaces;

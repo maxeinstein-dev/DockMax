@@ -192,6 +192,69 @@ pub fn status(periods: &[Period], today: i64, sensitive: i64) -> Status {
     }
 }
 
+/// A notice of the Ciclo (F2b-2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum Notice {
+    /// The sensitive window opens today.
+    Sensitive,
+    /// The expected start is tomorrow.
+    Eve,
+    /// The expected start is today.
+    Day,
+    /// One of the author's reminders: its text.
+    Reminder { text: String },
+}
+
+impl Notice {
+    /// What tells this notice from the others of the day, for firing it
+    /// once.
+    pub fn key(&self) -> String {
+        match self {
+            Notice::Sensitive => "sensitive".into(),
+            Notice::Eve => "eve".into(),
+            Notice::Day => "day".into(),
+            Notice::Reminder { text } => format!("reminder:{text}"),
+        }
+    }
+}
+
+/// The notices of `today` for a cycle seen as `status`, with the widget's
+/// config: none without a prediction.
+pub fn notices(
+    status: &Status,
+    config: &crate::domain::widgets::CycleConfig,
+    today: i64,
+) -> Vec<Notice> {
+    use crate::domain::widgets::cycle::Anchor;
+    let Some(next) = status.next.filter(|_| status.phase != Phase::Unknown) else {
+        return Vec::new();
+    };
+    let opens = next - i64::from(config.sensitive);
+    let mut notices = Vec::new();
+    if config.notices.sensitive && today == opens {
+        notices.push(Notice::Sensitive);
+    }
+    if config.notices.eve && today == next - 1 {
+        notices.push(Notice::Eve);
+    }
+    if config.notices.day && today == next {
+        notices.push(Notice::Day);
+    }
+    for reminder in &config.reminders {
+        let anchor = match reminder.anchor {
+            Anchor::Sensitive => opens,
+            Anchor::Period => next,
+        };
+        if today == anchor + i64::from(reminder.days) {
+            notices.push(Notice::Reminder {
+                text: reminder.text.trim().to_owned(),
+            });
+        }
+    }
+    notices
+}
+
 /// The share of the cycle gone today, 0–1, for the tile's ring.
 pub fn fraction(status: &Status) -> Option<f32> {
     (status.day > 0).then(|| (status.day as f64 / status.averages.cycle).clamp(0.0, 1.0) as f32)
@@ -294,6 +357,61 @@ mod tests {
         assert_eq!(today.day, 13);
         assert_eq!(today.next, Some(156));
         assert_eq!(fraction(&today), Some(13.0 / 28.0));
+    }
+
+    #[test]
+    fn the_notices_fall_on_their_days() {
+        use crate::domain::widgets::CycleConfig;
+        use crate::domain::widgets::cycle::{Anchor, Reminder};
+        let periods = [
+            Period {
+                first: 100,
+                days: 5,
+            },
+            Period {
+                first: 128,
+                days: 5,
+            },
+        ];
+        // Next start: 156; the window of 5 days opens on 151.
+        let config = CycleConfig {
+            reminders: vec![
+                Reminder {
+                    text: " Comprar chocolate ".into(),
+                    anchor: Anchor::Sensitive,
+                    days: -1,
+                },
+                Reminder {
+                    text: "Paciência".into(),
+                    anchor: Anchor::Period,
+                    days: 1,
+                },
+            ],
+            ..CycleConfig::default()
+        };
+        let on = |today| notices(&status(&periods, today, 5), &config, today);
+        assert_eq!(
+            on(150),
+            [Notice::Reminder {
+                text: "Comprar chocolate".into()
+            }]
+        );
+        assert_eq!(on(151), [Notice::Sensitive]);
+        assert_eq!(on(155), [Notice::Eve]);
+        assert_eq!(on(156), [Notice::Day]);
+        assert!(on(140).is_empty());
+        // Turned off: only the reminders.
+        let quiet = CycleConfig {
+            notices: crate::domain::widgets::cycle::Notices {
+                sensitive: false,
+                eve: false,
+                day: false,
+            },
+            ..config.clone()
+        };
+        assert!(notices(&status(&periods, 151, 5), &quiet, 151).is_empty());
+        // Without marks, nothing.
+        assert!(notices(&status(&[], 151, 5), &config, 151).is_empty());
     }
 
     #[test]

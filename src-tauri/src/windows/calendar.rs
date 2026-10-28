@@ -20,6 +20,7 @@ use super::google::{self, GoogleError};
 use crate::domain::calendar::{self, Event, EventsPage, Source};
 use crate::domain::cycle::Mark;
 use crate::domain::tasks::{self, GoogleTaskList, GoogleTaskLists, GoogleTasks, Task};
+use crate::domain::widgets::CycleConfig;
 
 /// How often the events are read again.
 const EVERY: Duration = Duration::from_secs(60);
@@ -83,7 +84,14 @@ type AccountList = (String, GoogleTaskList);
 static LISTS: Mutex<Option<(Instant, Vec<AccountList>)>> = Mutex::new(None);
 /// The docks (by window) that have a Calendário, and the symbols of their
 /// Ciclos: read while any has one.
-static WANTERS: Mutex<Vec<(isize, bool, Vec<String>)>> = Mutex::new(Vec::new());
+static WANTERS: Mutex<Vec<(isize, bool, Vec<CycleConfig>)>> = Mutex::new(Vec::new());
+
+/// The Ciclo's notices already shown, by day, symbol, calendar and notice:
+/// each once a day. In memory: one may show again after a restart.
+static FIRED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// The local hour from which the day's notices show.
+const NOTICE_HOUR: i64 = 9;
 
 /// The Ciclo's marks (spec 0017 F2b): each symbol's, by calendar, read
 /// again every half hour. Only the events with the symbol are asked for
@@ -135,14 +143,14 @@ pub fn snapshot() -> Option<Snapshot> {
 /// Whether the dock `dock` has a Calendário, and its Ciclos' symbols: the
 /// reading starts (its thread, the first time) while any dock has one, and
 /// stops when none has.
-pub fn want(dock: isize, calendar: bool, symbols: Vec<String>) {
+pub fn want(dock: isize, calendar: bool, cycles: Vec<CycleConfig>) {
     let on = {
         let mut wanters = WANTERS
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         wanters.retain(|(each, _, _)| *each != dock);
-        if calendar || !symbols.is_empty() {
-            wanters.push((dock, calendar, symbols));
+        if calendar || !cycles.is_empty() {
+            wanters.push((dock, calendar, cycles));
         }
         !wanters.is_empty()
     };
@@ -166,19 +174,75 @@ pub fn read_now() {
     wake.notify_all();
 }
 
-/// Whether a dock has a Calendário, and every Ciclo's symbol, each once.
-fn wanted() -> (bool, Vec<String>) {
+/// Whether a dock has a Calendário, and every Ciclo's config.
+fn wanted() -> (bool, Vec<CycleConfig>) {
     let wanters = WANTERS
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let calendar = wanters.iter().any(|(_, calendar, _)| *calendar);
-    let mut symbols: Vec<String> = wanters
+    let mut cycles: Vec<CycleConfig> = wanters
         .iter()
-        .flat_map(|(_, _, symbols)| symbols.iter().cloned())
+        .flat_map(|(_, _, cycles)| cycles.iter().cloned())
+        .collect();
+    cycles.dedup();
+    (calendar, cycles)
+}
+
+/// Every Ciclo's symbol, each once.
+fn symbols_of(cycles: &[CycleConfig]) -> Vec<String> {
+    let mut symbols: Vec<String> = cycles
+        .iter()
+        .map(|cycle| cycle.symbol.trim().to_owned())
         .collect();
     symbols.sort();
     symbols.dedup();
-    (calendar, symbols)
+    symbols
+}
+
+/// Shows the day's notices of the Ciclos not shown yet, from 9h: one
+/// neutral Windows notice for all of them.
+fn notify(cycles: &[CycleConfig]) {
+    use crate::domain::cycle;
+    let offset = offset();
+    let now = now();
+    let today = cycle::day_of(now, offset);
+    if (now + offset).rem_euclid(24 * 3600) < NOTICE_HOUR * 3600 {
+        return;
+    }
+    let mut new = Vec::new();
+    for config in cycles {
+        let Some(marks) = cycle_marks(config.symbol.trim(), |id| config.reads(id)) else {
+            continue;
+        };
+        let status = cycle::status(
+            &cycle::periods(&marks, offset),
+            today,
+            i64::from(config.sensitive),
+        );
+        for notice in cycle::notices(&status, config, today) {
+            new.push(format!(
+                "{today}|{}|{}|{}",
+                config.symbol.trim(),
+                config.calendar.as_deref().unwrap_or(""),
+                notice.key()
+            ));
+        }
+    }
+    let unseen: Vec<String> = {
+        let mut fired = FIRED
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // Yesterday's are no use any more.
+        fired.retain(|key| key.starts_with(&format!("{today}|")));
+        let unseen: Vec<String> = new.into_iter().filter(|key| !fired.contains(key)).collect();
+        fired.extend(unseen.iter().cloned());
+        unseen
+    };
+    if !unseen.is_empty()
+        && let Err(error) = super::toast::cycle_notice()
+    {
+        log::warn!("cycle: the notice was not shown: {error}");
+    }
 }
 
 /// The marks of `symbol` in the calendars `reads` takes, as the last
@@ -248,9 +312,13 @@ fn read_cycle(symbols: &[String]) -> bool {
 
 fn run() {
     loop {
-        let (calendar, symbols) = wanted();
+        let (calendar, cycles) = wanted();
+        let symbols = symbols_of(&cycles);
         if !symbols.is_empty() && read_cycle(&symbols) {
             super::native_dock::calendar_changed();
+        }
+        if !cycles.is_empty() {
+            notify(&cycles);
         }
         if calendar {
             let read = read();

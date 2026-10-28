@@ -64,6 +64,10 @@
     "threeDays",
     "week"
   ],
+  "ReminderAnchor": [
+    "sensitive",
+    "period"
+  ],
   "WidgetErrorCode": [
     "limitReached",
     "notCreatable",

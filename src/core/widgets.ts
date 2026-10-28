@@ -224,10 +224,41 @@ export interface CycleConfig {
   calendar: string | null;
   /** 1 to 10; checked in Rust. */
   sensitive: number;
+  /** The Windows notices kept (F2b-2). */
+  notices: CycleNotices;
+  /** The author's own reminders (F2b-2). */
+  reminders: CycleReminder[];
 }
 
 /** The sensitive windows the settings offer, in days. */
 export const CYCLE_WINDOWS = [3, 4, 5, 6, 7] as const;
+
+/** The Ciclo's Windows notices: when the sensitive window opens, the eve
+ * of the expected start, and the day itself. */
+export interface CycleNotices {
+  sensitive: boolean;
+  eve: boolean;
+  day: boolean;
+}
+
+/** What a reminder counts from. Must match `Anchor` in Rust. */
+export type ReminderAnchor = "sensitive" | "period";
+
+export const REMINDER_ANCHORS = ["sensitive", "period"] as const;
+
+/** A reminder: `text`, `days` before (negative) or after its `anchor`. */
+export interface CycleReminder {
+  text: string;
+  anchor: ReminderAnchor;
+  /** -10 to 10; checked in Rust. */
+  days: number;
+}
+
+/** Most reminders and the longest text of one; checked in Rust. */
+export const MAX_REMINDERS = 10;
+export const MAX_REMINDER_CHARS = 120;
+/** How far from its phase a reminder may fall, in days. */
+export const REMINDER_DAYS = 10;
 
 /** The config of each kind. */
 export interface WidgetConfigs {
