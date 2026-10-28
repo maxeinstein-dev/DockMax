@@ -1,21 +1,18 @@
 //! Opens a program of the dock with files or a folder (spec 0018): the
 //! files dropped on its tile, or the folder its tile was dropped on.
 //!
-//! The paths go to the program as when they are dropped on its shortcut in
-//! Windows: its item of the Apps folder takes the drop, and Windows makes
-//! the command line (a shortcut's own arguments, a Store app that takes
-//! files). The terminals open *in* the folder instead.
+//! The paths go to the program as when they are dropped on its shortcut: on
+//! its command line, after the shortcut's own arguments. A Store app opens
+//! them as "Abrir com" does. The terminals open *in* the folder instead, and
+//! File Explorer opens the folder (or the file, with its program).
 
 use std::path::{Path, PathBuf};
 
-use windows::Win32::Foundation::POINTL;
-use windows::Win32::System::Com::{CoTaskMemFree, IDataObject};
-use windows::Win32::System::Ole::{DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_LINK, IDropTarget};
-use windows::Win32::System::SystemServices::MK_LBUTTON;
+use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::UI::Shell::Common::ITEMIDLIST;
 use windows::Win32::UI::Shell::{
-    BHID_DataObject, BHID_SFUIObject, IShellItemArray, SHCreateShellItemArrayFromIDLists,
-    SHParseDisplayName, ShellExecuteW,
+    ApplicationActivationManager, IApplicationActivationManager, IShellItemArray,
+    SHCreateShellItemArrayFromIDLists, SHParseDisplayName, ShellExecuteW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     DispatchMessageW, MSG, PM_REMOVE, PeekMessageW, SW_SHOWNORMAL, TranslateMessage,
@@ -30,6 +27,8 @@ enum Shell {
     /// A console (Prompt de Comando, PowerShell): its program, started in
     /// the folder.
     Console(PathBuf),
+    /// File Explorer: it opens the folder, or the file with its program.
+    Explorer,
 }
 
 /// Whether the program `id` of the Apps folder, running `target`, is a
@@ -42,6 +41,9 @@ fn shell_of(id: &str, target: Option<&Path>) -> Option<Shell> {
         || matches!(name.as_deref(), Some("wt.exe" | "windowsterminal.exe"))
     {
         return Some(Shell::Terminal);
+    }
+    if id == "Microsoft.Windows.Explorer" || name.as_deref() == Some("explorer.exe") {
+        return Some(Shell::Explorer);
     }
     match (name.as_deref(), target) {
         (Some("cmd.exe" | "powershell.exe" | "pwsh.exe"), Some(target)) => {
@@ -98,8 +100,8 @@ fn execute(file: &HSTRING, arguments: Option<&str>, folder: Option<&Path>) -> Re
     }
 }
 
-/// The files of `paths` as a drag carries them.
-fn data_of(paths: &[PathBuf]) -> windows::core::Result<IDataObject> {
+/// The files of `paths` as the shell's items.
+fn items_of(paths: &[PathBuf]) -> windows::core::Result<IShellItemArray> {
     let mut lists: Vec<*mut ITEMIDLIST> = Vec::new();
     let result = (|| {
         for path in paths {
@@ -110,8 +112,7 @@ fn data_of(paths: &[PathBuf]) -> windows::core::Result<IDataObject> {
             lists.push(list);
         }
         let constant: Vec<*const ITEMIDLIST> = lists.iter().map(|list| list.cast_const()).collect();
-        let array: IShellItemArray = unsafe { SHCreateShellItemArrayFromIDLists(&constant)? };
-        unsafe { array.BindToHandler(None, &BHID_DataObject) }
+        unsafe { SHCreateShellItemArrayFromIDLists(&constant) }
     })();
     for list in lists {
         unsafe { CoTaskMemFree(Some(list.cast_const().cast())) };
@@ -119,29 +120,18 @@ fn data_of(paths: &[PathBuf]) -> windows::core::Result<IDataObject> {
     result
 }
 
-/// Drops `paths` on the program's item of the Apps folder, as on its
-/// shortcut. Whether the item took them.
-fn drop_on_item(id: &str, paths: &[PathBuf]) -> Result<bool, String> {
-    let item = super::apps::item_of(id)?;
-    let target: IDropTarget =
-        unsafe { item.BindToHandler(None, &BHID_SFUIObject) }.map_err(|error| error.to_string())?;
-    let data = data_of(paths).map_err(|error| error.to_string())?;
-    let point = POINTL { x: 0, y: 0 };
-    let mut effect: DROPEFFECT = DROPEFFECT_COPY | DROPEFFECT_LINK;
-    unsafe { target.DragEnter(&data, MK_LBUTTON, point, &mut effect) }
-        .map_err(|error| error.to_string())?;
-    if effect.0 == 0 {
-        let _ = unsafe { target.DragLeave() };
-        return Ok(false);
-    }
-    unsafe { target.Drop(&data, MK_LBUTTON, point, &mut effect) }
-        .map_err(|error| error.to_string())?;
-    Ok(effect.0 != 0)
+/// Opens the Store app `id` with `paths`, as "Abrir com" does.
+fn activate_for_files(id: &str, paths: &[PathBuf]) -> windows::core::Result<()> {
+    let manager: IApplicationActivationManager =
+        unsafe { CoCreateInstance(&ApplicationActivationManager, None, CLSCTX_ALL)? };
+    let items = items_of(paths)?;
+    unsafe { manager.ActivateForFile(&HSTRING::from(id), &items, &HSTRING::from("open"))? };
+    Ok(())
 }
 
-/// Opens the program `id` with `paths`: a terminal in their folder, any
-/// other as when they are dropped on its shortcut, or with them on its
-/// command line when its item takes no drop.
+/// Opens the program `id` with `paths`: a terminal in their folder, File
+/// Explorer on the first, a Store app as "Abrir com" does, any other with
+/// them on its command line.
 pub fn open(id: &str, paths: &[PathBuf]) -> Result<(), String> {
     super::apps::init_com();
     let target = super::apps::target_of(id);
@@ -158,17 +148,27 @@ pub fn open(id: &str, paths: &[PathBuf]) -> Result<(), String> {
             let folder = folder_of(paths).ok_or("nothing to open")?;
             return execute(&HSTRING::from(program.as_os_str()), None, Some(&folder));
         }
+        Some(Shell::Explorer) => {
+            let first = paths.first().ok_or("nothing to open")?;
+            return execute(&HSTRING::from(first.as_os_str()), None, None);
+        }
         None => {}
     }
-    match drop_on_item(id, paths) {
-        Ok(true) => return Ok(()),
-        Ok(false) => {}
-        Err(error) => log::info!("open with: the item takes no drop: {error}"),
+    // A Store app opens the files as when they are opened with it.
+    if id.contains('!') {
+        match activate_for_files(id, paths) {
+            Ok(()) => return Ok(()),
+            Err(error) => log::info!("open with: the Store app took no files: {error}"),
+        }
     }
     let program = target.ok_or("the program takes no files")?;
-    let arguments = paths
-        .iter()
-        .map(|path| quoted(path))
+    if !program.is_file() {
+        return Err("the program has no file to run".into());
+    }
+    // The shortcut's own arguments first (a Chrome profile, say).
+    let arguments = super::apps::arguments_of(id)
+        .into_iter()
+        .chain(paths.iter().map(|path| quoted(path)))
         .collect::<Vec<_>>()
         .join(" ");
     execute(
@@ -249,6 +249,10 @@ mod tests {
         let code = PathBuf::from(r"C:\Users\x\AppData\Local\Programs\Microsoft VS Code\Code.exe");
         assert_eq!(shell_of("Microsoft.VisualStudioCode", Some(&code)), None);
         assert_eq!(shell_of("MSEdge", None), None);
+        assert_eq!(
+            shell_of("Microsoft.Windows.Explorer", None),
+            Some(Shell::Explorer)
+        );
     }
 
     #[test]

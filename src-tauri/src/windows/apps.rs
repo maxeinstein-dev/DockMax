@@ -214,6 +214,30 @@ pub fn target_of(_id: &str) -> Option<std::path::PathBuf> {
     None
 }
 
+/// `System.Link.Arguments`: what a shortcut of the Apps folder adds to its
+/// program's command line.
+#[cfg(windows)]
+const PKEY_LINK_ARGUMENTS: PROPERTYKEY = PROPERTYKEY {
+    fmtid: ::windows::core::GUID::from_u128(0x436f2667_14e2_4feb_b30a_146c53b5b674),
+    pid: 100,
+};
+
+/// The arguments the shortcut of the item `id` of the Apps folder gives its
+/// program (a Chrome profile, say); `None` when it gives none.
+#[cfg(windows)]
+pub fn arguments_of(id: &str) -> Option<String> {
+    if !is_valid_app_id(id) {
+        return None;
+    }
+    init_com();
+    let name = HSTRING::from(format!("shell:AppsFolder\\{id}"));
+    unsafe { SHGetPropertyStoreFromParsingName::<_, _, IPropertyStore>(&name, None, GPS_DEFAULT) }
+        .ok()
+        .and_then(|store| unsafe { store.GetValue(&PKEY_LINK_ARGUMENTS) }.ok())
+        .map(|value| value.to_string())
+        .filter(|text| !text.trim().is_empty())
+}
+
 /// The path of the program's file, when its id is that path (a classic
 /// program the shell lists by its executable); `None` for a Store app, which
 /// has no file to show, and for the ids that name a folder and a file.

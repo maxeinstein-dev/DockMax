@@ -20,7 +20,9 @@ Igual ao Dock do macOS: em cima de um app, abre com ele; entre os blocos, fixa.
 
 ## 2. Como o app abre
 
-- **Arquivos ou pasta entregues ao app:** como quando se solta arquivos no atalho do app no Windows. O item do app na pasta Apps recebe a soltura e o Windows monta os argumentos certos, inclusive os do atalho (um perfil do Chrome, por exemplo) e os apps da Store que aceitam arquivos. Sem esse caminho, um app clássico abre com os caminhos como argumentos.
+- **App clássico:** o programa do atalho abre com os argumentos do próprio atalho (um perfil do Chrome, por exemplo) e, depois deles, os caminhos. É o que o Windows faz quando se solta arquivos no atalho. Os itens da pasta Apps não aceitam soltura direta: testado no Bloco de notas, Explorer, Chrome, Terminal e VS Code.
+- **App da Store:** abre os arquivos como o "Abrir com" (`ActivateForFile`).
+- **Explorador de Arquivos:** abre a pasta; um arquivo abre com o programa padrão dele.
 - **Terminais abrem na pasta, não com ela de argumento:** o Windows Terminal abre com `wt -d "<pasta>"`; o Prompt de Comando, o Windows PowerShell e o PowerShell 7 abrem com a pasta de trabalho na pasta. Um arquivo solto num terminal abre o terminal na pasta do arquivo.
 
 ## 3. No dock
