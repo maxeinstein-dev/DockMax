@@ -47,7 +47,8 @@ export type WidgetKind =
   | "todo"
   | "water"
   | "media"
-  | "claude";
+  | "claude"
+  | "weather";
 
 /* Each closed set below has a tuple with every value, in the order of the
  * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
@@ -71,6 +72,7 @@ export const WIDGET_KINDS = [
   "water",
   "media",
   "claude",
+  "weather",
 ] as const;
 
 /** The kinds `add_widget` accepts in this phase. */
@@ -93,6 +95,7 @@ export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "water",
   "media",
   "claude",
+  "weather",
 ];
 
 /** Stable ID of an instance: a UUID v7 made in Rust, never reused and never
@@ -364,6 +367,29 @@ export interface ClaudeConfig {
   width: ClaudeWidth;
 }
 
+/** The widths the Clima takes: the sky and the temperature, or the day's
+ * range beside them. Must match `weather::WIDTHS`. */
+export const WEATHER_WIDTHS = [1, 2] as const;
+
+export type WeatherWidth = (typeof WEATHER_WIDTHS)[number];
+
+/** A city of the Clima, as the search found it. */
+export interface WeatherCity {
+  name: string;
+  /** The state and the country, if the search gave them. */
+  region: string | null;
+  latitude: number;
+  longitude: number;
+}
+
+/** The Clima (spec 0017 F5): the width and the city picked; the weather
+ * comes from Open-Meteo, read in Rust. */
+export interface WeatherConfig {
+  width: WeatherWidth;
+  /** null until the user picks one. */
+  city: WeatherCity | null;
+}
+
 /** The config of each kind. */
 export interface WidgetConfigs {
   clock: ClockConfig;
@@ -381,6 +407,7 @@ export interface WidgetConfigs {
   water: WaterConfig;
   media: MediaConfig;
   claude: ClaudeConfig;
+  weather: WeatherConfig;
 }
 
 /** A kind's config tagged with the kind, as `update_widget` takes it:

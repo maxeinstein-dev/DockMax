@@ -237,6 +237,12 @@ impl Glaze {
         s: 55.0,
         l: 50.0,
     };
+    /// Céu: o Clima.
+    pub const WEATHER: Glaze = Glaze {
+        h: 226.0,
+        s: 56.0,
+        l: 52.0,
+    };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {
         h: 222.0,
@@ -357,6 +363,7 @@ mod tests {
             ("t-water", Glaze::WATER),
             ("t-music", Glaze::MUSIC),
             ("t-claude", Glaze::CLAUDE),
+            ("t-weather", Glaze::WEATHER),
         ];
         for (class, glaze) in glazes {
             let css_glaze = Glaze {

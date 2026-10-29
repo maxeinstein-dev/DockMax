@@ -89,6 +89,7 @@ pub struct DockMessages {
     pub claude_five_short: &'static str,
     pub claude_week: &'static str,
     pub claude_week_short: &'static str,
+    pub weather: &'static str,
     /// The media buttons of a window preview (F4).
     pub media_previous: &'static str,
     pub media_play: &'static str,
@@ -225,6 +226,7 @@ const PT_BR: Messages = Messages {
         claude_five_short: "5h",
         claude_week: "Semana",
         claude_week_short: "Sem",
+        weather: "Clima",
         media_previous: "Anterior",
         media_play: "Tocar",
         media_pause: "Pausar",

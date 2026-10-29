@@ -331,6 +331,28 @@ export const WIDGET_FIXTURES = {
     config: { width: 1 },
   } satisfies WidgetInstance<"claude">,
 
+  "weather-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f60a0",
+    label: null,
+    kind: "weather",
+    config: { width: 1, city: null },
+  } satisfies WidgetInstance<"weather">,
+
+  "weather-sample": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f60a1",
+    label: null,
+    kind: "weather",
+    config: {
+      width: 2,
+      city: {
+        name: "Belo Horizonte",
+        region: "Minas Gerais, Brasil",
+        latitude: -19.92,
+        longitude: -43.94,
+      },
+    },
+  } satisfies WidgetInstance<"weather">,
+
   "snapshot-sample": {
     storage: { state: "ok" },
     widgets: [CLOCK_DEFAULT, { ...NOTE_DEFAULT, label: "Mercado" }],

@@ -659,6 +659,7 @@ fn names() -> Names {
         water: dock.water,
         media: dock.media,
         claude: dock.claude,
+        weather: dock.weather,
     }
 }
 
@@ -991,6 +992,19 @@ impl Dock {
             matches!(item, Item::Widget(widget) if matches!(widget.config, WidgetConfig::Claude(_)))
         });
         super::claude_usage::want(self.hwnd.0 as isize, claude);
+        let cities = self
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Widget(widget) => match &widget.config {
+                    WidgetConfig::Weather(config) => config.city.as_ref(),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .map(|city| super::weather::key(city.latitude, city.longitude))
+            .collect();
+        super::weather::want(self.hwnd.0 as isize, cities);
         let wanted = self.items.iter().any(|item| {
             matches!(
                 item,
@@ -3569,6 +3583,7 @@ pub fn view() -> Option<View> {
                         crate::domain::widgets::WidgetConfig::Todo(_) => "agenda",
                         crate::domain::widgets::WidgetConfig::Water(_) => "ring",
                         crate::domain::widgets::WidgetConfig::Media(_) => "media",
+                        crate::domain::widgets::WidgetConfig::Weather(_) => "weather",
                         crate::domain::widgets::WidgetConfig::Claude(config) => {
                             if config.width > 1 { "meters" } else { "ring" }
                         }

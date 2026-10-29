@@ -43,6 +43,7 @@ pub mod system;
 pub mod time_progress;
 pub mod todo;
 pub mod water;
+pub mod weather;
 
 use std::fmt;
 
@@ -64,6 +65,7 @@ pub use system::{ActivityConfig, NetworkConfig};
 pub use time_progress::TimeProgressConfig;
 pub use todo::TodoConfig;
 pub use water::WaterConfig;
+pub use weather::WeatherConfig;
 
 /// Most widget instances the dock holds (spec 0003 §2.1 item 3).
 pub const MAX_WIDGETS: usize = 12;
@@ -105,6 +107,7 @@ pub enum WidgetKind {
     Water,
     Media,
     Claude,
+    Weather,
 }
 
 closed_set!(WidgetKind {
@@ -123,6 +126,7 @@ closed_set!(WidgetKind {
     Water,
     Media,
     Claude,
+    Weather,
 });
 
 impl WidgetKind {
@@ -142,7 +146,8 @@ impl WidgetKind {
             | WidgetKind::Todo
             | WidgetKind::Water
             | WidgetKind::Media
-            | WidgetKind::Claude => true,
+            | WidgetKind::Claude
+            | WidgetKind::Weather => true,
             WidgetKind::Shortcut | WidgetKind::Files => false,
         }
     }
@@ -165,7 +170,8 @@ impl WidgetKind {
             | WidgetKind::Todo
             | WidgetKind::Water
             | WidgetKind::Media
-            | WidgetKind::Claude => 1,
+            | WidgetKind::Claude
+            | WidgetKind::Weather => 1,
         }
     }
 
@@ -187,6 +193,7 @@ impl WidgetKind {
             WidgetKind::Water => "water",
             WidgetKind::Media => "media",
             WidgetKind::Claude => "claude",
+            WidgetKind::Weather => "weather",
         }
     }
 
@@ -282,6 +289,7 @@ pub enum WidgetConfig {
     Water(WaterConfig),
     Media(MediaConfig),
     Claude(ClaudeConfig),
+    Weather(WeatherConfig),
 }
 
 impl WidgetConfig {
@@ -302,6 +310,7 @@ impl WidgetConfig {
             WidgetConfig::Water(_) => WidgetKind::Water,
             WidgetConfig::Media(_) => WidgetKind::Media,
             WidgetConfig::Claude(_) => WidgetKind::Claude,
+            WidgetConfig::Weather(_) => WidgetKind::Weather,
         }
     }
 
@@ -329,6 +338,7 @@ impl WidgetConfig {
             WidgetConfig::Calendar(config) => config.width,
             WidgetConfig::Media(config) => config.width,
             WidgetConfig::Claude(config) => config.width,
+            WidgetConfig::Weather(config) => config.width,
         }
     }
 
@@ -351,6 +361,7 @@ impl WidgetConfig {
             WidgetConfig::Calendar(_) => calendar::WIDTHS,
             WidgetConfig::Media(_) => media::WIDTHS,
             WidgetConfig::Claude(_) => claude::WIDTHS,
+            WidgetConfig::Weather(_) => weather::WIDTHS,
         }
     }
 
@@ -368,6 +379,7 @@ impl WidgetConfig {
             WidgetConfig::Calendar(config) => config.width = width,
             WidgetConfig::Media(config) => config.width = width,
             WidgetConfig::Claude(config) => config.width = width,
+            WidgetConfig::Weather(config) => config.width = width,
             WidgetConfig::Clock(_)
             | WidgetConfig::Note(_)
             | WidgetConfig::Shortcut(_)
@@ -400,6 +412,7 @@ impl WidgetConfig {
             WidgetKind::Water => WidgetConfig::Water(WaterConfig::default()),
             WidgetKind::Media => WidgetConfig::Media(MediaConfig::default()),
             WidgetKind::Claude => WidgetConfig::Claude(ClaudeConfig::default()),
+            WidgetKind::Weather => WidgetConfig::Weather(WeatherConfig::default()),
         }
     }
 
@@ -421,6 +434,7 @@ impl WidgetConfig {
             WidgetConfig::Water(config) => config.validate(),
             WidgetConfig::Media(config) => config.validate(),
             WidgetConfig::Claude(config) => config.validate(),
+            WidgetConfig::Weather(config) => config.validate(),
         }
     }
 }
@@ -532,6 +546,7 @@ pub fn encode_config(config: &WidgetConfig) -> String {
         WidgetConfig::Water(config) => serde_json::to_string(config),
         WidgetConfig::Media(config) => serde_json::to_string(config),
         WidgetConfig::Claude(config) => serde_json::to_string(config),
+        WidgetConfig::Weather(config) => serde_json::to_string(config),
     };
     // Plain structs with string keys: serializing them can't fail.
     json.expect("widget configs always serialize")
@@ -570,6 +585,7 @@ pub fn decode_config(
         WidgetKind::Water => serde_json::from_str(json).map(WidgetConfig::Water),
         WidgetKind::Media => serde_json::from_str(json).map(WidgetConfig::Media),
         WidgetKind::Claude => serde_json::from_str(json).map(WidgetConfig::Claude),
+        WidgetKind::Weather => serde_json::from_str(json).map(WidgetConfig::Weather),
     }
     .map_err(|_| WidgetError::InvalidConfig)?;
     config.validate()?;
@@ -858,7 +874,8 @@ mod tests {
                 WidgetKind::Todo,
                 WidgetKind::Water,
                 WidgetKind::Media,
-                WidgetKind::Claude
+                WidgetKind::Claude,
+                WidgetKind::Weather
             ]
         );
     }
@@ -888,6 +905,7 @@ mod tests {
             "water",
             "media",
             "claude",
+            "weather",
         ];
         for (kind, name) in WidgetKind::ALL.into_iter().zip(names) {
             assert_eq!(to_json(&kind), name);
@@ -900,7 +918,7 @@ mod tests {
         }
         assert_eq!(WidgetKind::from_name("timeProgress"), None);
         assert_eq!(WidgetKind::from_name("Clock"), None);
-        assert_eq!(WidgetKind::from_name("weather"), None);
+        assert_eq!(WidgetKind::from_name("radio"), None);
     }
 
     #[test]
@@ -983,7 +1001,7 @@ mod tests {
                 | WidgetKind::Media => 3,
                 // Three was too small to read: two rise to three under
                 // the pointer instead.
-                WidgetKind::Calendar | WidgetKind::Claude => 2,
+                WidgetKind::Calendar | WidgetKind::Claude | WidgetKind::Weather => 2,
                 _ => 1,
             };
             assert_eq!(config.widths(), 1..=most, "{kind}");
@@ -1084,6 +1102,7 @@ mod tests {
             ),
             (WidgetKind::Media, json!({ "width": 2 })),
             (WidgetKind::Claude, json!({ "width": 2 })),
+            (WidgetKind::Weather, json!({ "width": 1, "city": null })),
         ];
         for (kind, config) in cases {
             let instance = instance(WidgetConfig::default_for(kind));
@@ -1189,7 +1208,7 @@ mod tests {
             config
         );
         assert!(
-            serde_json::from_value::<WidgetConfig>(json!({ "kind": "weather", "config": {} }))
+            serde_json::from_value::<WidgetConfig>(json!({ "kind": "radio", "config": {} }))
                 .is_err()
         );
     }

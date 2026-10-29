@@ -27,6 +27,7 @@ pub mod settings;
 pub mod system_activity;
 pub mod tasks;
 pub mod thumbnail;
+pub mod weather;
 pub mod widgets;
 pub mod window_spaces;
 pub mod workspaces;

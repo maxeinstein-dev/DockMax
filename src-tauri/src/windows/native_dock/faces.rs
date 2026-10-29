@@ -391,6 +391,39 @@ pub fn claude(config: &crate::domain::widgets::ClaudeConfig, size: DockSize) -> 
     }
 }
 
+/// The Clima's face (spec 0017 F5): the sky at the city now and its
+/// temperature; two icons wide, the day's highest and lowest too.
+pub fn weather(config: &crate::domain::widgets::WeatherConfig) -> Face {
+    use crate::windows::weather::{self, Reading};
+    let forecast = config.city.as_ref().and_then(|city| {
+        match weather::reading(weather::key(city.latitude, city.longitude)) {
+            Some(Reading::Ready { forecast, .. }) => Some(forecast),
+            _ => None,
+        }
+    });
+    let degrees = |value: f64| format!("{}°", value.round() as i64);
+    Face::Weather {
+        glaze: Glaze::WEATHER,
+        sky: forecast.as_ref().map_or(paint::SUN, |forecast| {
+            paint::sky(forecast.current.condition, forecast.current.day)
+        }),
+        temperature: forecast
+            .as_ref()
+            .map(|forecast| degrees(forecast.current.temperature)),
+        range: forecast
+            .as_ref()
+            .filter(|_| config.width > 1)
+            .and_then(|forecast| forecast.days.first())
+            .map(|today| {
+                format!(
+                    "\u{2191}{} \u{2193}{}",
+                    degrees(today.max),
+                    degrees(today.min)
+                )
+            }),
+    }
+}
+
 /// The face of `widget` at `now`, with the system's reading for the
 /// system widgets and the calendar's for the Calendário.
 pub fn widget(
@@ -471,6 +504,7 @@ pub fn widget(
         WidgetConfig::Todo(config) => todo(config, size),
         WidgetConfig::Water(config) => water(config, size),
         WidgetConfig::Claude(config) => claude(config, size),
+        WidgetConfig::Weather(config) => weather(config),
         // Drawn by the dock itself, which holds the cover (`Dock::media_face`).
         WidgetConfig::Media(_) => Face::Glyph {
             glaze: Glaze::MUSIC,
@@ -490,6 +524,27 @@ pub fn widget(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_sky_is_a_path() {
+        use crate::domain::weather::Condition;
+        for condition in [
+            Condition::Clear,
+            Condition::PartlyCloudy,
+            Condition::Cloudy,
+            Condition::Fog,
+            Condition::Drizzle,
+            Condition::Rain,
+            Condition::Snow,
+            Condition::Storm,
+        ] {
+            for day in [true, false] {
+                for path in paint::sky(condition, day) {
+                    assert!(super::super::svg::parse(path).is_some(), "{path}");
+                }
+            }
+        }
+    }
     use crate::domain::calendar::Event;
 
     const NOW: i64 = 1_793_188_800; // 2026-10-28 09:00 in Brasília.

@@ -14,7 +14,8 @@
     "todo",
     "water",
     "media",
-    "claude"
+    "claude",
+    "weather"
   ],
   "HourCycle": [
     "h23",

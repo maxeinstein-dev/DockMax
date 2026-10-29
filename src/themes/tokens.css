@@ -265,6 +265,13 @@
   --l: 50%;
 }
 
+/* Céu: Clima (spec 0017 F5). */
+.t-weather {
+  --h: 226;
+  --sat: 56%;
+  --l: 52%;
+}
+
 /* Argila. */
 .t-calendar {
   --h: 16;
