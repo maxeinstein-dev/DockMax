@@ -23,6 +23,13 @@ pub const MORE_WIDTH: f64 = 44.0;
 /// Inside the card, around the cells, and between two cells.
 pub const PAD: f64 = 8.0;
 pub const GAP: f64 = 6.0;
+/// The row of media buttons at the card's foot, when the program plays
+/// what Windows shows in its media controls (spec 0017 F4), and a button's
+/// side in it.
+pub const MEDIA_HEIGHT: f64 = 40.0;
+pub const MEDIA_SIDE: f64 = 32.0;
+/// Between two media buttons.
+pub const MEDIA_GAP: f64 = 14.0;
 /// Between the icon and the card, and between the card and the screen's
 /// edge.
 pub const OFFSET: f64 = 10.0;
@@ -52,17 +59,22 @@ pub struct Card {
     /// anything under it.
     pub more: usize,
     pub more_area: Option<Area>,
+    /// Previous, play or pause and next, at the card's foot, centred: only
+    /// for the program that plays now.
+    pub media: Option<[Area; 3]>,
 }
 
 /// The card for windows of the sizes `sizes` (their width and height; 0 for
 /// one the DWM can't measure), over the icon `icon` of a dock on `edge`, on
-/// the monitor `screen`, at `scale`. `None` without windows.
+/// the monitor `screen`, at `scale`; with the row of media buttons at its
+/// foot when `media`. `None` without windows.
 pub fn card(
     icon: Area,
     edge: DockEdge,
     screen: Area,
     scale: f64,
     sizes: &[(f64, f64)],
+    media: bool,
 ) -> Option<Card> {
     if sizes.is_empty() {
         return None;
@@ -94,7 +106,8 @@ pub fn card(
 
     let cells_width = shown as f64 * width + (shown as f64 - 1.0) * gap;
     let card_width = 2.0 * pad + cells_width + more_width;
-    let card_height = 2.0 * pad + title + height;
+    let media_height = if media { MEDIA_HEIGHT * scale } else { 0.0 };
+    let card_height = 2.0 * pad + title + height + media_height;
     let cells = sizes
         .iter()
         .take(shown)
@@ -162,6 +175,18 @@ pub fn card(
             width: MORE_WIDTH * scale,
             height: title + height,
         }),
+        media: media.then(|| {
+            let side = MEDIA_SIDE * scale;
+            let step = side + MEDIA_GAP * scale;
+            let left = card_width.round() / 2.0 - side / 2.0 - step;
+            let top = pad + title + height + (media_height - side) / 2.0;
+            std::array::from_fn(|index| Area {
+                x: left + index as f64 * step,
+                y: top,
+                width: side,
+                height: side,
+            })
+        }),
     })
 }
 
@@ -186,6 +211,8 @@ fn fit(room: Area, width: f64, height: f64) -> Area {
 pub enum Hit {
     Cell(usize),
     Close(usize),
+    /// A media button: 0 previous, 1 play or pause, 2 next.
+    Media(usize),
 }
 
 /// The cell or close button at `(x, y)`; `None` between them.
@@ -193,6 +220,12 @@ pub fn hit(card: &Card, x: f64, y: f64) -> Option<Hit> {
     let inside = |area: &Area| {
         x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height
     };
+    if let Some(index) = card
+        .media
+        .and_then(|buttons| buttons.iter().position(&inside))
+    {
+        return Some(Hit::Media(index));
+    }
     card.cells.iter().find_map(|cell| {
         if inside(&cell.close) {
             Some(Hit::Close(cell.index))
@@ -233,7 +266,14 @@ mod tests {
     #[test]
     fn no_window_no_card() {
         assert_eq!(
-            card(icon(900.0, 1020.0), DockEdge::Bottom, SCREEN, 1.0, &[]),
+            card(
+                icon(900.0, 1020.0),
+                DockEdge::Bottom,
+                SCREEN,
+                1.0,
+                &[],
+                false
+            ),
             None
         );
     }
@@ -246,6 +286,7 @@ mod tests {
             SCREEN,
             1.0,
             &[(1600.0, 900.0)],
+            false,
         )
         .unwrap();
         assert_eq!(card.area.width, 2.0 * PAD + THUMB_WIDTH);
@@ -263,6 +304,7 @@ mod tests {
             SCREEN,
             1.0,
             &[(800.0, 600.0)],
+            false,
         )
         .unwrap();
         assert_eq!(card.area.y, 4.0 + 48.0 + OFFSET);
@@ -271,16 +313,40 @@ mod tests {
     #[test]
     fn the_card_stays_on_the_screen_at_its_edges() {
         let sizes = [(800.0, 600.0); 3];
-        let left = card(icon(2.0, 1020.0), DockEdge::Bottom, SCREEN, 1.0, &sizes).unwrap();
+        let left = card(
+            icon(2.0, 1020.0),
+            DockEdge::Bottom,
+            SCREEN,
+            1.0,
+            &sizes,
+            false,
+        )
+        .unwrap();
         assert_eq!(left.area.x, MARGIN);
-        let right = card(icon(1900.0, 1020.0), DockEdge::Bottom, SCREEN, 1.0, &sizes).unwrap();
+        let right = card(
+            icon(1900.0, 1020.0),
+            DockEdge::Bottom,
+            SCREEN,
+            1.0,
+            &sizes,
+            false,
+        )
+        .unwrap();
         assert_eq!(right.area.x + right.area.width, 1920.0 - MARGIN);
         // A second monitor to the left of the first.
         let other = Area {
             x: -1280.0,
             ..SCREEN
         };
-        let far = card(icon(-1278.0, 1020.0), DockEdge::Bottom, other, 1.0, &sizes).unwrap();
+        let far = card(
+            icon(-1278.0, 1020.0),
+            DockEdge::Bottom,
+            other,
+            1.0,
+            &sizes,
+            false,
+        )
+        .unwrap();
         assert_eq!(far.area.x, -1280.0 + MARGIN);
     }
 
@@ -292,6 +358,7 @@ mod tests {
             SCREEN,
             1.0,
             &[(1000.0, 1000.0), (2000.0, 500.0), (0.0, 0.0)],
+            false,
         )
         .unwrap();
         let [square, wide, unknown] = [
@@ -325,6 +392,7 @@ mod tests {
             small,
             1.0,
             &[(800.0, 600.0); 8],
+            false,
         )
         .unwrap();
         assert_eq!(eight.cells.len(), 8);
@@ -338,6 +406,7 @@ mod tests {
             small,
             1.0,
             &[(800.0, 600.0); 30],
+            false,
         )
         .unwrap();
         assert_eq!(thirty.cells[0].area.width, MIN_THUMB_WIDTH);
@@ -360,6 +429,7 @@ mod tests {
             SCREEN,
             1.5,
             &[(800.0, 600.0)],
+            false,
         )
         .unwrap();
         assert_eq!(card.area.width, (2.0 * PAD + THUMB_WIDTH) * 1.5);
@@ -374,6 +444,7 @@ mod tests {
             SCREEN,
             1.0,
             &[(800.0, 600.0); 2],
+            false,
         )
         .unwrap();
         let close = card.cells[1].close;
@@ -392,5 +463,41 @@ mod tests {
         assert!(shows(1, false));
         assert!(!shows(1, true));
         assert!(shows(2, true));
+    }
+
+    #[test]
+    fn the_program_that_plays_gets_media_buttons_at_the_foot() {
+        let sizes = [(1600.0, 900.0), (1200.0, 800.0)];
+        let plain = card(
+            icon(900.0, 1020.0),
+            DockEdge::Bottom,
+            SCREEN,
+            1.0,
+            &sizes,
+            false,
+        )
+        .unwrap();
+        assert!(plain.media.is_none());
+        let playing = card(
+            icon(900.0, 1020.0),
+            DockEdge::Bottom,
+            SCREEN,
+            1.0,
+            &sizes,
+            true,
+        )
+        .unwrap();
+        assert_eq!(playing.area.height, plain.area.height + MEDIA_HEIGHT);
+        let [previous, toggle, next] = playing.media.unwrap();
+        // Under the cells, centred, side by side.
+        let foot = playing.cells[0].area.y + playing.cells[0].area.height;
+        assert!(previous.y >= foot);
+        let middle = toggle.x + toggle.width / 2.0;
+        assert!((middle - playing.area.width / 2.0).abs() < 1.0);
+        assert!(previous.x + previous.width < toggle.x && toggle.x + toggle.width < next.x);
+        assert_eq!(
+            hit(&playing, toggle.x + 2.0, toggle.y + 2.0),
+            Some(Hit::Media(1))
+        );
     }
 }

@@ -83,6 +83,11 @@ pub struct DockMessages {
     pub todo_none: &'static str,
     pub water: &'static str,
     pub media: &'static str,
+    /// The media buttons of a window preview (F4).
+    pub media_previous: &'static str,
+    pub media_play: &'static str,
+    pub media_pause: &'static str,
+    pub media_next: &'static str,
     /// The progress tile without a period running.
     pub no_value: &'static str,
     /// The Calendário's tile (spec 0017 F2a): no account, no meeting left,
@@ -209,6 +214,10 @@ const PT_BR: Messages = Messages {
         todo_none: "✓",
         water: "Beber água",
         media: "Tocando agora",
+        media_previous: "Anterior",
+        media_play: "Tocar",
+        media_pause: "Pausar",
+        media_next: "Próxima",
         no_value: "–",
         calendar_connect: "Conectar",
         calendar_free: "Livre",

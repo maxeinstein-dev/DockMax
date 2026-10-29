@@ -2193,6 +2193,7 @@ impl Dock {
             windows,
             name: self.names.get(index).cloned().unwrap_or_default(),
             motion: self.motion,
+            media: None,
         });
     }
 

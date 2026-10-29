@@ -297,6 +297,42 @@ fn run() {
     }
 }
 
+/// Whether the program `app` of the media session (an AppUserModelID, or a
+/// bare `Spotify.exe`) runs the window with the AppID `aumid` and the file
+/// `exe`.
+fn same_program(app: &str, aumid: Option<&str>, exe: Option<&std::path::Path>) -> bool {
+    let app = app.to_lowercase();
+    if app.is_empty() {
+        return false;
+    }
+    let by_id = aumid
+        .map(str::to_lowercase)
+        .is_some_and(|aumid| aumid == app || aumid.starts_with(&format!("{app}.")));
+    let by_file = exe
+        .and_then(std::path::Path::file_name)
+        .map(|file| file.to_string_lossy().to_lowercase())
+        .is_some_and(|file| file == app || app.ends_with(&format!("\\{file}")));
+    by_id || by_file
+}
+
+/// Whether what plays now comes from one of the windows `windows`: whether
+/// it plays, when it does. Read from Windows on the calling thread, which
+/// must not be a window's (it waits).
+pub fn session_in(windows: &[isize]) -> Option<bool> {
+    let _ = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
+    let session = manager().ok()?.GetCurrentSession().ok()?;
+    let app = session.SourceAppUserModelId().ok()?.to_string();
+    let playing = session
+        .GetPlaybackInfo()
+        .and_then(|info| info.PlaybackStatus())
+        .is_ok_and(|status| status == Status::Playing);
+    let ours = super::openwin::enumerate().into_iter().any(|window| {
+        windows.contains(&window.hwnd)
+            && same_program(&app, window.aumid.as_deref(), window.exe.as_deref())
+    });
+    ours.then_some(playing)
+}
+
 /// What the panel or the dock asks of the session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
@@ -336,5 +372,27 @@ pub fn control(action: Action) {
         });
     if let Err(error) = spawned {
         log::warn!("media: no thread: {error}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::same_program;
+
+    #[test]
+    fn the_session_is_matched_to_its_program() {
+        let spotify = Path::new(r"C:\Users\x\AppData\Roaming\Spotify\Spotify.exe");
+        assert!(same_program("Spotify.exe", None, Some(spotify)));
+        assert!(same_program(
+            "SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify",
+            Some("SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify"),
+            None
+        ));
+        // Chrome's session and a window of one of its profiles.
+        assert!(same_program("Chrome", Some("Chrome.ABCDEF"), None));
+        assert!(!same_program("Spotify.exe", Some("Chrome"), None));
+        assert!(!same_program("", Some(""), None));
     }
 }
