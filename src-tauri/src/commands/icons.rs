@@ -18,6 +18,7 @@ use super::widgets::lock;
 use crate::domain::apps::{AppError, PinnedApp};
 use crate::domain::icon_pack::PackError;
 use crate::persistence::database::Storage;
+use crate::persistence::bundled_packs;
 use crate::persistence::icon_packs::{self, Found, Pack};
 use crate::windows::apps;
 
@@ -38,6 +39,17 @@ fn folder(app: &AppHandle) -> Option<PathBuf> {
 fn stored(found: Option<Arc<Vec<Found>>>) -> Option<Arc<Vec<Found>>> {
     *PACKS.lock().unwrap_or_else(PoisonError::into_inner) = found.clone();
     found
+}
+
+/// Copies the packs that come with the app into the packs folder (spec 0019,
+/// G4). At startup, before the dock reads an icon.
+pub fn install_bundled(app: &AppHandle) {
+    let Some(root) = folder(app) else {
+        return;
+    };
+    if let Err(error) = bundled_packs::install(&root, bundled_packs::ALL) {
+        log::warn!("icons: could not copy the bundled packs: {}", error.kind());
+    }
 }
 
 /// Reads the folder again and keeps what it finds. Returns the new packs and
