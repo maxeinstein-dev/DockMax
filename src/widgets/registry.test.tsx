@@ -21,6 +21,7 @@ const INSTANCES = {
   todo: WIDGET_FIXTURES["todo-default"],
   water: WIDGET_FIXTURES["water-default"],
   media: WIDGET_FIXTURES["media-default"],
+  claude: WIDGET_FIXTURES["claude-default"],
 } as const;
 
 // 2026-10-15 18:07:05 UTC, a Thursday.

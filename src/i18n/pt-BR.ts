@@ -601,6 +601,7 @@ const messages = {
       todo: "Lista de tarefas",
       water: "Beber água",
       media: "Tocando agora",
+      claude: "Uso do Claude",
     } satisfies Record<WidgetKind, string>,
     /** Short name of each kind on the add buttons of Itens do dock. */
     addNames: {
@@ -616,6 +617,7 @@ const messages = {
       todo: "Lista de tarefas",
       water: "Beber água",
       media: "Tocando agora",
+      claude: "Uso do Claude",
     } satisfies Record<CreatableKind, string>,
     /** Parts every widget panel shares. */
     common: {
@@ -822,6 +824,8 @@ const messages = {
         cycle: "Acompanha um ciclo marcado na agenda, com discrição no dock.",
         todo: "Tarefas com marca de feita; o dock mostra quantas faltam.",
         water: "Os copos do dia contra uma meta, com lembrete opcional.",
+        claude:
+          "Os limites do seu plano do Claude: as 5 horas e a semana, com quando reiniciam.",
         media:
           "O que toca no Windows, com capa e os botões de tocar, voltar e avançar.",
         pomodoro:
@@ -895,6 +899,34 @@ const messages = {
       showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },
     /** The Ciclo (spec 0017 F2b): the panel says what the tile doesn't. */
+    /** The Uso do Claude (spec 0017 F5). */
+    claude: {
+      settingsTitle: "Ajustes do Uso do Claude",
+      loading: "Lendo o uso…",
+      fiveHour: "Sessão (5 horas)",
+      week: "Semana",
+      used: "{n}% usado",
+      resets: "Reinicia {when}",
+      resetWords: {
+        within: "em {time}",
+        hours: "{n} h",
+        minutes: "{n} min",
+        soon: "em instantes",
+      },
+      states: {
+        signedOut:
+          "Entre no Claude Code neste computador para ver o uso do seu plano.",
+        expired:
+          "O acesso do Claude Code expirou. Abra o Claude Code uma vez e ele se renova.",
+        unavailable:
+          "Não foi possível ler o uso agora. Tentando de novo em alguns minutos.",
+      },
+      footer: "Como o /usage do Claude Code · lido a cada 5 min",
+      widthHint:
+        "Com 1 ícone, o anel das 5 horas; com 2, as 5 horas e a semana.",
+      privacy:
+        "O DockMax usa o acesso que o Claude Code já guarda neste computador, só para perguntar o uso à Anthropic. Não copia nem guarda nada.",
+    },
     /** The Tocando agora (spec 0017 F4). */
     media: {
       settingsTitle: "Ajustes do Tocando agora",

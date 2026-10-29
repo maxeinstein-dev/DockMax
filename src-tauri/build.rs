@@ -39,6 +39,7 @@ fn main() {
             "pomodoro_act",
             "media_status",
             "media_control",
+            "claude_usage",
             "google_status",
             "set_google_client",
             "connect_google_account",

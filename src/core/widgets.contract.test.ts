@@ -184,6 +184,7 @@ describe("widget contract constants", () => {
       "todo",
       "water",
       "media",
+      "claude",
     ]);
     expect(CREATABLE_KINDS.every((kind) => WIDGET_KINDS.includes(kind))).toBe(
       true,

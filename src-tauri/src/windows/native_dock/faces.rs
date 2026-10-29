@@ -348,6 +348,49 @@ pub fn water(config: &crate::domain::widgets::WaterConfig, size: DockSize) -> Fa
     }
 }
 
+/// The Uso do Claude's face (spec 0017 F5): one icon, the five hours'
+/// ring and its share; two, the five hours' and the week's rings.
+pub fn claude(config: &crate::domain::widgets::ClaudeConfig, size: DockSize) -> Face {
+    use crate::windows::claude_usage::Reading;
+    let text = &crate::i18n::messages().dock;
+    let usage = match crate::windows::claude_usage::reading() {
+        Some(Reading::Ready { usage, .. }) => Some(usage),
+        _ => None,
+    };
+    let meter = |label, short, limit: Option<crate::domain::claude_usage::Limit>| Meter {
+        label,
+        short,
+        fraction: limit.map(|limit| (limit.percent / 100.0) as f32),
+        text: limit.map_or_else(
+            || text.no_value.to_owned(),
+            |limit| format!("{}%", limit.percent.round()),
+        ),
+    };
+    let five = meter(
+        text.claude_five,
+        text.claude_five_short,
+        usage.and_then(|usage| usage.five_hour),
+    );
+    if config.width > 1 {
+        let week = meter(
+            text.claude_week,
+            text.claude_week_short,
+            usage.and_then(|usage| usage.seven_day),
+        );
+        return Face::Meters {
+            glaze: Glaze::CLAUDE,
+            style: ActivityStyle::Rings,
+            meters: vec![five, week],
+            graph: None,
+        };
+    }
+    Face::Ring {
+        glaze: Glaze::CLAUDE,
+        fraction: five.fraction,
+        text: (size != DockSize::Small).then_some(five.text),
+    }
+}
+
 /// The face of `widget` at `now`, with the system's reading for the
 /// system widgets and the calendar's for the Calendário.
 pub fn widget(
@@ -427,6 +470,7 @@ pub fn widget(
         WidgetConfig::Pomodoro(config) => pomodoro(widget, config, size),
         WidgetConfig::Todo(config) => todo(config, size),
         WidgetConfig::Water(config) => water(config, size),
+        WidgetConfig::Claude(config) => claude(config, size),
         // Drawn by the dock itself, which holds the cover (`Dock::media_face`).
         WidgetConfig::Media(_) => Face::Glyph {
             glaze: Glaze::MUSIC,

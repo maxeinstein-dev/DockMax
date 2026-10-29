@@ -57,7 +57,13 @@ impl Drop for Handle {
 
 /// `GET url`, with `Authorization: Bearer <token>` when given.
 pub fn get(url: &str, bearer: Option<&str>) -> Result<Response, HttpError> {
-    request("GET", url, bearer, None)
+    request("GET", url, bearer, &[], None)
+}
+
+/// `GET url` with `Authorization: Bearer <token>` and the headers `extra`
+/// (name and value each).
+pub fn get_with(url: &str, bearer: &str, extra: &[(&str, &str)]) -> Result<Response, HttpError> {
+    request("GET", url, Some(bearer), extra, None)
 }
 
 /// `POST url` with a form body (`application/x-www-form-urlencoded`).
@@ -66,13 +72,20 @@ pub fn post_form(url: &str, form: &str) -> Result<Response, HttpError> {
         "POST",
         url,
         None,
+        &[],
         Some(("application/x-www-form-urlencoded", form)),
     )
 }
 
 /// `PATCH url` with a JSON body, with `Authorization: Bearer <token>`.
 pub fn patch_json(url: &str, bearer: &str, json: &str) -> Result<Response, HttpError> {
-    request("PATCH", url, Some(bearer), Some(("application/json", json)))
+    request(
+        "PATCH",
+        url,
+        Some(bearer),
+        &[],
+        Some(("application/json", json)),
+    )
 }
 
 /// `body`: its content type and the text.
@@ -80,6 +93,7 @@ fn request(
     method: &str,
     url: &str,
     bearer: Option<&str>,
+    extra: &[(&str, &str)],
     body: Option<(&str, &str)>,
 ) -> Result<Response, HttpError> {
     let url = Url::parse(url).map_err(|_| HttpError::NotHttps)?;
@@ -124,6 +138,9 @@ fn request(
     }
     if let Some((content_type, _)) = body {
         headers.push_str(&format!("Content-Type: {content_type}\r\n"));
+    }
+    for (name, value) in extra {
+        headers.push_str(&format!("{name}: {value}\r\n"));
     }
     let headers: Vec<u16> = headers.encode_utf16().collect();
     let body = body.map_or("", |(_, text)| text).as_bytes();

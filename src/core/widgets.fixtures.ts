@@ -317,6 +317,20 @@ export const WIDGET_FIXTURES = {
     config: { width: 3 },
   } satisfies WidgetInstance<"media">,
 
+  "claude-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6098",
+    label: null,
+    kind: "claude",
+    config: { width: 2 },
+  } satisfies WidgetInstance<"claude">,
+
+  "claude-sample": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6099",
+    label: null,
+    kind: "claude",
+    config: { width: 1 },
+  } satisfies WidgetInstance<"claude">,
+
   "snapshot-sample": {
     storage: { state: "ok" },
     widgets: [CLOCK_DEFAULT, { ...NOTE_DEFAULT, label: "Mercado" }],

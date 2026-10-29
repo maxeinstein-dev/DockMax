@@ -1,0 +1,35 @@
+/* The Uso do Claude's panel (spec 0017 F5). Tokens of tokens.css only. */
+
+.claude-limit {
+  margin: 0 0 14px;
+}
+
+.claude-limit-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.claude-limit-name {
+  font: 600 13px / 1.35 var(--font-display);
+}
+
+.claude-limit-percent {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.claude-bar {
+  width: 100%;
+  height: 8px;
+  margin: 6px 0 4px;
+  accent-color: var(--accent);
+}
+
+.claude-reset,
+.claude-note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}
