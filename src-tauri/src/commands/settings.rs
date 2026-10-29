@@ -327,6 +327,10 @@ fn apply(
         log::warn!("settings: saved, but failed to notify the windows: {error}");
     }
     crate::i18n::set_language(updated.language);
+    // The open Configurações takes the new language's title.
+    if let Some(window) = app.get_webview_window(crate::windows::settings_window::LABEL) {
+        let _ = window.set_title(crate::i18n::messages().settings.window_title);
+    }
     dock::settings_changed(&app, &before, &updated.dock);
     if updated.launch_at_login != launch_before {
         apply_launch_at_login(updated.launch_at_login);
