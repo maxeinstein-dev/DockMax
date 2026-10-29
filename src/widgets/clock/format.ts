@@ -1,12 +1,10 @@
 import type { ClockConfig } from "../../core/widgets";
+import { activeLocale } from "../../i18n";
 
 /* Clock formatting (spec 0003 §2.2, Relógio). Pure: the instant comes in,
  * so tests never wait for the real clock. Everything goes through
  * `Intl.DateTimeFormat`, which knows the IANA zones and the locale's
  * names; no date library. */
-
-/** The interface language of this phase. */
-export const DEFAULT_LOCALE = "pt-BR";
 
 /** An instant as a `Date` or as epoch milliseconds. */
 export type Instant = Date | number;
@@ -125,7 +123,7 @@ function timeParts(
 export function formatClock(
   instant: Instant,
   config: ClockConfig,
-  locale: string = DEFAULT_LOCALE,
+  locale: string = activeLocale(),
 ): ClockReading {
   const zone = resolveTimeZone(config.timeZone);
   const t = timeParts(instant, zone.timeZone, config.hourCycle, locale);
@@ -150,7 +148,7 @@ export function formatClock(
 export function formatDockTime(
   instant: Instant,
   config: ClockConfig,
-  locale: string = DEFAULT_LOCALE,
+  locale: string = activeLocale(),
 ): string {
   return formatClock(instant, config, locale).icon;
 }

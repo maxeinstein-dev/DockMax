@@ -2,8 +2,12 @@
 //! counterpart of `src/i18n/pt-BR.ts` (spec 0002 §2.3 item 7).
 //!
 //! `Messages` is the contract: a new locale is one more `Messages` value,
-//! and the compiler rejects it if a text is missing. Only PT-BR exists for
-//! now, so `messages()` returns it.
+//! and the compiler rejects it if a text is missing. PT-BR and English
+//! (spec 0019 G1); `set_language` picks one, from the settings.
+
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use crate::domain::settings::Language;
 
 /// Every text of the native interface, grouped by area.
 #[derive(Debug)]
@@ -289,14 +293,178 @@ const PT_BR: Messages = Messages {
     },
 };
 
+const EN: Messages = Messages {
+    tray: TrayMessages {
+        task_manager: "Task Manager",
+        search_apps: "Search apps…",
+        auto_hide: "Automatically hide",
+        open_settings: "Settings",
+        quit: "Quit",
+        new_workspace: "New workspace",
+        workspaces: "Workspaces",
+        size: "Size",
+        one_icon: "1 icon",
+        icons: "{n} icons",
+    },
+    settings: SettingsMessages {
+        window_title: "DockMax Settings",
+    },
+    dock: DockMessages {
+        settings: "Settings",
+        clock: "Clock",
+        time_progress: "Time progress",
+        note: "Note",
+        shortcut: "Shortcut",
+        files: "Files",
+        activity: "Activity",
+        network: "Network activity",
+        calendar: "Calendar",
+        cycle: "Cycle",
+        countdown: "Countdown",
+        countdown_days: "days",
+        countdown_day: "day",
+        countdown_today: "Today",
+        countdown_ago: "ago",
+        pomodoro: "Pomodoro",
+        pomodoro_focus_done: "Focus over: time for a break.",
+        pomodoro_pause_done: "Break over: time to focus.",
+        todo: "To-do list",
+        todo_open: "open",
+        todo_open_many: "open",
+        todo_none: "✓",
+        water: "Drink water",
+        media: "Now playing",
+        claude: "Claude usage",
+        claude_five: "5 hours",
+        claude_five_short: "5h",
+        claude_week: "Week",
+        claude_week_short: "Wk",
+        weather: "Weather",
+        media_previous: "Previous",
+        media_play: "Play",
+        media_pause: "Pause",
+        media_next: "Next",
+        no_value: "–",
+        calendar_connect: "Connect",
+        calendar_free: "Free",
+        calendar_now: "now",
+        calendar_in: "in {n} min",
+        calendar_minutes: "{n} min",
+        calendar_tomorrow: "tomorrow",
+        calendar_today: "Today",
+        calendar_tomorrow_title: "Tomorrow",
+        weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        calendar_all_day: "All day",
+        calendar_tasks: "Tasks",
+        calendar_late: "overdue",
+        calendar_nothing: "Nothing scheduled",
+        cycle_notice_title: "Cycle reminder",
+        cycle_notice_line: "Open Cycle in DockMax to see it.",
+        calendar_busy: "Busy",
+        calendar_untitled: "(no title)",
+        calendar_then: "Then",
+        periods: ["Day", "Week", "Month", "Year", "Workday"],
+        with_notice: "{name} (with notice)",
+        workspace: "Workspace {name}",
+        workspace_shown: "Workspace {name} (shown)",
+        previews: "{name} windows",
+        untitled: "Untitled window",
+        close_window: "Close {name}",
+        show_hidden_icons: "Show hidden icons",
+        tray_icon: "Tray icon",
+        wifi: "Wi-Fi",
+        wired: "Wired network",
+        offline: "No connection",
+        volume: "Volume: {n}%",
+        muted: "Muted",
+        battery: "Battery: {n}%",
+        battery_charging: "Battery: {n}% (charging)",
+    },
+    launcher: LauncherMessages {
+        title: "DockMax launcher",
+        placeholder: "Search apps",
+        app: "App",
+        windows_page: "Windows Settings",
+        dockmax_page: "DockMax Settings",
+        calculator: "Calculator · Enter copies the result",
+        web: "Web search",
+        search_for: "Search “{term}”",
+        search_with: "{name} · web search",
+        copied: "Result copied",
+        recent: "Recent",
+        reading: "Reading apps…",
+        hint: "Type to search apps and settings or do a calculation",
+        nothing_found: "No results",
+        failed: "Couldn't open",
+        results: "{n} results",
+        one_result: "1 result",
+        selected: "{name}, {kind}, {n} of {count}",
+    },
+};
+
 /// Texts of the current locale.
+/// Whether the texts are English; PT-BR until the settings are read.
+static ENGLISH: AtomicBool = AtomicBool::new(false);
+
+/// The texts of the active language.
 pub fn messages() -> &'static Messages {
-    &PT_BR
+    if ENGLISH.load(Ordering::Relaxed) {
+        &EN
+    } else {
+        &PT_BR
+    }
+}
+
+/// Uses the texts of `language` from now on: the menus are built again at
+/// each opening, and the dock's names at its next paint.
+pub fn set_language(language: Language) {
+    ENGLISH.store(
+        is_english(language, system_is_portuguese),
+        Ordering::Relaxed,
+    );
+}
+
+/// Whether `language` means English; "Sistema" asks `portuguese` whether
+/// Windows is shown in Portuguese.
+fn is_english(language: Language, portuguese: impl FnOnce() -> bool) -> bool {
+    match language {
+        Language::En => true,
+        Language::PtBr => false,
+        Language::System => !portuguese(),
+    }
+}
+
+/// Whether the Windows display language is a Portuguese one.
+#[cfg(windows)]
+fn system_is_portuguese() -> bool {
+    /// `LANG_PORTUGUESE`: the primary language of every Portuguese.
+    const PORTUGUESE: u16 = 0x16;
+    let id = unsafe { windows::Win32::Globalization::GetUserDefaultUILanguage() };
+    id & 0x3ff == PORTUGUESE
+}
+
+#[cfg(not(windows))]
+fn system_is_portuguese() -> bool {
+    true
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_system_language_decides_only_for_sistema() {
+        assert!(is_english(Language::En, || true));
+        assert!(!is_english(Language::PtBr, || false));
+        assert!(!is_english(Language::System, || true));
+        assert!(is_english(Language::System, || false));
+    }
+
+    #[test]
+    fn english_keeps_the_placeholders() {
+        assert!(EN.launcher.search_for.contains("{term}"));
+        assert_eq!(EN.tray.open_settings, "Settings");
+    }
 
     #[test]
     fn pt_br_has_every_tray_text() {

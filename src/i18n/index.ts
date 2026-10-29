@@ -1,21 +1,58 @@
+import { useSyncExternalStore } from "react";
+import type { Language } from "../core/settings";
+import { en } from "./en";
 import { ptBR, type Messages } from "./pt-BR";
 
 export type { Messages };
 
-/** Locales the interface ships. Adding one is a new entry here and in
- * `MESSAGES`. */
-type Locale = "pt-BR";
+/** Locales the interface ships (spec 0019 G1). Adding one is a new entry
+ * here, in `MESSAGES` and in Rust's `i18n.rs`. */
+export type Locale = "pt-BR" | "en";
 
 const MESSAGES: Record<Locale, Messages> = {
   "pt-BR": ptBR,
+  en,
 };
 
-/** Only PT-BR exists for now; the locale will come from the settings. */
-const ACTIVE_LOCALE: Locale = "pt-BR";
+/** The locale of `language`; "Sistema" is the Windows display language as
+ * the WebView has it: Portuguese if it is one, English otherwise (as Rust
+ * decides in `i18n::set_language`). */
+export function resolveLocale(
+  language: Language,
+  system: string = typeof navigator === "undefined"
+    ? "pt-BR"
+    : navigator.language,
+): Locale {
+  if (language !== "system") return language;
+  return system.toLowerCase().startsWith("pt") ? "pt-BR" : "en";
+}
+
+/** Until the settings arrive, the system's. */
+let active: Locale = resolveLocale("system");
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+/** The locale in use, for `Intl` and `toLocaleString`. */
+export function activeLocale(): Locale {
+  return active;
+}
+
+/** Switches the interface to `language`: every `useT` renders again. */
+export function setLanguage(language: Language): void {
+  const next = resolveLocale(language);
+  if (typeof document !== "undefined") document.documentElement.lang = next;
+  if (next === active) return;
+  active = next;
+  for (const listener of listeners) listener();
+}
 
 /** The messages of the active locale. */
 export function useT(): Messages {
-  return MESSAGES[ACTIVE_LOCALE];
+  return MESSAGES[useSyncExternalStore(subscribe, activeLocale)];
 }
 
 /** Values for the `{name}` placeholders of a message. */

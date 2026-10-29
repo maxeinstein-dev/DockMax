@@ -14,6 +14,7 @@ const SETTINGS: Settings = {
   launcher: true,
   launcherKeywords: [],
   launcherHotkey: "Alt+Space",
+  language: "system",
   dock: {
     edge: "bottom",
     iconSize: 48,
@@ -167,10 +168,10 @@ describe("Panel", () => {
 
     show("settings");
 
-    expect(screen.getByRole("button", { name: "Sistema" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    // The theme and the language are both "Sistema".
+    for (const system of screen.getAllByRole("button", { name: "Sistema" })) {
+      expect(system).toHaveAttribute("aria-pressed", "true");
+    }
     expect(screen.getByRole("button", { name: "Médio" })).toHaveAttribute(
       "aria-pressed",
       "true",

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { activeLocale } from "../i18n";
 import { errorKind, log } from "./log";
 
 /* The Uso do Claude's panel (spec 0017 F5): the plan's limits, read in Rust
@@ -90,7 +91,7 @@ export function resetText(
     ].filter(Boolean);
     return words.within.replace("{time}", parts.join(" "));
   }
-  return new Intl.DateTimeFormat("pt-BR", {
+  return new Intl.DateTimeFormat(activeLocale(), {
     weekday: "short",
     hour: "2-digit",
     minute: "2-digit",

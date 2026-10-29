@@ -13,8 +13,9 @@ use std::collections::BTreeMap;
 
 use crate::domain::launcher_web::WebKeyword;
 use crate::domain::settings::{
-    DockEdge, DockOpacity, DockSettings, DockStyle, HoverEffect, IconShape, Indicator, MiddleClick,
-    OpenAnimation, Settings, SettingsError, SettingsErrorCode, StyleTweaks, TaskbarMode, Theme,
+    DockEdge, DockOpacity, DockSettings, DockStyle, HoverEffect, IconShape, Indicator, Language,
+    MiddleClick, OpenAnimation, Settings, SettingsError, SettingsErrorCode, StyleTweaks,
+    TaskbarMode, Theme,
 };
 use crate::persistence::settings_file::{self, FILE_NAME};
 use crate::windows::dock;
@@ -38,6 +39,7 @@ pub struct SettingsInput {
     launcher: bool,
     launcher_keywords: Vec<WebKeywordInput>,
     launcher_hotkey: String,
+    language: Language,
 }
 
 /// A keyword of [`SettingsInput`], as strict.
@@ -98,6 +100,7 @@ impl From<SettingsInput> for Settings {
             launcher,
             launcher_keywords,
             launcher_hotkey,
+            language,
         } = input;
         Settings {
             version,
@@ -113,6 +116,7 @@ impl From<SettingsInput> for Settings {
                 })
                 .collect(),
             launcher_hotkey,
+            language,
             dock: DockSettings {
                 edge: dock.edge,
                 icon_size: dock.icon_size,
@@ -186,6 +190,7 @@ impl SettingsState {
 /// the log for the last two.
 pub fn setup(app: &AppHandle) {
     let state = load_state(app.path().app_config_dir());
+    crate::i18n::set_language(state.settings.language);
     app.manage(Mutex::new(state));
 }
 
@@ -321,6 +326,11 @@ fn apply(
     if let Err(error) = app.emit(CHANGED_EVENT, &updated) {
         log::warn!("settings: saved, but failed to notify the windows: {error}");
     }
+    crate::i18n::set_language(updated.language);
+    // The open Configurações takes the new language's title.
+    if let Some(window) = app.get_webview_window(crate::windows::settings_window::LABEL) {
+        let _ = window.set_title(crate::i18n::messages().settings.window_title);
+    }
     dock::settings_changed(&app, &before, &updated.dock);
     if updated.launch_at_login != launch_before {
         apply_launch_at_login(updated.launch_at_login);
@@ -446,7 +456,7 @@ mod tests {
 
     fn full() -> String {
         format!(
-            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}},"launchAtLogin":true,"launcher":false,"launcherKeywords":[{{"keyword":"d","name":"Duck","template":"https://duckduckgo.com/?q=%s"}}],"launcherHotkey":"Ctrl+Shift+K"}}"#
+            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}},"launchAtLogin":true,"launcher":false,"launcherKeywords":[{{"keyword":"d","name":"Duck","template":"https://duckduckgo.com/?q=%s"}}],"launcherHotkey":"Ctrl+Shift+K","language":"en"}}"#
         )
     }
 
@@ -467,6 +477,7 @@ mod tests {
                     template: "https://duckduckgo.com/?q=%s".into(),
                 }],
                 launcher_hotkey: "Ctrl+Shift+K".into(),
+                language: Language::En,
                 dock: DockSettings {
                     edge: DockEdge::Top,
                     icon_size: 64,
