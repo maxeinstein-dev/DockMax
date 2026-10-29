@@ -602,6 +602,7 @@ const messages = {
       water: "Beber água",
       media: "Tocando agora",
       claude: "Uso do Claude",
+      weather: "Clima",
     } satisfies Record<WidgetKind, string>,
     /** Short name of each kind on the add buttons of Itens do dock. */
     addNames: {
@@ -618,6 +619,7 @@ const messages = {
       water: "Beber água",
       media: "Tocando agora",
       claude: "Uso do Claude",
+      weather: "Clima",
     } satisfies Record<CreatableKind, string>,
     /** Parts every widget panel shares. */
     common: {
@@ -826,6 +828,8 @@ const messages = {
         water: "Os copos do dia contra uma meta, com lembrete opcional.",
         claude:
           "Os limites do seu plano do Claude: as 5 horas e a semana, com quando reiniciam.",
+        weather:
+          "O tempo agora na sua cidade e os próximos dias, com máxima, mínima e chuva.",
         media:
           "O que toca no Windows, com capa e os botões de tocar, voltar e avançar.",
         pomodoro:
@@ -899,6 +903,44 @@ const messages = {
       showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },
     /** The Ciclo (spec 0017 F2b): the panel says what the tile doesn't. */
+    /** The Clima (spec 0017 F5). */
+    weather: {
+      settingsTitle: "Ajustes do Clima",
+      loading: "Lendo o tempo…",
+      unavailable:
+        "Não foi possível ler o tempo agora. Tentando de novo em alguns minutos.",
+      noCity: "Escolha a cidade nos Ajustes.",
+      now: "Agora",
+      days: "Próximos dias",
+      today: "Hoje",
+      feelsLike: "Sensação {value}",
+      humidity: "Umidade {value}%",
+      wind: "Vento {value} km/h",
+      range: "{max} / {min}",
+      conditions: {
+        clear: "Céu limpo",
+        partlyCloudy: "Parcialmente nublado",
+        cloudy: "Nublado",
+        fog: "Neblina",
+        drizzle: "Garoa",
+        rain: "Chuva",
+        snow: "Neve",
+        storm: "Tempestade",
+      },
+      footer: "Open-Meteo · lido a cada 30 min",
+      cityNow: "Cidade: {city}",
+      search: "Buscar cidade",
+      searchPlaceholder: "Ex.: Belo Horizonte",
+      searchButton: "Buscar",
+      searching: "Buscando…",
+      searchFailed: "Não foi possível buscar agora. Tente de novo.",
+      nothingFound: "Nenhuma cidade com esse nome.",
+      found: "Cidades encontradas",
+      widthHint:
+        "Com 1 ícone, o céu e a temperatura; com 2, a máxima e a mínima do dia ao lado.",
+      privacy:
+        "Só o nome buscado e as coordenadas da cidade vão para o Open-Meteo, sem conta nem localização automática.",
+    },
     /** The Uso do Claude (spec 0017 F5). */
     claude: {
       settingsTitle: "Ajustes do Uso do Claude",

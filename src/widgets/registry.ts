@@ -32,6 +32,9 @@ import TodoTile from "./todo/TodoTile";
 import WaterPanel from "./water/WaterPanel";
 import WaterSettings from "./water/WaterSettings";
 import WaterTile from "./water/WaterTile";
+import WeatherPanel from "./weather/WeatherPanel";
+import WeatherSettings from "./weather/WeatherSettings";
+import WeatherTile from "./weather/WeatherTile";
 import ClockSettings from "./clock/ClockSettings";
 import ClockTile from "./clock/ClockTile";
 import type {
@@ -69,7 +72,8 @@ export type GlazeClass =
   | "t-todo"
   | "t-water"
   | "t-music"
-  | "t-claude";
+  | "t-claude"
+  | "t-weather";
 
 export interface WidgetDefinition<K extends CreatableKind> {
   kind: K;
@@ -192,6 +196,14 @@ export const WIDGET_REGISTRY: {
     Tile: ClaudeTile,
     Panel: ClaudePanel,
     Settings: ClaudeSettings,
+  },
+  weather: {
+    kind: "weather",
+    nameKey: "weather",
+    glaze: "t-weather",
+    Tile: WeatherTile,
+    Panel: WeatherPanel,
+    Settings: WeatherSettings,
   },
 };
 

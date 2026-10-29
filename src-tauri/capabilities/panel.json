@@ -32,6 +32,8 @@
     "allow-media-status",
     "allow-media-control",
     "allow-claude-usage",
+    "allow-weather-reading",
+    "allow-weather-search",
     "allow-tray-to-dock",
     "allow-list-apps",
     "allow-list-catalog",

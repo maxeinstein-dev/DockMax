@@ -10,5 +10,6 @@ pub mod pomodoro;
 pub mod settings;
 pub mod system;
 pub mod tray;
+pub mod weather;
 pub mod widgets;
 pub mod workspaces;

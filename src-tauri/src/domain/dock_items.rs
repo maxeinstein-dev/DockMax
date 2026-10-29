@@ -82,6 +82,7 @@ pub struct Names {
     pub water: &'static str,
     pub media: &'static str,
     pub claude: &'static str,
+    pub weather: &'static str,
 }
 
 impl Names {
@@ -107,6 +108,7 @@ impl Names {
                     WidgetKind::Water => self.water,
                     WidgetKind::Media => self.media,
                     WidgetKind::Claude => self.claude,
+                    WidgetKind::Weather => self.weather,
                 }
                 .to_string()
             }),
@@ -267,6 +269,7 @@ mod tests {
         water: "Beber água",
         media: "Tocando agora",
         claude: "Uso do Claude",
+        weather: "Clima",
     };
 
     fn id(n: u8) -> WidgetId {

@@ -84,6 +84,48 @@ const PLAY: &[&str] = &["M8 5.5l11 6.5 -11 6.5z"];
 const PREVIOUS: &[&str] = &["M6 6v12M19 6l-9 6 9 6z"];
 const NEXT: &[&str] = &["M18 6v12M5 6l9 6 -9 6z"];
 
+/// The Clima's skies (24 px box, after Lucide's).
+pub const SUN: &[&str] = &[
+    "M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0 -8",
+    "M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4 -1.4M17.3 6.7l1.4 -1.4",
+];
+const MOON: &[&str] = &["M12 3a6 6 0 0 0 9 9a9 9 0 1 1 -9 -9z"];
+const PARTLY: &[&str] = &[
+    "M12 2v2M4.93 4.93l1.41 1.41M20 12h2M19.07 4.93l-1.41 1.41",
+    "M15.947 12.65a4 4 0 0 0 -5.925 -4.128",
+    "M13 22H7a5 5 0 1 1 4.9 -6H13a3 3 0 0 1 0 6z",
+];
+const CLOUD: &[&str] = &["M17.5 19H9a7 7 0 1 1 6.71 -9h1.79a4.5 4.5 0 1 1 0 9z"];
+/// A cloud's upper part, with room under it.
+const CLOUD_TOP: &str = "M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242";
+const FOG: &[&str] = &[CLOUD_TOP, "M16 17H7M17 21H9"];
+const DRIZZLE: &[&str] = &[CLOUD_TOP, "M8 19v1M8 14v1M16 19v1M16 14v1M12 21v1M12 16v1"];
+const RAIN: &[&str] = &[CLOUD_TOP, "M16 14v6M8 14v6M12 16v6"];
+const SNOW: &[&str] = &[
+    CLOUD_TOP,
+    "M8 15h0.01M8 19h0.01M12 17h0.01M12 21h0.01M16 15h0.01M16 19h0.01",
+];
+const STORM: &[&str] = &[
+    "M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 0.5 8.973",
+    "M13 12l-3 5h4l-3 5",
+];
+
+/// The sky of `condition`; a clear night has the moon.
+pub fn sky(condition: crate::domain::weather::Condition, day: bool) -> &'static [&'static str] {
+    use crate::domain::weather::Condition;
+    match condition {
+        Condition::Clear if day => SUN,
+        Condition::Clear => MOON,
+        Condition::PartlyCloudy => PARTLY,
+        Condition::Cloudy => CLOUD,
+        Condition::Fog => FOG,
+        Condition::Drizzle => DRIZZLE,
+        Condition::Rain => RAIN,
+        Condition::Snow => SNOW,
+        Condition::Storm => STORM,
+    }
+}
+
 /// What a tile shows inside its glaze.
 pub enum Face {
     /// A line glyph on a glaze.
@@ -146,6 +188,15 @@ pub enum Face {
         controls: bool,
         /// Seconds since the track showed: where a long title rolls to.
         since: f64,
+    },
+    /// The Clima (spec 0017 F5): the sky and, once read, the temperature
+    /// under it; on a wide tile, beside it with the day's highest and
+    /// lowest.
+    Weather {
+        glaze: Glaze,
+        sky: &'static [&'static str],
+        temperature: Option<String>,
+        range: Option<String>,
     },
     /// The Atividade de rede: the rates and, on a wide tile, the graph.
     Rates {
@@ -1268,6 +1319,17 @@ impl Painter {
                     controls: *controls,
                     since: *since,
                 },
+                Face::Weather {
+                    glaze,
+                    sky,
+                    temperature,
+                    range,
+                } => Face::Weather {
+                    glaze: *glaze,
+                    sky,
+                    temperature: temperature.clone(),
+                    range: range.clone(),
+                },
                 Face::Rates {
                     glaze,
                     down,
@@ -1416,6 +1478,15 @@ impl Painter {
             } => {
                 self.glaze(area, *glaze, tile.pressed);
                 self.rates(area, down, up, graph.as_ref());
+            }
+            Face::Weather {
+                glaze,
+                sky,
+                temperature,
+                range,
+            } => {
+                self.glaze(area, *glaze, tile.pressed);
+                self.weather(area, sky, temperature.as_deref(), range.as_deref());
             }
             Face::Media {
                 glaze,
@@ -1897,6 +1968,55 @@ impl Painter {
             }
             y += height;
         }
+    }
+
+    /// The Clima: the sky alone until the weather is read; on a square
+    /// tile, the temperature under it; on a wide one, the sky on the left
+    /// and the temperature with the day's range beside it.
+    fn weather(
+        &mut self,
+        area: Area,
+        sky: &'static [&'static str],
+        temperature: Option<&str>,
+        range: Option<&str>,
+    ) {
+        let u = area.height;
+        let square = Area { width: u, ..area };
+        let Some(temperature) = temperature else {
+            let middle = Area {
+                x: area.x + (area.width - u) / 2.0,
+                ..square
+            };
+            self.strokes(middle, 0.54, sky, Color::WHITE, 1.75);
+            return;
+        };
+        if area.width > u * 1.5 {
+            self.strokes(square, 0.56, sky, Color::WHITE, 1.75);
+            let x = area.x + u * 0.92;
+            match range {
+                Some(range) => {
+                    self.text_from(temperature, x, area.y + u * 0.4, u * 0.3, Color::WHITE);
+                    let faint = Color::WHITE.with_alpha(0.8);
+                    self.text_from(range, x, area.y + u * 0.7, u * 0.15, faint);
+                }
+                None => {
+                    self.text_from(temperature, x, area.y + u * 0.5, u * 0.3, Color::WHITE);
+                }
+            }
+            return;
+        }
+        let top = Area {
+            y: area.y + u * 0.06,
+            height: u * 0.56,
+            ..square
+        };
+        self.strokes(top, 0.42, sky, Color::WHITE, 1.9);
+        let under = Area {
+            y: area.y + u * 0.56,
+            height: u * 0.34,
+            ..square
+        };
+        self.text(temperature, under, u * 0.26, 600, true, Color::WHITE);
     }
 
     /// The Atividade de rede: the two rates and, on a wide tile, the graph

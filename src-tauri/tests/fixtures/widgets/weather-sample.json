@@ -1,0 +1,14 @@
+{
+  "id": "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f60a1",
+  "label": null,
+  "kind": "weather",
+  "config": {
+    "width": 2,
+    "city": {
+      "name": "Belo Horizonte",
+      "region": "Minas Gerais, Brasil",
+      "latitude": -19.92,
+      "longitude": -43.94
+    }
+  }
+}

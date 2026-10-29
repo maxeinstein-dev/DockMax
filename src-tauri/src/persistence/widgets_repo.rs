@@ -691,13 +691,13 @@ mod tests {
             [],
         )
         .unwrap();
-        let weather = WidgetId::new();
-        insert_raw(conn, weather.as_str(), "weather", 1);
+        let radio = WidgetId::new();
+        insert_raw(conn, radio.as_str(), "radio", 1);
         insert_raw(conn, "not-an-id", "clock", 2);
 
         assert_eq!(ids(conn), before);
         assert_eq!(count(conn, "widget_instances"), 5);
-        assert_eq!(remove(conn, &weather), Err(WidgetError::NotFound));
+        assert_eq!(remove(conn, &radio), Err(WidgetError::NotFound));
 
         // Moves skip the hidden rows: one step up is one place in the dock.
         move_widget(conn, &before[1], MoveDirection::Up).unwrap();
@@ -712,7 +712,7 @@ mod tests {
         let kept: i64 = conn
             .query_row(
                 "SELECT count(*) FROM widget_instances WHERE id IN (?1, 'not-an-id')",
-                [weather.as_str()],
+                [radio.as_str()],
                 |row| row.get(0),
             )
             .unwrap();
@@ -874,7 +874,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut storage = open(&dir);
         let conn = storage.connection().unwrap();
-        insert_raw(conn, WidgetId::new().as_str(), "weather", 3);
+        insert_raw(conn, WidgetId::new().as_str(), "radio", 3);
 
         for _ in 3..MAX_WIDGETS {
             add(conn, WidgetKind::Clock).unwrap();

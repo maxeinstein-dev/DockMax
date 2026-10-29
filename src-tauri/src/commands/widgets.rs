@@ -727,7 +727,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let (mut storage, _) = open(&dir);
 
-        for kind in ["shortcut", "files", "weather", "Clock", "timeProgress", ""] {
+        for kind in ["shortcut", "files", "radio", "Clock", "timeProgress", ""] {
             assert_eq!(
                 add(&mut storage, kind, None).map(|_| ()),
                 Err(WidgetError::NotCreatable),
@@ -851,7 +851,7 @@ mod tests {
             json!({ "kind": "clock",
                     "config": { "timeZone": null, "hourCycle": "h23", "showSeconds": false,
                                 "iconStyle": "Analog" } }),
-            json!({ "kind": "weather", "config": {} }),
+            json!({ "kind": "radio", "config": {} }),
             json!(null),
             json!([]),
             json!("clock"),
