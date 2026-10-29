@@ -32,6 +32,7 @@
     "allow-media-status",
     "allow-media-control",
     "allow-claude-usage",
+    "allow-open-tour",
     "allow-claude-sign-in",
     "allow-weather-reading",
     "allow-weather-search",

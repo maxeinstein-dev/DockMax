@@ -1,4 +1,6 @@
 import { version } from "../../package.json";
+import { errorKind, log } from "../core/log";
+import { openTour } from "../core/tour";
 import { useT } from "../i18n";
 import PanelFooter from "./PanelFooter";
 
@@ -44,6 +46,17 @@ function AboutPanel() {
           <dd className="about-code">{t.about.repository}</dd>
         </div>
       </dl>
+      <button
+        type="button"
+        className="secondary-button about-tour"
+        onClick={() =>
+          void openTour().catch((error: unknown) => {
+            log.warn(`tour: open failed: ${errorKind(error)}`);
+          })
+        }
+      >
+        {t.about.tour}
+      </button>
       <PanelFooter>{t.about.footer}</PanelFooter>
     </>
   );

@@ -40,6 +40,7 @@ pub struct SettingsInput {
     launcher_keywords: Vec<WebKeywordInput>,
     launcher_hotkey: String,
     language: Language,
+    tour_shown: bool,
 }
 
 /// A keyword of [`SettingsInput`], as strict.
@@ -101,6 +102,7 @@ impl From<SettingsInput> for Settings {
             launcher_keywords,
             launcher_hotkey,
             language,
+            tour_shown,
         } = input;
         Settings {
             version,
@@ -117,6 +119,7 @@ impl From<SettingsInput> for Settings {
                 .collect(),
             launcher_hotkey,
             language,
+            tour_shown,
             dock: DockSettings {
                 edge: dock.edge,
                 icon_size: dock.icon_size,
@@ -456,7 +459,7 @@ mod tests {
 
     fn full() -> String {
         format!(
-            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}},"launchAtLogin":true,"launcher":false,"launcherKeywords":[{{"keyword":"d","name":"Duck","template":"https://duckduckgo.com/?q=%s"}}],"launcherHotkey":"Ctrl+Shift+K","language":"en"}}"#
+            r#"{{"version":1,"theme":"dark","dock":{{"edge":"top","iconSize":64,"opacity":"solid",{LOOK}}},"launchAtLogin":true,"launcher":false,"launcherKeywords":[{{"keyword":"d","name":"Duck","template":"https://duckduckgo.com/?q=%s"}}],"launcherHotkey":"Ctrl+Shift+K","language":"en","tourShown":true}}"#
         )
     }
 
@@ -478,6 +481,7 @@ mod tests {
                 }],
                 launcher_hotkey: "Ctrl+Shift+K".into(),
                 language: Language::En,
+                tour_shown: true,
                 dock: DockSettings {
                     edge: DockEdge::Top,
                     icon_size: 64,
