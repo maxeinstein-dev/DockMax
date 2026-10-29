@@ -170,6 +170,7 @@ mod tests {
             launcher_keywords: crate::domain::launcher_web::defaults(),
             launcher_hotkey: crate::domain::hotkey::DEFAULT.to_owned(),
             language: Language::System,
+            tour_shown: true,
             dock: DockSettings {
                 edge: DockEdge::Top,
                 icon_size: 64,
@@ -378,7 +379,8 @@ mod tests {
                 {"keyword": "gh", "name": "GitHub", "template": "https://github.com/search?q=%s"}
               ],
               "launcherHotkey": "Alt+Space",
-                "language": "system"
+                "language": "system",
+                "tourShown": false
             })
         );
     }

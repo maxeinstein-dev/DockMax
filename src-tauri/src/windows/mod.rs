@@ -66,6 +66,7 @@ pub mod system_status;
 pub mod taskbar;
 #[cfg(windows)]
 pub mod toast;
+pub mod tour_window;
 #[cfg(windows)]
 pub mod tray_host;
 #[cfg(windows)]
