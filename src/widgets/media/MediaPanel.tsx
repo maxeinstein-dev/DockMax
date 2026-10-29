@@ -52,27 +52,45 @@ function MediaPanel({
           <div className="media-actions">
             <button
               type="button"
-              className="secondary-button"
+              className="media-button"
+              aria-label={text.previous}
+              title={text.previous}
               disabled={!view.canPrevious}
               onClick={() => act("previous")}
             >
-              {text.previous}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6v12M19 6l-9 6 9 6z" />
+              </svg>
             </button>
             <button
               type="button"
-              className="secondary-button media-main"
+              className="media-button media-main"
+              aria-label={view.playing ? text.pause : text.play}
+              title={view.playing ? text.pause : text.play}
               disabled={!view.canToggle}
               onClick={() => act("toggle")}
             >
-              {view.playing ? text.pause : text.play}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d={
+                    view.playing
+                      ? "M9 6v12M15 6v12"
+                      : "M8.5 5.5l10 6.5 -10 6.5z"
+                  }
+                />
+              </svg>
             </button>
             <button
               type="button"
-              className="secondary-button"
+              className="media-button"
+              aria-label={text.next}
+              title={text.next}
               disabled={!view.canNext}
               onClick={() => act("next")}
             >
-              {text.next}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18 6v12M5 6l9 6 -9 6z" />
+              </svg>
             </button>
           </div>
         </>

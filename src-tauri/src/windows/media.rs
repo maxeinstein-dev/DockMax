@@ -13,7 +13,7 @@ use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSessionMediaProperties as Properties,
     GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status,
 };
-use windows::Storage::Streams::{DataReader, IInputStream};
+use windows::Storage::Streams::{DataReader, IInputStream, InputStreamOptions};
 use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx};
 use windows::core::Interface;
 
@@ -172,18 +172,32 @@ fn art_of(properties: &Properties) -> Option<(String, Vec<u8>)> {
         .ok()?
         .join()
         .ok()?;
-    let size = stream.Size().ok()?;
-    if size == 0 || size > MAX_ART {
-        return None;
-    }
     let kind = stream
         .ContentType()
         .map(|kind| kind.to_string())
         .unwrap_or_default();
+    // The size a program gives may be 0 while the cover is still on its
+    // way: read in parts until the stream ends, whatever it says.
     let reader = DataReader::CreateDataReader(&stream.cast::<IInputStream>().ok()?).ok()?;
-    let loaded = reader.LoadAsync(size as u32).ok()?.join().ok()?;
-    let mut bytes = vec![0u8; loaded as usize];
-    reader.ReadBytes(&mut bytes).ok()?;
+    reader
+        .SetInputStreamOptions(InputStreamOptions::Partial)
+        .ok()?;
+    let mut bytes = Vec::new();
+    loop {
+        let loaded = reader.LoadAsync(64 * 1024).ok()?.join().ok()?;
+        if loaded == 0 {
+            break;
+        }
+        let start = bytes.len();
+        bytes.resize(start + loaded as usize, 0);
+        reader.ReadBytes(&mut bytes[start..]).ok()?;
+        if bytes.len() as u64 > MAX_ART {
+            return None;
+        }
+    }
+    if bytes.is_empty() {
+        return None;
+    }
     let kind = if kind.starts_with("image/") {
         kind
     } else {

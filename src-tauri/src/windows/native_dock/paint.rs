@@ -1491,6 +1491,9 @@ impl Painter {
             None => {
                 let paths = if playing { NOTE } else { PAUSE };
                 self.strokes(cover, 0.62, paths, Color::WHITE, 1.75);
+                if let Some(badge) = badge {
+                    self.badge(scene, cover, badge);
+                }
             }
         }
         let Some(title) = title else {

@@ -45,17 +45,52 @@
 .media-actions {
   display: flex;
   justify-content: center;
-  gap: 8px;
+  align-items: center;
+  gap: 18px;
   margin: 12px 0 4px;
 }
 
-.media-actions .media-main {
-  background: var(--accent);
-  color: #fff;
+/* Icons only, as the Spotify has them: the play or pause in a circle. */
+.media-button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
 }
 
-.media-actions .media-main:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 86%, #000);
+.media-button svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.media-button:hover:not(:disabled) {
+  background: var(--track);
+}
+
+.media-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.media-button.media-main {
+  width: 44px;
+  height: 44px;
+  background: var(--ink);
+  color: rgb(var(--surface-rgb));
+}
+
+.media-button.media-main:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 85%, rgb(var(--surface-rgb)));
 }
 
 .media-source {
