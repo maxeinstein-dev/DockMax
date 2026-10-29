@@ -81,6 +81,15 @@ pub struct Settings {
     pub launcher_hotkey: String,
     /// The interface's language (spec 0019 G1).
     pub language: Language,
+    /// The welcome tour was shown (spec 0019 G2). A new install starts
+    /// without it, so the tour opens once; a file written before the tour
+    /// existed counts as shown.
+    #[serde(default = "shown")]
+    pub tour_shown: bool,
+}
+
+fn shown() -> bool {
+    true
 }
 
 impl Default for Settings {
@@ -94,6 +103,7 @@ impl Default for Settings {
             launcher_keywords: launcher_web::defaults(),
             launcher_hotkey: hotkey::DEFAULT.to_owned(),
             language: Language::default(),
+            tour_shown: false,
         }
     }
 }
@@ -696,7 +706,8 @@ mod tests {
                 {"keyword": "gh", "name": "GitHub", "template": "https://github.com/search?q=%s"}
               ],
               "launcherHotkey": "Alt+Space",
-              "language": "system"
+              "language": "system",
+              "tourShown": false
             }"#,
         )
         .unwrap();
@@ -964,9 +975,13 @@ mod tests {
         assert_eq!(settings.dock.edge, DockEdge::Top);
         assert_eq!(settings.dock.icon_size, 40);
         assert_eq!(settings.dock.opacity, DockOpacity::Translucent);
+        // Except the tour: a file from before it existed counts as shown.
         assert_eq!(
             serde_json::from_str::<Settings>("{}").unwrap(),
-            Settings::default()
+            Settings {
+                tour_shown: true,
+                ..Settings::default()
+            }
         );
     }
 

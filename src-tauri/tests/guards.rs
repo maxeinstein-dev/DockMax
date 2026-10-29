@@ -66,6 +66,8 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // The Uso do Claude (F5): the last reading of the plan's
             // limits; the token never reaches the page.
             "allow-claude-usage",
+            // "Ver o tour" in Sobre (spec 0019 G2).
+            "allow-open-tour",
             // Opens the Claude Code's own sign-in in a terminal.
             "allow-claude-sign-in",
             // The Clima (F5): the last forecast of a city, and the search
@@ -163,6 +165,8 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-cancel-google-sign-in",
             "allow-google-calendars",
             "allow-disconnect-google-account",
+            // "Ver o tour" in Sobre (spec 0019 G2).
+            "allow-open-tour",
             "log:allow-log",
         ],
     ),
@@ -179,6 +183,20 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-e2e-launcher-toggle",
             "allow-e2e-launcher-type",
             "allow-e2e-launcher-key",
+        ],
+    ),
+    (
+        "tour.json",
+        "tour",
+        &["tour"],
+        &[
+            "core:event:allow-listen",
+            "core:event:allow-unlisten",
+            // The theme and the language, and the hotkey the tour names.
+            "allow-get-settings",
+            // Its last step: close, and open Configurações if asked.
+            "allow-finish-tour",
+            "log:allow-log",
         ],
     ),
 ];

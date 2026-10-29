@@ -406,6 +406,43 @@ const messages = {
     /** The source code repository, shown as selectable text (a link from Fase 3). */
     repository: "github.com/maxeinstein-dev/DockMax",
     footer: "Projeto independente",
+    /** Opens the welcome tour again (spec 0019 G2). */
+    tour: "Ver o tour",
+  },
+  /** The welcome tour (spec 0019 G2). `{hotkey}` is the launcher's. */
+  tour: {
+    count: "{n} de {total}",
+    skip: "Pular",
+    back: "Voltar",
+    next: "Próximo",
+    start: "Começar",
+    openSettings: "Abrir Configurações",
+    steps: {
+      welcome: {
+        title: "Boas-vindas ao DockMax",
+        body: "Um dock para o seu Windows: os seus apps, espaços de trabalho e widgets vivos num só lugar. Sem conta e sem rastreamento.",
+      },
+      apps: {
+        title: "Seus apps no dock",
+        body: "Clique para abrir um app ou trazer a janela dele; passe o mouse para ver as janelas abertas.\nArraste para mudar a ordem e use o clique direito para fixar, fechar e mais.",
+      },
+      workspaces: {
+        title: "Espaços de trabalho",
+        body: "As bolinhas no começo do dock são os seus espaços. Cada um tem os seus apps, widgets e janelas.\nTroque com um clique, com a roda do mouse sobre o dock ou com Ctrl+Alt+número.",
+      },
+      widgets: {
+        title: "Widgets vivos",
+        body: "Relógio, clima, agenda, Pomodoro e outros mostram o que importa no próprio ícone. Clique para abrir o painel; os ajustes ficam lá dentro.\nAdicione mais em Configurações › Widgets.",
+      },
+      launcher: {
+        title: "Ache tudo com {hotkey}",
+        body: "O lançador acha apps e páginas das Configurações, faz contas e busca na web por palavra-chave, como “g dockmax”.",
+      },
+      done: {
+        title: "Tudo pronto",
+        body: "Abra as Configurações pelo clique direito no dock para mudar tema, posição, tamanho e muito mais.\nPara rever este tour, vá em Configurações › Sobre.",
+      },
+    },
   },
   /** Texts of the widgets and of Configurações › Itens do dock (spec 0003
    * §2.2, §2.3; the approved mock `docs/design/widgets-mock.html`). A text

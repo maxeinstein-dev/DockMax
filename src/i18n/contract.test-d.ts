@@ -269,6 +269,41 @@ export const otherText: Messages = {
     licenseValue: "Personal use",
     repository: "github.com/maxeinstein-dev/DockMax",
     footer: "Independent project",
+    tour: "See the tour",
+  },
+  tour: {
+    count: "{n} of {total}",
+    skip: "Skip",
+    back: "Back",
+    next: "Next",
+    start: "Get started",
+    openSettings: "Open Settings",
+    steps: {
+      welcome: {
+        title: "Welcome to DockMax",
+        body: "A dock for your Windows: your apps, workspaces and live widgets in one place. No account, no tracking.",
+      },
+      apps: {
+        title: "Your apps in the dock",
+        body: "Click to open an app or bring its window forward; hover to see its open windows.\nDrag to reorder, and right-click to pin, close and more.",
+      },
+      workspaces: {
+        title: "Workspaces",
+        body: "The dots at the start of the dock are your workspaces. Each one has its own apps, widgets and windows.\nSwitch with a click, the mouse wheel over the dock, or Ctrl+Alt+number.",
+      },
+      widgets: {
+        title: "Live widgets",
+        body: "Clock, weather, calendar, Pomodoro and more show what matters right on the icon. Click to open the panel; options are inside.\nAdd more in Settings › Widgets.",
+      },
+      launcher: {
+        title: "Find anything with {hotkey}",
+        body: "The launcher finds apps and Settings pages, does math and searches the web by keyword, like “g dockmax”.",
+      },
+      done: {
+        title: "All set",
+        body: "Open Settings from the dock's right-click menu to change the theme, position, size and much more.\nTo see this tour again, go to Settings › About.",
+      },
+    },
   },
   workspaces: {
     title: "Workspaces",
