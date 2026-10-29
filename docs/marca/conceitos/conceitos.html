@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conceitos de marca</title>
+<style>
+  :root { --surface: rgb(247 247 249); --ink: #1d1e22; --ink-2: #5b5f69; --hair: rgb(0 0 0 / .09); }
+  body { margin: 0; padding: 32px 16px; background: var(--surface); color: var(--ink);
+    font: 400 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; }
+  h1 { font: 600 22px "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; margin: 0 0 4px; }
+  h2 { font: 600 17px "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; margin: 0 0 4px; }
+  p { margin: 0 0 16px; color: var(--ink-2); }
+  section { border-top: 1px solid var(--hair); padding: 24px 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  .board { display: flex; gap: 20px; align-items: flex-end; padding: 20px; border-radius: 12px; }
+  .claro { background: #fff; border: 1px solid var(--hair); }
+  .escuro { background: rgb(38 39 44); }
+  .board img { display: block; }
+  .lock { max-width: 100%; height: auto; }
+  .lock-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .lock-row > div { padding: 12px; border-radius: 12px; }
+  @media (max-width: 700px) { .lock-row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>G6 · Conceitos de marca</h1>
+  <p>Ícone em superelipse com esmalte de dois tons (paleta do DESIGN.md) e o logotipo em Segoe UI Variable Display 600. Tamanhos: 256, 64, 32 e 24 px.</p>
+
+  <section>
+    <h2>Dockyard A · Pórtico</h2>
+    <p>Esmalte petróleo. Um pórtico de estaleiro ergue um ladrilho da barra: a barra é o dock, o ladrilho que sobe é o lançador.</p>
+    <div class="row">
+      <div class="board claro"><img src="dockyard-a-portico.svg" width="256" height="256" alt="Ícone Dockyard A"><img src="dockyard-a-portico.svg" width="64" height="64" alt=""><img src="dockyard-a-portico.svg" width="32" height="32" alt=""><img src="dockyard-a-portico.svg" width="24" height="24" alt=""></div>
+      <div class="board escuro"><img src="dockyard-a-portico.svg" width="64" height="64" alt=""><img src="dockyard-a-portico.svg" width="32" height="32" alt=""><img src="dockyard-a-portico.svg" width="24" height="24" alt=""></div>
+    </div>
+    <div class="lock-row"><div class="claro"><img class="lock" src="dockyard-a-portico-logotipo.svg" alt="Logotipo Dockyard A, claro"></div><div class="escuro"><img class="lock" src="dockyard-a-portico-logotipo-escuro.svg" alt="Logotipo Dockyard A, escuro"></div></div>
+  </section>
+
+  <section>
+    <h2>Dockyard B · Lançamento</h2>
+    <p>Esmalte tinta. O ladrilho do lançador (o prompt ›_ do Alt+Space) sai da barra com linhas de impulso.</p>
+    <div class="row">
+      <div class="board claro"><img src="dockyard-b-lancamento.svg" width="256" height="256" alt="Ícone Dockyard B"><img src="dockyard-b-lancamento.svg" width="64" height="64" alt=""><img src="dockyard-b-lancamento.svg" width="32" height="32" alt=""><img src="dockyard-b-lancamento.svg" width="24" height="24" alt=""></div>
+      <div class="board escuro"><img src="dockyard-b-lancamento.svg" width="64" height="64" alt=""><img src="dockyard-b-lancamento.svg" width="32" height="32" alt=""><img src="dockyard-b-lancamento.svg" width="24" height="24" alt=""></div>
+    </div>
+    <div class="lock-row"><div class="claro"><img class="lock" src="dockyard-b-lancamento-logotipo.svg" alt="Logotipo Dockyard B, claro"></div><div class="escuro"><img class="lock" src="dockyard-b-lancamento-logotipo-escuro.svg" alt="Logotipo Dockyard B, escuro"></div></div>
+  </section>
+
+  <section>
+    <h2>DockMax · Ampliação (referência)</h2>
+    <p>Esmalte ardósia. Os ladrilhos crescem em curva até o do meio, como a ampliação do dock, com o ponto de painel aberto embaixo.</p>
+    <div class="row">
+      <div class="board claro"><img src="dockmax-ampliacao.svg" width="256" height="256" alt="Ícone DockMax"><img src="dockmax-ampliacao.svg" width="64" height="64" alt=""><img src="dockmax-ampliacao.svg" width="32" height="32" alt=""><img src="dockmax-ampliacao.svg" width="24" height="24" alt=""></div>
+      <div class="board escuro"><img src="dockmax-ampliacao.svg" width="64" height="64" alt=""><img src="dockmax-ampliacao.svg" width="32" height="32" alt=""><img src="dockmax-ampliacao.svg" width="24" height="24" alt=""></div>
+    </div>
+    <div class="lock-row"><div class="claro"><img class="lock" src="dockmax-ampliacao-logotipo.svg" alt="Logotipo DockMax, claro"></div><div class="escuro"><img class="lock" src="dockmax-ampliacao-logotipo-escuro.svg" alt="Logotipo DockMax, escuro"></div></div>
+  </section>
+</main>
+</body>
+</html>

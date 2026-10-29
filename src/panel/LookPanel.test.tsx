@@ -14,6 +14,7 @@ const SETTINGS: Settings = {
   launcherKeywords: [],
   launcherHotkey: "Alt+Space",
   language: "system",
+  tourShown: true,
   dock: {
     edge: "bottom",
     iconSize: 48,

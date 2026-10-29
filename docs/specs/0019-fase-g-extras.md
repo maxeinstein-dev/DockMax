@@ -2,7 +2,7 @@
 
 Fase G da [spec 0004](0004-paridade-primodock.md) (§6), depois da fase F ([spec 0017](0017-fase-f-widgets.md), concluída em 2026-10-29).
 
-**Status:** em andamento: G1 (idioma inglês) em curso.
+**Status:** em andamento: G1 (idioma inglês, #75) entregue; G2 (tour) em curso. Ordem decidida pelo autor em 2026-10-29: tour, pacote de ícones, nome e logo, estudo do Linux e, por último, atualização automática.
 
 ## 1. Decisões do autor (2026-10-29)
 
@@ -17,18 +17,18 @@ O que entra na fase, no lugar da lista da spec 0004 (mascote, onboarding, config
 | **Atualização automática** | Entra |
 | **Pacotes de ícones** | Entra: começa por ícones retrô / 8-bit |
 | **Linux** | Entra como estudo: como fazer o DockMax funcionar no Linux |
-| **Nome e logo** | Talvez: um nome e uma logo mais "comerciáveis" que DockMax |
+| **Nome e logo** | Talvez: um nome e uma logo mais "comerciáveis" que DockMax. Decidido: **Dockyard** (G6) |
 
 ## 2. Recortes
 
 | Recorte | Entrega |
 |---|---|
 | **G1. Idioma inglês** | Seletor **Idioma** em Configurações (Sistema, Português, English); toda a interface em inglês, do front (`src/i18n/en.ts`) e do Rust (`i18n.rs`: menus, nomes do dock, lançador); datas e números no formato do idioma. "Sistema" segue o idioma de exibição do Windows: português se for um, inglês nos outros. A troca vale na hora, sem reabrir o app. |
-| G2. Tour de boas-vindas | A definir. |
+| **G2. Tour de boas-vindas** | Uma janela pequena com 6 passos (boas-vindas, apps, espaços, widgets, lançador, pronto), com Próximo, Voltar e Pular; no fim, Começar ou Abrir Configurações. Abre sozinha na primeira execução e em Sobre › Ver o tour. |
 | G3. Atualização automática | A definir (onde publicar as versões). |
 | **G4. Pacote de ícones retrô / 8-bit** | O primeiro pacote próprio, **Retrô 8-bit**: 43 ícones em pixel art 16×16 na paleta do PICO-8 (o dock do autor e uns 35 apps comuns, mais um cartucho de reserva), no formato do B4a ([spec 0007](0007-fase-b4-icones.md) §3). Vem embutido e o app o copia para `IconPacks` ao abrir; o usuário o escolhe em Aparência › Ícones dos apps. |
 | **G5. Linux** | Feito: [estudo 0001](../estudos/0001-linux.md). Recomenda não portar agora; se o Linux virar meta, separar o Windows atrás de traits e fazer um dock para KDE Plasma e wlroots com layer-shell. GNOME/Zorin só com uma extensão do Shell, à parte. Decisões do autor no §6 do estudo. |
-| G6. Nome e logo | A definir com o autor. |
+| **G6. Nome e logo** | **Decidido em 2026-10-29:** o nome passa a ser **Dockyard**, com o ícone do lançador saindo da barra em esmalte cobalto ([marca 0001](../marca/0001-proposta.md)). Só proposta e SVGs; o renome no código é um recorte futuro, com os passos na proposta. |
 
 ## 3. G1 em detalhe
 
@@ -37,7 +37,14 @@ O que entra na fase, no lugar da lista da spec 0004 (mascote, onboarding, config
 - Front: `useT` acompanha o idioma (o `settings-changed` chega a todas as janelas); `activeLocale()` dá o idioma para `Intl` e `toLocaleString`. O `<html lang>` acompanha.
 - O contrato não muda: `en.ts` tem o tipo `Messages` do PT-BR, e o Rust tem a mesma struct `Messages`; uma chave faltando não compila.
 
-## 4. G4 em detalhe
+## 4. G2 em detalhe
+
+- Decisões do autor (2026-10-29): **janela com passos** (não balões apontando no dock) e **abre na primeira execução e em Sobre**.
+- `settings.json` ganha `tourShown`. Uma instalação nova começa sem ele e o tour abre uma vez; um arquivo de antes do tour, sem o campo, conta como mostrado, para não abrir para quem já usa. O Rust marca ao abrir, então fechar no meio não traz o tour de volta.
+- A janela `tour` (`tour.html`, `src/tour/`) tem a sua capability: ler as configurações (tema, idioma e o atalho do lançador, que o passo 5 cita) e `finish_tour`, que fecha a janela e, se pedido, abre Configurações. "Ver o tour" (`open_tour`) fica no Sobre do painel e de Configurações.
+- Teclado: setas passam os passos, Esc pula; o título de cada passo recebe o foco, para o leitor de tela ler.
+
+## 5. G4 em detalhe
 
 Decisões do autor (2026-10-29): lista grande de apps mais os do dock dele; paleta do PICO-8; grade 16×16; embutido, instalando sozinho. Os widgets e os glyphs do dock ficam fora: o formato do B4a só veste programas.
 

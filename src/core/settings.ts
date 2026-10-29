@@ -263,6 +263,8 @@ export interface Settings {
   launcherKeywords: WebKeyword[];
   /** The interface's language (spec 0019 G1). */
   language: Language;
+  /** The welcome tour was shown (spec 0019 G2); Rust sets it. */
+  tourShown: boolean;
 }
 
 /** A keyword of the launcher's web search; must match `WebKeyword` in

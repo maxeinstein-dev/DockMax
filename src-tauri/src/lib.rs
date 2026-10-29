@@ -132,6 +132,8 @@ macro_rules! handler {
             commands::media::media_status,
             commands::media::media_control,
             commands::claude::claude_usage,
+            commands::tour::open_tour,
+            commands::tour::finish_tour,
             commands::claude::claude_sign_in,
             commands::weather::weather_reading,
             commands::weather::weather_search,
@@ -211,6 +213,8 @@ macro_rules! handler {
             commands::media::media_status,
             commands::media::media_control,
             commands::claude::claude_usage,
+            commands::tour::open_tour,
+            commands::tour::finish_tour,
             commands::claude::claude_sign_in,
             commands::weather::weather_reading,
             commands::weather::weather_search,
@@ -310,6 +314,8 @@ pub fn run() {
             #[cfg(windows)]
             windows::badges::start(app.handle());
             tray::setup(app.handle())?;
+            // The first run opens the welcome tour (spec 0019 G2).
+            commands::tour::first_run(app.handle());
             Ok(())
         })
         .invoke_handler(handler!());

@@ -41,6 +41,7 @@
     "allow-cancel-google-sign-in",
     "allow-google-calendars",
     "allow-disconnect-google-account",
+    "allow-open-tour",
     "log:allow-log"
   ]
 }
