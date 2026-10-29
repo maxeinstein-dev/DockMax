@@ -10,9 +10,10 @@ const STEPS = [
   {
     key: "welcome",
     glaze: "t-about",
+    // A dock: the bar and three icons on it.
     paths: [
-      "M4 17.5h16",
-      "M6.5 14h3v3.5h-3zM10.5 12h3v5.5h-3zM14.5 14h3v3.5h-3z",
+      "M4 15.5h16a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1 -1.5 1.5H4a1.5 1.5 0 0 1 -1.5 -1.5v-1a1.5 1.5 0 0 1 1.5 -1.5z",
+      "M5 8h4v4H5zM10 8h4v4h-4zM15 8h4v4h-4z",
     ],
   },
   {
