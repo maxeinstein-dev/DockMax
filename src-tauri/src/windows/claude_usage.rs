@@ -2,7 +2,8 @@
 //! as the Claude Code's `/usage` asks them, every five minutes while a dock
 //! has the widget and when its panel opens. The Claude Code's sign-in is
 //! read from its credentials file at each ask and kept nowhere; the token
-//! never reaches a log or the page.
+//! never reaches a log or the page. An expired sign-in is renewed by the
+//! Claude Code itself: `claude auth status` renews it without spending use.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex, Once};
@@ -25,7 +26,7 @@ pub enum Reading {
     Ready { usage: Usage, at: i64 },
     /// No Claude Code signed in on this computer.
     SignedOut,
-    /// The sign-in expired: the Claude Code renews it when it next runs.
+    /// The sign-in expired and the Claude Code couldn't renew it.
     Expired,
     /// Anthropic didn't answer, or not as expected.
     Unavailable,
@@ -87,8 +88,51 @@ fn credentials_file() -> Option<std::path::PathBuf> {
     )
 }
 
-/// Asks Anthropic for the usage once.
+/// `CREATE_NO_WINDOW`: the renewal never shows a console.
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+/// How long the Claude Code may take to renew.
+const RENEWAL: Duration = Duration::from_secs(30);
+
+/// Asks Anthropic for the usage, renewing an expired sign-in once.
 fn read() -> Reading {
+    match ask() {
+        Reading::Expired if renew() => ask(),
+        reading => reading,
+    }
+}
+
+/// Has the Claude Code renew its sign-in (it writes the credentials file
+/// itself); whether it ran and finished well in time.
+fn renew() -> bool {
+    use std::os::windows::process::CommandExt;
+    let child = std::process::Command::new("cmd")
+        .args(["/C", "claude", "auth", "status"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn();
+    let Ok(mut child) = child else {
+        return false;
+    };
+    let started = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return status.success(),
+            Ok(None) if started.elapsed() < RENEWAL => {
+                std::thread::sleep(Duration::from_millis(250));
+            }
+            _ => {
+                let _ = child.kill();
+                log::warn!("claude usage: the Claude Code didn't renew in time");
+                return false;
+            }
+        }
+    }
+}
+
+/// Asks Anthropic for the usage once.
+fn ask() -> Reading {
     let Some(credentials) = credentials_file()
         .and_then(|file| std::fs::read(file).ok())
         .and_then(|json| claude_usage::parse_credentials(&json))

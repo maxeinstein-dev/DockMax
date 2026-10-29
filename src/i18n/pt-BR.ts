@@ -917,7 +917,7 @@ const messages = {
         signedOut:
           "Entre no Claude Code neste computador para ver o uso do seu plano.",
         expired:
-          "O acesso do Claude Code expirou. Abra o Claude Code uma vez e ele se renova.",
+          "O acesso do Claude Code expirou e não deu para renovar. Rode o Claude Code no terminal uma vez.",
         unavailable:
           "Não foi possível ler o uso agora. Tentando de novo em alguns minutos.",
       },
