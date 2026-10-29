@@ -37,6 +37,8 @@ fn main() {
             "cycle_test_notice",
             "pomodoro_status",
             "pomodoro_act",
+            "media_status",
+            "media_control",
             "google_status",
             "set_google_client",
             "connect_google_account",

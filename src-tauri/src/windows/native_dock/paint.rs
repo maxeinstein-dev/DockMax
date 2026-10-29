@@ -73,6 +73,13 @@ pub const NOTE_GLYPH: &[&str] = &[
     "M8.5 8.5h7M8.5 12h7M8.5 15.5h4",
 ];
 
+/// A note, the Tocando agora without a cover (24 px box).
+const NOTE: &[&str] = &[
+    "M9 17.5V5.5l10 -2v12M9 17.5a2.5 2.5 0 1 1 -5 0a2.5 2.5 0 1 1 5 0M19 15.5a2.5 2.5 0 1 1 -5 0a2.5 2.5 0 1 1 5 0",
+];
+/// Two bars: paused.
+const PAUSE: &[&str] = &["M9 6v12M15 6v12"];
+
 /// What a tile shows inside its glaze.
 pub enum Face {
     /// A line glyph on a glaze.
@@ -116,6 +123,16 @@ pub enum Face {
     Agenda {
         glaze: Glaze,
         lines: Vec<AgendaLine>,
+    },
+    /// The Tocando agora (spec 0017 F4): the cover (a note without one),
+    /// dimmed while paused; on a wide tile, the title and the artist beside
+    /// it.
+    Media {
+        glaze: Glaze,
+        art: Option<ID2D1Bitmap>,
+        playing: bool,
+        title: Option<String>,
+        artist: Option<String>,
     },
     /// The Atividade de rede: the rates and, on a wide tile, the graph.
     Rates {
@@ -1212,6 +1229,19 @@ impl Painter {
                     glaze: *glaze,
                     lines: lines.clone(),
                 },
+                Face::Media {
+                    glaze,
+                    art,
+                    playing,
+                    title,
+                    artist,
+                } => Face::Media {
+                    glaze: *glaze,
+                    art: art.clone(),
+                    playing: *playing,
+                    title: title.clone(),
+                    artist: artist.clone(),
+                },
                 Face::Rates {
                     glaze,
                     down,
@@ -1361,6 +1391,144 @@ impl Painter {
                 self.glaze(area, *glaze, tile.pressed);
                 self.rates(area, down, up, graph.as_ref());
             }
+            Face::Media {
+                glaze,
+                art,
+                playing,
+                title,
+                artist,
+            } => {
+                self.glaze(area, *glaze, tile.pressed);
+                self.media(
+                    area,
+                    art.as_ref(),
+                    *playing,
+                    title.as_deref(),
+                    artist.as_deref(),
+                );
+            }
+        }
+    }
+
+    /// The Tocando agora: the cover in a rounded square at the left of the
+    /// tile (all of it on a square tile), and the title and the artist to
+    /// its right on a wide one.
+    fn media(
+        &mut self,
+        area: Area,
+        art: Option<&ID2D1Bitmap>,
+        playing: bool,
+        title: Option<&str>,
+        artist: Option<&str>,
+    ) {
+        let u = area.height;
+        let inset = u * 0.12;
+        let side = u - 2.0 * inset;
+        let cover = Area {
+            x: area.x + inset,
+            y: area.y + inset,
+            width: side,
+            height: side,
+        };
+        match art {
+            Some(art) => {
+                self.rounded_bitmap(cover, side * 0.2, art);
+                if !playing {
+                    let shade = self.solid(Color::BLACK.with_alpha(0.38)).clone();
+                    unsafe {
+                        self.target.FillRoundedRectangle(
+                            &D2D1_ROUNDED_RECT {
+                                rect: rect(cover),
+                                radiusX: (side * 0.2) as f32,
+                                radiusY: (side * 0.2) as f32,
+                            },
+                            &shade,
+                        );
+                    }
+                    self.strokes(cover, 0.4, PAUSE, Color::WHITE, 2.0);
+                }
+            }
+            None => {
+                let paths = if playing || title.is_none() {
+                    NOTE
+                } else {
+                    PAUSE
+                };
+                self.strokes(cover, 0.62, paths, Color::WHITE, 1.75);
+            }
+        }
+        let Some(title) = title else {
+            return;
+        };
+        let x = cover.x + side + inset;
+        let room = area.x + area.width - inset - x;
+        if room <= 0.0 {
+            return;
+        }
+        let rows: Vec<(&str, f64, i32, Color)> = match artist.filter(|artist| !artist.is_empty()) {
+            Some(artist) => vec![
+                (title, 0.19, 600, Color::WHITE),
+                (artist, 0.16, 500, Color::WHITE.with_alpha(0.78)),
+            ],
+            None => vec![(title, 0.19, 600, Color::WHITE)],
+        };
+        let heights: Vec<f64> = rows.iter().map(|(_, size, _, _)| u * size * 1.3).collect();
+        let mut y = area.y + (u - heights.iter().sum::<f64>()) / 2.0;
+        for ((text, size, weight, ink), height) in rows.into_iter().zip(heights) {
+            let size = u * size;
+            let text = self.fit(text, room, size, weight);
+            let width = self.text_width(&text, size, weight, true);
+            let place = Area {
+                x,
+                y,
+                width,
+                height,
+            };
+            self.text(&text, place, size, weight, true, ink);
+            y += height;
+        }
+    }
+
+    /// `bitmap` drawn over `area`, its corners rounded by `radius`.
+    fn rounded_bitmap(&mut self, area: Area, radius: f64, bitmap: &ID2D1Bitmap) {
+        let bounds = rect(area);
+        let Ok(round) = (unsafe {
+            self.factory
+                .CreateRoundedRectangleGeometry(&D2D1_ROUNDED_RECT {
+                    rect: bounds,
+                    radiusX: radius as f32,
+                    radiusY: radius as f32,
+                })
+        }) else {
+            return;
+        };
+        let Ok(mask) = round.cast::<ID2D1Geometry>() else {
+            return;
+        };
+        unsafe {
+            let parameters = D2D1_LAYER_PARAMETERS {
+                contentBounds: bounds,
+                geometricMask: std::mem::ManuallyDrop::new(Some(mask)),
+                maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                maskTransform: IDENTITY,
+                opacity: 1.0,
+                opacityBrush: std::mem::ManuallyDrop::new(None),
+                layerOptions: D2D1_LAYER_OPTIONS_NONE,
+            };
+            self.target.PushLayer(
+                &parameters,
+                None::<&windows::Win32::Graphics::Direct2D::ID2D1Layer>,
+            );
+            self.target.DrawBitmap(
+                bitmap,
+                Some(&bounds),
+                1.0,
+                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                None,
+            );
+            self.target.PopLayer();
+            let mut parameters = parameters;
+            std::mem::ManuallyDrop::drop(&mut parameters.geometricMask);
         }
     }
 

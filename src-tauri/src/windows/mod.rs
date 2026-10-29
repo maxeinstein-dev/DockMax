@@ -24,6 +24,8 @@ pub mod http;
 pub mod jumplist;
 #[cfg(windows)]
 pub mod launcher;
+#[cfg(windows)]
+pub mod media;
 pub mod memory;
 #[cfg(windows)]
 pub mod menu;

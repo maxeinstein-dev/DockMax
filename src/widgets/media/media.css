@@ -1,0 +1,65 @@
+/* The Tocando agora's panel (spec 0017 F4). Tokens of tokens.css only. */
+
+.media-cover {
+  width: 160px;
+  height: 160px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--track);
+}
+
+.media-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-cover svg {
+  width: 56px;
+  height: 56px;
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.media-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font: 600 15px / 1.35 var(--font-display);
+}
+
+.media-artist {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.media-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.media-actions .media-main {
+  background: var(--accent);
+  color: #fff;
+}
+
+.media-actions .media-main:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 86%, #000);
+}
+
+.media-note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}

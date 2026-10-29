@@ -29,6 +29,8 @@
     "allow-cycle-test-notice",
     "allow-pomodoro-status",
     "allow-pomodoro-act",
+    "allow-media-status",
+    "allow-media-control",
     "allow-tray-to-dock",
     "allow-list-apps",
     "allow-list-catalog",

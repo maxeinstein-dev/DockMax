@@ -427,6 +427,11 @@ pub fn widget(
         WidgetConfig::Pomodoro(config) => pomodoro(widget, config, size),
         WidgetConfig::Todo(config) => todo(config, size),
         WidgetConfig::Water(config) => water(config, size),
+        // Drawn by the dock itself, which holds the cover (`Dock::media_face`).
+        WidgetConfig::Media(_) => Face::Glyph {
+            glaze: Glaze::MUSIC,
+            paths: &["M9 17.5V5.5l10 -2v12"],
+        },
         WidgetConfig::Calendar(config) => {
             agenda(config, calendar, crate::windows::calendar::now(), opened)
         }

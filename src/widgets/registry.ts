@@ -20,6 +20,9 @@ import PomodoroSettings from "./pomodoro/PomodoroSettings";
 import PomodoroTile from "./pomodoro/PomodoroTile";
 import CycleSettings from "./cycle/CycleSettings";
 import CycleTile from "./cycle/CycleTile";
+import MediaPanel from "./media/MediaPanel";
+import MediaSettings from "./media/MediaSettings";
+import MediaTile from "./media/MediaTile";
 import TodoPanel from "./todo/TodoPanel";
 import TodoSettings from "./todo/TodoSettings";
 import TodoTile from "./todo/TodoTile";
@@ -61,7 +64,8 @@ export type GlazeClass =
   | "t-countdown"
   | "t-pomodoro"
   | "t-todo"
-  | "t-water";
+  | "t-water"
+  | "t-music";
 
 export interface WidgetDefinition<K extends CreatableKind> {
   kind: K;
@@ -168,6 +172,14 @@ export const WIDGET_REGISTRY: {
     Tile: WaterTile,
     Panel: WaterPanel,
     Settings: WaterSettings,
+  },
+  media: {
+    kind: "media",
+    nameKey: "media",
+    glaze: "t-music",
+    Tile: MediaTile,
+    Panel: MediaPanel,
+    Settings: MediaSettings,
   },
 };
 

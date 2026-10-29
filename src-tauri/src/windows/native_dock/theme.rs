@@ -193,6 +193,12 @@ impl Glaze {
         s: 58.0,
         l: 44.0,
     };
+    /// Ameixa: the Tocando agora (and Aparência in Configurações).
+    pub const MUSIC: Glaze = Glaze {
+        h: 318.0,
+        s: 20.0,
+        l: 43.0,
+    };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {
         h: 222.0,
@@ -311,6 +317,7 @@ mod tests {
             ("t-pomodoro", Glaze::POMODORO),
             ("t-todo", Glaze::TODO),
             ("t-water", Glaze::WATER),
+            ("t-music", Glaze::MUSIC),
         ];
         for (class, glaze) in glazes {
             let css_glaze = Glaze {
