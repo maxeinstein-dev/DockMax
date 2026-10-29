@@ -908,7 +908,7 @@ const messages = {
       from: "Tocando em",
       footer: "O que o Windows mostra nos controles de mídia",
       widthHint:
-        "Com 1 ícone, só a capa; com 2 ou 3, a capa com o título e o artista. O clique do meio toca ou pausa.",
+        "Com 1 ícone, só a capa; com 2, a capa com o título e o artista; com 3, também os botões de voltar, tocar ou pausar e avançar. O clique do meio toca ou pausa.",
     },
     /** The Beber água (spec 0017 F3-2). */
     water: {

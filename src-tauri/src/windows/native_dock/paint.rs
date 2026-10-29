@@ -79,6 +79,10 @@ const NOTE: &[&str] = &[
 ];
 /// Two bars: paused.
 const PAUSE: &[&str] = &["M9 6v12M15 6v12"];
+/// The Tocando agora's buttons, three icons wide.
+const PLAY: &[&str] = &["M8 5.5l11 6.5 -11 6.5z"];
+const PREVIOUS: &[&str] = &["M6 6v12M19 6l-9 6 9 6z"];
+const NEXT: &[&str] = &["M18 6v12M5 6l9 6 -9 6z"];
 
 /// What a tile shows inside its glaze.
 pub enum Face {
@@ -137,6 +141,9 @@ pub enum Face {
         idle: bool,
         /// The program that plays, a small mark on the cover.
         badge: Option<ID2D1Bitmap>,
+        /// Three icons wide: previous, play or pause and next under the
+        /// title (`dock_layout::media_buttons`).
+        controls: bool,
     },
     /// The Atividade de rede: the rates and, on a wide tile, the graph.
     Rates {
@@ -1241,6 +1248,7 @@ impl Painter {
                     artist,
                     idle,
                     badge,
+                    controls,
                 } => Face::Media {
                     glaze: *glaze,
                     art: art.clone(),
@@ -1249,6 +1257,7 @@ impl Painter {
                     artist: artist.clone(),
                     idle: *idle,
                     badge: badge.clone(),
+                    controls: *controls,
                 },
                 Face::Rates {
                     glaze,
@@ -1407,6 +1416,7 @@ impl Painter {
                 artist,
                 idle,
                 badge,
+                controls,
             } => {
                 self.glaze(area, *glaze, tile.pressed);
                 if *idle {
@@ -1423,6 +1433,7 @@ impl Painter {
                         area,
                         art.as_ref(),
                         badge.as_ref(),
+                        *controls,
                         *playing,
                         title.as_deref(),
                         artist.as_deref(),
@@ -1442,6 +1453,7 @@ impl Painter {
         area: Area,
         art: Option<&ID2D1Bitmap>,
         badge: Option<&ID2D1Bitmap>,
+        controls: bool,
         playing: bool,
         title: Option<&str>,
         artist: Option<&str>,
@@ -1496,8 +1508,20 @@ impl Painter {
             ],
             None => vec![(title, 0.19, 600, Color::WHITE)],
         };
+        let rows: Vec<(&str, f64, i32, Color)> = if controls {
+            // Smaller, at the top: the buttons take the lower part.
+            rows.into_iter()
+                .map(|(text, size, weight, ink)| (text, size * 0.8, weight, ink))
+                .collect()
+        } else {
+            rows
+        };
         let heights: Vec<f64> = rows.iter().map(|(_, size, _, _)| u * size * 1.3).collect();
-        let mut y = area.y + (u - heights.iter().sum::<f64>()) / 2.0;
+        let mut y = if controls {
+            area.y + u * 0.1
+        } else {
+            area.y + (u - heights.iter().sum::<f64>()) / 2.0
+        };
         for ((text, size, weight, ink), height) in rows.into_iter().zip(heights) {
             let size = u * size;
             let text = self.fit(text, room, size, weight);
@@ -1510,6 +1534,15 @@ impl Painter {
             };
             self.text(&text, place, size, weight, true, ink);
             y += height;
+        }
+        if controls {
+            let toggle = if playing { PAUSE } else { PLAY };
+            for (button, paths) in dock_layout::media_buttons(area)
+                .into_iter()
+                .zip([PREVIOUS, toggle, NEXT])
+            {
+                self.strokes(button, 1.0, paths, Color::WHITE, 1.6);
+            }
         }
     }
 

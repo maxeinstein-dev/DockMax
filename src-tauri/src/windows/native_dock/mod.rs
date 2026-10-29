@@ -2371,7 +2371,10 @@ impl Dock {
         } else if let Some(cell) = self.strip_hit(x, y) {
             self.strip_click(cell, false);
         } else if let Some(index) = self.hit(x, y).filter(|&index| Some(index) == pressed) {
-            self.click(index);
+            match self.media_button_at(index, x, y) {
+                Some(action) => super::media::control(action),
+                None => self.click(index),
+            }
         }
         self.paint();
     }
@@ -2404,7 +2407,41 @@ impl Dock {
             title,
             artist,
             idle: now.is_none(),
+            controls: width == 3 && size != DockSize::Small && now.is_some(),
         }
+    }
+
+    /// The button of the Tocando agora at `index` under `(x, y)`, three
+    /// icons wide while something plays (spec 0017 F4).
+    fn media_button_at(&self, index: usize, x: f64, y: f64) -> Option<super::media::Action> {
+        let Some(Item::Widget(widget)) = self.items.get(index) else {
+            return None;
+        };
+        if !matches!(widget.config, WidgetConfig::Media(_))
+            || widget.config.width() != 3
+            || self.shape().size == DockSize::Small
+            || super::media::snapshot().is_none()
+        {
+            return None;
+        }
+        let tile = *self.placement_now().tiles.get(index)?;
+        let actions = [
+            super::media::Action::Previous,
+            super::media::Action::Toggle,
+            super::media::Action::Next,
+        ];
+        dock_layout::media_buttons(tile)
+            .into_iter()
+            .zip(actions)
+            .find(|(button, _)| {
+                // A little more than the glyph, easier to hit.
+                let pad = button.width * 0.2;
+                x >= button.x - pad
+                    && x <= button.x + button.width + pad
+                    && y >= button.y - pad
+                    && y <= button.y + button.height + pad
+            })
+            .map(|(_, action)| action)
     }
 
     /// What plays changed: a new cover is read into a bitmap, and the tile
