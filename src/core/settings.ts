@@ -11,6 +11,12 @@ import { errorKind, log } from "./log";
 /** Follows the Windows light/dark setting, or forces one. */
 export type Theme = "system" | "light" | "dark";
 
+/** The interface's language (spec 0019 G1); must match `Language` in
+ * Rust. */
+export type Language = "system" | "pt-BR" | "en";
+
+export const LANGUAGES: readonly Language[] = ["system", "pt-BR", "en"];
+
 /** Screen edge the dock sits on. */
 export type DockEdge = "bottom" | "top";
 
@@ -255,6 +261,8 @@ export interface Settings {
   /** The launcher's web search by keyword (spec 0012 L2); the first is the
    * default search. */
   launcherKeywords: WebKeyword[];
+  /** The interface's language (spec 0019 G1). */
+  language: Language;
 }
 
 /** A keyword of the launcher's web search; must match `WebKeyword` in
