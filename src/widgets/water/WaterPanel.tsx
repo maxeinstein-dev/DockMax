@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { todayOf } from "../../core/countdown";
 import { errorKind, log } from "../../core/log";
-import { format, useT } from "../../i18n";
+import { activeLocale, format, useT } from "../../i18n";
 import PanelFooter from "../../panel/PanelFooter";
 import PanelHeader from "../../panel/parts/PanelHeader";
 import type { WidgetPanelProps } from "../contract";
@@ -56,8 +56,8 @@ function WaterPanel({
       </p>
       <p className="water-ml">
         {format(text.ml, {
-          n: (count * config.cup).toLocaleString("pt-BR"),
-          goal: (config.goal * config.cup).toLocaleString("pt-BR"),
+          n: (count * config.cup).toLocaleString(activeLocale()),
+          goal: (config.goal * config.cup).toLocaleString(activeLocale()),
         })}
       </p>
       <progress

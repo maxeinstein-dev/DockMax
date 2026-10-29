@@ -4,7 +4,7 @@ import {
   useWeather,
   type WeatherCondition,
 } from "../../core/weather";
-import { format, useT } from "../../i18n";
+import { activeLocale, format, useT } from "../../i18n";
 import PanelFooter from "../../panel/PanelFooter";
 import PanelHeader from "../../panel/parts/PanelHeader";
 import type { WidgetPanelProps } from "../contract";
@@ -33,7 +33,7 @@ export function Sky({
 /** The weekday of `date` (`YYYY-MM-DD`), short: `qui.`. */
 function weekday(date: string): string {
   // Midday local: the same day in any zone.
-  return new Intl.DateTimeFormat("pt-BR", { weekday: "short" }).format(
+  return new Intl.DateTimeFormat(activeLocale(), { weekday: "short" }).format(
     new Date(`${date}T12:00:00`),
   );
 }

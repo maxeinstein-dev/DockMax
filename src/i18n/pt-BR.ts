@@ -11,6 +11,7 @@ import type {
   MiddleClick,
   IndicatorColor,
   KeywordProblem,
+  Language,
   OpenAnimation,
   SettingsErrorCode,
   SizePreset,
@@ -67,6 +68,7 @@ const messages = {
     /** Label of each option group, by setting. */
     groups: {
       theme: "Tema",
+      language: "Idioma",
       edge: "Posição",
       size: "Tamanho",
       opacity: "Opacidade do dock",
@@ -217,6 +219,12 @@ const messages = {
       light: "Claro",
       dark: "Escuro",
     } satisfies Record<Theme, string>,
+    /** Each language by its own name, so anyone finds theirs. */
+    language: {
+      system: "Sistema",
+      "pt-BR": "Português",
+      en: "English",
+    } satisfies Record<Language, string>,
     edge: {
       bottom: "Embaixo",
       top: "Em cima",

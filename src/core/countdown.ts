@@ -1,3 +1,4 @@
+import { activeLocale } from "../i18n";
 import type { CountdownConfig } from "./widgets";
 
 /* The Contagem regressiva (spec 0017 F2c): the days to a date. Mirrors
@@ -67,7 +68,7 @@ export function daysLeft(
 
 /** `domingo, 20 de dezembro de 2026`: a day number in words. */
 export function longDay(day: number): string {
-  return new Intl.DateTimeFormat("pt-BR", {
+  return new Intl.DateTimeFormat(activeLocale(), {
     weekday: "long",
     day: "numeric",
     month: "long",
