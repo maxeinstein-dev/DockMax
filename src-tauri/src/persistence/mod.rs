@@ -2,6 +2,7 @@
 //! without storage traits (spec 0002, Q26); tests use temporary folders.
 
 pub mod apps_repo;
+pub mod bundled_packs;
 pub mod database;
 pub mod icon_packs;
 pub mod launcher_repo;

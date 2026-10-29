@@ -307,6 +307,7 @@ pub fn run() {
             #[cfg(windows)]
             windows::toast::set_identifier(&app.config().identifier);
             commands::settings::sync_launch_at_login(app.handle());
+            commands::icons::install_bundled(app.handle());
             windows::dock::setup(app.handle())?;
             #[cfg(windows)]
             windows::open_apps::start(app.handle());
