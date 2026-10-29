@@ -144,6 +144,8 @@ pub enum Face {
         /// Three icons wide: previous, play or pause and next under the
         /// title (`dock_layout::media_buttons`).
         controls: bool,
+        /// Seconds since the track showed: where a long title rolls to.
+        since: f64,
     },
     /// The Atividade de rede: the rates and, on a wide tile, the graph.
     Rates {
@@ -410,6 +412,9 @@ pub struct Painter {
     /// Applied after every transform: the mirror while a reflection is
     /// drawn, nothing otherwise.
     base: Matrix3x2,
+    /// Seconds until a long text drawn in the last frame moves again: the
+    /// dock paints again then. `None` when nothing rolls.
+    pub marquee: Option<f64>,
 }
 
 impl Painter {
@@ -530,6 +535,7 @@ impl Painter {
             rim,
             dpi: 96.0,
             base: IDENTITY,
+            marquee: None,
         })
     }
 
@@ -707,6 +713,7 @@ impl Painter {
         height: i32,
         scene: &Scene,
     ) -> windows::core::Result<()> {
+        self.marquee = None;
         if width <= 0 || height <= 0 {
             return Ok(());
         }
@@ -1249,6 +1256,7 @@ impl Painter {
                     idle,
                     badge,
                     controls,
+                    since,
                 } => Face::Media {
                     glaze: *glaze,
                     art: art.clone(),
@@ -1258,6 +1266,7 @@ impl Painter {
                     idle: *idle,
                     badge: badge.clone(),
                     controls: *controls,
+                    since: *since,
                 },
                 Face::Rates {
                     glaze,
@@ -1417,6 +1426,7 @@ impl Painter {
                 idle,
                 badge,
                 controls,
+                since,
             } => {
                 self.glaze(area, *glaze, tile.pressed);
                 if *idle {
@@ -1434,6 +1444,7 @@ impl Painter {
                         art.as_ref(),
                         badge.as_ref(),
                         *controls,
+                        *since,
                         *playing,
                         title.as_deref(),
                         artist.as_deref(),
@@ -1454,6 +1465,7 @@ impl Painter {
         art: Option<&ID2D1Bitmap>,
         badge: Option<&ID2D1Bitmap>,
         controls: bool,
+        since: f64,
         playing: bool,
         title: Option<&str>,
         artist: Option<&str>,
@@ -1515,66 +1527,89 @@ impl Painter {
         }
         if controls {
             // The upper line: the title, and the artist after it, fainter.
-            let cy = area.y + u * 0.33;
             let size = u * 0.17;
-            let title = self.fit(title, room, size, 600);
-            let used = self.text_width(&title, size, 600, true);
-            self.text(
-                &title,
-                Area {
-                    x,
-                    y: cy - size * 0.65,
-                    width: used,
-                    height: size * 1.3,
-                },
-                size,
-                600,
-                true,
-                Color::WHITE,
-            );
-            let left = room - used - size * 0.4;
-            if let Some(artist) = artist.filter(|artist| !artist.is_empty())
-                && left > size * 2.0
-            {
-                let artist = self.fit(&format!("· {artist}"), left, size * 0.9, 500);
-                let width = self.text_width(&artist, size * 0.9, 500, true);
-                self.text(
-                    &artist,
-                    Area {
-                        x: x + used + size * 0.4,
-                        y: cy - size * 0.65,
-                        width,
-                        height: size * 1.3,
-                    },
+            let mut runs = vec![(title.to_owned(), size, 600, Color::WHITE)];
+            if let Some(artist) = artist.filter(|artist| !artist.is_empty()) {
+                runs.push((
+                    format!("  ·  {artist}"),
                     size * 0.9,
                     500,
-                    true,
                     Color::WHITE.with_alpha(0.78),
-                );
+                ));
             }
+            self.rolling(&runs, x, area.y + u * 0.33, room, since);
             return;
         }
-        let rows: Vec<(&str, f64, i32, Color)> = match artist.filter(|artist| !artist.is_empty()) {
+        let rows: Vec<(String, f64, i32, Color)> = match artist.filter(|artist| !artist.is_empty())
+        {
             Some(artist) => vec![
-                (title, 0.19, 600, Color::WHITE),
-                (artist, 0.16, 500, Color::WHITE.with_alpha(0.78)),
+                (title.to_owned(), u * 0.19, 600, Color::WHITE),
+                (
+                    artist.to_owned(),
+                    u * 0.16,
+                    500,
+                    Color::WHITE.with_alpha(0.78),
+                ),
             ],
-            None => vec![(title, 0.19, 600, Color::WHITE)],
+            None => vec![(title.to_owned(), u * 0.19, 600, Color::WHITE)],
         };
-        let heights: Vec<f64> = rows.iter().map(|(_, size, _, _)| u * size * 1.3).collect();
+        let heights: Vec<f64> = rows.iter().map(|(_, size, _, _)| size * 1.3).collect();
         let mut y = area.y + (u - heights.iter().sum::<f64>()) / 2.0;
-        for ((text, size, weight, ink), height) in rows.into_iter().zip(heights) {
-            let size = u * size;
-            let text = self.fit(text, room, size, weight);
-            let width = self.text_width(&text, size, weight, true);
-            let place = Area {
-                x,
-                y,
-                width,
-                height,
-            };
-            self.text(&text, place, size, weight, true, ink);
+        for (row, height) in rows.into_iter().zip(heights) {
+            self.rolling(std::slice::from_ref(&row), x, y + height / 2.0, room, since);
             y += height;
+        }
+    }
+
+    /// Texts side by side (`runs`: each with its size, weight and ink), from
+    /// `x`, centered on `cy`, in `room`: when they don't fit, they roll in it
+    /// (`dock_layout::marquee`), `since` seconds after they showed.
+    fn rolling(
+        &mut self,
+        runs: &[(String, f64, i32, Color)],
+        x: f64,
+        cy: f64,
+        room: f64,
+        since: f64,
+    ) {
+        let widths: Vec<f64> = runs
+            .iter()
+            .map(|(text, size, weight, _)| self.text_width(text, *size, *weight, true))
+            .collect();
+        let total: f64 = widths.iter().sum();
+        let (offset, next) = dock_layout::marquee(since, total - room);
+        let tall = runs.iter().map(|(_, size, _, _)| *size).fold(0.0, f64::max) * 1.3;
+        let clip = Area {
+            x,
+            y: cy - tall / 2.0,
+            width: room,
+            height: tall,
+        };
+        unsafe {
+            self.target
+                .PushAxisAlignedClip(&rect(clip), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        }
+        let mut from = x - offset;
+        for ((text, size, weight, ink), width) in runs.iter().zip(widths) {
+            let height = size * 1.3;
+            self.text(
+                text,
+                Area {
+                    x: from,
+                    y: cy - height / 2.0,
+                    width,
+                    height,
+                },
+                *size,
+                *weight,
+                true,
+                *ink,
+            );
+            from += width;
+        }
+        unsafe { self.target.PopAxisAlignedClip() };
+        if next.is_finite() {
+            self.marquee = Some(self.marquee.map_or(next, |due| due.min(next)));
         }
     }
 

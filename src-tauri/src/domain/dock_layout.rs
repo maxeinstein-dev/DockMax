@@ -639,6 +639,38 @@ pub fn media_buttons(tile: Area) -> [Area; 3] {
     })
 }
 
+/// Seconds a long text stands at its start, and at its end, before it moves.
+const MARQUEE_WAIT: f64 = 3.0;
+const MARQUEE_REST: f64 = 2.0;
+/// How fast it moves, in logical pixels a second.
+const MARQUEE_SPEED: f64 = 22.0;
+/// A frame while it moves: 30 a second.
+const MARQUEE_FRAME: f64 = 1.0 / 30.0;
+
+/// Where a text `overflow` pixels too long for its room is, `t` seconds
+/// after it showed (spec 0017 F4): it waits at its start, rolls to its end,
+/// rests there and rolls back, over and over. The offset to draw it at
+/// (0 to `overflow`), and the seconds until it moves again (a frame while
+/// it moves).
+pub fn marquee(t: f64, overflow: f64) -> (f64, f64) {
+    if overflow <= 0.0 {
+        return (0.0, f64::INFINITY);
+    }
+    let travel = overflow / MARQUEE_SPEED;
+    let cycle = MARQUEE_WAIT + travel + MARQUEE_REST + travel;
+    let at = t.max(0.0) % cycle;
+    if at < MARQUEE_WAIT {
+        (0.0, MARQUEE_WAIT - at)
+    } else if at < MARQUEE_WAIT + travel {
+        ((at - MARQUEE_WAIT) * MARQUEE_SPEED, MARQUEE_FRAME)
+    } else if at < MARQUEE_WAIT + travel + MARQUEE_REST {
+        (overflow, MARQUEE_WAIT + travel + MARQUEE_REST - at)
+    } else {
+        let back = at - MARQUEE_WAIT - travel - MARQUEE_REST;
+        ((overflow - back * MARQUEE_SPEED).max(0.0), MARQUEE_FRAME)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1097,5 +1129,21 @@ mod tests {
         assert!(previous.x + previous.width < toggle.x);
         assert!(toggle.x + toggle.width < next.x);
         assert!(next.x + next.width < tile.x + tile.width);
+    }
+
+    #[test]
+    fn a_long_text_waits_rolls_to_its_end_and_back() {
+        // 44 px too long: 2 s to roll at 22 px/s.
+        assert_eq!(marquee(1.0, 44.0), (0.0, 2.0));
+        let (offset, next) = marquee(4.0, 44.0);
+        assert!((offset - 22.0).abs() < 1e-9);
+        assert!(next < 0.1);
+        assert_eq!(marquee(5.5, 44.0), (44.0, 1.5));
+        let (offset, _) = marquee(8.0, 44.0);
+        assert!((offset - 22.0).abs() < 1e-9);
+        // Then over again.
+        assert_eq!(marquee(9.0 + 1.0, 44.0), (0.0, 2.0));
+        // A text that fits never moves.
+        assert_eq!(marquee(4.0, 0.0), (0.0, f64::INFINITY));
     }
 }
