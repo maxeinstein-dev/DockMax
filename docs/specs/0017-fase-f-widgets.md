@@ -2,7 +2,7 @@
 
 Fase F da [spec 0004](0004-paridade-primodock.md) (§3.5), depois da fase E. Referência do PrimoDock em [`docs/reference/primodock/interface.md`](../reference/primodock/interface.md) (aba Widgets: catálogo, "Em uso", largura do tile) e [`settings-e-dados.md`](../reference/primodock/settings-e-dados.md).
 
-**Status:** em andamento: F1 (PR #52), F1b (#53), F2a-1 (Contas Google, #54 e #55, [ADR 0012](../adr/0012-contas-google.md)), F2a-2 (Calendário, #57), F2a-3 (Tasks, #58) e F2a-4 (cartão, #59) entregues; F2b-1 (o widget Ciclo, com o [guia do Atalho do iPhone](../guia-atalho-ciclo.md), #60), F2b-2 (avisos e lembretes, #61) e F2b-3 (o aviso no dock, #62) entregues; F2c-1 (Contagem regressiva, #65), F2c-2 (Pomodoro, #66) e F3-1 (Lista de tarefas, #67) e F3-2 (Beber água, #68) entregues; F4 (Tocando agora, #69 a #71) entregue; F5 em curso (Uso do Claude); o iCal ficou para depois.
+**Status:** concluída: F1 (PR #52), F1b (#53), F2a-1 (Contas Google, #54 e #55, [ADR 0012](../adr/0012-contas-google.md)), F2a-2 (Calendário, #57), F2a-3 (Tasks, #58) e F2a-4 (cartão, #59) entregues; F2b-1 (o widget Ciclo, com o [guia do Atalho do iPhone](../guia-atalho-ciclo.md), #60), F2b-2 (avisos e lembretes, #61) e F2b-3 (o aviso no dock, #62) entregues; F2c-1 (Contagem regressiva, #65), F2c-2 (Pomodoro, #66) e F3-1 (Lista de tarefas, #67) e F3-2 (Beber água, #68) entregues; F4 (Tocando agora, #69 a #71) entregue; F5 (Uso do Claude, #72 e #74; Clima, #73) entregue. **Fase F concluída em 2026-10-29.** Ficam para depois, fora da fase: o iCal, criar reunião pelo Calendário e o Notion.
 
 ## 1. Decisões do autor (2026-10-27)
 
