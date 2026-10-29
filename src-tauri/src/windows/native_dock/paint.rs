@@ -1499,9 +1499,59 @@ impl Painter {
         let Some(title) = title else {
             return;
         };
+        if controls {
+            let toggle = if playing { PAUSE } else { PLAY };
+            for (button, paths) in dock_layout::media_buttons(area)
+                .into_iter()
+                .zip([PREVIOUS, toggle, NEXT])
+            {
+                self.strokes(button, 1.0, paths, Color::WHITE, 1.6);
+            }
+        }
         let x = cover.x + side + inset;
         let room = area.x + area.width - inset - x;
         if room <= 0.0 {
+            return;
+        }
+        if controls {
+            // The upper line: the title, and the artist after it, fainter.
+            let cy = area.y + u * 0.33;
+            let size = u * 0.17;
+            let title = self.fit(title, room, size, 600);
+            let used = self.text_width(&title, size, 600, true);
+            self.text(
+                &title,
+                Area {
+                    x,
+                    y: cy - size * 0.65,
+                    width: used,
+                    height: size * 1.3,
+                },
+                size,
+                600,
+                true,
+                Color::WHITE,
+            );
+            let left = room - used - size * 0.4;
+            if let Some(artist) = artist.filter(|artist| !artist.is_empty())
+                && left > size * 2.0
+            {
+                let artist = self.fit(&format!("· {artist}"), left, size * 0.9, 500);
+                let width = self.text_width(&artist, size * 0.9, 500, true);
+                self.text(
+                    &artist,
+                    Area {
+                        x: x + used + size * 0.4,
+                        y: cy - size * 0.65,
+                        width,
+                        height: size * 1.3,
+                    },
+                    size * 0.9,
+                    500,
+                    true,
+                    Color::WHITE.with_alpha(0.78),
+                );
+            }
             return;
         }
         let rows: Vec<(&str, f64, i32, Color)> = match artist.filter(|artist| !artist.is_empty()) {
@@ -1511,20 +1561,8 @@ impl Painter {
             ],
             None => vec![(title, 0.19, 600, Color::WHITE)],
         };
-        let rows: Vec<(&str, f64, i32, Color)> = if controls {
-            // Smaller, at the top: the buttons take the lower part.
-            rows.into_iter()
-                .map(|(text, size, weight, ink)| (text, size * 0.8, weight, ink))
-                .collect()
-        } else {
-            rows
-        };
         let heights: Vec<f64> = rows.iter().map(|(_, size, _, _)| u * size * 1.3).collect();
-        let mut y = if controls {
-            area.y + u * 0.1
-        } else {
-            area.y + (u - heights.iter().sum::<f64>()) / 2.0
-        };
+        let mut y = area.y + (u - heights.iter().sum::<f64>()) / 2.0;
         for ((text, size, weight, ink), height) in rows.into_iter().zip(heights) {
             let size = u * size;
             let text = self.fit(text, room, size, weight);
@@ -1537,15 +1575,6 @@ impl Painter {
             };
             self.text(&text, place, size, weight, true, ink);
             y += height;
-        }
-        if controls {
-            let toggle = if playing { PAUSE } else { PLAY };
-            for (button, paths) in dock_layout::media_buttons(area)
-                .into_iter()
-                .zip([PREVIOUS, toggle, NEXT])
-            {
-                self.strokes(button, 1.0, paths, Color::WHITE, 1.6);
-            }
         }
     }
 

@@ -620,16 +620,19 @@ pub fn drag_offset(x: f64, start: f64, rest_left: f64, width: f64, min: f64, max
 }
 
 /// The three buttons of a Tocando agora three icons wide (spec 0017 F4),
-/// left to right: previous, play or pause, next. Under its title, to the
-/// right of the cover; the dock draws them and takes their clicks.
+/// left to right: previous, play or pause, next. On the lower line of the
+/// column right of the cover, centered in it (the title and the artist are
+/// on the upper one); the dock draws them and takes their clicks.
 pub fn media_buttons(tile: Area) -> [Area; 3] {
     let u = tile.height;
-    let inset = u * 0.12;
     let side = u * 0.3;
-    let left = tile.x + u + inset * 0.2;
-    let y = tile.y + u * 0.58;
+    let step = side * 1.7;
+    let column = tile.x + u;
+    let center = (column + tile.x + tile.width - u * 0.12) / 2.0;
+    let left = center - side / 2.0 - step;
+    let y = tile.y + u * 0.68 - side / 2.0;
     std::array::from_fn(|index| Area {
-        x: left + index as f64 * side * 1.35,
+        x: left + index as f64 * step,
         y,
         width: side,
         height: side,
@@ -1087,10 +1090,10 @@ mod tests {
             height: 56.0,
         };
         let [previous, toggle, next] = media_buttons(tile);
-        // Beside the cover (a tile's height wide), in the lower part.
+        // Right of the cover, on the lower line.
         assert!(previous.x > tile.x + tile.height);
-        assert!(previous.y > tile.y + tile.height / 2.0);
-        assert!(previous.y + previous.height <= tile.y + tile.height);
+        assert!(previous.y > tile.y + tile.height / 2.0 - previous.height);
+        assert!(previous.y + previous.height < tile.y + tile.height);
         assert!(previous.x + previous.width < toggle.x);
         assert!(toggle.x + toggle.width < next.x);
         assert!(next.x + next.width < tile.x + tile.width);
