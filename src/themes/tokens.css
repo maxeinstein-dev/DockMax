@@ -258,6 +258,13 @@
   --l: 44%;
 }
 
+/* Terracota: Uso do Claude (spec 0017 F5). */
+.t-claude {
+  --h: 15;
+  --sat: 55%;
+  --l: 50%;
+}
+
 /* Argila. */
 .t-calendar {
   --h: 16;

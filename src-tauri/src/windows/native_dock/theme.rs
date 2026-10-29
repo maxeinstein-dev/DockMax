@@ -231,6 +231,12 @@ impl Glaze {
         s: 20.0,
         l: 43.0,
     };
+    /// Terracota: the Uso do Claude.
+    pub const CLAUDE: Glaze = Glaze {
+        h: 15.0,
+        s: 55.0,
+        l: 50.0,
+    };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {
         h: 222.0,
@@ -350,6 +356,7 @@ mod tests {
             ("t-todo", Glaze::TODO),
             ("t-water", Glaze::WATER),
             ("t-music", Glaze::MUSIC),
+            ("t-claude", Glaze::CLAUDE),
         ];
         for (class, glaze) in glazes {
             let css_glaze = Glaze {

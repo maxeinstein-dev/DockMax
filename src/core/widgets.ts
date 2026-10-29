@@ -46,7 +46,8 @@ export type WidgetKind =
   | "pomodoro"
   | "todo"
   | "water"
-  | "media";
+  | "media"
+  | "claude";
 
 /* Each closed set below has a tuple with every value, in the order of the
  * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
@@ -69,6 +70,7 @@ export const WIDGET_KINDS = [
   "todo",
   "water",
   "media",
+  "claude",
 ] as const;
 
 /** The kinds `add_widget` accepts in this phase. */
@@ -90,6 +92,7 @@ export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "todo",
   "water",
   "media",
+  "claude",
 ];
 
 /** Stable ID of an instance: a UUID v7 made in Rust, never reused and never
@@ -349,6 +352,18 @@ export interface MediaConfig {
   width: WidgetWidth;
 }
 
+/** The widths the Uso do Claude takes: the five hours' ring, or both
+ * limits. Must match `claude::WIDTHS`. */
+export const CLAUDE_WIDTHS = [1, 2] as const;
+
+export type ClaudeWidth = (typeof CLAUDE_WIDTHS)[number];
+
+/** The Uso do Claude (spec 0017 F5): only the width; the usage comes from
+ * Anthropic, read in Rust. */
+export interface ClaudeConfig {
+  width: ClaudeWidth;
+}
+
 /** The config of each kind. */
 export interface WidgetConfigs {
   clock: ClockConfig;
@@ -365,6 +380,7 @@ export interface WidgetConfigs {
   todo: TodoConfig;
   water: WaterConfig;
   media: MediaConfig;
+  claude: ClaudeConfig;
 }
 
 /** A kind's config tagged with the kind, as `update_widget` takes it:

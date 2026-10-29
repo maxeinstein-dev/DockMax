@@ -27,6 +27,7 @@ macro_rules! closed_set {
 }
 
 pub mod calendar;
+pub mod claude;
 pub mod clock;
 #[cfg(test)]
 mod contract_tests;
@@ -50,6 +51,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 pub use calendar::CalendarConfig;
+pub use claude::ClaudeConfig;
 pub use clock::ClockConfig;
 pub use countdown::CountdownConfig;
 pub use cycle::CycleConfig;
@@ -102,6 +104,7 @@ pub enum WidgetKind {
     Todo,
     Water,
     Media,
+    Claude,
 }
 
 closed_set!(WidgetKind {
@@ -119,6 +122,7 @@ closed_set!(WidgetKind {
     Todo,
     Water,
     Media,
+    Claude,
 });
 
 impl WidgetKind {
@@ -137,7 +141,8 @@ impl WidgetKind {
             | WidgetKind::Pomodoro
             | WidgetKind::Todo
             | WidgetKind::Water
-            | WidgetKind::Media => true,
+            | WidgetKind::Media
+            | WidgetKind::Claude => true,
             WidgetKind::Shortcut | WidgetKind::Files => false,
         }
     }
@@ -159,7 +164,8 @@ impl WidgetKind {
             | WidgetKind::Pomodoro
             | WidgetKind::Todo
             | WidgetKind::Water
-            | WidgetKind::Media => 1,
+            | WidgetKind::Media
+            | WidgetKind::Claude => 1,
         }
     }
 
@@ -180,6 +186,7 @@ impl WidgetKind {
             WidgetKind::Todo => "todo",
             WidgetKind::Water => "water",
             WidgetKind::Media => "media",
+            WidgetKind::Claude => "claude",
         }
     }
 
@@ -274,6 +281,7 @@ pub enum WidgetConfig {
     Todo(TodoConfig),
     Water(WaterConfig),
     Media(MediaConfig),
+    Claude(ClaudeConfig),
 }
 
 impl WidgetConfig {
@@ -293,6 +301,7 @@ impl WidgetConfig {
             WidgetConfig::Todo(_) => WidgetKind::Todo,
             WidgetConfig::Water(_) => WidgetKind::Water,
             WidgetConfig::Media(_) => WidgetKind::Media,
+            WidgetConfig::Claude(_) => WidgetKind::Claude,
         }
     }
 
@@ -319,6 +328,7 @@ impl WidgetConfig {
             WidgetConfig::Network(config) => config.width,
             WidgetConfig::Calendar(config) => config.width,
             WidgetConfig::Media(config) => config.width,
+            WidgetConfig::Claude(config) => config.width,
         }
     }
 
@@ -340,6 +350,7 @@ impl WidgetConfig {
             | WidgetConfig::Network(_) => system::WIDTHS,
             WidgetConfig::Calendar(_) => calendar::WIDTHS,
             WidgetConfig::Media(_) => media::WIDTHS,
+            WidgetConfig::Claude(_) => claude::WIDTHS,
         }
     }
 
@@ -356,6 +367,7 @@ impl WidgetConfig {
             WidgetConfig::Network(config) => config.width = width,
             WidgetConfig::Calendar(config) => config.width = width,
             WidgetConfig::Media(config) => config.width = width,
+            WidgetConfig::Claude(config) => config.width = width,
             WidgetConfig::Clock(_)
             | WidgetConfig::Note(_)
             | WidgetConfig::Shortcut(_)
@@ -387,6 +399,7 @@ impl WidgetConfig {
             WidgetKind::Todo => WidgetConfig::Todo(TodoConfig::default()),
             WidgetKind::Water => WidgetConfig::Water(WaterConfig::default()),
             WidgetKind::Media => WidgetConfig::Media(MediaConfig::default()),
+            WidgetKind::Claude => WidgetConfig::Claude(ClaudeConfig::default()),
         }
     }
 
@@ -407,6 +420,7 @@ impl WidgetConfig {
             WidgetConfig::Todo(config) => config.validate(),
             WidgetConfig::Water(config) => config.validate(),
             WidgetConfig::Media(config) => config.validate(),
+            WidgetConfig::Claude(config) => config.validate(),
         }
     }
 }
@@ -517,6 +531,7 @@ pub fn encode_config(config: &WidgetConfig) -> String {
         WidgetConfig::Todo(config) => serde_json::to_string(config),
         WidgetConfig::Water(config) => serde_json::to_string(config),
         WidgetConfig::Media(config) => serde_json::to_string(config),
+        WidgetConfig::Claude(config) => serde_json::to_string(config),
     };
     // Plain structs with string keys: serializing them can't fail.
     json.expect("widget configs always serialize")
@@ -554,6 +569,7 @@ pub fn decode_config(
         WidgetKind::Todo => serde_json::from_str(json).map(WidgetConfig::Todo),
         WidgetKind::Water => serde_json::from_str(json).map(WidgetConfig::Water),
         WidgetKind::Media => serde_json::from_str(json).map(WidgetConfig::Media),
+        WidgetKind::Claude => serde_json::from_str(json).map(WidgetConfig::Claude),
     }
     .map_err(|_| WidgetError::InvalidConfig)?;
     config.validate()?;
@@ -841,7 +857,8 @@ mod tests {
                 WidgetKind::Pomodoro,
                 WidgetKind::Todo,
                 WidgetKind::Water,
-                WidgetKind::Media
+                WidgetKind::Media,
+                WidgetKind::Claude
             ]
         );
     }
@@ -870,6 +887,7 @@ mod tests {
             "todo",
             "water",
             "media",
+            "claude",
         ];
         for (kind, name) in WidgetKind::ALL.into_iter().zip(names) {
             assert_eq!(to_json(&kind), name);
@@ -965,7 +983,7 @@ mod tests {
                 | WidgetKind::Media => 3,
                 // Three was too small to read: two rise to three under
                 // the pointer instead.
-                WidgetKind::Calendar => 2,
+                WidgetKind::Calendar | WidgetKind::Claude => 2,
                 _ => 1,
             };
             assert_eq!(config.widths(), 1..=most, "{kind}");
@@ -1065,6 +1083,7 @@ mod tests {
                 }),
             ),
             (WidgetKind::Media, json!({ "width": 2 })),
+            (WidgetKind::Claude, json!({ "width": 2 })),
         ];
         for (kind, config) in cases {
             let instance = instance(WidgetConfig::default_for(kind));

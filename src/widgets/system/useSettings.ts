@@ -16,7 +16,8 @@ type SystemKind =
   | "pomodoro"
   | "todo"
   | "water"
-  | "media";
+  | "media"
+  | "claude";
 
 /** The error code of a refused command; anything else counts as a failed
  * write (the contract rejects only with a `WidgetCommandError`). */

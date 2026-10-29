@@ -162,6 +162,8 @@ impl Panel {
                 WidgetKind::Water => (300.0, 250.0),
                 // Title, the cover, the track, the buttons, footer.
                 WidgetKind::Media => (300.0, 420.0),
+                // Title, the two limits, footer.
+                WidgetKind::Claude => (300.0, 250.0),
                 // Never opened in this phase: `toggle_panel` refuses kinds
                 // that can't be created. The Settings card, if one ever is.
                 WidgetKind::Shortcut | WidgetKind::Files => (320.0, 390.0),

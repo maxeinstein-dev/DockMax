@@ -10,6 +10,9 @@ import ActivityTile from "./activity/ActivityTile";
 import CalendarPanel from "./calendar/CalendarPanel";
 import CalendarSettings from "./calendar/CalendarSettings";
 import CalendarTile from "./calendar/CalendarTile";
+import ClaudePanel from "./claude/ClaudePanel";
+import ClaudeSettings from "./claude/ClaudeSettings";
+import ClaudeTile from "./claude/ClaudeTile";
 import ClockPanel from "./clock/ClockPanel";
 import CountdownPanel from "./countdown/CountdownPanel";
 import CountdownSettings from "./countdown/CountdownSettings";
@@ -65,7 +68,8 @@ export type GlazeClass =
   | "t-pomodoro"
   | "t-todo"
   | "t-water"
-  | "t-music";
+  | "t-music"
+  | "t-claude";
 
 export interface WidgetDefinition<K extends CreatableKind> {
   kind: K;
@@ -180,6 +184,14 @@ export const WIDGET_REGISTRY: {
     Tile: MediaTile,
     Panel: MediaPanel,
     Settings: MediaSettings,
+  },
+  claude: {
+    kind: "claude",
+    nameKey: "claude",
+    glaze: "t-claude",
+    Tile: ClaudeTile,
+    Panel: ClaudePanel,
+    Settings: ClaudeSettings,
   },
 };
 

@@ -75,6 +75,7 @@ const GLYPHS: Readonly<Record<CreatableKind, readonly string[]>> = {
   media: [
     "M9 17.5V5.5l10 -2v12M9 17.5a2.5 2.5 0 1 1 -5 0a2.5 2.5 0 1 1 5 0M19 15.5a2.5 2.5 0 1 1 -5 0a2.5 2.5 0 1 1 5 0",
   ],
+  claude: ["M4.5 16a7.5 7.5 0 1 1 15 0M12 16l3.5 -4.5"],
   countdown: [
     "M7 4h10M7 20h10M8 4c0 4 4 5 4 8s-4 4-4 8M16 4c0 4-4 5-4 8s4 4 4 8",
   ],

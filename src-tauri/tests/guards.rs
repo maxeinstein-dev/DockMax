@@ -63,6 +63,9 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // the previous and the next.
             "allow-media-status",
             "allow-media-control",
+            // The Uso do Claude (F5): the last reading of the plan's
+            // limits; the token never reaches the page.
+            "allow-claude-usage",
             // Dragging a tray icon onto the dock keeps it there; the command
             // names an icon the list gave and a point on the screen.
             "allow-tray-to-dock",

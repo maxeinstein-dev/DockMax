@@ -9,6 +9,8 @@ pub mod badges;
 #[cfg(windows)]
 pub mod calendar;
 #[cfg(windows)]
+pub mod claude_usage;
+#[cfg(windows)]
 pub mod credentials;
 pub mod dock;
 #[cfg(windows)]
