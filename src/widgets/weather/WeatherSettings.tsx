@@ -82,23 +82,29 @@ function WeatherSettings({
             })
           : text.noCity}
       </p>
-      <div className="weather-search">
+      {/* A form: Enter or the button searches. Not on leaving the field,
+          which a click on a city found does first. */}
+      <form
+        className="weather-search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          find();
+        }}
+      >
         <TextField
           label={text.search}
           placeholder={text.searchPlaceholder}
           value={query}
           onChange={setQuery}
-          onCommit={find}
         />
         <button
-          type="button"
+          type="submit"
           className="secondary-button"
-          onClick={find}
           disabled={!query.trim() || search.state === "searching"}
         >
           {text.searchButton}
         </button>
-      </div>
+      </form>
       {search.state === "searching" ? (
         <p className="sys-hint" role="status">
           {text.searching}
