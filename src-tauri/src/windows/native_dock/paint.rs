@@ -135,6 +135,8 @@ pub enum Face {
         artist: Option<String>,
         /// Nothing plays: a note in the middle of the tile, no text.
         idle: bool,
+        /// The program that plays, a small mark on the cover.
+        badge: Option<ID2D1Bitmap>,
     },
     /// The Atividade de rede: the rates and, on a wide tile, the graph.
     Rates {
@@ -1238,6 +1240,7 @@ impl Painter {
                     title,
                     artist,
                     idle,
+                    badge,
                 } => Face::Media {
                     glaze: *glaze,
                     art: art.clone(),
@@ -1245,6 +1248,7 @@ impl Painter {
                     title: title.clone(),
                     artist: artist.clone(),
                     idle: *idle,
+                    badge: badge.clone(),
                 },
                 Face::Rates {
                     glaze,
@@ -1402,6 +1406,7 @@ impl Painter {
                 title,
                 artist,
                 idle,
+                badge,
             } => {
                 self.glaze(area, *glaze, tile.pressed);
                 if *idle {
@@ -1414,8 +1419,10 @@ impl Painter {
                     self.strokes(middle, 0.5, NOTE, Color::WHITE, 1.75);
                 } else {
                     self.media(
+                        scene,
                         area,
                         art.as_ref(),
+                        badge.as_ref(),
                         *playing,
                         title.as_deref(),
                         artist.as_deref(),
@@ -1428,10 +1435,13 @@ impl Painter {
     /// The Tocando agora: the cover in a rounded square at the left of the
     /// tile (all of it on a square tile), and the title and the artist to
     /// its right on a wide one.
+    #[allow(clippy::too_many_arguments)]
     fn media(
         &mut self,
+        scene: &Scene,
         area: Area,
         art: Option<&ID2D1Bitmap>,
+        badge: Option<&ID2D1Bitmap>,
         playing: bool,
         title: Option<&str>,
         artist: Option<&str>,
@@ -1461,6 +1471,9 @@ impl Painter {
                         );
                     }
                     self.strokes(cover, 0.4, PAUSE, Color::WHITE, 2.0);
+                }
+                if let Some(badge) = badge {
+                    self.badge(scene, cover, badge);
                 }
             }
             None => {

@@ -30,6 +30,11 @@ pub struct Snapshot {
     pub can_next: bool,
     /// The cover, as the program gave it, with its type (`image/png`).
     pub art: Option<Arc<(String, Vec<u8>)>>,
+    /// The cover's color, its red, green and blue: the tile's ground, as a
+    /// phone's media notification has it.
+    pub tint: Option<(u8, u8, u8)>,
+    /// The program's icon, a PNG: a small mark on the cover.
+    pub icon: Option<Arc<Vec<u8>>>,
 }
 
 impl Snapshot {
@@ -77,6 +82,81 @@ pub fn want(dock: isize, wanted: bool) {
             let _ = std::thread::Builder::new().name("media".into()).spawn(run);
         });
     }
+}
+
+/// The color of `image` (PNG, JPEG...): the mean of its pixels, read at
+/// 16 × 16.
+fn tint_of(image: &[u8]) -> Option<(u8, u8, u8)> {
+    use windows::Win32::Graphics::Imaging::{
+        CLSID_WICImagingFactory, GUID_WICPixelFormat32bppBGRA, IWICImagingFactory,
+        WICBitmapDitherTypeNone, WICBitmapInterpolationModeFant, WICBitmapPaletteTypeCustom,
+        WICDecodeMetadataCacheOnLoad,
+    };
+    use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
+    const SIDE: u32 = 16;
+    unsafe {
+        let wic: IWICImagingFactory =
+            CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER).ok()?;
+        let stream = wic.CreateStream().ok()?;
+        stream.InitializeFromMemory(image).ok()?;
+        let decoder = wic
+            .CreateDecoderFromStream(&stream, std::ptr::null(), WICDecodeMetadataCacheOnLoad)
+            .ok()?;
+        let frame = decoder.GetFrame(0).ok()?;
+        let scaler = wic.CreateBitmapScaler().ok()?;
+        scaler
+            .Initialize(&frame, SIDE, SIDE, WICBitmapInterpolationModeFant)
+            .ok()?;
+        let converter = wic.CreateFormatConverter().ok()?;
+        converter
+            .Initialize(
+                &scaler,
+                &GUID_WICPixelFormat32bppBGRA,
+                WICBitmapDitherTypeNone,
+                None,
+                0.0,
+                WICBitmapPaletteTypeCustom,
+            )
+            .ok()?;
+        let mut pixels = vec![0u8; (SIDE * SIDE * 4) as usize];
+        converter
+            .CopyPixels(std::ptr::null(), SIDE * 4, &mut pixels)
+            .ok()?;
+        let count = SIDE * SIDE;
+        let sum = pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .fold((0u32, 0u32, 0u32), |(r, g, b), px| {
+                (
+                    r + u32::from(px[2]),
+                    g + u32::from(px[1]),
+                    b + u32::from(px[0]),
+                )
+            });
+        Some((
+            (sum.0 / count) as u8,
+            (sum.1 / count) as u8,
+            (sum.2 / count) as u8,
+        ))
+    }
+}
+
+/// The icon of the program `app` that plays: its item of the Apps folder,
+/// or, for a bare `Spotify.exe`, the file of the open window that runs it.
+fn icon_of(app: &str) -> Option<Vec<u8>> {
+    if let Some(png) = super::apps::icon_png(app, 64) {
+        return Some(png);
+    }
+    let name = app.rsplit(['\\', '/']).next()?.to_lowercase();
+    let file = super::openwin::enumerate().into_iter().find_map(|window| {
+        let exe = window.exe?;
+        let same = exe
+            .file_name()
+            .is_some_and(|file| file.to_string_lossy().to_lowercase() == name);
+        same.then_some(exe)
+    })?;
+    super::apps::icon_png(&file.to_string_lossy(), 64)
 }
 
 fn manager() -> windows::core::Result<Manager> {
@@ -139,15 +219,25 @@ fn read(manager: &Manager, previous: Option<&Snapshot>) -> Option<Snapshot> {
         can_previous: flag(controls.as_ref().map(|c| c.IsPreviousEnabled())),
         can_next: flag(controls.as_ref().map(|c| c.IsNextEnabled())),
         art: None,
+        tint: None,
+        icon: None,
     };
     if snapshot.title.is_empty() && snapshot.artist.is_empty() {
         return None;
     }
-    snapshot.art = match previous {
+    match previous {
         Some(previous) if previous.track() == snapshot.track() && previous.art.is_some() => {
-            previous.art.clone()
+            snapshot.art = previous.art.clone();
+            snapshot.tint = previous.tint;
         }
-        _ => art_of(&properties).map(Arc::new),
+        _ => {
+            snapshot.art = art_of(&properties).map(Arc::new);
+            snapshot.tint = snapshot.art.as_ref().and_then(|art| tint_of(&art.1));
+        }
+    }
+    snapshot.icon = match previous {
+        Some(previous) if previous.app == snapshot.app => previous.icon.clone(),
+        _ => icon_of(&snapshot.app).map(Arc::new),
     };
     Some(snapshot)
 }
@@ -179,6 +269,7 @@ fn run() {
                     && a.can_previous == b.can_previous
                     && a.can_next == b.can_next
                     && a.art.as_ref().map(Arc::as_ptr) == b.art.as_ref().map(Arc::as_ptr)
+                    && a.icon.as_ref().map(Arc::as_ptr) == b.icon.as_ref().map(Arc::as_ptr)
             }
             (None, None) => true,
             _ => false,

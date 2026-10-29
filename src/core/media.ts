@@ -17,6 +17,8 @@ export interface MediaView {
   canNext: boolean;
   /** The cover as a `data:` URL. */
   art: string | null;
+  /** The program's icon as a `data:` URL. */
+  icon: string | null;
 }
 
 export type MediaAction = "toggle" | "previous" | "next";

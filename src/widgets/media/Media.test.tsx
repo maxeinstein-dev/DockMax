@@ -26,6 +26,7 @@ const PLAYING: MediaView = {
   canPrevious: false,
   canNext: true,
   art: "data:image/png;base64,AAAA",
+  icon: "data:image/png;base64,BBBB",
 };
 
 function panel() {

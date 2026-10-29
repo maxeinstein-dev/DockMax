@@ -78,7 +78,14 @@ function MediaPanel({
         </>
       )}
       <PanelFooter>
-        {view ? `${text.from} ${view.app}` : text.footer}
+        {view ? (
+          <span className="media-source">
+            {view.icon ? <img src={view.icon} alt="" /> : null}
+            {`${text.from} ${view.app}`}
+          </span>
+        ) : (
+          text.footer
+        )}
       </PanelFooter>
     </>
   );

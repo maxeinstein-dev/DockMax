@@ -215,6 +215,13 @@ impl Press {
     }
 }
 
+/// The cover of a track, and the icon of its program, as bitmaps (F4).
+type MediaArt = (
+    (String, String, String),
+    Option<ID2D1Bitmap>,
+    Option<ID2D1Bitmap>,
+);
+
 /// What the dock reads from the rest of the app.
 struct Data {
     settings: Settings,
@@ -280,8 +287,9 @@ pub struct Dock {
     drag_cursor: Option<HCURSOR>,
     /// The tile under files dragged over the dock (spec 0018).
     drop_hover: Option<usize>,
-    /// The cover of what plays now, as a bitmap, with its track (F4).
-    media_art: Option<((String, String, String), Option<ID2D1Bitmap>)>,
+    /// The cover of what plays now, as a bitmap, with its track, and the
+    /// icon of the program that plays it (F4).
+    media_art: Option<MediaArt>,
     landing: Option<Landing>,
     /// How far each item is drawn from its place at rest, sideways: the
     /// room made for a dragged item, or the way to a new place, eased.
@@ -2372,9 +2380,11 @@ impl Dock {
     /// and, wider, its title and artist.
     fn media_face(&self, width: u8, size: DockSize) -> Face {
         let now = super::media::snapshot();
-        let art = match (&now, &self.media_art) {
-            (Some(now), Some((track, art))) if *track == now.track() => art.clone(),
-            _ => None,
+        let (art, badge) = match (&now, &self.media_art) {
+            (Some(now), Some((track, art, icon))) if *track == now.track() => {
+                (art.clone(), icon.clone())
+            }
+            _ => (None, None),
         };
         let (title, artist) = match &now {
             Some(now) if width > 1 && size != DockSize::Small => {
@@ -2383,8 +2393,13 @@ impl Dock {
             _ => (None, None),
         };
         Face::Media {
-            glaze: theme::Glaze::MUSIC,
+            // The cover's color, as a phone's media notification has it.
+            glaze: now
+                .as_ref()
+                .and_then(|now| now.tint)
+                .map_or(theme::Glaze::MUSIC, theme::Glaze::ground_of),
             art,
+            badge,
             playing: now.as_ref().is_some_and(|now| now.playing),
             title,
             artist,
@@ -2397,11 +2412,12 @@ impl Dock {
     fn media_changed(&mut self) {
         let now = super::media::snapshot();
         let track = now.as_ref().map(super::media::Snapshot::track);
-        let kept = self.media_art.as_ref().map(|(track, _)| track.clone());
+        let kept = self.media_art.as_ref().map(|(track, _, _)| track.clone());
         if track != kept {
             self.media_art = now.as_ref().map(|now| {
                 let art = now.art.as_ref().and_then(|art| self.painter.bitmap(&art.1));
-                (now.track(), art)
+                let icon = now.icon.as_ref().and_then(|icon| self.painter.bitmap(icon));
+                (now.track(), art, icon)
             });
         }
         self.paint();

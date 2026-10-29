@@ -28,6 +28,8 @@ pub struct MediaView {
     pub can_next: bool,
     /// The cover as a `data:` URL.
     pub art: Option<String>,
+    /// The program's icon as a `data:` URL.
+    pub icon: Option<String>,
 }
 
 /// The name of the program `aumid`: the Start menu's, or the file's.
@@ -54,6 +56,12 @@ pub fn media_status(window: WebviewWindow) -> Result<Option<MediaView>, String> 
                 "data:{};base64,{}",
                 art.0,
                 base64::engine::general_purpose::STANDARD.encode(&art.1)
+            )
+        }),
+        icon: now.icon.as_ref().map(|icon| {
+            format!(
+                "data:image/png;base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(icon.as_slice())
             )
         }),
         title: now.title,

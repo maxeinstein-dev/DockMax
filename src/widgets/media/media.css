@@ -58,6 +58,17 @@
   background: color-mix(in srgb, var(--accent) 86%, #000);
 }
 
+.media-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.media-source img {
+  width: 16px;
+  height: 16px;
+}
+
 .media-note {
   margin: 0;
   color: var(--ink-2);
