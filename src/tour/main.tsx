@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import "../themes/tokens.css";
 import "../themes/base.css";
 import "../panel/Panel.css";
+import "../panel/parts/parts.css";
 import Appearance from "../components/Appearance";
 import { ROOT_OPTIONS } from "../core/reactRoot";
 import TourApp from "./TourApp";
