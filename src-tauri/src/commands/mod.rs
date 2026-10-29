@@ -9,6 +9,7 @@ pub mod panel;
 pub mod pomodoro;
 pub mod settings;
 pub mod system;
+pub mod tour;
 pub mod tray;
 pub mod weather;
 pub mod widgets;

@@ -158,6 +158,8 @@ pub struct DockMessages {
 pub struct SettingsMessages {
     /// The window's title, in its title bar and in Alt+Tab.
     pub window_title: &'static str,
+    /// The welcome tour's window (spec 0019 G2).
+    pub tour_title: &'static str,
 }
 
 /// Items of the tray icon menu and of the dock's own menu.
@@ -199,6 +201,7 @@ const PT_BR: Messages = Messages {
     },
     settings: SettingsMessages {
         window_title: "Configurações do DockMax",
+        tour_title: "Boas-vindas ao DockMax",
     },
     dock: DockMessages {
         settings: "Configurações",
@@ -308,6 +311,7 @@ const EN: Messages = Messages {
     },
     settings: SettingsMessages {
         window_title: "DockMax Settings",
+        tour_title: "Welcome to DockMax",
     },
     dock: DockMessages {
         settings: "Settings",

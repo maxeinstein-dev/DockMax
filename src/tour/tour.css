@@ -1,0 +1,88 @@
+/* The welcome tour (spec 0019 G2). Tokens of tokens.css only. */
+
+.tour {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 36px 40px 24px;
+  text-align: center;
+}
+
+.tour-tile.about-tile {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 18px;
+}
+
+.tour-count {
+  margin: 0 0 6px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tour-title {
+  margin: 0 0 12px;
+  font: 600 22px / 1.25 var(--font-display);
+}
+
+.tour-title:focus {
+  outline: none;
+}
+
+.tour-body {
+  max-width: 440px;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.tour-dots {
+  display: flex;
+  gap: 6px;
+  margin: auto 0 18px;
+  padding: 18px 0 0;
+  list-style: none;
+}
+
+.tour-dots li {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink-2) 35%, transparent);
+}
+
+.tour-dots li[data-current] {
+  background: var(--accent);
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+.tour-spacer {
+  flex: 1;
+}
+
+.tour-actions .tour-main {
+  background: var(--accent);
+  color: #fff;
+}
+
+.tour-actions .tour-main:hover {
+  background: color-mix(in srgb, var(--accent) 86%, #000);
+}
+
+@media (forced-colors: active) {
+  .tour-dots li[data-current] {
+    background: Highlight;
+  }
+}

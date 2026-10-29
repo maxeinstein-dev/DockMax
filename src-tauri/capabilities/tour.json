@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "tour",
+  "description": "Capability for the welcome tour window (spec 0019 G2)",
+  "windows": ["tour"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-get-settings",
+    "allow-finish-tour",
+    "log:allow-log"
+  ]
+}
