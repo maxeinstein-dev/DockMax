@@ -142,11 +142,11 @@ mod tests {
 
     #[test]
     fn it_reads_the_sign_in_and_never_prints_the_token() {
-        let json = br#"{"claudeAiOauth":{"accessToken":"sk-ant-oat01-secret","refreshToken":"x","expiresAt":1761700000000,"scopes":["user:inference"]}}"#;
+        let json = br#"{"claudeAiOauth":{"accessToken":"not-a-real-token","refreshToken":"x","expiresAt":1761700000000,"scopes":["user:inference"]}}"#;
         let credentials = parse_credentials(json).unwrap();
-        assert_eq!(credentials.access_token, "sk-ant-oat01-secret");
+        assert_eq!(credentials.access_token, "not-a-real-token");
         assert_eq!(credentials.expires_at, Some(1_761_700_000_000));
-        assert!(!format!("{credentials:?}").contains("secret"));
+        assert!(!format!("{credentials:?}").contains("not-a-real-token"));
         assert!(parse_credentials(br#"{"claudeAiOauth":{"accessToken":"  "}}"#).is_none());
         assert!(parse_credentials(b"{}").is_none());
     }
