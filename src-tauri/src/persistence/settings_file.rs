@@ -155,7 +155,7 @@ mod tests {
     use tempfile::{TempDir, tempdir};
 
     use super::*;
-    use crate::domain::settings::{DockEdge, DockOpacity, DockSettings, Theme};
+    use crate::domain::settings::{DockEdge, DockOpacity, DockSettings, Language, Theme};
 
     fn settings_path(dir: &TempDir) -> PathBuf {
         dir.path().join(FILE_NAME)
@@ -169,6 +169,7 @@ mod tests {
             launcher: true,
             launcher_keywords: crate::domain::launcher_web::defaults(),
             launcher_hotkey: crate::domain::hotkey::DEFAULT.to_owned(),
+            language: Language::System,
             dock: DockSettings {
                 edge: DockEdge::Top,
                 icon_size: 64,
@@ -376,7 +377,8 @@ mod tests {
                 {"keyword": "w", "name": "Wikipédia", "template": "https://pt.wikipedia.org/w/index.php?search=%s"},
                 {"keyword": "gh", "name": "GitHub", "template": "https://github.com/search?q=%s"}
               ],
-              "launcherHotkey": "Alt+Space"
+              "launcherHotkey": "Alt+Space",
+                "language": "system"
             })
         );
     }

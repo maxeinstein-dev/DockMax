@@ -1,4 +1,5 @@
 import {
+  LANGUAGES,
   MAX_AUTO_HIDE_DELAY,
   MAX_PREVIEW_DELAY,
   MAX_AUTO_HIDE_REVEAL,
@@ -13,7 +14,7 @@ import {
 } from "../core/settings";
 import { MAX_APPS, type AppsSnapshot } from "../core/apps";
 import { MAX_WIDGETS, type WidgetsSnapshot } from "../core/widgets";
-import { format, useT, type Messages } from "../i18n";
+import { activeLocale, format, useT, type Messages } from "../i18n";
 import OptionGroup, { type Option } from "./OptionGroup";
 import PanelFooter from "./PanelFooter";
 import NavRow from "./parts/NavRow";
@@ -36,7 +37,7 @@ const MIDDLE_CLICKS: readonly MiddleClick[] = ["newInstance", "none"];
 
 /** Milliseconds as seconds, the Brazilian way: `0,3 s`. */
 function seconds(ms: number): string {
-  return `${(ms / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} s`;
+  return `${(ms / 1000).toLocaleString(activeLocale(), { maximumFractionDigits: 2 })} s`;
 }
 
 /** The preset whose icon size is `iconSize`, or null when none is (a size
@@ -361,6 +362,14 @@ function SettingsPanel({
             ) : null}
           </SettingsGroup>
         ) : null}
+        <SettingsGroup title={t.settings.groups.language} grouped>
+          <OptionGroup
+            label={t.settings.groups.language}
+            options={options(LANGUAGES, t.settings.language)}
+            selected={shown?.language ?? null}
+            onSelect={(value) => change((s) => ({ ...s, language: value }))}
+          />
+        </SettingsGroup>
         <SettingsGroup title={groups.startup} grouped>
           <ToggleField
             label={t.settings.launchAtLogin}
@@ -413,6 +422,12 @@ function SettingsPanel({
         options={options(THEMES, t.settings.theme)}
         selected={theme}
         onSelect={(value) => change((s) => ({ ...s, theme: value }))}
+      />
+      <OptionGroup
+        label={t.settings.groups.language}
+        options={options(LANGUAGES, t.settings.language)}
+        selected={shown?.language ?? null}
+        onSelect={(value) => change((s) => ({ ...s, language: value }))}
       />
       <OptionGroup
         label={t.settings.groups.edge}

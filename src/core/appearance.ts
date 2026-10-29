@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { dockLookOf } from "../dock/look";
+import { setLanguage } from "../i18n";
 import {
   SIZE_PRESETS,
   useSettings,
@@ -104,6 +105,7 @@ export function useAppearance(window: AppWindow): Settings | null {
   useEffect(() => {
     if (settings) {
       applyAppearance(document.documentElement, settings, { window });
+      setLanguage(settings.language);
     }
   }, [settings, window]);
 

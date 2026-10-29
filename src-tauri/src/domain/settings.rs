@@ -79,6 +79,8 @@ pub struct Settings {
     /// What opens the launcher (spec 0012 L3), as `hotkey::Hotkey` writes
     /// it (`Alt+Space`).
     pub launcher_hotkey: String,
+    /// The interface's language (spec 0019 G1).
+    pub language: Language,
 }
 
 impl Default for Settings {
@@ -91,6 +93,7 @@ impl Default for Settings {
             launcher: true,
             launcher_keywords: launcher_web::defaults(),
             launcher_hotkey: hotkey::DEFAULT.to_owned(),
+            language: Language::default(),
         }
     }
 }
@@ -177,6 +180,20 @@ fn is_hex_color(color: &str) -> bool {
     color.len() == 7
         && color.starts_with('#')
         && color[1..].bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+/// The interface's language (spec 0019 G1).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Language {
+    /// The Windows display language: Portuguese if it is one, English
+    /// otherwise.
+    #[default]
+    #[serde(rename = "system")]
+    System,
+    #[serde(rename = "pt-BR")]
+    PtBr,
+    #[serde(rename = "en")]
+    En,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -678,7 +695,8 @@ mod tests {
                 {"keyword": "w", "name": "Wikipédia", "template": "https://pt.wikipedia.org/w/index.php?search=%s"},
                 {"keyword": "gh", "name": "GitHub", "template": "https://github.com/search?q=%s"}
               ],
-              "launcherHotkey": "Alt+Space"
+              "launcherHotkey": "Alt+Space",
+              "language": "system"
             }"#,
         )
         .unwrap();
