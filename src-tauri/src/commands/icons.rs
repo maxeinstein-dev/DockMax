@@ -17,8 +17,8 @@ use super::apps::{AppCommandError, forget_icons};
 use super::widgets::lock;
 use crate::domain::apps::{AppError, PinnedApp};
 use crate::domain::icon_pack::PackError;
-use crate::persistence::database::Storage;
 use crate::persistence::bundled_packs;
+use crate::persistence::database::Storage;
 use crate::persistence::icon_packs::{self, Found, Pack};
 use crate::windows::apps;
 

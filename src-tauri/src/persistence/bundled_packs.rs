@@ -162,13 +162,15 @@ mod tests {
             .filter(|path| *path != "pack.json")
             .collect();
         assert_eq!(named, listed);
-        let on_disk: BTreeSet<String> = fs::read_dir(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("icon-packs/retro-8bit/apps"),
-        )
-        .unwrap()
-        .map(|entry| format!("apps/{}", entry.unwrap().file_name().to_string_lossy()))
-        .collect();
-        assert_eq!(on_disk, listed.iter().map(|path| path.to_string()).collect());
+        let on_disk: BTreeSet<String> =
+            fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("icon-packs/retro-8bit/apps"))
+                .unwrap()
+                .map(|entry| format!("apps/{}", entry.unwrap().file_name().to_string_lossy()))
+                .collect();
+        assert_eq!(
+            on_disk,
+            listed.iter().map(|path| path.to_string()).collect()
+        );
     }
 
     #[test]
@@ -179,7 +181,12 @@ mod tests {
         assert_eq!(found.len(), 1);
         let pack = found[0].pack.clone().expect("the pack is valid");
         assert_eq!(pack.id, "retro-8bit");
-        for path in pack.manifest.icons.values().chain(pack.manifest.fallback.iter()) {
+        for path in pack
+            .manifest
+            .icons
+            .values()
+            .chain(pack.manifest.fallback.iter())
+        {
             assert!(icon_packs::read_image(&pack, path).is_some(), "{path}");
         }
         // The author's dock, by the names Windows shows.
@@ -226,8 +233,17 @@ mod tests {
         assert_eq!(marker, format!("retro-8bit 0.9.0\n{}\n", RETRO_8BIT.line()));
     }
 
-    /// The drawings of the source, by file: 16 lines of 16 characters each.
-    fn drawings() -> (BTreeMap<char, [u8; 3]>, BTreeMap<String, Vec<String>>, usize) {
+    /// What `retro-8bit.txt` says about the images.
+    struct Source {
+        /// A character of a drawing → its color.
+        palette: BTreeMap<char, [u8; 3]>,
+        /// The drawings by file: 16 lines of 16 characters each.
+        drawings: BTreeMap<String, Vec<String>>,
+        /// How many pixels of the PNG a character is, on each side.
+        scale: usize,
+    }
+
+    fn source() -> Source {
         let mut palette = BTreeMap::new();
         let mut drawings: BTreeMap<String, Vec<String>> = BTreeMap::new();
         let mut scale = 0;
@@ -247,7 +263,10 @@ mod tests {
                 let (key, hex) = color.split_once(':').unwrap();
                 let hex = hex.trim();
                 let byte = |at: usize| u8::from_str_radix(&hex[at..at + 2], 16).unwrap();
-                palette.insert(key.trim().chars().next().unwrap(), [byte(1), byte(3), byte(5)]);
+                palette.insert(
+                    key.trim().chars().next().unwrap(),
+                    [byte(1), byte(3), byte(5)],
+                );
             } else if let Some(id) = line.strip_prefix('@') {
                 current = format!("apps/{id}.png");
                 drawings.insert(current.clone(), Vec::new());
@@ -255,12 +274,20 @@ mod tests {
                 drawings.get_mut(&current).unwrap().push(line.to_owned());
             }
         }
-        (palette, drawings, scale)
+        Source {
+            palette,
+            drawings,
+            scale,
+        }
     }
 
     #[test]
     fn the_images_are_the_drawings_of_the_source() {
-        let (palette, drawings, scale) = drawings();
+        let Source {
+            palette,
+            drawings,
+            scale,
+        } = source();
         let images: BTreeMap<&str, &[u8]> = RETRO_8BIT
             .files
             .iter()
@@ -272,11 +299,16 @@ mod tests {
             images.keys().copied().collect::<Vec<_>>()
         );
         for (path, rows) in &drawings {
-            let mut reader = png::Decoder::new(images[path.as_str()]).read_info().unwrap();
+            let mut reader = png::Decoder::new(images[path.as_str()])
+                .read_info()
+                .unwrap();
             let mut pixels = vec![0; reader.output_buffer_size()];
             let frame = reader.next_frame(&mut pixels).unwrap();
             assert_eq!(frame.color_type, png::ColorType::Rgba, "{path}");
-            assert_eq!((frame.width, frame.height), (16 * scale as u32, 16 * scale as u32));
+            assert_eq!(
+                (frame.width, frame.height),
+                (16 * scale as u32, 16 * scale as u32)
+            );
             for (y, row) in rows.iter().enumerate() {
                 for (x, cell) in row.chars().enumerate() {
                     let expected = match cell {
