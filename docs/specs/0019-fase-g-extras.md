@@ -27,7 +27,7 @@ O que entra na fase, no lugar da lista da spec 0004 (mascote, onboarding, config
 | **G2. Tour de boas-vindas** | Uma janela pequena com 6 passos (boas-vindas, apps, espaços, widgets, lançador, pronto), com Próximo, Voltar e Pular; no fim, Começar ou Abrir Configurações. Abre sozinha na primeira execução e em Sobre › Ver o tour. |
 | G3. Atualização automática | A definir (onde publicar as versões). |
 | G4. Pacote de ícones retrô / 8-bit | A definir. |
-| G5. Linux | Estudo do que muda (o dock nativo é Win32/Direct2D). |
+| **G5. Linux** | Feito: [estudo 0001](../estudos/0001-linux.md). Recomenda não portar agora; se o Linux virar meta, separar o Windows atrás de traits e fazer um dock para KDE Plasma e wlroots com layer-shell. GNOME/Zorin só com uma extensão do Shell, à parte. Decisões do autor no §6 do estudo. |
 | G6. Nome e logo | A definir com o autor. |
 
 ## 3. G1 em detalhe
