@@ -956,14 +956,16 @@ const messages = {
         soon: "em instantes",
       },
       states: {
-        signedOut:
-          "Entre no Claude Code neste computador para ver o uso do seu plano.",
-        expired:
-          "O acesso do Claude Code expirou e não deu para renovar. Rode o Claude Code no terminal uma vez.",
+        signedOut: "O Claude Code não está conectado neste computador.",
+        expired: "O acesso do Claude Code expirou e não deu para renovar.",
         unavailable:
           "Não foi possível ler o uso agora. Tentando de novo em alguns minutos.",
       },
       footer: "Como o /usage do Claude Code · lido a cada 5 min",
+      signIn: "Entrar no Claude Code",
+      signInOpened:
+        "Conclua o login na janela do terminal. O uso aparece aqui em seguida.",
+      signInFailed: "Não foi possível abrir o terminal do Claude Code.",
       widthHint:
         "Com 1 ícone, o anel das 5 horas; com 2, as 5 horas e a semana.",
       privacy:

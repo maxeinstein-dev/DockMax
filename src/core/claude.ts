@@ -32,16 +32,25 @@ export function claudeUsage(fresh: boolean): Promise<ClaudeReading | null> {
   return invoke<ClaudeReading | null>("claude_usage", { fresh });
 }
 
-/** The last reading, asked again while mounted; the first ask reads anew. */
+/** Opens the Claude Code's sign-in in a terminal. */
+export function claudeSignIn(): Promise<void> {
+  return invoke("claude_sign_in");
+}
+
+/** The last reading, asked again while mounted; the first ask reads anew,
+ * and so does every one while the Claude Code is signed out or expired
+ * (the sign-in may be on its way). */
 export function useClaudeUsage(): ClaudeReading | null | undefined {
   const [reading, setReading] = useState<ClaudeReading | null | undefined>(
     undefined,
   );
   useEffect(() => {
     let active = true;
+    let waiting = false;
     const ask = (fresh: boolean) => {
-      claudeUsage(fresh).then(
+      claudeUsage(fresh || waiting).then(
         (next) => {
+          waiting = next?.state === "signedOut" || next?.state === "expired";
           if (active) setReading(next);
         },
         (error: unknown) => {

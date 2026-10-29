@@ -1,4 +1,11 @@
-import { resetText, useClaudeUsage, type ClaudeLimit } from "../../core/claude";
+import { useState } from "react";
+import {
+  claudeSignIn,
+  resetText,
+  useClaudeUsage,
+  type ClaudeLimit,
+} from "../../core/claude";
+import { errorKind, log } from "../../core/log";
 import { format, useT } from "../../i18n";
 import PanelFooter from "../../panel/PanelFooter";
 import PanelHeader from "../../panel/parts/PanelHeader";
@@ -21,6 +28,18 @@ function ClaudePanel({
   const text = t.widgets.claude;
   const reading = useClaudeUsage();
   const seconds = Math.floor(now.getTime() / 1000);
+  // The sign-in: not yet, its terminal is open, or it didn't open.
+  const [signIn, setSignIn] = useState<"idle" | "opened" | "failed">("idle");
+
+  function openSignIn() {
+    claudeSignIn().then(
+      () => setSignIn("opened"),
+      (error: unknown) => {
+        log.warn(`claude usage: sign-in failed: ${errorKind(error)}`);
+        setSignIn("failed");
+      },
+    );
+  }
 
   const limit = (name: string, value: ClaudeLimit | null) => (
     <section className="claude-limit" aria-label={name}>
@@ -61,7 +80,25 @@ function ClaudePanel({
           {limit(text.week, reading.usage.sevenDay)}
         </>
       ) : (
-        <p className="claude-note">{text.states[reading.state]}</p>
+        <>
+          <p className="claude-note">{text.states[reading.state]}</p>
+          {reading.state === "signedOut" || reading.state === "expired" ? (
+            <div className="claude-sign-in">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={openSignIn}
+              >
+                {text.signIn}
+              </button>
+              {signIn === "idle" ? null : (
+                <p className="claude-note" role="status">
+                  {signIn === "opened" ? text.signInOpened : text.signInFailed}
+                </p>
+              )}
+            </div>
+          ) : null}
+        </>
       )}
       <PanelFooter>{text.footer}</PanelFooter>
     </>

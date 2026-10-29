@@ -40,6 +40,7 @@ fn main() {
             "media_status",
             "media_control",
             "claude_usage",
+            "claude_sign_in",
             "weather_reading",
             "weather_search",
             "google_status",

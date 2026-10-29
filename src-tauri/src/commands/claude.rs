@@ -21,3 +21,14 @@ pub fn claude_usage(
     }
     Ok(crate::windows::claude_usage::reading())
 }
+
+/// Opens the Claude Code's sign-in (`claude auth login`) in a terminal of
+/// its own; the Claude Code keeps the access, the panel reads it after.
+#[cfg(windows)]
+#[tauri::command]
+pub fn claude_sign_in(window: WebviewWindow) -> Result<(), String> {
+    if window.label() != panel::LABEL {
+        return Err("only the panel signs in".into());
+    }
+    crate::windows::claude_usage::sign_in().map_err(|()| "the terminal didn't open".into())
+}

@@ -131,6 +131,31 @@ fn renew() -> bool {
     }
 }
 
+/// Opens a terminal running the Claude Code's sign-in.
+pub fn sign_in() -> Result<(), ()> {
+    use std::os::windows::process::CommandExt;
+    // `start` gives the sign-in a console of its own, which stays open
+    // (`/K`) to show how it went.
+    std::process::Command::new("cmd")
+        .args([
+            "/C",
+            "start",
+            "Claude Code",
+            "cmd",
+            "/K",
+            "claude",
+            "auth",
+            "login",
+        ])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map(drop)
+        .map_err(|error| log::warn!("claude usage: no terminal for the sign-in: {error}"))
+}
+
 /// Asks Anthropic for the usage once.
 fn ask() -> Reading {
     let Some(credentials) = credentials_file()

@@ -66,6 +66,8 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // The Uso do Claude (F5): the last reading of the plan's
             // limits; the token never reaches the page.
             "allow-claude-usage",
+            // Opens the Claude Code's own sign-in in a terminal.
+            "allow-claude-sign-in",
             // The Clima (F5): the last forecast of a city, and the search
             // for one by its name.
             "allow-weather-reading",
