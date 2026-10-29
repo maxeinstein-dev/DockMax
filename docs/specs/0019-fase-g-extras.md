@@ -17,7 +17,7 @@ O que entra na fase, no lugar da lista da spec 0004 (mascote, onboarding, config
 | **Atualização automática** | Entra |
 | **Pacotes de ícones** | Entra: começa por ícones retrô / 8-bit |
 | **Linux** | Entra como estudo: como fazer o DockMax funcionar no Linux |
-| **Nome e logo** | Talvez: um nome e uma logo mais "comerciáveis" que DockMax |
+| **Nome e logo** | Talvez: um nome e uma logo mais "comerciáveis" que DockMax. Decidido: **Dockyard** (G6) |
 
 ## 2. Recortes
 
@@ -28,7 +28,7 @@ O que entra na fase, no lugar da lista da spec 0004 (mascote, onboarding, config
 | G3. Atualização automática | A definir (onde publicar as versões). |
 | G4. Pacote de ícones retrô / 8-bit | A definir. |
 | G5. Linux | Estudo do que muda (o dock nativo é Win32/Direct2D). |
-| G6. Nome e logo | A definir com o autor. |
+| G6. Nome e logo | **Decidido em 2026-10-29:** o nome passa a ser **Dockyard**, com o ícone do lançador saindo da barra em esmalte cobalto ([marca 0001](../marca/0001-proposta.md)). Só proposta e SVGs; o renome no código é um recorte futuro, com os passos na proposta. |
 
 ## 3. G1 em detalhe
 
