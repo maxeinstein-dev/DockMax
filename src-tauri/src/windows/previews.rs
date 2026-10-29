@@ -32,7 +32,8 @@ use windows::Win32::Graphics::Direct2D::{
     D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_FEATURE_LEVEL_DEFAULT,
     D2D1_HWND_RENDER_TARGET_PROPERTIES, D2D1_PRESENT_OPTIONS_NONE, D2D1_RENDER_TARGET_PROPERTIES,
     D2D1_RENDER_TARGET_TYPE_SOFTWARE, D2D1_RENDER_TARGET_USAGE_NONE, D2D1_ROUNDED_RECT,
-    D2D1CreateFactory, ID2D1Factory, ID2D1HwndRenderTarget, ID2D1SolidColorBrush,
+    D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE, D2D1CreateFactory, ID2D1Factory, ID2D1HwndRenderTarget,
+    ID2D1SolidColorBrush,
 };
 use windows::Win32::Graphics::DirectWrite::{
     DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
@@ -85,6 +86,18 @@ const SLIDE_TIME: Duration = Duration::from_millis(120);
 /// A button of the card pressed by assistive technology: `wparam` is the
 /// cell's index, doubled, plus one for its close button.
 const WM_PRESS: u32 = WM_APP + 1;
+/// The program of the card plays what Windows shows in its media controls:
+/// `wparam` 1 paused, 2 playing; `lparam` the windows' key (`key_of`).
+const WM_MEDIA: u32 = WM_APP + 2;
+/// `WM_PRESS`'s `wparam` from which it names a media button.
+const PRESS_MEDIA: usize = 1_000_000;
+
+/// The windows of a card, as one number: the media answer for this card.
+fn key_of(windows: &[isize]) -> isize {
+    windows.iter().fold(17isize, |key, window| {
+        key.wrapping_mul(31).wrapping_add(*window)
+    })
+}
 
 /// What a dock asks to show.
 #[derive(Clone)]
@@ -103,6 +116,10 @@ pub struct Request {
     pub name: String,
     /// Windows does not ask for less motion: a new card slides in.
     pub motion: bool,
+    /// The program plays what Windows shows in its media controls: the
+    /// card has the media buttons, and whether it plays. `None` until known
+    /// (spec 0017 F4).
+    pub media: Option<bool>,
 }
 
 /// A card on the screen.
@@ -237,6 +254,7 @@ pub fn show(request: Request) {
         request.screen,
         request.scale,
         &sizes,
+        request.media.is_some(),
     ) else {
         unregister(&thumbs);
         hide();
@@ -288,6 +306,8 @@ pub fn show(request: Request) {
         let _ = unsafe { DwmUpdateThumbnailProperties(thumb, &properties) };
     }
     let request = Request { windows, ..request };
+    let media_unknown = request.media.is_none();
+    let media_windows = request.windows.clone();
     publish(hwnd, &request, &card, &titles);
     PREVIEW.with_borrow_mut(|preview| {
         if let Some(preview) = preview {
@@ -303,6 +323,25 @@ pub fn show(request: Request) {
             });
         }
     });
+    if media_unknown {
+        // Whether the program plays what Windows shows in its media
+        // controls, asked off this thread; the card grows its buttons then.
+        let (target, key) = (hwnd.0 as isize, key_of(&media_windows));
+        let _ = std::thread::Builder::new()
+            .name("preview-media".into())
+            .spawn(move || {
+                if let Some(playing) = super::media::session_in(&media_windows) {
+                    let _ = unsafe {
+                        PostMessageW(
+                            Some(HWND(target as _)),
+                            WM_MEDIA,
+                            WPARAM(usize::from(playing) + 1),
+                            LPARAM(key),
+                        )
+                    };
+                }
+            });
+    }
     unsafe {
         SetTimer(Some(hwnd), WATCH_TIMER, WATCH_EVERY, None);
         if slides {
@@ -392,6 +431,23 @@ fn publish(hwnd: HWND, request: &Request, card: &Card, titles: &[String]) {
                 },
             ]
         })
+        .chain(card.media.iter().flat_map(|buttons| {
+            let toggle = if request.media == Some(true) {
+                text.media_pause
+            } else {
+                text.media_play
+            };
+            buttons
+                .iter()
+                .zip([text.media_previous, toggle, text.media_next])
+                .enumerate()
+                .map(|(index, (button, name))| Entry {
+                    key: format!("media:{index}"),
+                    name: name.to_owned(),
+                    rect: on_screen(*button),
+                })
+                .collect::<Vec<_>>()
+        }))
         .collect();
     access::publish_for(
         hwnd.0 as isize,
@@ -415,6 +471,7 @@ fn press_code(key: &str) -> Option<usize> {
     let (index, close) = match key.split_once(':')? {
         ("window", index) => (index, 0),
         ("close", index) => (index, 1),
+        ("media", index) => return Some(PRESS_MEDIA + index.parse::<usize>().ok()?),
         _ => return None,
     };
     Some(index.parse::<usize>().ok()? * 2 + close)
@@ -531,12 +588,48 @@ fn click(x: f64, y: f64) {
     }
 }
 
+/// The card's program plays what Windows shows in its media controls: it
+/// is shown again, with the media buttons, when it is still the same card.
+fn media_found(playing: bool, key: isize) {
+    let request = PREVIEW.with_borrow(|preview| {
+        let shown = preview.as_ref()?.shown.as_ref()?;
+        (shown.request.media.is_none() && key_of(&shown.request.windows) == key)
+            .then(|| shown.request.clone())
+    });
+    if let Some(request) = request {
+        show(Request {
+            media: Some(playing),
+            ..request
+        });
+    }
+}
+
 /// Does what the cell or close button `hit` does.
 fn act(hit: Hit) {
+    if let Hit::Media(index) = hit {
+        use super::media::{Action, control};
+        let action = [Action::Previous, Action::Toggle, Action::Next][index.min(2)];
+        control(action);
+        if action == Action::Toggle {
+            // Shown at once; the session says it a moment later.
+            PREVIEW.with_borrow_mut(|preview| {
+                if let Some(shown) = preview.as_mut().and_then(|preview| preview.shown.as_mut())
+                    && let Some(playing) = shown.request.media.as_mut()
+                {
+                    *playing = !*playing;
+                }
+            });
+            if let Some(hwnd) = window() {
+                let _ = unsafe { InvalidateRect(Some(hwnd), None, false) };
+            }
+        }
+        return;
+    }
     let target = PREVIEW.with_borrow(|preview| {
         let shown = preview.as_ref()?.shown.as_ref()?;
         let index = match hit {
             Hit::Cell(index) | Hit::Close(index) => index,
+            Hit::Media(_) => return None,
         };
         Some((hit, *shown.request.windows.get(index)?))
     });
@@ -549,7 +642,7 @@ fn act(hit: Hit) {
             super::openwin::close(value);
             without(value);
         }
-        None => {}
+        Some((Hit::Media(_), _)) | None => {}
     }
 }
 
@@ -602,6 +695,14 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
         }
         WM_TIMER if wparam.0 == SLIDE_TIMER => {
             slide(hwnd);
+            LRESULT(0)
+        }
+        WM_MEDIA => {
+            media_found(wparam.0 == 2, lparam.0);
+            LRESULT(0)
+        }
+        WM_PRESS if wparam.0 >= PRESS_MEDIA => {
+            act(Hit::Media(wparam.0 - PRESS_MEDIA));
             LRESULT(0)
         }
         WM_PRESS => {
@@ -743,7 +844,12 @@ impl Painter {
             let target = unsafe { self.factory.CreateHwndRenderTarget(&properties, &window) }
                 .inspect_err(|error| log::warn!("previews: nothing to paint with: {error}"))
                 .ok()?;
-            unsafe { target.SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE) };
+            unsafe {
+                target.SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+                // Grayscale, as the dock: ClearType tints the thin bars of
+                // the media icons pink and green.
+                target.SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+            }
             self.brush = unsafe { target.CreateSolidColorBrush(&WHITE, None) }.ok();
             self.target = Some(target);
         }
@@ -895,6 +1001,33 @@ impl Painter {
                 true,
                 if over_close { WHITE } else { c.dim },
             );
+        }
+        if let Some(buttons) = shown.card.media {
+            // Segoe Fluent Icons' "Previous", "Play" or "Pause", "Next".
+            let toggle = if shown.request.media == Some(true) {
+                "\u{E769}"
+            } else {
+                "\u{E768}"
+            };
+            for (index, (button, glyph)) in buttons
+                .iter()
+                .zip(["\u{E892}", toggle, "\u{E893}"])
+                .enumerate()
+            {
+                if shown.hovered == Some(Hit::Media(index)) {
+                    self.fill(&target, *button, button.width / 2.0, c.hover);
+                }
+                self.text(
+                    &target,
+                    glyph,
+                    *button,
+                    if index == 1 { 16.0 } else { 13.0 } * scale,
+                    DWRITE_FONT_WEIGHT_NORMAL,
+                    DWRITE_TEXT_ALIGNMENT_CENTER,
+                    true,
+                    c.text,
+                );
+            }
         }
         if let Some(more) = shown.card.more_area {
             self.text(
