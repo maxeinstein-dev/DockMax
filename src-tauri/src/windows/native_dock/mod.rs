@@ -88,6 +88,8 @@ const CARD_DELAY: u32 = 450;
 /// Reads the processor, the memory and the network again while a system
 /// widget is on the dock (spec 0017 F1).
 const ACTIVITY_TIMER: usize = 7;
+/// The next frame of a long text that rolls (the Tocando agora, F4).
+const MARQUEE_TIMER: usize = 9;
 /// Looks at the pointer while the dock hides on its own.
 const AUTO_HIDE_TIMER: usize = 5;
 /// The key of a workspace dot for assistive technology, before its id.
@@ -290,6 +292,8 @@ pub struct Dock {
     /// The cover of what plays now, as a bitmap, with its track, and the
     /// icon of the program that plays it (F4).
     media_art: Option<MediaArt>,
+    /// When the track now playing showed: where its long title rolls to.
+    media_since: Instant,
     landing: Option<Landing>,
     /// How far each item is drawn from its place at rest, sideways: the
     /// room made for a dragged item, or the way to a new place, eased.
@@ -471,6 +475,7 @@ fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
         drag_cursor: None,
         drop_hover: None,
         media_art: None,
+        media_since: Instant::now(),
         landing: None,
         slide: Vec::new(),
         open: None,
@@ -1660,6 +1665,16 @@ impl Dock {
         ) {
             log::warn!("dock: could not paint: {error}");
         }
+        // A long title rolls: painted again when it moves next.
+        match self.painter.marquee {
+            Some(next) => {
+                let ms = (next * 1000.0).ceil().clamp(16.0, 60_000.0) as u32;
+                unsafe { SetTimer(Some(self.hwnd), MARQUEE_TIMER, ms, None) };
+            }
+            None => {
+                let _ = unsafe { KillTimer(Some(self.hwnd), MARQUEE_TIMER) };
+            }
+        }
     }
 
     /// Whether the dock is drawn dark: the setting, or Windows' own.
@@ -2409,6 +2424,7 @@ impl Dock {
             artist,
             idle: now.is_none(),
             controls: width == 3 && size != DockSize::Small && now.is_some(),
+            since: self.media_since.elapsed().as_secs_f64(),
         }
     }
 
@@ -2452,6 +2468,7 @@ impl Dock {
         let track = now.as_ref().map(super::media::Snapshot::track);
         let kept = self.media_art.as_ref().map(|(track, _, _)| track.clone());
         if track != kept {
+            self.media_since = Instant::now();
             self.media_art = now.as_ref().map(|now| {
                 let art = now.art.as_ref().and_then(|art| self.painter.bitmap(&art.1));
                 let icon = now.icon.as_ref().and_then(|icon| self.painter.bitmap(icon));
@@ -3338,6 +3355,7 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
                 dock.show_card();
             }),
             ACTIVITY_TIMER => with_dock(hwnd, Dock::read_activity),
+            MARQUEE_TIMER => with_dock(hwnd, Dock::paint),
             AUTO_HIDE_TIMER => with_dock(hwnd, Dock::watch_pointer),
             PREVIEW_TIMER => with_dock(hwnd, |dock| {
                 let _ = unsafe { KillTimer(Some(dock.hwnd), PREVIEW_TIMER) };
