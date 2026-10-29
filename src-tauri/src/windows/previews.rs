@@ -32,7 +32,8 @@ use windows::Win32::Graphics::Direct2D::{
     D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_FEATURE_LEVEL_DEFAULT,
     D2D1_HWND_RENDER_TARGET_PROPERTIES, D2D1_PRESENT_OPTIONS_NONE, D2D1_RENDER_TARGET_PROPERTIES,
     D2D1_RENDER_TARGET_TYPE_SOFTWARE, D2D1_RENDER_TARGET_USAGE_NONE, D2D1_ROUNDED_RECT,
-    D2D1CreateFactory, ID2D1Factory, ID2D1HwndRenderTarget, ID2D1SolidColorBrush,
+    D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE, D2D1CreateFactory, ID2D1Factory, ID2D1HwndRenderTarget,
+    ID2D1SolidColorBrush,
 };
 use windows::Win32::Graphics::DirectWrite::{
     DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
@@ -843,7 +844,12 @@ impl Painter {
             let target = unsafe { self.factory.CreateHwndRenderTarget(&properties, &window) }
                 .inspect_err(|error| log::warn!("previews: nothing to paint with: {error}"))
                 .ok()?;
-            unsafe { target.SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE) };
+            unsafe {
+                target.SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+                // Grayscale, as the dock: ClearType tints the thin bars of
+                // the media icons pink and green.
+                target.SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+            }
             self.brush = unsafe { target.CreateSolidColorBrush(&WHITE, None) }.ok();
             self.target = Some(target);
         }
