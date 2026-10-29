@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetText, type ClaudeReading } from "../../core/claude";
 import type { WidgetInstance } from "../../core/widgets";
@@ -58,6 +58,13 @@ describe("ClaudePanel", () => {
   it("says when the Claude Code is not signed in, or expired", async () => {
     panel({ state: "signedOut" });
     expect(await screen.findByText(text.states.signedOut)).toBeInTheDocument();
+  });
+
+  it("opens the Claude Code's sign-in", async () => {
+    panel({ state: "expired" });
+    fireEvent.click(await screen.findByRole("button", { name: text.signIn }));
+    expect(await screen.findByText(text.signInOpened)).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith("claude_sign_in");
   });
 });
 
