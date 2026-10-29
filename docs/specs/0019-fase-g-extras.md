@@ -27,7 +27,7 @@ O que entra na fase, no lugar da lista da spec 0004 (mascote, onboarding, config
 | G2. Tour de boas-vindas | A definir. |
 | G3. Atualização automática | A definir (onde publicar as versões). |
 | **G4. Pacote de ícones retrô / 8-bit** | O primeiro pacote próprio, **Retrô 8-bit**: 43 ícones em pixel art 16×16 na paleta do PICO-8 (o dock do autor e uns 35 apps comuns, mais um cartucho de reserva), no formato do B4a ([spec 0007](0007-fase-b4-icones.md) §3). Vem embutido e o app o copia para `IconPacks` ao abrir; o usuário o escolhe em Aparência › Ícones dos apps. |
-| G5. Linux | Estudo do que muda (o dock nativo é Win32/Direct2D). |
+| **G5. Linux** | Feito: [estudo 0001](../estudos/0001-linux.md). Recomenda não portar agora; se o Linux virar meta, separar o Windows atrás de traits e fazer um dock para KDE Plasma e wlroots com layer-shell. GNOME/Zorin só com uma extensão do Shell, à parte. Decisões do autor no §6 do estudo. |
 | G6. Nome e logo | A definir com o autor. |
 
 ## 3. G1 em detalhe
