@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
@@ -57,6 +57,14 @@ export const config: WebdriverIO.Config = {
     mkdirSync(RUNS_DIR, { recursive: true });
     const dataDir = mkdtempSync(join(RUNS_DIR, "run-"));
     process.env[DATA_DIR_VAR] = dataDir;
+    // The suite reads the PT-BR texts, and "Sistema" would follow the
+    // runner's Windows, in English on CI (spec 0019 G1). A file written
+    // here also counts the welcome tour as shown (G2), so no tour window
+    // opens in the middle of the specs.
+    writeFileSync(
+      join(dataDir, "settings.json"),
+      JSON.stringify({ version: 1, language: "pt-BR" }),
+    );
     console.log(`DockMax E2E data folder: ${dataDir}`);
   },
 
