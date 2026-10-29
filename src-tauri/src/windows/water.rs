@@ -73,3 +73,28 @@ pub fn seen(widget: &str) -> bool {
     pending.retain(|each| each != widget);
     pending.len() != before
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_due_reminder_leaves_a_badge_once_per_interval() {
+        // 2026-10-28 at 19:37 in São Paulo (UTC-3), no cup today.
+        let offset = -3 * 3600;
+        let now = 20_389 * 24 * 3600 + 19 * 3600 + 37 * 60 - offset;
+        let config = WaterConfig {
+            remind: 45,
+            ..WaterConfig::default()
+        };
+        let id = "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6099".to_string();
+        check(&[(id.clone(), config.clone())], now, offset);
+        assert!(pending(&id));
+        assert!(seen(&id));
+        // Seen, and not again before another interval.
+        check(&[(id.clone(), config.clone())], now + 60, offset);
+        assert!(!pending(&id));
+        check(&[(id.clone(), config)], now + 45 * 60, offset);
+        assert!(pending(&id));
+    }
+}
