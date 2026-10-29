@@ -133,6 +133,8 @@ pub enum Face {
         playing: bool,
         title: Option<String>,
         artist: Option<String>,
+        /// Nothing plays: a note in the middle of the tile, no text.
+        idle: bool,
     },
     /// The Atividade de rede: the rates and, on a wide tile, the graph.
     Rates {
@@ -1235,12 +1237,14 @@ impl Painter {
                     playing,
                     title,
                     artist,
+                    idle,
                 } => Face::Media {
                     glaze: *glaze,
                     art: art.clone(),
                     playing: *playing,
                     title: title.clone(),
                     artist: artist.clone(),
+                    idle: *idle,
                 },
                 Face::Rates {
                     glaze,
@@ -1397,15 +1401,26 @@ impl Painter {
                 playing,
                 title,
                 artist,
+                idle,
             } => {
                 self.glaze(area, *glaze, tile.pressed);
-                self.media(
-                    area,
-                    art.as_ref(),
-                    *playing,
-                    title.as_deref(),
-                    artist.as_deref(),
-                );
+                if *idle {
+                    let u = area.height;
+                    let middle = Area {
+                        x: area.x + (area.width - u) / 2.0,
+                        width: u,
+                        ..area
+                    };
+                    self.strokes(middle, 0.5, NOTE, Color::WHITE, 1.75);
+                } else {
+                    self.media(
+                        area,
+                        art.as_ref(),
+                        *playing,
+                        title.as_deref(),
+                        artist.as_deref(),
+                    );
+                }
             }
         }
     }
@@ -1449,11 +1464,7 @@ impl Painter {
                 }
             }
             None => {
-                let paths = if playing || title.is_none() {
-                    NOTE
-                } else {
-                    PAUSE
-                };
+                let paths = if playing { NOTE } else { PAUSE };
                 self.strokes(cover, 0.62, paths, Color::WHITE, 1.75);
             }
         }

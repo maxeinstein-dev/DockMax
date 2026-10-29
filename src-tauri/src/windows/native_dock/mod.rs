@@ -2380,10 +2380,6 @@ impl Dock {
             Some(now) if width > 1 && size != DockSize::Small => {
                 (Some(now.title.clone()), Some(now.artist.clone()))
             }
-            None if width > 1 => (
-                Some(crate::i18n::messages().dock.media_none.to_owned()),
-                None,
-            ),
             _ => (None, None),
         };
         Face::Media {
@@ -2392,6 +2388,7 @@ impl Dock {
             playing: now.as_ref().is_some_and(|now| now.playing),
             title,
             artist,
+            idle: now.is_none(),
         }
     }
 
