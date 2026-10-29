@@ -1,0 +1,111 @@
+/* The Tocando agora's panel (spec 0017 F4). Tokens of tokens.css only. */
+
+.media-cover {
+  width: 160px;
+  height: 160px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--track);
+}
+
+.media-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-cover svg {
+  width: 56px;
+  height: 56px;
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.media-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font: 600 15px / 1.35 var(--font-display);
+}
+
+.media-artist {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.media-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  margin: 12px 0 4px;
+}
+
+/* Icons only, as the Spotify has them: the play or pause in a circle. */
+.media-button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+}
+
+.media-button svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.media-button:hover:not(:disabled) {
+  background: var(--track);
+}
+
+.media-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.media-button.media-main {
+  width: 44px;
+  height: 44px;
+  background: var(--ink);
+  color: rgb(var(--surface-rgb));
+}
+
+.media-button.media-main:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 85%, rgb(var(--surface-rgb)));
+}
+
+.media-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.media-source img {
+  width: 16px;
+  height: 16px;
+}
+
+.media-note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}

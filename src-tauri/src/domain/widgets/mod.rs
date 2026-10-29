@@ -33,6 +33,7 @@ mod contract_tests;
 pub mod countdown;
 pub mod cycle;
 pub mod files;
+pub mod media;
 pub mod note;
 mod path;
 pub mod pomodoro;
@@ -53,6 +54,7 @@ pub use clock::ClockConfig;
 pub use countdown::CountdownConfig;
 pub use cycle::CycleConfig;
 pub use files::FilesConfig;
+pub use media::MediaConfig;
 pub use note::NoteConfig;
 pub use pomodoro::PomodoroConfig;
 pub use shortcut::ShortcutConfig;
@@ -99,6 +101,7 @@ pub enum WidgetKind {
     Pomodoro,
     Todo,
     Water,
+    Media,
 }
 
 closed_set!(WidgetKind {
@@ -115,6 +118,7 @@ closed_set!(WidgetKind {
     Pomodoro,
     Todo,
     Water,
+    Media,
 });
 
 impl WidgetKind {
@@ -132,7 +136,8 @@ impl WidgetKind {
             | WidgetKind::Countdown
             | WidgetKind::Pomodoro
             | WidgetKind::Todo
-            | WidgetKind::Water => true,
+            | WidgetKind::Water
+            | WidgetKind::Media => true,
             WidgetKind::Shortcut | WidgetKind::Files => false,
         }
     }
@@ -153,7 +158,8 @@ impl WidgetKind {
             | WidgetKind::Countdown
             | WidgetKind::Pomodoro
             | WidgetKind::Todo
-            | WidgetKind::Water => 1,
+            | WidgetKind::Water
+            | WidgetKind::Media => 1,
         }
     }
 
@@ -173,6 +179,7 @@ impl WidgetKind {
             WidgetKind::Pomodoro => "pomodoro",
             WidgetKind::Todo => "todo",
             WidgetKind::Water => "water",
+            WidgetKind::Media => "media",
         }
     }
 
@@ -266,6 +273,7 @@ pub enum WidgetConfig {
     Pomodoro(PomodoroConfig),
     Todo(TodoConfig),
     Water(WaterConfig),
+    Media(MediaConfig),
 }
 
 impl WidgetConfig {
@@ -284,6 +292,7 @@ impl WidgetConfig {
             WidgetConfig::Pomodoro(_) => WidgetKind::Pomodoro,
             WidgetConfig::Todo(_) => WidgetKind::Todo,
             WidgetConfig::Water(_) => WidgetKind::Water,
+            WidgetConfig::Media(_) => WidgetKind::Media,
         }
     }
 
@@ -309,6 +318,7 @@ impl WidgetConfig {
             WidgetConfig::Activity(config) => config.width,
             WidgetConfig::Network(config) => config.width,
             WidgetConfig::Calendar(config) => config.width,
+            WidgetConfig::Media(config) => config.width,
         }
     }
 
@@ -329,6 +339,7 @@ impl WidgetConfig {
             | WidgetConfig::Activity(_)
             | WidgetConfig::Network(_) => system::WIDTHS,
             WidgetConfig::Calendar(_) => calendar::WIDTHS,
+            WidgetConfig::Media(_) => media::WIDTHS,
         }
     }
 
@@ -344,6 +355,7 @@ impl WidgetConfig {
             WidgetConfig::Activity(config) => config.width = width,
             WidgetConfig::Network(config) => config.width = width,
             WidgetConfig::Calendar(config) => config.width = width,
+            WidgetConfig::Media(config) => config.width = width,
             WidgetConfig::Clock(_)
             | WidgetConfig::Note(_)
             | WidgetConfig::Shortcut(_)
@@ -374,6 +386,7 @@ impl WidgetConfig {
             WidgetKind::Pomodoro => WidgetConfig::Pomodoro(PomodoroConfig::default()),
             WidgetKind::Todo => WidgetConfig::Todo(TodoConfig::default()),
             WidgetKind::Water => WidgetConfig::Water(WaterConfig::default()),
+            WidgetKind::Media => WidgetConfig::Media(MediaConfig::default()),
         }
     }
 
@@ -393,6 +406,7 @@ impl WidgetConfig {
             WidgetConfig::Pomodoro(config) => config.validate(),
             WidgetConfig::Todo(config) => config.validate(),
             WidgetConfig::Water(config) => config.validate(),
+            WidgetConfig::Media(config) => config.validate(),
         }
     }
 }
@@ -502,6 +516,7 @@ pub fn encode_config(config: &WidgetConfig) -> String {
         WidgetConfig::Pomodoro(config) => serde_json::to_string(config),
         WidgetConfig::Todo(config) => serde_json::to_string(config),
         WidgetConfig::Water(config) => serde_json::to_string(config),
+        WidgetConfig::Media(config) => serde_json::to_string(config),
     };
     // Plain structs with string keys: serializing them can't fail.
     json.expect("widget configs always serialize")
@@ -538,6 +553,7 @@ pub fn decode_config(
         WidgetKind::Pomodoro => serde_json::from_str(json).map(WidgetConfig::Pomodoro),
         WidgetKind::Todo => serde_json::from_str(json).map(WidgetConfig::Todo),
         WidgetKind::Water => serde_json::from_str(json).map(WidgetConfig::Water),
+        WidgetKind::Media => serde_json::from_str(json).map(WidgetConfig::Media),
     }
     .map_err(|_| WidgetError::InvalidConfig)?;
     config.validate()?;
@@ -824,7 +840,8 @@ mod tests {
                 WidgetKind::Countdown,
                 WidgetKind::Pomodoro,
                 WidgetKind::Todo,
-                WidgetKind::Water
+                WidgetKind::Water,
+                WidgetKind::Media
             ]
         );
     }
@@ -852,6 +869,7 @@ mod tests {
             "pomodoro",
             "todo",
             "water",
+            "media",
         ];
         for (kind, name) in WidgetKind::ALL.into_iter().zip(names) {
             assert_eq!(to_json(&kind), name);
@@ -941,7 +959,10 @@ mod tests {
         for kind in WidgetKind::ALL {
             let config = WidgetConfig::default_for(kind);
             let most = match kind {
-                WidgetKind::TimeProgress | WidgetKind::Activity | WidgetKind::Network => 3,
+                WidgetKind::TimeProgress
+                | WidgetKind::Activity
+                | WidgetKind::Network
+                | WidgetKind::Media => 3,
                 // Three was too small to read: two rise to three under
                 // the pointer instead.
                 WidgetKind::Calendar => 2,
@@ -1043,6 +1064,7 @@ mod tests {
                     "last": null
                 }),
             ),
+            (WidgetKind::Media, json!({ "width": 2 })),
         ];
         for (kind, config) in cases {
             let instance = instance(WidgetConfig::default_for(kind));

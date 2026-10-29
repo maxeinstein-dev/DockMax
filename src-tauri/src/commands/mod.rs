@@ -3,6 +3,7 @@ pub mod calendar;
 pub mod google;
 pub mod icons;
 pub mod launcher;
+pub mod media;
 pub mod panel;
 pub mod pomodoro;
 pub mod settings;

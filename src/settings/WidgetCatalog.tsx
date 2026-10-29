@@ -12,7 +12,7 @@ import { format, useT } from "../i18n";
 import { MiniTile } from "../panel/DockItems";
 import "./WidgetCatalog.css";
 
-type Category = "system" | "time" | "productivity" | "personal";
+type Category = "system" | "time" | "media" | "productivity" | "personal";
 
 /** The catalog's shelves, in order, with their kinds. */
 const SHELVES: readonly { category: Category; kinds: CreatableKind[] }[] = [
@@ -22,6 +22,7 @@ const SHELVES: readonly { category: Category; kinds: CreatableKind[] }[] = [
     kinds: ["calendar", "clock", "countdown", "pomodoro", "time-progress"],
   },
   { category: "productivity", kinds: ["todo", "note", "water"] },
+  { category: "media", kinds: ["media"] },
   { category: "personal", kinds: ["cycle"] },
 ];
 
@@ -38,6 +39,7 @@ const WIDTHS: Readonly<Record<CreatableKind, number>> = {
   pomodoro: 1,
   todo: 1,
   water: 1,
+  media: 2,
 };
 
 /** Text compared without case or accents: "relogio" finds "Relógio". */

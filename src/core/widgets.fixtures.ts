@@ -303,6 +303,20 @@ export const WIDGET_FIXTURES = {
     },
   } satisfies WidgetInstance<"water">,
 
+  "media-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6096",
+    label: null,
+    kind: "media",
+    config: { width: 2 },
+  } satisfies WidgetInstance<"media">,
+
+  "media-sample": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f6097",
+    label: null,
+    kind: "media",
+    config: { width: 3 },
+  } satisfies WidgetInstance<"media">,
+
   "snapshot-sample": {
     storage: { state: "ok" },
     widgets: [CLOCK_DEFAULT, { ...NOTE_DEFAULT, label: "Mercado" }],

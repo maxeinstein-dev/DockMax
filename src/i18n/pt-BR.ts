@@ -600,6 +600,7 @@ const messages = {
       pomodoro: "Pomodoro",
       todo: "Lista de tarefas",
       water: "Beber água",
+      media: "Tocando agora",
     } satisfies Record<WidgetKind, string>,
     /** Short name of each kind on the add buttons of Itens do dock. */
     addNames: {
@@ -614,6 +615,7 @@ const messages = {
       pomodoro: "Pomodoro",
       todo: "Lista de tarefas",
       water: "Beber água",
+      media: "Tocando agora",
     } satisfies Record<CreatableKind, string>,
     /** Parts every widget panel shares. */
     common: {
@@ -806,6 +808,7 @@ const messages = {
         system: "Sistema",
         time: "Tempo",
         productivity: "Produtividade",
+        media: "Mídia",
         personal: "Pessoal",
       },
       descriptions: {
@@ -819,6 +822,8 @@ const messages = {
         cycle: "Acompanha um ciclo marcado na agenda, com discrição no dock.",
         todo: "Tarefas com marca de feita; o dock mostra quantas faltam.",
         water: "Os copos do dia contra uma meta, com lembrete opcional.",
+        media:
+          "O que toca no Windows, com capa e os botões de tocar, voltar e avançar.",
         pomodoro:
           "Foco e pausa com o tempo no dock; continua contando com o painel fechado.",
         countdown:
@@ -890,6 +895,21 @@ const messages = {
       showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },
     /** The Ciclo (spec 0017 F2b): the panel says what the tile doesn't. */
+    /** The Tocando agora (spec 0017 F4). */
+    media: {
+      settingsTitle: "Ajustes do Tocando agora",
+      loading: "Procurando o que toca…",
+      nothing: "Nada tocando agora.",
+      untitled: "Sem título",
+      previous: "Anterior",
+      play: "Tocar",
+      pause: "Pausar",
+      next: "Próxima",
+      from: "Tocando em",
+      footer: "O que o Windows mostra nos controles de mídia",
+      widthHint:
+        "Com 1 ícone, só a capa; com 2, a capa com o título e o artista; com 3, também os botões de voltar, tocar ou pausar e avançar. O clique do meio toca ou pausa.",
+    },
     /** The Beber água (spec 0017 F3-2). */
     water: {
       settingsTitle: "Ajustes da água",

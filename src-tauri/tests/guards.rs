@@ -59,6 +59,10 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             // skip or start over the widget it names.
             "allow-pomodoro-status",
             "allow-pomodoro-act",
+            // The Tocando agora (F4): what plays now, and play or pause,
+            // the previous and the next.
+            "allow-media-status",
+            "allow-media-control",
             // Dragging a tray icon onto the dock keeps it there; the command
             // names an icon the list gave and a point on the screen.
             "allow-tray-to-dock",

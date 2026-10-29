@@ -215,6 +215,13 @@ impl Press {
     }
 }
 
+/// The cover of a track, and the icon of its program, as bitmaps (F4).
+type MediaArt = (
+    (String, String, String),
+    Option<ID2D1Bitmap>,
+    Option<ID2D1Bitmap>,
+);
+
 /// What the dock reads from the rest of the app.
 struct Data {
     settings: Settings,
@@ -280,6 +287,9 @@ pub struct Dock {
     drag_cursor: Option<HCURSOR>,
     /// The tile under files dragged over the dock (spec 0018).
     drop_hover: Option<usize>,
+    /// The cover of what plays now, as a bitmap, with its track, and the
+    /// icon of the program that plays it (F4).
+    media_art: Option<MediaArt>,
     landing: Option<Landing>,
     /// How far each item is drawn from its place at rest, sideways: the
     /// room made for a dragged item, or the way to a new place, eased.
@@ -460,6 +470,7 @@ fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
         drag_x: 0.0,
         drag_cursor: None,
         drop_hover: None,
+        media_art: None,
         landing: None,
         slide: Vec::new(),
         open: None,
@@ -641,6 +652,7 @@ fn names() -> Names {
         pomodoro: dock.pomodoro,
         todo: dock.todo,
         water: dock.water,
+        media: dock.media,
     }
 }
 
@@ -965,6 +977,10 @@ impl Dock {
             })
             .collect();
         super::calendar::want(self.hwnd.0 as isize, calendar, cycles);
+        let media = self.items.iter().any(|item| {
+            matches!(item, Item::Widget(widget) if matches!(widget.config, WidgetConfig::Media(_)))
+        });
+        super::media::want(self.hwnd.0 as isize, media);
         let wanted = self.items.iter().any(|item| {
             matches!(
                 item,
@@ -1891,6 +1907,9 @@ impl Dock {
         match item {
             Item::App(app) => program(&app.app_id, None),
             Item::Other(other) => program(&other.app_id, other.badge.then_some(other.key.as_str())),
+            Item::Widget(widget) if matches!(widget.config, WidgetConfig::Media(_)) => {
+                self.media_face(widget.config.width(), size)
+            }
             Item::Widget(widget) => {
                 let calendar = matches!(widget.config, WidgetConfig::Calendar(_))
                     .then(super::calendar::snapshot)
@@ -2352,7 +2371,91 @@ impl Dock {
         } else if let Some(cell) = self.strip_hit(x, y) {
             self.strip_click(cell, false);
         } else if let Some(index) = self.hit(x, y).filter(|&index| Some(index) == pressed) {
-            self.click(index);
+            match self.media_button_at(index, x, y) {
+                Some(action) => super::media::control(action),
+                None => self.click(index),
+            }
+        }
+        self.paint();
+    }
+
+    /// The Tocando agora's tile (spec 0017 F4): the cover of what plays now
+    /// and, wider, its title and artist.
+    fn media_face(&self, width: u8, size: DockSize) -> Face {
+        let now = super::media::snapshot();
+        let (art, badge) = match (&now, &self.media_art) {
+            (Some(now), Some((track, art, icon))) if *track == now.track() => {
+                (art.clone(), icon.clone())
+            }
+            _ => (None, None),
+        };
+        let (title, artist) = match &now {
+            Some(now) if width > 1 && size != DockSize::Small => {
+                (Some(now.title.clone()), Some(now.artist.clone()))
+            }
+            _ => (None, None),
+        };
+        Face::Media {
+            // The cover's color, as a phone's media notification has it.
+            glaze: now
+                .as_ref()
+                .and_then(|now| now.tint)
+                .map_or(theme::Glaze::MUSIC, theme::Glaze::ground_of),
+            art,
+            badge,
+            playing: now.as_ref().is_some_and(|now| now.playing),
+            title,
+            artist,
+            idle: now.is_none(),
+            controls: width == 3 && size != DockSize::Small && now.is_some(),
+        }
+    }
+
+    /// The button of the Tocando agora at `index` under `(x, y)`, three
+    /// icons wide while something plays (spec 0017 F4).
+    fn media_button_at(&self, index: usize, x: f64, y: f64) -> Option<super::media::Action> {
+        let Some(Item::Widget(widget)) = self.items.get(index) else {
+            return None;
+        };
+        if !matches!(widget.config, WidgetConfig::Media(_))
+            || widget.config.width() != 3
+            || self.shape().size == DockSize::Small
+            || super::media::snapshot().is_none()
+        {
+            return None;
+        }
+        let tile = *self.placement_now().tiles.get(index)?;
+        let actions = [
+            super::media::Action::Previous,
+            super::media::Action::Toggle,
+            super::media::Action::Next,
+        ];
+        dock_layout::media_buttons(tile)
+            .into_iter()
+            .zip(actions)
+            .find(|(button, _)| {
+                // A little more than the glyph, easier to hit.
+                let pad = button.width * 0.2;
+                x >= button.x - pad
+                    && x <= button.x + button.width + pad
+                    && y >= button.y - pad
+                    && y <= button.y + button.height + pad
+            })
+            .map(|(_, action)| action)
+    }
+
+    /// What plays changed: a new cover is read into a bitmap, and the tile
+    /// painted again.
+    fn media_changed(&mut self) {
+        let now = super::media::snapshot();
+        let track = now.as_ref().map(super::media::Snapshot::track);
+        let kept = self.media_art.as_ref().map(|(track, _, _)| track.clone());
+        if track != kept {
+            self.media_art = now.as_ref().map(|now| {
+                let art = now.art.as_ref().and_then(|art| self.painter.bitmap(&art.1));
+                let icon = now.icon.as_ref().and_then(|icon| self.painter.bitmap(icon));
+                (now.track(), art, icon)
+            });
         }
         self.paint();
     }
@@ -2613,6 +2716,13 @@ impl Dock {
                     log::warn!("calendar: the meeting could not be opened: {error}");
                 }
             }));
+            return;
+        }
+        // The Tocando agora plays or pauses (spec 0017 F4).
+        if let Some(Item::Widget(widget)) = self.items.get(index)
+            && matches!(widget.config, WidgetConfig::Media(_))
+        {
+            super::media::control(super::media::Action::Toggle);
             return;
         }
         // The Pomodoro starts or pauses (spec 0017 F2c-2).
@@ -3333,6 +3443,11 @@ fn pointer_off(hwnd: HWND) -> bool {
     at.x < window.left || at.x >= window.right || at.y < window.top || at.y >= window.bottom
 }
 
+/// What plays now changed (spec 0017 F4).
+pub fn media_changed() {
+    post(Dock::media_changed);
+}
+
 /// The notification badges of the taskbar changed (spec 0016).
 pub fn badges_changed() {
     post(Dock::notices_changed);
@@ -3430,6 +3545,7 @@ pub fn view() -> Option<View> {
                         crate::domain::widgets::WidgetConfig::Pomodoro(_) => "ring",
                         crate::domain::widgets::WidgetConfig::Todo(_) => "agenda",
                         crate::domain::widgets::WidgetConfig::Water(_) => "ring",
+                        crate::domain::widgets::WidgetConfig::Media(_) => "media",
                         _ => "glyph",
                     },
                 };

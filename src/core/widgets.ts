@@ -45,7 +45,8 @@ export type WidgetKind =
   | "countdown"
   | "pomodoro"
   | "todo"
-  | "water";
+  | "water"
+  | "media";
 
 /* Each closed set below has a tuple with every value, in the order of the
  * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
@@ -67,6 +68,7 @@ export const WIDGET_KINDS = [
   "pomodoro",
   "todo",
   "water",
+  "media",
 ] as const;
 
 /** The kinds `add_widget` accepts in this phase. */
@@ -87,6 +89,7 @@ export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "pomodoro",
   "todo",
   "water",
+  "media",
 ];
 
 /** Stable ID of an instance: a UUID v7 made in Rust, never reused and never
@@ -340,6 +343,12 @@ export const WATER_CHOICES = {
   remind: [0, 30, 45, 60, 90, 120],
 } as const;
 
+/** The Tocando agora (spec 0017 F4): only the width, 1 to 3 icons; what
+ * plays comes from Windows. */
+export interface MediaConfig {
+  width: WidgetWidth;
+}
+
 /** The config of each kind. */
 export interface WidgetConfigs {
   clock: ClockConfig;
@@ -355,6 +364,7 @@ export interface WidgetConfigs {
   pomodoro: PomodoroConfig;
   todo: TodoConfig;
   water: WaterConfig;
+  media: MediaConfig;
 }
 
 /** A kind's config tagged with the kind, as `update_widget` takes it:

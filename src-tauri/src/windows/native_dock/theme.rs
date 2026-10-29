@@ -121,6 +121,38 @@ pub struct Glaze {
 }
 
 impl Glaze {
+    /// A ground for white text from the color `rgb` (a cover's): its hue,
+    /// a moderate saturation, and dark.
+    pub fn ground_of((r, g, b): (u8, u8, u8)) -> Glaze {
+        let (r, g, b) = (
+            f32::from(r) / 255.0,
+            f32::from(g) / 255.0,
+            f32::from(b) / 255.0,
+        );
+        let max = r.max(g).max(b);
+        let min = r.min(g).min(b);
+        let l = (max + min) / 2.0;
+        let d = max - min;
+        let (h, s) = if d == 0.0 {
+            (0.0, 0.0)
+        } else {
+            let s = d / (1.0 - (2.0 * l - 1.0).abs());
+            let h = if max == r {
+                60.0 * ((g - b) / d).rem_euclid(6.0)
+            } else if max == g {
+                60.0 * ((b - r) / d + 2.0)
+            } else {
+                60.0 * ((r - g) / d + 4.0)
+            };
+            (h, s)
+        };
+        Glaze {
+            h,
+            s: (s * 100.0).clamp(12.0, 55.0),
+            l: 34.0,
+        }
+    }
+
     /// Petróleo.
     pub const CLOCK: Glaze = Glaze {
         h: 192.0,
@@ -192,6 +224,12 @@ impl Glaze {
         h: 204.0,
         s: 58.0,
         l: 44.0,
+    };
+    /// Ameixa: the Tocando agora (and Aparência in Configurações).
+    pub const MUSIC: Glaze = Glaze {
+        h: 318.0,
+        s: 20.0,
+        l: 43.0,
     };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {
@@ -311,6 +349,7 @@ mod tests {
             ("t-pomodoro", Glaze::POMODORO),
             ("t-todo", Glaze::TODO),
             ("t-water", Glaze::WATER),
+            ("t-music", Glaze::MUSIC),
         ];
         for (class, glaze) in glazes {
             let css_glaze = Glaze {
@@ -326,5 +365,22 @@ mod tests {
     fn a_glaze_is_lighter_on_top() {
         let (top, bottom) = Glaze::CLOCK.tones();
         assert!(top.r + top.g + top.b > bottom.r + bottom.g + bottom.b);
+    }
+}
+
+#[cfg(test)]
+mod ground_tests {
+    use super::Glaze;
+
+    #[test]
+    fn a_cover_color_becomes_a_dark_ground_of_its_hue() {
+        let red = Glaze::ground_of((220, 30, 30));
+        assert!((red.h - 0.0).abs() < 1.0);
+        assert_eq!((red.s, red.l), (55.0, 34.0));
+        let blue = Glaze::ground_of((40, 60, 160));
+        assert!((blue.h - 230.0).abs() < 1.0);
+        // A gray cover: a neutral, dark ground.
+        let gray = Glaze::ground_of((128, 128, 128));
+        assert_eq!((gray.s, gray.l), (12.0, 34.0));
     }
 }
