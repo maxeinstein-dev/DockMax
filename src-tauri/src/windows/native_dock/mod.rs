@@ -2411,9 +2411,9 @@ impl Dock {
             _ => (None, None),
         };
         let (title, artist) = match &now {
-            Some(now) if width > 1 && size != DockSize::Small => {
-                (Some(now.title.clone()), Some(now.artist.clone()))
-            }
+            // A small dock has room for the title alone.
+            Some(now) if width > 1 && size == DockSize::Small => (Some(now.title.clone()), None),
+            Some(now) if width > 1 => (Some(now.title.clone()), Some(now.artist.clone())),
             _ => (None, None),
         };
         Face::Media {
@@ -2428,7 +2428,7 @@ impl Dock {
             title,
             artist,
             idle: now.is_none(),
-            controls: width == 3 && size != DockSize::Small && now.is_some(),
+            controls: width == 3 && now.is_some(),
             since: self.media_since.elapsed().as_secs_f64(),
         }
     }
@@ -2441,7 +2441,6 @@ impl Dock {
         };
         if !matches!(widget.config, WidgetConfig::Media(_))
             || widget.config.width() != 3
-            || self.shape().size == DockSize::Small
             || super::media::snapshot().is_none()
         {
             return None;

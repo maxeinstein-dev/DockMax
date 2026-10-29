@@ -1522,12 +1522,14 @@ impl Painter {
         }
         let x = cover.x + side + inset;
         let room = area.x + area.width - inset - x;
+        // On a small dock the text keeps a readable size.
+        let t = if u < 44.0 { u * 1.25 } else { u };
         if room <= 0.0 {
             return;
         }
         if controls {
             // The upper line: the title, and the artist after it, fainter.
-            let size = u * 0.17;
+            let size = t * 0.17;
             let mut runs = vec![(title.to_owned(), size, 600, Color::WHITE)];
             if let Some(artist) = artist.filter(|artist| !artist.is_empty()) {
                 runs.push((
@@ -1543,15 +1545,15 @@ impl Painter {
         let rows: Vec<(String, f64, i32, Color)> = match artist.filter(|artist| !artist.is_empty())
         {
             Some(artist) => vec![
-                (title.to_owned(), u * 0.19, 600, Color::WHITE),
+                (title.to_owned(), t * 0.19, 600, Color::WHITE),
                 (
                     artist.to_owned(),
-                    u * 0.16,
+                    t * 0.16,
                     500,
                     Color::WHITE.with_alpha(0.78),
                 ),
             ],
-            None => vec![(title.to_owned(), u * 0.19, 600, Color::WHITE)],
+            None => vec![(title.to_owned(), t * 0.19, 600, Color::WHITE)],
         };
         let heights: Vec<f64> = rows.iter().map(|(_, size, _, _)| size * 1.3).collect();
         let mut y = area.y + (u - heights.iter().sum::<f64>()) / 2.0;
