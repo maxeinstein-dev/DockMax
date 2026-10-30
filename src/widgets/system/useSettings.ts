@@ -18,7 +18,8 @@ type SystemKind =
   | "water"
   | "media"
   | "claude"
-  | "weather";
+  | "weather"
+  | "launcher";
 
 /** The error code of a refused command; anything else counts as a failed
  * write (the contract rejects only with a `WidgetCommandError`). */

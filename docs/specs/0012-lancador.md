@@ -1,6 +1,6 @@
 # Spec 0012 — Lançador: buscar e abrir pelo teclado
 
-**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado; L6 (menu de ações por resultado) implementado; L7 (janelas abertas) implementado; a área de transferência (seção 8h) implementada.
+**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado; L6 (menu de ações por resultado) implementado; L7 (janelas abertas) implementado; a área de transferência (seção 8i) implementada.
 **Origem:** pedido do autor (2026-10-26) de um lançador no estilo do [Ulauncher](https://ulauncher.io/): uma caixa de busca aberta por um atalho de teclado global, que acha e abre apps e, no futuro, arquivos e extensões. O PrimoDock tem algo parecido ("O botão Iniciar abre: Apps do PrimoDock", [interface](../reference/primodock/interface.md)), mas só pelo mouse e sem busca por teclado.
 
 ## 1. Decisões do autor (2026-10-26)
@@ -30,8 +30,8 @@ L1 e L2 formam o primeiro recorte do produto. Cada um é um PR; o L2 só começa
 
 - **Extensões** (seção 9): só a forma interna dos provedores nasce no L1, preparada para elas.
 - A **tecla Win sozinha** ou a tecla Copilot como atalho (exigem um hook de teclado de baixo nível).
-- A conversão de unidades e o histórico de contas. (A área de transferência saiu desta lista: seção 8h.)
-- Um item no dock que abre o lançador (o "botão Iniciar" do PrimoDock).
+- A conversão de unidades e o histórico de contas. (A área de transferência saiu desta lista: seção 8i.)
+- ~~Um item no dock que abre o lançador (o "botão Iniciar" do PrimoDock).~~ **Feito** (seção 8h).
 
 ## 3. O atalho
 
@@ -136,7 +136,7 @@ O desenho e o que foi medido estão em "Como o L4 ficou" (seção 8d).
 |---|---|
 | Digitar | Busca a cada tecla (o catálogo cabe em memória; sem atraso), relendo as janelas abertas (L7); os arquivos, 120 ms depois da última tecla (L4) |
 | `j ` | Só as janelas abertas (L7); sem nada depois, todas, a usada por último primeiro |
-| `cb ` | Só o histórico da área de transferência do Windows (seção 8h); sem nada depois, os últimos copiados. Enter põe o item de volta como o copiado agora, sem colar |
+| `cb ` | Só o histórico da área de transferência do Windows (seção 8i); sem nada depois, os últimos copiados. Enter põe o item de volta como o copiado agora, sem colar |
 | Cima, Baixo | Muda o resultado selecionado, sem sair da caixa de texto |
 | Enter | Abre o selecionado (o primeiro, se nenhum foi escolhido); numa janela (L7), traz para a frente, restaurando se estiver minimizada |
 | Shift+Enter | O menu de ações do selecionado (L6); numa janela: Alternar para a janela, Fechar janela, Mostrar no Explorador (L7); numa página de Configurações, numa busca na web ou numa conta, que só têm uma ação, faz essa ação direto, sem menu |
@@ -162,7 +162,7 @@ O mouse também funciona: passar o ponteiro seleciona, o clique abre e o botão 
 - **Tamanho do texto:** a fonte segue o "Tamanho do texto" da Acessibilidade do Windows, além do DPI; as linhas crescem com ela.
 - **Só teclado:** tudo o que o mouse faz no lançador também se faz pelo teclado (seção 6).
 - **O menu de ações (L6)** é o menu próprio do app (`windows/menu`, o do dock), com o mesmo provedor de UI Automation: o Narrador ouve o menu abrir ("Dockyard") e lê cada item com o foco ("Abrir como administrador", "Mostrar no Explorador"); o Invoke escolhe. Aberto pelo teclado, o primeiro item já vem com o foco. "Caminho copiado" é um anúncio, como "Resultado copiado".
-- **A área de transferência (seção 8h):** o item da UI Automation tem o tipo "Área de transferência" e a primeira linha como nome; o Narrador lê "Relatório de vendas, Área de transferência, 1 de 12". Pôr um item de volta diz "Copiado"; a falha de leitura é dita como as outras notas da lista.
+- **A área de transferência (seção 8i):** o item da UI Automation tem o tipo "Área de transferência" e a primeira linha como nome; o Narrador lê "Relatório de vendas, Área de transferência, 1 de 12". Pôr um item de volta diz "Copiado"; a falha de leitura é dita como as outras notas da lista.
 
 ## 8. Como verificar
 
@@ -385,7 +385,22 @@ Duas falhas apareceram e foram corrigidas antes do PR: o campo lia a **posição
 
 **Não verificado (só ao vivo):** Enter trazendo para a frente uma janela comum, uma minimizada e uma de programa elevado (o Windows pode barrar o foco de uma janela de administrador vinda de um processo comum); Fechar janela num programa com documento não salvo (a pergunta aparecendo); o tempo de leitura com 20–30 janelas abertas (a meta de 5 ms); o ícone e o nome de cada app (Chrome com perfis, Explorador, apps da Loja via `ApplicationFrameHost`); uma janela de outro espaço em outro monitor; o Narrador lendo "Janela".
 
-## 8h. Área de transferência
+## 8h. O item Lançador no dock
+
+O "botão Iniciar" do PrimoDock, com o lançador no lugar do Iniciar.
+
+- **O mecanismo:** um widget novo, `launcher` (`domain/widgets/launcher.rs`), e não um item de sistema: os itens de sistema (Configurações) o usuário não põe nem tira, e os widgets já têm tudo isso, o catálogo de Configurações › Widgets (prateleira Sistema), os espaços de trabalho, arrastar para reordenar e o "Remover do dock" do menu (PR #89). A config é vazia (`{}`): o atalho é o do lançador, em `launcherHotkey`.
+- **O desenho:** o glifo de busca do Windows (`Segoe Fluent Icons`, `E721`, o `SEARCH_GLYPH` do menu) em branco sobre um esmalte próprio, Turquesa (`Glaze::LAUNCHER`, `.t-launcher`), por uma face nova do dock (`Face::Symbol`), que desenha um glifo da fonte de ícones como a faixa de ícones pequenos já fazia.
+- **A dica e o nome:** "Lançador (Alt+Espaço)", com o atalho em uso e a tecla Espaço no idioma da interface (`launcher::tip`); com o atalho desligado em Configurações, só "Lançador". Um rótulo dado pelo usuário entra no lugar do nome. É o mesmo texto que o Narrador lê, como os outros itens; o papel é o dos outros itens do dock.
+- **O clique** abre ou fecha o lançador (`launcher::toggle`, o mesmo de "Buscar apps…"), onde ele abre hoje: centrado no monitor do ponteiro. **Com o atalho desligado** o clique abre o lançador do mesmo jeito: a chave de Configurações só solta o atalho do teclado ("os menus o abrem de qualquer jeito", seção 3), e o item é um desses caminhos pelo mouse. Ligar o atalho por um clique ou mandar o usuário para Configurações seria mudar uma escolha dele sem pedir. Passar o mouse não pré-aquece o painel, que o item não abre.
+- **O clique direito:** o menu do widget com **Configurar atalho…** (abre Configurações › Geral, onde fica o atalho) e **Remover do dock**, antes do menu do dock.
+- **O painel** do widget existe só porque todo widget tem um (o contrato do `registry.ts`): uma frase dizendo como o item funciona e, em Ajustes, o rótulo e "Remover do dock". O clique do dock nunca o abre.
+
+**Testes de unidade:** o kind (nome, `{}`, criável, uma largura), a config lendo de JSON antigo e sempre válida, a dica com o atalho (Espaço traduzido, outro atalho, sem atalho), o menu (Configurar atalho… e Remover do dock, as escolhas certas), quem é o Lançador entre os itens, o esmalte batendo com `tokens.css` e as fixtures dos dois lados.
+
+**Não verificado (só ao vivo):** o glifo centrado e do tamanho dos outros no esmalte, nos três tamanhos do dock e nos temas; o clique com o lançador aberto fechando-o (e não reabrindo, se o clique no dock tirar o foco do lançador antes); a dica e o Narrador lendo "Lançador (Alt+Espaço)"; Configurar atalho… abrindo Configurações já em Geral.
+
+## 8i. Área de transferência
 
 **Decisões do autor (2026-10-30):**
 
@@ -416,7 +431,7 @@ Duas falhas apareceram e foram corrigidas antes do PR: o campo lia a **posição
 
 **Testes de unidade:** a palavra-chave (só `cb ` com espaço, `cb` sozinho e as outras consultas sem histórico, a palavra-chave do usuário vencendo) e as colisões com as padrão, o `f` e o `j`; o filtro (sem acento, sem maiúsculas, todas as palavras, a ordem do mais recente, o limite de 25); o corte da primeira linha (linhas em branco, tabulações, 80 caracteres por caractere e não por byte); o "há N min" (agora, minutos, horas, dias, relógio atrasado); a conversão do `DateTime` do WinRT; o histórico desligado, a resposta atrasada e a de antes de um descarte; a URL (só um `https://` sozinho; `http://`, texto em volta, duas linhas, `javascript:` e endereço longo demais ficam de fora); as ações (Copiar e Abrir como link, o Ctrl+C, a ação na lista fechada); e as duas guardas de privacidade.
 
-**A medir:** o teste `clipboard_history_answers`, ignorado no `cargo test` e rodado à mão com `cargo test clipboard_history_answers -- --ignored --nocapture`, imprime só a contagem e o tamanho dos itens (nunca o conteúdo), o tempo das duas leituras e a memória privada que o WinRT somou ao processo. Ele ainda não rodou: no dia do PR o disco da máquina estava cheio e o build de teste não coube. Se a memória passar de 1–2 MB, a leitura vai para o auxiliar, como no L4, com o cuidado do primeiro plano acima.
+**Medido** (2026-10-30, na máquina do autor, pelo teste `clipboard_history_answers`, ignorado no `cargo test` e rodado à mão com `cargo test clipboard_history_answers -- --ignored --nocapture`, que imprime só a contagem e o tamanho dos itens, nunca o conteúdo): rodando de um terminal, **o Windows não entregou o histórico** ("the history could not be read", em 2,8 ms; a segunda tentativa, em 13 µs). É o esperado de um processo sem janela em primeiro plano, e confirma por que a leitura não vai para o auxiliar. O WinRT somou **+0,1 MB** de memória privada ao processo (1,9 MB antes e depois). A contagem e o tempo de uma leitura de verdade ficam para o teste ao vivo, com o lançador aberto.
 
 **Não verificado (só ao vivo):** a leitura com o lançador em primeiro plano (o teste roda de um terminal, que é quem tem o primeiro plano); o Enter pondo o item de volta e o Ctrl+V em outro programa colando-o; "Abrir como link" no navegador; a linha do histórico desligado abrindo a página; o tempo e a memória com o lançador aberto; o Narrador lendo "Área de transferência" e "Copiado".
 

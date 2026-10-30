@@ -133,6 +133,9 @@ pub enum Face {
         glaze: Glaze,
         paths: &'static [&'static str],
     },
+    /// A glyph of Windows' icon font (`strip::ICON_FONT`) on a glaze: the
+    /// Lançador's search, as the menus show it.
+    Symbol { glaze: Glaze, glyph: char },
     /// A program's icon; its first letter while there is none.
     App {
         icon: Option<ID2D1Bitmap>,
@@ -1261,6 +1264,10 @@ impl Painter {
                     glaze: *glaze,
                     paths,
                 },
+                Face::Symbol { glaze, glyph } => Face::Symbol {
+                    glaze: *glaze,
+                    glyph: *glyph,
+                },
                 Face::Time { glaze, text } => Face::Time {
                     glaze: *glaze,
                     text: text.clone(),
@@ -1365,6 +1372,11 @@ impl Painter {
             Face::Glyph { glaze, paths } => {
                 self.glaze(area, *glaze, tile.pressed);
                 self.strokes(area, 0.54, paths, Color::WHITE, 1.75);
+            }
+            Face::Symbol { glaze, glyph } => {
+                self.glaze(area, *glaze, tile.pressed);
+                // About the size of the line glyphs (`strokes` at 0.54).
+                self.icon_glyph(*glyph, area, area.width * 0.46, Color::WHITE);
             }
             Face::App {
                 icon,

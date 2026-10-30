@@ -665,6 +665,7 @@ const messages = {
       media: "Tocando agora",
       claude: "Uso do Claude",
       weather: "Clima",
+      launcher: "Lançador",
     } satisfies Record<WidgetKind, string>,
     /** Short name of each kind on the add buttons of Itens do dock. */
     addNames: {
@@ -682,6 +683,7 @@ const messages = {
       media: "Tocando agora",
       claude: "Uso do Claude",
       weather: "Clima",
+      launcher: "Lançador",
     } satisfies Record<CreatableKind, string>,
     /** Parts every widget panel shares. */
     common: {
@@ -898,6 +900,8 @@ const messages = {
           "Foco e pausa com o tempo no dock; continua contando com o painel fechado.",
         countdown:
           "Os dias que faltam para uma data, como um casamento ou as férias.",
+        launcher:
+          "Um botão no dock que abre o lançador, como o Iniciar: busca apps, páginas e contas.",
       } satisfies Record<CreatableKind, string>,
       /** The add button of a card, and its accessible name. */
       add: "Adicionar",
@@ -965,6 +969,12 @@ const messages = {
       showTasksOptions: { show: "Mostrar", hide: "Ocultar" },
     },
     /** The Ciclo (spec 0017 F2b): the panel says what the tile doesn't. */
+    /** The Lançador (spec 0012): a click on the dock opens the launcher,
+     * so this panel shows only if it is opened some other way. */
+    launcher: {
+      settingsTitle: "Ajustes do Lançador",
+      hint: "Clique no Lançador, no dock, para abrir ou fechar a busca de apps. O atalho do teclado fica em Configurações › Geral.",
+    },
     /** The Clima (spec 0017 F5). */
     weather: {
       settingsTitle: "Ajustes do Clima",

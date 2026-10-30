@@ -505,6 +505,11 @@ pub fn widget(
         WidgetConfig::Water(config) => water(config, size),
         WidgetConfig::Claude(config) => claude(config, size),
         WidgetConfig::Weather(config) => weather(config),
+        // The search of Windows, as the menus' "Buscar apps…" (spec 0012).
+        WidgetConfig::Launcher(_) => Face::Symbol {
+            glaze: Glaze::LAUNCHER,
+            glyph: super::SEARCH_GLYPH,
+        },
         // Drawn by the dock itself, which holds the cover (`Dock::media_face`).
         WidgetConfig::Media(_) => Face::Glyph {
             glaze: Glaze::MUSIC,
