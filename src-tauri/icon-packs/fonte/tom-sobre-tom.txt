@@ -5,7 +5,7 @@
 
 pack.name: Tom sobre tom
 pack.author: Dockyard
-pack.version: 1.0.0
+pack.version: 1.1.0
 pack.description: Placas suaves na matiz de cada app, com o glifo no mesmo tom.
 pack.accent: #6F8FAF
 
