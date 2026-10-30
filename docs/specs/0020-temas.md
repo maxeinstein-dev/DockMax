@@ -44,6 +44,8 @@ Tomadas numa sessão de perguntas (Q1–Q22), todas na recomendação:
 - Um pacote que o usuário apagou de `IconPacks` continua no tema: aplicado, o dock mostra os ícones originais e o cartão de ícones o mostra como indisponível, como hoje.
 - **Testes:** `themes.test.ts` (cada tema usa um estilo que existe e um pacote embutido que existe; cada tema é reconhecido pelas suas escolhas; nenhum quando uma escolha é do usuário); `settings::bar_dark` (as barras escuras, a clara e as que seguem o modo); `ThemeGallery.test.tsx` (ordem dos cartões, tema em uso marcado, aplicar grava as três escolhas, "Personalizado", miniatura com os ícones do tema, desligado).
 
+- **Verificado ao vivo** (2026-10-30, build de teste e2e, cópia dos dados do autor, modo claro): Aparência mostrou o grupo **Temas** com os 5 cartões e o **Estilo da barra**. Os dados do autor (Flutuante com indicador branco) apareceram sem tema marcado, com "Personalizado". Cada cartão gravou as três escolhas e ficou marcado, e o dock trocou barra e ícones na hora. A Meia-noite mostrou o Traço claro na barra preta, e o Neon os ícones soltos, como pede a barra escura. Trocar o pacote para Argila desmarcou o tema e mostrou "Personalizado". Memória: 295 MB em 7 processos com Configurações aberta. A barra do Windows ficou igual. Fotos em [`docs/fotos/g7-temas-ao-vivo.png`](../fotos/g7-temas-ao-vivo.png).
+
 ## 3. A skin de 9 fatias (passo 3)
 
 A definir no PR dele: `skin.json` com nome, imagem, as quatro margens do corte e se o meio e as bordas esticam ou repetem; desenhada pelo dock nativo (Direct2D) e pela miniatura (`border-image`).
