@@ -5,7 +5,9 @@
 //! settings pages of Windows and of the Dockyard; and, under them (L4), the
 //! files and folders of the computer (`files`, in the helper process); and,
 //! alone, the folder of a path typed (L5, `paths`). Each result does one
-//! action of a closed list (`search::Action`), checked before it runs.
+//! action of a closed list (`search::Action`), checked before it runs; its
+//! menu of actions (L6: Shift+Enter, the Menu key, the right button) offers
+//! the others its kind has (`launcher_actions`), in the app's own menu.
 //!
 //! A native window, not WebView2 (author's decision, 2026-10-26): it opens in
 //! a few milliseconds and costs a few megabytes only while open. The frame is
@@ -52,7 +54,7 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyState, HOT_KEY_MODIFIERS, MOD_NOREPEAT, RegisterHotKey, SetFocus, UnregisterHotKey,
-    VK_DOWN, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB, VK_UP,
+    VK_CONTROL, VK_DOWN, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -63,14 +65,16 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SetTimer, SetWindowPos, SetWindowTextW, ShowWindow, SystemParametersInfoW, WA_INACTIVE,
     WINDOW_EX_STYLE, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_CHAR, WM_COMMAND, WM_CTLCOLOREDIT,
     WM_DPICHANGED, WM_ERASEBKGND, WM_GETOBJECT, WM_HOTKEY, WM_KEYDOWN, WM_LBUTTONUP, WM_MOUSEMOVE,
-    WM_PAINT, WM_SETFONT, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN, WM_TIMER,
-    WNDCLASSW, WS_CHILD, WS_CLIPCHILDREN, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP, WS_VISIBLE,
+    WM_PAINT, WM_RBUTTONUP, WM_SETFONT, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN,
+    WM_TIMER, WNDCLASSW, WS_CHILD, WS_CLIPCHILDREN, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    WS_VISIBLE,
 };
 use windows::core::{HSTRING, PCWSTR, w};
 
 use self::layout::{BOX, Colors, ROW, Rgb};
 use crate::domain::hotkey::{self, Hotkey};
 use crate::domain::launcher::{self as search, Action, Candidate, MAX_RESULTS};
+use crate::domain::launcher_actions::{self, Subject, Verb};
 use crate::domain::launcher_calc;
 use crate::domain::launcher_files::{self, FileHit, FileQuery, Generation, Mode};
 use crate::domain::launcher_pages::{self, Target};
@@ -84,6 +88,15 @@ const LIST_CLASS: PCWSTR = w!("DockMaxLauncherList");
 
 /// Runs the work queued by `post`.
 const WM_RUN: u32 = WM_APP + 0x41;
+/// Opens the menu of actions of the selected result (L6), out of the
+/// launcher's borrow: the menu runs a loop of its own.
+const WM_ACTION_MENU: u32 = WM_APP + 0x42;
+/// `WM_CONTEXTMENU`: the Menu key or Shift+F10 in the text field (its
+/// `lParam` is -1 then), or its right button.
+const WM_CONTEXTMENU: u32 = 0x007B;
+/// The character of Ctrl+C, and of Ctrl+Enter.
+const COPY_CHAR: usize = 0x03;
+const LINE_FEED_CHAR: usize = 0x0A;
 /// `EN_CHANGE`: the text field's text changed.
 const EN_CHANGE: u32 = 0x0300;
 /// `EM_SETCUEBANNER`: the text the field shows while empty.
@@ -145,6 +158,11 @@ static FRAME: AtomicIsize = AtomicIsize::new(0);
 static HOTKEY_TAKEN: AtomicBool = AtomicBool::new(false);
 /// Configurações is capturing a new hotkey: the current one is let go.
 static CAPTURING: AtomicBool = AtomicBool::new(false);
+/// The launcher stays open when it loses the keyboard: to its menu of
+/// actions, or to Windows' question of an opening as administrator (L6).
+static HOLD: AtomicBool = AtomicBool::new(false);
+/// The menu of actions is on screen.
+static MENU_OPEN: AtomicBool = AtomicBool::new(false);
 
 static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
 
@@ -264,6 +282,14 @@ impl Found {
             subtitle: None,
             action: Action::OpenFile(hit.path),
         })
+    }
+
+    /// The path of the file or folder it opens, for one.
+    fn path(&self) -> Option<&str> {
+        match &self.action {
+            Action::OpenFile(path) => Some(path),
+            _ => None,
+        }
     }
 
     /// The file or folder it opens, for one.
@@ -419,7 +445,87 @@ pub struct Launcher {
     /// The pointer's last place over the list: a row is selected by the
     /// mouse only when it moves, not when the list opens under it.
     pointer: Option<(i32, i32)>,
+    /// The file of each classic program the menu of actions asked the shell
+    /// about (`None`: it has none to show), until the launcher is released.
+    app_files: HashMap<String, Option<String>>,
+    /// The menu of actions was asked for, and where it opens.
+    menu_request: Option<Placement>,
 }
+
+/// Where the menu of actions opens.
+#[derive(Debug, Clone, Copy)]
+enum Placement {
+    /// At the pointer, on screen (the right button).
+    Pointer(POINT),
+    /// Beside the selected row (the keyboard).
+    Row,
+}
+
+/// A menu of actions ready to open.
+struct MenuPlan {
+    owner: HWND,
+    /// The result it is about, and its actions, one per line.
+    key: String,
+    verbs: Vec<Verb>,
+    lines: Vec<super::menu::Line>,
+    at: POINT,
+    keyboard: bool,
+}
+
+/// The glyphs of the menu of actions.
+const OPEN_GLYPH: char = '\u{E8A7}';
+const ADMIN_GLYPH: char = '\u{E7EF}';
+const PIN_GLYPH: char = '\u{E718}';
+const UNPIN_GLYPH: char = '\u{E77A}';
+const REVEAL_GLYPH: char = '\u{E838}';
+const COPY_GLYPH: char = '\u{E8C8}';
+
+/// A line of the menu of actions: its text, its glyph and the keys that do
+/// the same without the menu.
+fn menu_line(verb: Verb) -> super::menu::Line {
+    let text = &crate::i18n::messages().launcher;
+    let (label, glyph, keys) = match verb {
+        Verb::Open => (text.action_open, OPEN_GLYPH, Some("Enter")),
+        Verb::OpenAsAdmin => (text.action_admin, ADMIN_GLYPH, Some("Ctrl+Shift+Enter")),
+        Verb::Pin => (text.action_pin, PIN_GLYPH, None),
+        Verb::Unpin => (text.action_unpin, UNPIN_GLYPH, None),
+        Verb::Reveal => (text.action_reveal, REVEAL_GLYPH, None),
+        Verb::CopyPath => (text.action_copy_path, COPY_GLYPH, Some("Ctrl+C")),
+        Verb::CopyResult => (text.action_copy_result, COPY_GLYPH, Some("Ctrl+C")),
+    };
+    let item = super::menu::Item::new(label, glyph);
+    super::menu::Line::Item(match keys {
+        Some(keys) => item.shortcut(keys),
+        None => item,
+    })
+}
+
+/// Opens the menu of actions asked for (`WM_ACTION_MENU`), out of the
+/// launcher's borrow: while the menu's loop runs, the launcher answers its
+/// messages (the files, the icons) and stays open without the keyboard.
+fn open_action_menu() {
+    let mut plan = None;
+    with(|launcher| plan = launcher.menu_plan());
+    let Some(plan) = plan else {
+        return;
+    };
+    HOLD.store(true, Ordering::SeqCst);
+    MENU_OPEN.store(true, Ordering::SeqCst);
+    let chosen = super::menu::show_from(
+        Some(plan.owner),
+        Some(plan.at),
+        false,
+        plan.lines,
+        plan.keyboard,
+    );
+    MENU_OPEN.store(false, Ordering::SeqCst);
+    HOLD.store(false, Ordering::SeqCst);
+    let verb = chosen.and_then(|index| plan.verbs.get(index).copied());
+    with(|launcher| launcher.menu_closed(&plan.key, verb));
+}
+
+/// The outcome of opening something as administrator.
+type Elevated = Result<(), super::apps::Elevation>;
 
 /// Queues `work` for the launcher, from any thread, and wakes it.
 pub fn post(work: impl FnOnce(&mut Launcher) + Send + 'static) {
@@ -580,6 +686,8 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
         colors: layout::colors(false),
         scale: 1.0,
         pointer: None,
+        app_files: HashMap::new(),
+        menu_request: None,
     };
     LAUNCHER.with(|slot| *slot.borrow_mut() = Some(launcher));
     register(crate::commands::settings::current(app).launcher);
@@ -976,6 +1084,7 @@ impl Launcher {
         }
         self.query.clear();
         self.results.clear();
+        self.menu_request = None;
         self.file_query = None;
         self.files.clear();
         // A search of files, or a folder being read, answers nothing.
@@ -1000,6 +1109,7 @@ impl Launcher {
         }
         self.painter = None;
         self.icons.clear();
+        self.app_files.clear();
         log::info!("launcher: released");
     }
 
@@ -1786,23 +1896,54 @@ impl Launcher {
         }
     }
 
-    /// Does what the result `index` does, once its action is checked: the
-    /// launcher closes once it is done, or stays saying it could not.
+    /// Does what the result `index` does (Enter).
     fn open(&mut self, index: usize) {
+        if let Some(found) = self.results.get(index).cloned() {
+            let action = found.action.clone();
+            self.perform(&found, action);
+        }
+    }
+
+    /// Does `verb` of the menu of actions to the result `index` (L6).
+    fn act(&mut self, index: usize, verb: Verb) {
         let Some(found) = self.results.get(index).cloned() else {
             return;
         };
+        let file = found
+            .app_id()
+            .and_then(|id| self.app_files.get(id).cloned().flatten());
+        match launcher_actions::action(verb, &found.action, file.as_deref()) {
+            Some(action) => self.perform(&found, action),
+            None => log::warn!("launcher: an action does not apply to its result"),
+        }
+    }
+
+    /// Does `action` to `found`, once it is checked: the launcher closes
+    /// once it is done, or stays saying it could not.
+    fn perform(&mut self, found: &Found, action: Action) {
         if self.launching.is_some() {
             return;
         }
         let key = found.key.clone();
-        let remembered = found.kind.remembered();
-        if !search::is_allowed(&found.action) {
+        // Opening counts in the use, as administrator too; showing, copying
+        // and pinning do not.
+        let remembered = found.kind.remembered()
+            && matches!(
+                action,
+                Action::OpenApp(_)
+                    | Action::OpenUri(_)
+                    | Action::OpenFile(_)
+                    | Action::OpenSection(_)
+                    | Action::OpenAppAsAdmin(_)
+                    | Action::OpenFileAsAdmin(_)
+            );
+        if !search::is_allowed(&action) {
             log::warn!("launcher: a result's action was refused");
             self.launched(&key, false, false);
             return;
         }
-        match found.action {
+        let text = &crate::i18n::messages().launcher;
+        match action {
             Action::OpenApp(id) => {
                 self.open_off_thread(key, remembered, move || super::apps::launch(&id))
             }
@@ -1812,6 +1953,15 @@ impl Launcher {
             Action::OpenFile(path) => {
                 self.open_off_thread(key, remembered, move || super::apps::open_path(&path))
             }
+            Action::Reveal(path) => {
+                self.open_off_thread(key, false, move || super::apps::reveal_path(&path))
+            }
+            Action::OpenAppAsAdmin(id) => self.elevate(key, remembered, move |parent| {
+                super::apps::open_app_as_admin(&id, parent)
+            }),
+            Action::OpenFileAsAdmin(path) => self.elevate(key, remembered, move |parent| {
+                super::apps::open_path_as_admin(&path, parent)
+            }),
             Action::OpenSection(section) => {
                 let opened = super::settings_window::open_section(&self.app, section)
                     .inspect_err(|error| {
@@ -1820,17 +1970,309 @@ impl Launcher {
                     .is_ok();
                 self.launched(&key, remembered, opened);
             }
-            Action::Copy(text) => {
-                let copied = copy_text(self.frame, &text);
-                if copied {
-                    access::announce(
-                        self.list.0 as isize,
-                        crate::i18n::messages().launcher.copied,
-                    );
-                }
-                self.launched(&key, false, copied);
+            Action::Copy(copied) => self.copy(&key, &copied, text.copied),
+            Action::CopyPath(path) => self.copy(&key, &path, text.path_copied),
+            Action::PinApp(id) => self.pin(&key, &id, &found.name, true),
+            Action::UnpinApp(id) => self.pin(&key, &id, &found.name, false),
+        }
+    }
+
+    /// Pins the program `id` to the dock (`wanted`) or takes it out, as the
+    /// panel does; the launcher closes.
+    fn pin(&mut self, key: &str, id: &str, name: &str, wanted: bool) {
+        let done = crate::commands::apps::pin_from_launcher(&self.app, id, name, wanted)
+            .inspect_err(|error| log::warn!("launcher: the dock did not change: {error:?}"))
+            .is_ok();
+        self.launched(key, false, done);
+    }
+
+    /// Copies `text` and says `said` (the launcher closes, as opening).
+    fn copy(&mut self, key: &str, text: &str, said: &str) {
+        let copied = copy_text(self.frame, text);
+        if copied {
+            access::announce(self.list.0 as isize, said);
+        }
+        self.launched(key, false, copied);
+    }
+
+    /// Runs `run` as administrator on a thread of its own (Windows asks the
+    /// user first); the launcher stays open while Windows asks. Saying no
+    /// is not an error: the launcher stays, with nothing said.
+    fn elevate(
+        &mut self,
+        key: String,
+        remembered: bool,
+        run: impl FnOnce(isize) -> Elevated + Send + 'static,
+    ) {
+        self.launching = Some(key.clone());
+        HOLD.store(true, Ordering::SeqCst);
+        let parent = self.frame.0 as isize;
+        let thread_key = key.clone();
+        let spawned = std::thread::Builder::new()
+            .name("launcher-admin".into())
+            .spawn(move || {
+                let answer = run(parent);
+                post(move |launcher| launcher.elevated(&thread_key, remembered, answer));
+            });
+        if spawned.is_err() {
+            HOLD.store(false, Ordering::SeqCst);
+            self.launched(&key, remembered, false);
+        }
+    }
+
+    /// Windows answered an opening as administrator.
+    fn elevated(&mut self, key: &str, remembered: bool, answer: Elevated) {
+        HOLD.store(false, Ordering::SeqCst);
+        match answer {
+            Ok(()) => self.launched(key, remembered, true),
+            Err(super::apps::Elevation::Cancelled) => {
+                log::info!("launcher: opening as administrator was cancelled");
+                self.launching = None;
+                self.take_keyboard(true);
+            }
+            Err(super::apps::Elevation::Failed(error)) => {
+                log::warn!("launcher: it did not open as administrator: {error}");
+                self.launched(key, remembered, false);
+                self.take_keyboard(true);
             }
         }
+    }
+
+    /// Whether the workspace in use has the program `id` pinned.
+    fn pinned(&self, id: &str) -> bool {
+        let Some(state) = self.app.try_state::<Mutex<Storage>>() else {
+            return false;
+        };
+        let mut storage = state.lock().unwrap_or_else(PoisonError::into_inner);
+        crate::commands::apps::pinned_here(&mut storage, id)
+            .ok()
+            .flatten()
+            .is_some()
+    }
+
+    /// What `found` is, for its menu of actions; `pinned` asks the dock
+    /// whether a program is pinned (only the menu shows it).
+    fn subject<'a>(&self, found: &'a Found, pinned: bool) -> Subject<'a> {
+        match found.kind {
+            Kind::App => {
+                let id = found.app_id().unwrap_or_default();
+                Subject::App {
+                    id,
+                    pinned: pinned && self.pinned(id),
+                    has_file: self.app_files.get(id).is_some_and(Option::is_some),
+                }
+            }
+            Kind::File => Subject::File {
+                path: found.path().unwrap_or_default(),
+            },
+            Kind::Folder => Subject::Folder,
+            Kind::WindowsPage | Kind::DockyardPage => Subject::Page,
+            Kind::Web => Subject::Web,
+            Kind::Calculator => Subject::Calculator,
+        }
+    }
+
+    /// The actions of the selected result.
+    fn selected_verbs(&self, pinned: bool) -> Vec<Verb> {
+        self.results
+            .get(self.selected)
+            .map(|found| launcher_actions::verbs(self.subject(found, pinned)))
+            .unwrap_or_default()
+    }
+
+    /// Shift+Enter: the menu of actions of the selected result; with one
+    /// action only (a page, a web search, a sum), that action at once.
+    fn shift_enter(&mut self) {
+        let verbs = self.selected_verbs(false);
+        if launcher_actions::opens_menu(&verbs) {
+            self.request_menu(Placement::Row);
+        } else if let Some(&verb) = verbs.first() {
+            self.act(self.selected, verb);
+        }
+    }
+
+    /// Ctrl+Shift+Enter: the selected result as administrator, when its
+    /// kind can be (a program, a program's file or a shortcut).
+    fn open_as_admin(&mut self) {
+        if self.selected_verbs(false).contains(&Verb::OpenAsAdmin) {
+            self.act(self.selected, Verb::OpenAsAdmin);
+        }
+    }
+
+    /// Ctrl+C: with nothing selected in the field, the selected result's
+    /// path (or a sum's result) is copied. Whether it was the result's.
+    fn copy_selected(&mut self) -> bool {
+        let (start, end) = self.selection();
+        let verbs = self.selected_verbs(false);
+        if !launcher_actions::ctrl_c_copies_result(start, end, &verbs) {
+            return false;
+        }
+        if let Some(verb) = launcher_actions::copy_verb(&verbs) {
+            self.act(self.selected, verb);
+        }
+        true
+    }
+
+    /// Whether the selected result has a menu of actions.
+    fn selected_has_menu(&self) -> bool {
+        launcher_actions::opens_menu(&self.selected_verbs(false))
+    }
+
+    /// Asks for the menu of actions of the selected result, at `placement`.
+    /// For a classic program, the shell is asked for its file first (off the
+    /// main thread), to know whether "Mostrar no Explorador" is offered.
+    fn request_menu(&mut self, placement: Placement) {
+        if self.launching.is_some() || MENU_OPEN.load(Ordering::SeqCst) {
+            return;
+        }
+        let Some(found) = self.results.get(self.selected) else {
+            return;
+        };
+        if let Some(id) = found.app_id()
+            && launcher_actions::may_have_file(id)
+            && !self.app_files.contains_key(id)
+        {
+            let id = id.to_owned();
+            let key = found.key.clone();
+            let thread_id = id.clone();
+            let spawned = std::thread::Builder::new()
+                .name("launcher-app-file".into())
+                .spawn(move || {
+                    let file = super::apps::target_of(&thread_id)
+                        .filter(|file| file.is_file())
+                        .map(|file| file.to_string_lossy().into_owned())
+                        .filter(|file| launcher_files::is_openable(file));
+                    post(move |launcher| {
+                        launcher.app_files.insert(thread_id, file);
+                        let same = launcher
+                            .results
+                            .get(launcher.selected)
+                            .is_some_and(|found| found.key == key);
+                        if is_open() && same {
+                            launcher.menu_request = Some(placement);
+                            launcher.post_menu();
+                        }
+                    });
+                });
+            if spawned.is_ok() {
+                return;
+            }
+            self.app_files.insert(id, None);
+        }
+        self.menu_request = Some(placement);
+        self.post_menu();
+    }
+
+    /// Has the frame open the menu asked for, once the launcher is free.
+    fn post_menu(&self) {
+        let _ = unsafe { PostMessageW(Some(self.frame), WM_ACTION_MENU, WPARAM(0), LPARAM(0)) };
+    }
+
+    /// The menu of actions asked for, ready to open; `None` when it was not
+    /// asked for, or the selected result has no menu.
+    fn menu_plan(&mut self) -> Option<MenuPlan> {
+        let placement = self.menu_request.take()?;
+        if !is_open() || self.launching.is_some() {
+            return None;
+        }
+        let found = self.results.get(self.selected)?;
+        let verbs = launcher_actions::verbs(self.subject(found, true));
+        if !launcher_actions::opens_menu(&verbs) {
+            return None;
+        }
+        let (at, keyboard) = match placement {
+            Placement::Pointer(at) => (at, false),
+            Placement::Row => (self.row_point(), true),
+        };
+        Some(MenuPlan {
+            owner: self.frame,
+            key: found.key.clone(),
+            lines: verbs.iter().copied().map(menu_line).collect(),
+            verbs,
+            at,
+            keyboard,
+        })
+    }
+
+    /// Where the menu of the selected row opens: under it, at its right
+    /// end, on screen.
+    fn row_point(&self) -> POINT {
+        let mut origin = POINT::default();
+        unsafe {
+            let _ = windows::Win32::Graphics::Gdi::ClientToScreen(self.list, &mut origin);
+        }
+        let s = self.scale;
+        let top = layout::LIST_PAD + if self.recent { layout::TITLE } else { 0.0 };
+        let row = self.selected.saturating_sub(self.first) as f64;
+        POINT {
+            x: origin.x + ((layout::WIDTH - layout::SIDE) * s).round() as i32,
+            y: origin.y + ((top + (row + 1.0) * ROW) * s).round() as i32,
+        }
+    }
+
+    /// The menu of actions closed, with `verb` chosen for the result `key`
+    /// or nothing. Let go by a click elsewhere, the launcher closes too, as
+    /// it does when it loses the keyboard; let go by Esc, it takes the
+    /// keyboard back.
+    fn menu_closed(&mut self, key: &str, verb: Option<Verb>) {
+        if !is_open() {
+            return;
+        }
+        if !self.take_keyboard(false) {
+            return;
+        }
+        let Some(verb) = verb else {
+            return;
+        };
+        if let Some(index) = self.results.iter().position(|found| found.key == key) {
+            self.act(index, verb);
+        }
+    }
+
+    /// Takes the keyboard back into the search box after the menu or
+    /// Windows' question. Unless `always`, only when the foreground is still
+    /// the Dockyard's: another program took it, the launcher closes. Whether
+    /// it stayed open.
+    fn take_keyboard(&mut self, always: bool) -> bool {
+        use windows::Win32::System::Threading::GetCurrentProcessId;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetForegroundWindow, GetWindowThreadProcessId,
+        };
+        if !is_open() {
+            return false;
+        }
+        let foreground = unsafe { GetForegroundWindow() };
+        let mut process = 0u32;
+        if !foreground.is_invalid() {
+            unsafe { GetWindowThreadProcessId(foreground, Some(&mut process)) };
+        }
+        let ours = foreground.is_invalid() || process == unsafe { GetCurrentProcessId() };
+        if !always && !ours {
+            self.hide();
+            return false;
+        }
+        let taken =
+            unsafe { SetForegroundWindow(self.frame) }.as_bool() || foreground == self.frame;
+        if !taken && !ours {
+            self.hide();
+            return false;
+        }
+        let _ = unsafe { SetFocus(Some(self.edit)) };
+        true
+    }
+
+    /// The text field's selection, as UTF-16 positions.
+    fn selection(&self) -> (u32, u32) {
+        let (mut start, mut end) = (0u32, 0u32);
+        unsafe {
+            SendMessageW(
+                self.edit,
+                EM_GETSEL,
+                Some(WPARAM(std::ptr::from_mut(&mut start) as usize)),
+                Some(LPARAM(std::ptr::from_mut(&mut end) as isize)),
+            );
+        }
+        (start, end)
     }
 
     /// Runs `open` on a thread of its own (Windows may take a while to
@@ -2013,6 +2455,24 @@ impl Launcher {
             self.open(self.first + index);
         }
     }
+
+    /// The right button on a row: it is selected and its menu of actions
+    /// opens at the pointer (L6); nothing on a result with one action only.
+    fn right_clicked(&mut self, x: i32, y: i32) {
+        let at = f64::from(y) / self.scale;
+        let Some(index) = layout::row_at(at, self.shown(), self.recent) else {
+            return;
+        };
+        self.select(self.first + index);
+        if !self.selected_has_menu() {
+            return;
+        }
+        let mut point = POINT { x, y };
+        unsafe {
+            let _ = windows::Win32::Graphics::Gdi::ClientToScreen(self.list, &mut point);
+        }
+        self.request_menu(Placement::Pointer(point));
+    }
 }
 
 /// The text typed in `edit`.
@@ -2043,11 +2503,19 @@ extern "system" fn frame_procedure(
 ) -> LRESULT {
     match message {
         WM_RUN => run_queue(),
-        WM_HOTKEY if wparam.0 as i32 == HOTKEY => with(Launcher::toggle),
+        WM_ACTION_MENU => open_action_menu(),
+        // While the menu of actions is open, the hotkey waits: the menu
+        // belongs to the launcher.
+        WM_HOTKEY if wparam.0 as i32 == HOTKEY => {
+            if !MENU_OPEN.load(Ordering::SeqCst) {
+                with(Launcher::toggle);
+            }
+        }
         WM_ACTIVATE => {
             // Somewhere else took the keyboard: the launcher closes, as the
-            // Ulauncher does.
-            if (wparam.0 & 0xFFFF) as u32 == WA_INACTIVE {
+            // Ulauncher does; not to its own menu of actions, nor while
+            // Windows asks about an opening as administrator (L6).
+            if (wparam.0 & 0xFFFF) as u32 == WA_INACTIVE && !HOLD.load(Ordering::SeqCst) {
                 with(Launcher::hide);
             }
         }
@@ -2133,6 +2601,11 @@ extern "system" fn list_procedure(
             let (_, y) = point(lparam);
             with(|launcher| launcher.clicked(y));
         }
+        // The right button on a row: its menu of actions, at the pointer (L6).
+        WM_RBUTTONUP => {
+            let (x, y) = point(lparam);
+            with(|launcher| launcher.right_clicked(x, y));
+        }
         WM_MOUSEWHEEL => with(|launcher| launcher.scroll(wheel_rows(wparam))),
         WM_GETOBJECT => match access::get_object(hwnd, wparam, lparam) {
             Some(result) => return result,
@@ -2163,9 +2636,41 @@ unsafe extern "system" fn edit_procedure(
             with(|launcher| launcher.step(1));
             return LRESULT(0);
         }
+        // Enter opens; Shift+Enter, the menu of actions; Ctrl+Shift+Enter,
+        // as administrator (L6).
         WM_KEYDOWN if key == VK_RETURN.0 => {
-            with(|launcher| launcher.open(launcher.selected));
+            let shift = unsafe { GetKeyState(i32::from(VK_SHIFT.0)) } < 0;
+            let control = unsafe { GetKeyState(i32::from(VK_CONTROL.0)) } < 0;
+            with(|launcher| match (control, shift) {
+                (true, true) => launcher.open_as_admin(),
+                (false, true) => launcher.shift_enter(),
+                _ => launcher.open(launcher.selected),
+            });
             return LRESULT(0);
+        }
+        // The Menu key and Shift+F10 (`lParam` -1): the menu of actions of
+        // the selected result, when it has one; otherwise, and for the
+        // right button on the field, the field's own menu.
+        WM_CONTEXTMENU if lparam.0 as i32 == -1 => {
+            let mut opened = false;
+            with(|launcher| {
+                opened = launcher.selected_has_menu();
+                if opened {
+                    launcher.request_menu(Placement::Row);
+                }
+            });
+            if opened {
+                return LRESULT(0);
+            }
+        }
+        // Ctrl+C with nothing selected copies the selected result's path
+        // (L6); with text selected, the text, as always.
+        WM_CHAR if wparam.0 == COPY_CHAR => {
+            let mut copied = false;
+            with(|launcher| copied = launcher.copy_selected());
+            if copied {
+                return LRESULT(0);
+            }
         }
         WM_KEYDOWN if key == VK_ESCAPE.0 => {
             with(Launcher::hide);
@@ -2193,8 +2698,10 @@ unsafe extern "system" fn edit_procedure(
                 return LRESULT(0);
             }
         }
-        // Enter, Esc and Tab would beep in a one-line field.
-        WM_CHAR if matches!(wparam.0, 0x0D | 0x1B | 0x09) => return LRESULT(0),
+        // Enter, Ctrl+Enter, Esc and Tab would beep in a one-line field.
+        WM_CHAR if matches!(wparam.0, 0x0D | LINE_FEED_CHAR | 0x1B | 0x09) => {
+            return LRESULT(0);
+        }
         WM_SYSKEYDOWN if (u16::from(b'1')..=u16::from(b'9')).contains(&key) => {
             let index = usize::from(key - u16::from(b'1'));
             with(|launcher| launcher.open(launcher.first + index));

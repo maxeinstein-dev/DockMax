@@ -465,6 +465,103 @@ pub fn open_path(_path: &str) -> Result<(), String> {
     Err("not Windows".to_owned())
 }
 
+/// Why something was not opened as administrator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Elevation {
+    /// The user said no to Windows' question (UAC): not an error.
+    Cancelled,
+    Failed(String),
+}
+
+/// Runs `file` (with `parameters`) as administrator, as Windows' Run does
+/// with Ctrl+Shift+Enter: the shell's `runas` verb, which asks the user
+/// (UAC). `parent` is the window the question belongs to. Blocks until
+/// Windows answers: off the main thread.
+#[cfg(windows)]
+fn run_as_admin(file: &str, parameters: Option<&str>, parent: isize) -> Result<(), Elevation> {
+    use ::windows::Win32::Foundation::{ERROR_CANCELLED, HWND};
+    use ::windows::Win32::UI::Shell::{
+        SEE_MASK_FLAG_NO_UI, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW, ShellExecuteExW,
+    };
+    init_com();
+    let verb = HSTRING::from("runas");
+    let file = HSTRING::from(file);
+    let parameters = parameters.map(HSTRING::from);
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: size_of::<SHELLEXECUTEINFOW>() as u32,
+        fMask: SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI,
+        hwnd: HWND(parent as _),
+        lpVerb: PCWSTR(verb.as_ptr()),
+        lpFile: PCWSTR(file.as_ptr()),
+        lpParameters: parameters
+            .as_ref()
+            .map_or(PCWSTR::null(), |parameters| PCWSTR(parameters.as_ptr())),
+        nShow: SW_SHOWNORMAL.0,
+        ..Default::default()
+    };
+    match unsafe { ShellExecuteExW(&mut info) } {
+        Ok(()) => Ok(()),
+        Err(error) if error.code() == ERROR_CANCELLED.to_hresult() => Err(Elevation::Cancelled),
+        Err(error) => Err(Elevation::Failed(error.to_string())),
+    }
+}
+
+/// Opens the program `id` of the Apps folder as administrator, as the Start
+/// menu's "Executar como administrador" does; a classic program the Apps
+/// folder can't raise is run from its file, with its shortcut's arguments.
+#[cfg(windows)]
+pub fn open_app_as_admin(id: &str, parent: isize) -> Result<(), Elevation> {
+    use crate::domain::launcher::{Action, is_allowed};
+    if !is_allowed(&Action::OpenAppAsAdmin(id.to_owned())) {
+        return Err(Elevation::Failed("not a program of the Apps folder".into()));
+    }
+    match run_as_admin(&format!("shell:AppsFolder\\{id}"), None, parent) {
+        Err(Elevation::Failed(error)) => {
+            let Some(file) = target_of(id).filter(|file| file.is_file()) else {
+                return Err(Elevation::Failed(error));
+            };
+            let arguments = arguments_of(id);
+            run_as_admin(&file.to_string_lossy(), arguments.as_deref(), parent)
+        }
+        other => other,
+    }
+}
+
+#[cfg(not(windows))]
+pub fn open_app_as_admin(_id: &str, _parent: isize) -> Result<(), Elevation> {
+    Err(Elevation::Failed("not Windows".to_owned()))
+}
+
+/// Runs a launcher's program, script or shortcut (`path`) as administrator.
+/// Checked again here: only a path the launcher opens, of a kind Windows
+/// raises.
+#[cfg(windows)]
+pub fn open_path_as_admin(path: &str, parent: isize) -> Result<(), Elevation> {
+    use crate::domain::launcher::{Action, is_allowed};
+    if !is_allowed(&Action::OpenFileAsAdmin(path.to_owned())) {
+        return Err(Elevation::Failed("not a program the launcher runs".into()));
+    }
+    run_as_admin(path, None, parent)
+}
+
+#[cfg(not(windows))]
+pub fn open_path_as_admin(_path: &str, _parent: isize) -> Result<(), Elevation> {
+    Err(Elevation::Failed("not Windows".to_owned()))
+}
+
+/// Shows a launcher's file or folder (`path`) selected in File Explorer.
+/// Checked again here, as `open_path`.
+pub fn reveal_path(path: &str) -> Result<(), String> {
+    use crate::domain::launcher::{Action, is_allowed};
+    if !is_allowed(&Action::Reveal(path.to_owned())) {
+        return Err("the path is not one the launcher shows".to_owned());
+    }
+    // A folder without its `\`, but a drive with it (`C:\`).
+    let trimmed = path.trim_end_matches('\\');
+    let shown = if trimmed.len() <= 2 { path } else { trimmed };
+    reveal(std::path::Path::new(shown))
+}
+
 #[cfg(windows)]
 fn item_icon_png(item: &IShellItem, size: u32) -> Option<Vec<u8>> {
     let factory: IShellItemImageFactory = windows_core_cast(item)?;
