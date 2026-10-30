@@ -14,15 +14,15 @@ Também entrou o "experimentar e voltar" (#115). Ficam para depois: os temas Cyb
 
 **Verificação final** (2026-10-30, build e2e da `main` com os seis passos, cópia dos dados do autor):
 - **Os 11 temas:** aplicados pelos cartões, um a um. Cada um perguntou "Manter este tema?", foi mantido e gravou estilo e pacote, e o dock desenhou a barra e os ícones dele. Fotos em [`docs/fotos/g7-11-temas-ao-vivo.png`](../fotos/g7-11-temas-ao-vivo.png).
-- **Memória do dock em repouso** (Configurações fechada, 25 s parado, 7 processos):
+- **Memória em repouso, somando o processo do dock e os 6 do WebView2** (Configurações fechada, 25 s parado). **Não é a memória do dock sozinho** e não se compara aos 64,5 MB da 0.3.0, que mediram só o processo do dock. Mesmo com Configurações fechada, os processos do WebView2 continuaram abertos, o que fica para a M1 (que mede o dock sozinho) e a M8 (painel e Configurações mais leves) do [estudo 0002](../estudos/0002-melhorias-e-funcionalidades.md). Aqui vale só a comparação entre os temas:
 
-| Tema | Memória | Diferença |
+| Tema | Memória (7 processos) | Diferença |
 |---|---|---|
 | Padrão (base) | 293,2 MB | — |
 | Medieval 8-bit (skin e pacote de pixel) | 294,3 MB | +1,1 MB |
 | Caçador (skin e pacote vetoriais) | 297,2 MB | +4,0 MB |
 
-  Uma skin e um pacote somam poucos MB: o bitmap da barra e os PNGs dos ícones.
+  Uma skin e um pacote somam poucos MB ao conjunto: o bitmap da barra e os PNGs dos ícones.
 - **E2E:** `e2e/specs/themes.e2e.ts` aplica o Neon e o mantém, experimenta o Vidro e volta, conferindo o `settings.json` e o cartão marcado.
 - **Barra do Windows:** ficou igual ao fim.
 
