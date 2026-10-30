@@ -4,7 +4,7 @@
 
 pack.name: Círculo
 pack.author: Dockyard
-pack.version: 1.0.0
+pack.version: 1.1.0
 pack.description: Discos chapados na cor de cada app, com um glifo branco.
 pack.accent: #3F7FBF
 
