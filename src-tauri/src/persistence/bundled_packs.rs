@@ -1154,6 +1154,70 @@ pub const MEDIEVAL: Bundled = Bundled {
     ),
 };
 
+/// Caçador: the glyphs engraved in amber on a leather medallion with a bone
+/// ring; its fallback is a claw print. Drawn by `icon-packs/fonte/vetor.py` from layers.
+pub const CACADOR: Bundled = Bundled {
+    id: "cacador",
+    files: pack_files!("cacador":
+        "pack.json",
+        "apps/amd.png",
+        "apps/battlenet.png",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/ea.png",
+        "apps/edge.png",
+        "apps/epic.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/faceit.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/garra.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/gog.png",
+        "apps/lixeira.png",
+        "apps/medal.png",
+        "apps/notion.png",
+        "apps/nvidia.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/overwolf.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/riot.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/twitch.png",
+        "apps/ubisoft.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
 /// Every pack in the binary.
 pub const ALL: &[Bundled] = &[
     RETRO_8BIT,
@@ -1170,6 +1234,7 @@ pub const ALL: &[Bundled] = &[
     GAME_BOY,
     TATICO,
     MEDIEVAL,
+    CACADOR,
 ];
 
 impl Bundled {
@@ -1262,6 +1327,7 @@ mod tests {
             (ESMALTE, "Esmalte"),
             (TRACO, "Traço"),
             (CLASSICO_98, "Clássico 98"),
+            (CACADOR, "Caçador"),
             (MEDIEVAL, "Medieval 8-bit"),
             (TATICO, "Tático"),
             (FOSFORO, "Fósforo"),
@@ -1342,6 +1408,7 @@ mod tests {
                 "retro-8bit" | "game-boy" => "apps/cartucho.png",
                 "tatico" => "apps/mira.png",
                 "medieval" => "apps/bau.png",
+                "cacador" => "apps/garra.png",
                 _ => "apps/grade.png",
             };
             assert_eq!(
@@ -1770,6 +1837,7 @@ mod tests {
             (NEON, &["apps/", "escuro/"][..]),
             (ARGILA, &["apps/"][..]),
             (TATICO, &["apps/"][..]),
+            (CACADOR, &["apps/"][..]),
         ] {
             let manifest = pack.manifest();
             let svg_folder = |theme: &str| match theme {
@@ -1784,6 +1852,7 @@ mod tests {
                     .map(|path| path.replace("apps/", theme))
                     .map(|path| match pack.id {
                         "tatico" => path.replace("grade.png", "mira.png"),
+                        "cacador" => path.replace("grade.png", "garra.png"),
                         _ => path,
                     })
                     .collect();
@@ -1916,6 +1985,7 @@ mod tests {
             ARGILA,
             TATICO,
             MEDIEVAL,
+            CACADOR,
         ] {
             let manifest = pack.manifest();
             for app in launchers {

@@ -50,8 +50,8 @@ class Forma:
         elif self.tipo == "octogono":
             m.preencher(achatar(self.octogono(dx, dy)))
         elif self.tipo == "disco":
-            r = self.t / 2
-            cx, cy = self.x0 + r + dx, self.y0 + r + dy
+            r = self.t / 2 - self.recuo
+            cx, cy = self.x0 + self.t / 2 + dx, self.y0 + self.t / 2 + dy
             m.preencher(achatar(f"M{cx} {cy - r}a{r} {r} 0 1 1 0 {2 * r}a{r} {r} 0 1 1 0 {-2 * r}z"))
         else:
             lado, gx, gy = self.caixa_glifo()
@@ -67,8 +67,8 @@ class Forma:
         if self.tipo == "octogono":
             return f'<path d="{self.octogono(dx, dy)}" {tinta}/>'
         if self.tipo == "disco":
-            r = self.t / 2
-            return f'<circle cx="{n(self.x0 + r + dx)}" cy="{n(self.y0 + r + dy)}" r="{n(r)}" {tinta}/>'
+            r = self.t / 2 - self.recuo
+            return f'<circle cx="{n(self.x0 + self.t / 2 + dx)}" cy="{n(self.y0 + self.t / 2 + dy)}" r="{n(r)}" {tinta}/>'
         lado, gx, gy = self.caixa_glifo()
         escala = lado / 24
         caminhos = "".join(f'<path d="{d}"/>' for d in self.glifo["caminhos"])
@@ -332,4 +332,25 @@ def tatico(glifo, lado, estilo):
     ]
 
 
-ESTILOS = {"tatico": tatico, "circulo": circulo, "tom": tom, "vidro": vidro, "neon": neon, "argila": argila}
+def cacador(glifo, lado, estilo):
+    """Medalhão de couro com aro de osso e o glifo gravado em âmbar, em
+    relevo: sombra embaixo e à direita, luz em cima e à esquerda (spec 0020
+    §4)."""
+    k = geometria_esmalte(lado)[0] / 48
+    aro = Forma("disco", lado)
+    couro = Forma("disco", lado, recuo=4.5 * k)
+    vinco = Forma("disco", lado, recuo=5.5 * k)
+    traco = Forma("glifo", lado, glifo, caixa=numero(estilo, "caixa"), largura=2.2)
+    ambar = cor_hex(estilo["cor"])
+    return [
+        Camada(aro, ("cor", PRETO), 0.3, dy=1.5 * k, borrao=3),
+        Camada(aro, ("vertical", cor_hex(estilo["osso"]), cor_hex(estilo["osso-base"]))),
+        Camada(couro, ("vertical", cor_hex(estilo["couro"]), cor_hex(estilo["couro-base"]))),
+        Camada(couro, ("cor", PRETO), 0.45, menos=(vinco, 0.0, 0.0)),
+        Camada(traco, ("cor", PRETO), 0.55, dx=0.6 * k, dy=0.8 * k, borrao=1),
+        Camada(traco, ("cor", BRANCO), 0.25, dx=-0.4 * k, dy=-0.5 * k),
+        Camada(traco, ("cor", ambar)),
+    ]
+
+
+ESTILOS = {"cacador": cacador, "tatico": tatico, "circulo": circulo, "tom": tom, "vidro": vidro, "neon": neon, "argila": argila}

@@ -2,7 +2,7 @@
 
 Extensão da fase G ([spec 0019](0019-fase-g-extras.md)): **temas** que vestem o dock de uma vez, como os temas sazonais do PrimoDock, começando por temas gamer.
 
-**Status:** em andamento: passo 1 (galeria de Temas), passo 2 (launchers) e passo 3 (skins de barra, com Retrô, Clássico 98 e Fósforo) passo 4 (Tático) e passo 5 (Medieval 8-bit).
+**Status:** em andamento: passo 1 (galeria de Temas), passo 2 (launchers) e passo 3 (skins de barra, com Retrô, Clássico 98 e Fósforo) passo 4 (Tático) passo 5 (Medieval 8-bit) e passo 6 (Caçador).
 
 ## 1. Decisões do autor (2026-10-30)
 
@@ -79,4 +79,8 @@ Tomadas numa sessão de perguntas (Q1–Q22), todas na recomendação:
   - **Pacote** `medieval` (`fonte/medieval.txt`, pixel art 32×32, `gerar.py`): cada app num espaço de inventário de pedra com bisel. O objeto sai do glifo, com contorno escuro, corpo na cor terrosa mais próxima da matiz do app (vermelho, laranja, ouro, verde, verde-água, azul, roxo, vinho ou marrom), detalhes em pergaminho e sombra de 1 px. Um glifo sem área fechada leva o traço na cor do app. Cobre os 55 glifos. A reserva é um baú (`apps/bau.png`). Os desenhos partiram dos glifos e se editam no texto.
   - **Tema** `medieval`: skin Medieval, pacote Medieval e indicador do estilo.
   - **Verificado ao vivo** (2026-10-30, build e2e com o "experimentar e voltar", cópia dos dados do autor): o Medieval aplicado mostrou a moldura de madeira, os tijolos de pedra, os ícones em espaços de inventário e as marcas ouro, sem "Cantos". Os casos do "experimentar e voltar" também passaram: Manter tirou a pergunta; o Tático sem resposta voltou sozinho ao Medieval depois da contagem; e Voltar ao anterior no Neon voltou ao Medieval. A barra do Windows ficou igual. Fotos em [`docs/fotos/g7-medieval-ao-vivo.png`](../fotos/g7-medieval-ao-vivo.png).
-- **Caçador:** barra de couro curtido com costura pespontada e cantos de osso; indicador âmbar `#F2A33A`. Ícones: medalhão de couro com aro de osso e o glifo gravado em âmbar, em relevo. Reserva: pegada de garra.
+- **Caçador** (passo 6, feito):
+  - **Skin** `hunter` (`skins/fonte/hunter.py`, em vetor): 60×64 px, pontas de 26 px e meio de 8 px que se repete, para os pontos da costura não esticarem. Couro curtido em gradiente (`#7A4E2C` → `#4A2E18`), vinco escuro na borda, costura pespontada cor de linha (`#E8D2A6`) a 7,5 px de cima e de baixo, e pontas de osso com rebite. Separador linha a 40%, relógio linha, indicador âmbar `#F2A33A`. Barra escura nos dois modos.
+  - **Pacote** `cacador` (`fonte/cacador.txt`, estilo de camadas `cacador`): medalhão com aro de osso (`#EDE4CC` → `#B9AB8C`) e couro dentro (`#7A4E2C` → `#4A2E18`), com vinco escuro. O glifo, de traço 2,2, é gravado em âmbar, com sombra embaixo e à direita e luz em cima e à esquerda. Cobre os 55 glifos. A reserva é uma pegada de garra (`apps/garra.png`). O `disco` das camadas passa a aceitar `recuo`, como o octógono.
+  - **Tema** `hunter`: skin Caçador, pacote Caçador e indicador do estilo.
+  - **Verificado ao vivo** (2026-10-30, build e2e, cópia dos dados do autor): o cartão Caçador perguntou "Manter este tema?", gravou estilo `hunter` e pacote `cacador`, e o dock desenhou o couro com a costura, as pontas de osso, os medalhões gravados e as marcas âmbar, sem "Cantos". Memória: 298 MB em 7 processos com Configurações aberta. A barra do Windows ficou igual. Fotos em [`docs/fotos/g7-cacador-ao-vivo.png`](../fotos/g7-cacador-ao-vivo.png).

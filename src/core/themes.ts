@@ -16,7 +16,8 @@ export type ThemeId =
   | "classic98"
   | "phosphor"
   | "tactical"
-  | "medieval";
+  | "medieval"
+  | "hunter";
 
 export interface Theme {
   id: ThemeId;
@@ -70,6 +71,12 @@ export const THEMES: readonly Theme[] = [
     id: "medieval",
     style: "medieval",
     iconPack: "medieval",
+    indicatorColor: null,
+  },
+  {
+    id: "hunter",
+    style: "hunter",
+    iconPack: "cacador",
     indicatorColor: null,
   },
 ];
