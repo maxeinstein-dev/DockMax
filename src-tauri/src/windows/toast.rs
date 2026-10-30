@@ -1,4 +1,4 @@
-//! Windows notices (spec 0017 F2b-2): a toast of Windows with the DockMax's
+//! Windows notices (spec 0017 F2b-2): a toast of Windows with the Dockyard's
 //! name. The app is not packaged, so its name for the notices
 //! (AppUserModelID) is registered under the user's classes the first time,
 //! as Windows asks of desktop apps.
@@ -72,7 +72,7 @@ fn register() -> windows::core::Result<()> {
             None,
         )
         .ok()?;
-        let name: Vec<u16> = "DockMax\0".encode_utf16().collect();
+        let name: Vec<u16> = "Dockyard\0".encode_utf16().collect();
         let bytes = std::slice::from_raw_parts(name.as_ptr().cast::<u8>(), name.len() * 2);
         let set = RegSetValueExW(
             key,
@@ -87,7 +87,7 @@ fn register() -> windows::core::Result<()> {
 }
 
 /// Shows a toast with `title` and `line`: `false` when Windows has the
-/// notices off (for every app or for the DockMax), where it would take the
+/// notices off (for every app or for the Dockyard), where it would take the
 /// toast and show nothing.
 pub fn show(title: &str, line: &str) -> windows::core::Result<bool> {
     // WinRT on a thread of its own (the calendar's): COM first. A thread

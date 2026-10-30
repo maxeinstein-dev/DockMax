@@ -57,7 +57,7 @@ pub fn open_storage<E>(data_dir: Result<PathBuf, E>) -> Storage {
     }
 }
 
-/// Opens the database and manages it as state. Runs in the `dockmax-startup`
+/// Opens the database and manages it as state. Runs in the `dockyard-startup`
 /// plugin, after the settings, so both windows find it.
 pub fn setup(app: &AppHandle) {
     let storage = open_storage(app.path().app_data_dir());

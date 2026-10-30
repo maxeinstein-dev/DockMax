@@ -1,9 +1,9 @@
-DockMax — Licença de uso pessoal
+Dockyard — Licença de uso pessoal
 
 Copyright (c) 2026 Maxsuel Einstein. Todos os direitos reservados.
 
 Este software e a documentação que o acompanha são de uso pessoal e não
-comercial. Você pode baixar, compilar e executar o DockMax para uso próprio e
+comercial. Você pode baixar, compilar e executar o Dockyard para uso próprio e
 estudar o código-fonte.
 
 Sem autorização prévia e por escrito do titular, é proibido:
@@ -11,7 +11,7 @@ Sem autorização prévia e por escrito do titular, é proibido:
 - redistribuir o software ou o código-fonte, no todo ou em parte, modificados
   ou não;
 - vender, alugar, sublicenciar ou oferecer o software como produto ou serviço;
-- usar o software, o nome DockMax ou a identidade visual em atividade
+- usar o software, o nome Dockyard ou a identidade visual em atividade
   comercial.
 
 O software é fornecido "no estado em que se encontra", sem garantia de
@@ -20,5 +20,5 @@ qualquer espécie. O titular não responde por danos decorrentes do uso.
 Versões anteriores à 0.3.0 foram publicadas sob a licença MIT; quem as obteve
 sob essa licença mantém os direitos que ela concede sobre aquelas versões.
 
-Componentes de terceiros usados pelo DockMax (React, Tauri, Rust e demais
+Componentes de terceiros usados pelo Dockyard (React, Tauri, Rust e demais
 dependências) mantêm suas próprias licenças, listadas em seus pacotes.

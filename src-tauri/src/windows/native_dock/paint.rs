@@ -61,7 +61,7 @@ use crate::domain::widgets::system::ActivityStyle;
 /// The superellipse every tile is cut to, in a 100 × 100 box.
 const SQUIRCLE: &str = "M50 0C90 0 100 10 100 50S90 100 50 100 0 90 0 50 10 0 50 0Z";
 
-/// The glyphs drawn for DockMax itself (`src/dock/Glyph.tsx`, the note's
+/// The glyphs drawn for Dockyard itself (`src/dock/Glyph.tsx`, the note's
 /// tile): a 24 px view box, a 1.75 stroke with round ends.
 pub const SETTINGS_GLYPH: &[&str] = &[
     "M4 7.5h9.5M17.5 7.5H20M4 16.5h3.5M11.5 16.5H20",

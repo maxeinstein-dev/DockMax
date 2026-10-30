@@ -61,7 +61,7 @@ export const otherText: Messages = {
       },
       brand: "Settings",
       leads: {
-        general: "How DockMax fits into Windows.",
+        general: "How Dockyard fits into Windows.",
         workspaces: "A dock for each thing you do.",
         look: "Make the dock yours.",
         apps: "The programs pinned to each workspace's dock.",
@@ -84,7 +84,7 @@ export const otherText: Messages = {
       },
     },
     launchAtLogin: "Start with Windows",
-    launchAtLoginHint: "Opens the DockMax when you sign in to Windows",
+    launchAtLoginHint: "Opens the Dockyard when you sign in to Windows",
     launcher: {
       label: "Launcher ({hotkey})",
       hint: "Finds and opens apps from anywhere",
@@ -267,7 +267,7 @@ export const otherText: Messages = {
     description: "Windows 11 dock, built with Tauri.",
     labels: { version: "Version", license: "License", code: "Code" },
     licenseValue: "Personal use",
-    repository: "github.com/maxeinstein-dev/DockMax",
+    repository: "github.com/maxeinstein-dev/Dockyard",
     footer: "Independent project",
     tour: "See the tour",
   },
@@ -280,7 +280,7 @@ export const otherText: Messages = {
     openSettings: "Open Settings",
     steps: {
       welcome: {
-        title: "Welcome to DockMax",
+        title: "Welcome to Dockyard",
         body: "A dock for your Windows: your apps, workspaces and live widgets in one place. No account, no tracking.",
       },
       apps: {
@@ -297,7 +297,7 @@ export const otherText: Messages = {
       },
       launcher: {
         title: "Find anything with {hotkey}",
-        body: "The launcher finds apps and Settings pages, does math and searches the web by keyword, like “g dockmax”.",
+        body: "The launcher finds apps and Settings pages, does math and searches the web by keyword, like “g dockyard”.",
       },
       done: {
         title: "All set",

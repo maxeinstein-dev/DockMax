@@ -12,7 +12,7 @@ import {
 } from "./app.ts";
 
 /** Parent of the run folders; only this suite writes here. */
-const RUNS_DIR = join(tmpdir(), "dockmax-e2e");
+const RUNS_DIR = join(tmpdir(), "dockyard-e2e");
 
 const capabilities: TauriCapabilities[] = [
   {
@@ -65,7 +65,7 @@ export const config: WebdriverIO.Config = {
       join(dataDir, "settings.json"),
       JSON.stringify({ version: 1, language: "pt-BR" }),
     );
-    console.log(`DockMax E2E data folder: ${dataDir}`);
+    console.log(`Dockyard E2E data folder: ${dataDir}`);
   },
 
   /**

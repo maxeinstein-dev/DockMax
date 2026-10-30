@@ -364,7 +364,7 @@ unsafe extern "system" fn procedure(
     let manager = window().is_some_and(|manager| manager == hwnd);
     match msg {
         WM_NEW_BAND if manager => {
-            let made = make_window(w!("DockMax app bar band"));
+            let made = make_window(w!("Dockyard app bar band"));
             return LRESULT(made.map_or(0, |band| band.0 as isize));
         }
         WM_APPLY => {
@@ -436,7 +436,7 @@ fn run(ready: mpsc::Sender<()>) {
         Ordering::Relaxed,
     );
     explorer_taskbar_changed();
-    match make_window(w!("DockMax app bar")) {
+    match make_window(w!("Dockyard app bar")) {
         Some(hwnd) => WINDOW.store(hwnd.0 as isize, Ordering::Release),
         None => log::warn!("appbar: the window was not created"),
     }

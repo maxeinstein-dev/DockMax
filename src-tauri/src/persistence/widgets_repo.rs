@@ -2,7 +2,7 @@
 //!
 //! Positions are 0-based and contiguous after every write, which runs in one
 //! transaction. Reading never fails on a bad row (edited by hand, by another
-//! tool or by a newer DockMax):
+//! tool or by a newer Dockyard):
 //!
 //! - a config that can't be read gives the kind's default;
 //! - a label that isn't text or breaks the label rules reads as no label;

@@ -266,12 +266,12 @@ describe("InlineNotice", () => {
     render(
       <InlineNotice
         title="Os widgets estão indisponíveis."
-        detail="O motivo está no log do DockMax."
+        detail="O motivo está no log do Dockyard."
       />,
     );
 
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Os widgets estão indisponíveis. O motivo está no log do DockMax.",
+      "Os widgets estão indisponíveis. O motivo está no log do Dockyard.",
     );
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });

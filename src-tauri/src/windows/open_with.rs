@@ -332,17 +332,17 @@ mod tests {
     fn a_drive_keeps_its_quote() {
         assert_eq!(quoted(Path::new(r"C:\")), r#""C:\.""#);
         assert_eq!(
-            quoted(Path::new(r"C:\Projetos\DockMax")),
-            r#""C:\Projetos\DockMax""#
+            quoted(Path::new(r"C:\Projetos\Dockyard")),
+            r#""C:\Projetos\Dockyard""#
         );
     }
 
     #[test]
     fn files_of_one_kind_share_their_extension() {
         let here = std::env::temp_dir();
-        let a = here.join("dockmax-ext-a.TXT");
-        let b = here.join("dockmax-ext-b.txt");
-        let c = here.join("dockmax-ext-c.md");
+        let a = here.join("dockyard-ext-a.TXT");
+        let b = here.join("dockyard-ext-b.txt");
+        let c = here.join("dockyard-ext-c.md");
         for file in [&a, &b, &c] {
             std::fs::write(file, "").unwrap();
         }
@@ -361,7 +361,7 @@ mod tests {
     fn a_file_opens_the_terminal_in_its_folder() {
         let here = std::env::temp_dir();
         assert_eq!(folder_of(std::slice::from_ref(&here)), Some(here.clone()));
-        let file = here.join("dockmax-not-a-folder.txt");
+        let file = here.join("dockyard-not-a-folder.txt");
         assert_eq!(folder_of(&[file]), Some(here));
         assert_eq!(folder_of(&[]), None);
     }
@@ -375,8 +375,8 @@ mod machine {
     #[test]
     #[ignore = "opens the Bloco de notas of this machine"]
     fn notepad_opens_a_file() {
-        let file = std::env::temp_dir().join("teste-dockmax.txt");
-        std::fs::write(&file, "teste do DockMax").unwrap();
+        let file = std::env::temp_dir().join("teste-dockyard.txt");
+        std::fs::write(&file, "teste do Dockyard").unwrap();
         let id = "Microsoft.WindowsNotepad_8wekyb3d8bbwe!App";
         assert_eq!(super::open(id, &[file]), Ok(()));
     }

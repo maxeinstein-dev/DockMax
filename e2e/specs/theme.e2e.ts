@@ -38,7 +38,7 @@ describe("Theme", () => {
       ),
     ).toBe("dark");
 
-    // The test build writes to the run's folder, not to the user's DockMax.
+    // The test build writes to the run's folder, not to the user's Dockyard.
     const dataDir = process.env[DATA_DIR_VAR];
     if (!dataDir) throw new Error(`${DATA_DIR_VAR} is not set`);
     const saved: unknown = JSON.parse(

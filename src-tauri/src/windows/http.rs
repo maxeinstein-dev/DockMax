@@ -109,7 +109,7 @@ fn request(
 
     let session = Handle::new(unsafe {
         WinHttpOpen(
-            w!("DockMax"),
+            w!("Dockyard"),
             WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
             PCWSTR::null(),
             PCWSTR::null(),

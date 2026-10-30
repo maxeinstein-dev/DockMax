@@ -100,7 +100,7 @@ const srcTauri = fileURLToPath(new URL("../src-tauri", import.meta.url));
 
 /**
  * The test build, as `pnpm test:e2e:build` leaves it. Its own name
- * (`mainBinaryName`) keeps it apart from the `dockmax.exe` that `tauri dev`
+ * (`mainBinaryName`) keeps it apart from the `dockyard.exe` that `tauri dev`
  * writes to the same folder.
  */
 export const APP_PATH = join(
@@ -108,12 +108,12 @@ export const APP_PATH = join(
     ? resolve(srcTauri, process.env.CARGO_TARGET_DIR)
     : join(srcTauri, "target"),
   "debug",
-  process.platform === "win32" ? "dockmax-e2e.exe" : "dockmax-e2e",
+  process.platform === "win32" ? "dockyard-e2e.exe" : "dockyard-e2e",
 );
 
 /**
  * Fails unless `APP_PATH` is a test build: a normal build would ignore the
- * data folder and use, or wake, the user's DockMax. The identifier proves the
+ * data folder and use, or wake, the user's Dockyard. The identifier proves the
  * e2e config; the name of the data folder variable, read only by the code of
  * the `e2e` feature (`src-tauri/src/e2e.rs`), proves the feature.
  */

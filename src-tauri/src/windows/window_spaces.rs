@@ -8,7 +8,7 @@
 //! is written down: the parked windows are kept in a file next to the
 //! taskbar's state, and every way out shows them again, like the taskbar
 //! (ADR 0009): the normal exit and the end of the Windows session
-//! (`release_all`), the watchdog when the DockMax dies (`restore_file`), and
+//! (`release_all`), the watchdog when the Dockyard dies (`restore_file`), and
 //! the next start (`setup`).
 //!
 //! Which workspace each window belongs to is kept too, in a session file
@@ -370,7 +370,7 @@ pub fn switch(monitor: &str, from: &str, target: &str) -> Option<isize> {
         Some((hide, back, path, parked))
     })?;
     if !hide.is_empty() {
-        // The watchdog shows them again if the DockMax dies.
+        // The watchdog shows them again if the Dockyard dies.
         super::taskbar::ensure_watchdog(&path.with_file_name(super::taskbar::STATE_FILE));
     }
     if let Err(error) = write(&path, &parked) {
@@ -429,7 +429,7 @@ pub fn forget_workspace(id: &str) {
     }
 }
 
-/// Every parked window comes back (the DockMax ends, or the session). The
+/// Every parked window comes back (the Dockyard ends, or the session). The
 /// workspace of each window stays written down for the next start.
 pub fn release_all() {
     let (back, path) = with_state(|inner| {

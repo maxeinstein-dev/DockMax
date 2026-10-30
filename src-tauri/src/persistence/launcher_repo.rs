@@ -3,7 +3,7 @@
 //! opened. Only the launcher writes here.
 //!
 //! Reading never fails on a bad row (edited by hand, by another tool or by a
-//! newer DockMax): a row with a key that is not one the launcher makes, or a
+//! newer Dockyard): a row with a key that is not one the launcher makes, or a
 //! weight that is not a number, is left out and stays as it is.
 
 use std::collections::HashMap;

@@ -2,7 +2,7 @@
 //!
 //! Positions are 0-based and contiguous after every write, which runs in one
 //! transaction. Reading never fails on a bad row (edited by hand, by another
-//! tool or by a newer DockMax): a row with an id that is not one Rust makes,
+//! tool or by a newer Dockyard): a row with an id that is not one Rust makes,
 //! or an id or a name that is not valid text, is left out of the list and
 //! stays as it is; the log gets only the kind of problem.
 

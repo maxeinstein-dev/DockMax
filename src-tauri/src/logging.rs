@@ -28,7 +28,7 @@ const MAX_FILE_SIZE: u128 = 1024 * 1024;
 /// files of up to 1 MiB: about 5 MB on disk.
 const ARCHIVED_FILES: usize = 4;
 
-/// Level of DockMax's own messages, from Rust and from the webviews.
+/// Level of Dockyard's own messages, from Rust and from the webviews.
 const APP_LEVEL: LevelFilter = if cfg!(debug_assertions) {
     LevelFilter::Debug
 } else {
@@ -40,7 +40,7 @@ const APP_LEVEL: LevelFilter = if cfg!(debug_assertions) {
 /// payloads.
 const DEPENDENCY_LEVEL: LevelFilter = LevelFilter::Warn;
 
-/// Per-target levels: DockMax's Rust code and the webviews.
+/// Per-target levels: Dockyard's Rust code and the webviews.
 const LEVELS: [(&str, LevelFilter); 2] = [
     (env!("CARGO_CRATE_NAME"), APP_LEVEL),
     (WEBVIEW_TARGET, APP_LEVEL),
@@ -164,14 +164,14 @@ mod tests {
     }
 
     #[test]
-    fn dockmax_and_the_webviews_log_more_than_the_dependencies() {
+    fn dockyard_and_the_webviews_log_more_than_the_dependencies() {
         let app = if cfg!(debug_assertions) {
             LevelFilter::Debug
         } else {
             LevelFilter::Info
         };
 
-        assert_eq!(LEVELS, [("dockmax_lib", app), ("webview", app)]);
+        assert_eq!(LEVELS, [("dockyard_lib", app), ("webview", app)]);
         assert_eq!(DEPENDENCY_LEVEL, LevelFilter::Warn);
     }
 

@@ -42,13 +42,13 @@ pub enum GoogleError {
     Refused,
     #[error("the sign-in took too long")]
     TimedOut,
-    #[error("the sign-in was cancelled in the DockMax")]
+    #[error("the sign-in was cancelled in the Dockyard")]
     Cancelled,
     #[error("no connection to Google")]
     Offline,
     #[error("Google no longer accepts this account: it must sign in again")]
     SignInAgain,
-    #[error("Google gave an answer the DockMax can't read")]
+    #[error("Google gave an answer the Dockyard can't read")]
     Unexpected,
     #[error("the vault could not be written")]
     Vault,
@@ -162,12 +162,12 @@ fn open_browser(url: &str) -> Result<(), GoogleError> {
 /// The small page the browser shows once it came back.
 fn answer(stream: &mut TcpStream, done: bool) {
     let text = if done {
-        "Conta conectada ao DockMax. Pode fechar esta aba."
+        "Conta conectada ao Dockyard. Pode fechar esta aba."
     } else {
-        "A conta não foi conectada. Volte ao DockMax e tente de novo."
+        "A conta não foi conectada. Volte ao Dockyard e tente de novo."
     };
     let body = format!(
-        "<!doctype html><meta charset=utf-8><title>DockMax</title>\
+        "<!doctype html><meta charset=utf-8><title>Dockyard</title>\
          <body style=\"font:16px system-ui;margin:3em\">{text}</body>"
     );
     let _ = write!(

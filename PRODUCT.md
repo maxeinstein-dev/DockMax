@@ -10,7 +10,7 @@ web
 
 ## Users
 
-- **Primário:** o próprio autor, desenvolvedor, no Windows 11 do dia a dia (monitor 2560×1080 a 100%, efeitos de transparência desligados). Usa o DockMax o dia inteiro como o dock do Windows: abrir apps, trocar de workspace, ver widgets. A barra de tarefas nativa fica visível, escondida automaticamente ou oculta por completo, à escolha dele.
+- **Primário:** o próprio autor, desenvolvedor, no Windows 11 do dia a dia (monitor 2560×1080 a 100%, efeitos de transparência desligados). Usa o Dockyard o dia inteiro como o dock do Windows: abrir apps, trocar de workspace, ver widgets. A barra de tarefas nativa fica visível, escondida automaticamente ou oculta por completo, à escolha dele.
 - **Secundário:** quem lê o projeto no GitHub (README, prints). A licença é de uso pessoal; o código pode ser estudado, não redistribuído.
 - **Prioridade confirmada:** uso pessoal. O dock precisa ser agradável no uso diário.
 
@@ -42,14 +42,14 @@ Dock para Windows construído com Tauri (leve, local, sem conta, sem analytics),
 
 ## Brand Commitments
 
-- Nome: **DockMax**. Projeto independente, sem afiliação com o PrimoDock; a marca, o nome e o logotipo do PrimoDock não são usados.
+- Nome: **Dockyard**. Projeto independente, sem afiliação com o PrimoDock; a marca, o nome e o logotipo do PrimoDock não são usados.
 - **Licença:** uso pessoal, todos os direitos reservados (arquivo `LICENSE`). Versões até a 0.2.0 foram MIT.
-- Identidade **própria do DockMax**, sem ligação com a marca pessoal do autor, isolada em tokens para poder mudar depois.
+- Identidade **própria do Dockyard**, sem ligação com a marca pessoal do autor, isolada em tokens para poder mudar depois.
 - **Personalização é requisito:** o dock precisa ser ajustável o suficiente para ficar do gosto de quem usa. Toda a identidade vive em tokens trocáveis; os ajustes da Fase 1 são tema, posição, tamanho e opacidade, e a arquitetura não pode impedir outros (destaque, estilo dos ícones etc.).
 - **Destino:** substituir a barra de tarefas do Windows, em harmonia com as janelas abertas (ADR 0009, que substitui a convivência do ADR 0004). Enquanto isso não chega, o dock convive com a barra.
 - Ficar próximo do PrimoDock e do dock do macOS é desejado. Os temas chamativos (Neon, Rocket, Canarinho) existem como opção; o padrão continua discreto.
 - Referência visual principal: o PrimoDock, observado pelas telas de configuração e pelo uso (capturas do autor). Referências secundárias: dock do macOS (Big Sur), WhiteSur, Zorin OS, Plank, Latte Dock, Cairo-Dock.
-- **Regra de implementação do zero:** o DockMax copia funcionalidade, organização e aparência, nunca arquivos. Nada do executável do PrimoDock, do código descompilado, da pasta `IconPacks`, do catálogo da galeria nem dos sprites do pet entra no repositório. Ícones, pacotes e pet são desenhados do zero, e pacotes de terceiros (GPL, por exemplo) também ficam de fora. Ter visto o produto original não é um "clean room" estrito; a proteção é a regra de não copiar arquivos nem código.
+- **Regra de implementação do zero:** o Dockyard copia funcionalidade, organização e aparência, nunca arquivos. Nada do executável do PrimoDock, do código descompilado, da pasta `IconPacks`, do catálogo da galeria nem dos sprites do pet entra no repositório. Ícones, pacotes e pet são desenhados do zero, e pacotes de terceiros (GPL, por exemplo) também ficam de fora. Ter visto o produto original não é um "clean room" estrito; a proteção é a regra de não copiar arquivos nem código.
 
 ## Evidence on Hand
 

@@ -523,15 +523,26 @@ pub fn recover(state_path: &Path) {
 }
 
 /// Name of the copy of this executable the watchdog runs as. A different
-/// name, so that ending `dockmax.exe` by name (`taskkill /IM`, the Details
+/// name, so that ending `dockyard.exe` by name (`taskkill /IM`, the Details
 /// tab of the Task Manager) leaves the watchdog alone.
-pub const GUARD_NAME: &str = "dockmax-guard.exe";
+pub const GUARD_NAME: &str = "dockyard-guard.exe";
+
+/// Name of the copy before the Dockyard was renamed (it was the DockMax).
+/// Nothing ends it by name: a watchdog only waits for the run that started
+/// it, gives back what that run left and ends, so one of an old run ends by
+/// itself. The file is left over in the data folder.
+pub const LEGACY_GUARD_NAME: &str = "dockmax-guard.exe";
 
 /// The copy of `source` the watchdog runs as, in `dir`: made when it is
 /// missing or differs from `source` (another size or date, as after an
 /// update). A copy that cannot be made (a watchdog of an earlier run is
 /// still running from it) leaves the one there.
+///
+/// The copy under the old name goes away too. Windows refuses to delete a
+/// program that is running, so a watchdog of an old run still waiting keeps
+/// its file and does its job.
 fn ensure_guard(source: &Path, dir: &Path) -> io::Result<PathBuf> {
+    let _ = fs::remove_file(dir.join(LEGACY_GUARD_NAME));
     let guard = dir.join(GUARD_NAME);
     let same = || -> Option<bool> {
         let from = fs::metadata(source).ok()?;
@@ -802,7 +813,7 @@ mod tests {
     #[test]
     fn the_guard_is_a_copy_with_a_name_of_its_own() {
         let dir = tempdir().unwrap();
-        let source = dir.path().join("dockmax.exe");
+        let source = dir.path().join("dockyard.exe");
         fs::write(&source, b"the program").unwrap();
         let folder = dir.path().join("data");
 
@@ -816,7 +827,7 @@ mod tests {
     #[test]
     fn an_up_to_date_guard_is_not_copied_again() {
         let dir = tempdir().unwrap();
-        let source = dir.path().join("dockmax.exe");
+        let source = dir.path().join("dockyard.exe");
         fs::write(&source, b"the program").unwrap();
         let guard = ensure_guard(&source, dir.path()).unwrap();
         // Same size and same date: left alone (a mark would be overwritten).
@@ -830,7 +841,7 @@ mod tests {
     #[test]
     fn a_guard_of_another_version_is_replaced() {
         let dir = tempdir().unwrap();
-        let source = dir.path().join("dockmax.exe");
+        let source = dir.path().join("dockyard.exe");
         fs::write(&source, b"version one").unwrap();
         ensure_guard(&source, dir.path()).unwrap();
         fs::write(&source, b"version two, longer").unwrap();
@@ -838,6 +849,46 @@ mod tests {
         let guard = ensure_guard(&source, dir.path()).unwrap();
 
         assert_eq!(fs::read(&guard).unwrap(), b"version two, longer");
+    }
+
+    #[test]
+    fn the_guard_of_the_old_name_is_removed() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("dockyard.exe");
+        fs::write(&source, b"the program").unwrap();
+        let legacy = dir.path().join(LEGACY_GUARD_NAME);
+        fs::write(&legacy, b"the old program").unwrap();
+
+        let guard = ensure_guard(&source, dir.path()).unwrap();
+
+        assert!(!legacy.exists());
+        assert_eq!(fs::read(&guard).unwrap(), b"the program");
+    }
+
+    #[test]
+    fn a_running_guard_of_the_old_name_is_left_alone() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("dockyard.exe");
+        fs::write(&source, b"the program").unwrap();
+        let legacy = dir.path().join(LEGACY_GUARD_NAME);
+        fs::write(&legacy, b"the old program").unwrap();
+        // Held open without sharing deletion, as Windows holds a running
+        // program: the delete fails, and that is no error for the new copy.
+        let held = {
+            use std::os::windows::fs::OpenOptionsExt;
+            const FILE_SHARE_READ: u32 = 0x1;
+            fs::OpenOptions::new()
+                .read(true)
+                .share_mode(FILE_SHARE_READ)
+                .open(&legacy)
+                .unwrap()
+        };
+
+        let guard = ensure_guard(&source, dir.path()).unwrap();
+
+        assert!(legacy.exists());
+        assert_eq!(fs::read(&guard).unwrap(), b"the program");
+        drop(held);
     }
 
     #[test]
@@ -850,7 +901,7 @@ mod tests {
     #[test]
     fn the_watchdog_starts_through_cmd_with_every_path_quoted() {
         let line = watchdog_command_line(
-            Path::new(r"C:\Users\Maxsuel Einstein\AppData\Local\dev.x\dockmax-guard.exe"),
+            Path::new(r"C:\Users\Maxsuel Einstein\AppData\Local\dev.x\dockyard-guard.exe"),
             4242,
             Path::new(r"C:\Users\Maxsuel Einstein\AppData\Local\dev.x\taskbar-state.json"),
         )
@@ -858,7 +909,7 @@ mod tests {
 
         assert_eq!(
             line,
-            r#"/c start "" /b "C:\Users\Maxsuel Einstein\AppData\Local\dev.x\dockmax-guard.exe" --taskbar-watchdog 4242 "C:\Users\Maxsuel Einstein\AppData\Local\dev.x\taskbar-state.json""#
+            r#"/c start "" /b "C:\Users\Maxsuel Einstein\AppData\Local\dev.x\dockyard-guard.exe" --taskbar-watchdog 4242 "C:\Users\Maxsuel Einstein\AppData\Local\dev.x\taskbar-state.json""#
         );
     }
 

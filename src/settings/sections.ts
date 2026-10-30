@@ -25,12 +25,12 @@ declare global {
   interface Window {
     /** The section a window opened by the launcher starts on, set by Rust
      * before the page's scripts run. */
-    __DOCKMAX_SECTION__?: string;
+    __DOCKYARD_SECTION__?: string;
   }
 }
 
 /** The section the window starts on: the launcher's, else Geral. */
 export function startSection(): Section {
-  const asked = window.__DOCKMAX_SECTION__;
+  const asked = window.__DOCKYARD_SECTION__;
   return isSection(asked) ? asked : "general";
 }

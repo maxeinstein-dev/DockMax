@@ -55,7 +55,7 @@ fn lines() -> (Vec<Entry>, Option<usize>) {
 }
 
 /// The menu's name for assistive technology.
-const LABEL: &str = "DockMax";
+const LABEL: &str = "Dockyard";
 
 /// The menu opened with these lines: the screen reader hears it open.
 pub fn opened(hwnd: HWND, found: Vec<Entry>) {

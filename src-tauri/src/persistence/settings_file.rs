@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn save_creates_the_missing_config_folder() {
         let dir = tempdir().unwrap();
-        let path = dir.path().join("DockMax").join("config").join(FILE_NAME);
+        let path = dir.path().join("Dockyard").join("config").join(FILE_NAME);
 
         save(&path, &Settings::default()).unwrap();
 

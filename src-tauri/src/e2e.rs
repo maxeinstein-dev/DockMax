@@ -1,5 +1,5 @@
 //! Test build only (feature `e2e`, spec 0003 §2.8). Keeps every run of the
-//! E2E suite away from the user's DockMax: its own identifier (so its own
+//! E2E suite away from the user's Dockyard: its own identifier (so its own
 //! single-instance lock, `%APPDATA%` and `%LOCALAPPDATA%` folders and WebView2
 //! profile) and a data folder chosen by the test runner for each run.
 //!
@@ -33,7 +33,7 @@ pub fn isolate<R: Runtime>(context: &mut Context<R>) {
 fn data_root(identifier: &str, data_dir: Option<OsString>) -> Result<PathBuf, String> {
     // Built with `--features e2e` but without the e2e config, the test build
     // would share the identifier, and with it the single-instance lock and the
-    // WebView2 profile, of the user's DockMax.
+    // WebView2 profile, of the user's Dockyard.
     if !identifier.ends_with(IDENTIFIER_SUFFIX) {
         return Err(format!(
             "the identifier `{identifier}` must end in `{IDENTIFIER_SUFFIX}`; build with `--config src-tauri/tauri.e2e.conf.json`"
@@ -127,7 +127,7 @@ mod tests {
     const TEST_IDENTIFIER: &str = "dev.maxsueleinstein.dockmax.e2e";
 
     fn absolute_dir() -> PathBuf {
-        std::env::temp_dir().join("dockmax-e2e-test")
+        std::env::temp_dir().join("dockyard-e2e-test")
     }
 
     #[test]
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn refuses_a_relative_or_variable_folder() {
-        for value in ["dockmax-e2e", "$TEMP/dockmax-e2e"] {
+        for value in ["dockyard-e2e", "$TEMP/dockyard-e2e"] {
             let error = data_root(TEST_IDENTIFIER, Some(value.into())).unwrap_err();
             assert!(error.contains("absolute"), "{value}: {error}");
         }

@@ -1,4 +1,4 @@
-//! The DockMax's own menus (spec 0014 R3): a native window drawn with
+//! The Dockyard's own menus (spec 0014 R3): a native window drawn with
 //! Direct2D, as the launcher, in place of Windows' menu (`TrackPopupMenu`),
 //! which can't have the look of the rest of the app.
 //!
@@ -160,7 +160,7 @@ pub fn show(at: Option<POINT>, up: bool, lines: Vec<Line>) -> Option<usize> {
         CreateWindowExW(
             WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
             CLASS,
-            w!("DockMax"),
+            w!("Dockyard"),
             WS_POPUP,
             0,
             0,

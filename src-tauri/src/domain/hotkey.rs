@@ -4,7 +4,7 @@
 //! The keys are the letters, the digits, F1–F24 and Space. A combination is
 //! refused when it has no modifier, when its only modifier is Shift or Ctrl
 //! with a letter or a digit (it would take typing or an editing shortcut,
-//! such as Ctrl+C, from every program), and when Windows or the DockMax keep
+//! such as Ctrl+C, from every program), and when Windows or the Dockyard keep
 //! it for themselves (Win and one key, Alt+F4, Ctrl+Alt and a digit).
 
 use std::fmt;
@@ -87,7 +87,7 @@ pub enum Problem {
     NoModifier,
     /// Shift or Ctrl alone with a letter or a digit.
     TakesTyping,
-    /// Windows or the DockMax keep it.
+    /// Windows or the Dockyard keep it.
     Reserved,
 }
 
@@ -264,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn what_windows_and_the_dockmax_keep_is_refused() {
+    fn what_windows_and_the_dockyard_keep_is_refused() {
         for text in [
             "Win+L",
             "Win+Space",

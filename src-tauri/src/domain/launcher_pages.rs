@@ -1,6 +1,6 @@
 //! The settings pages the launcher finds (spec 0012 §5, L2): a fixed list,
 //! in the code, of the `ms-settings:` pages used most and of the sections of
-//! the DockMax's Configurações, each with its name in Portuguese and other
+//! the Dockyard's Configurações, each with its name in Portuguese and other
 //! words that find it (`wifi`, `internet` and `rede` find "Wi-Fi"). Pure.
 
 /// A section of the Configurações app; must match `Section` in
@@ -36,8 +36,8 @@ impl Section {
 pub enum Target {
     /// A page of the Windows settings (`ms-settings:network-wifi`).
     Windows(&'static str),
-    /// A section of the DockMax's Configurações.
-    DockMax(Section),
+    /// A section of the Dockyard's Configurações.
+    Dockyard(Section),
 }
 
 /// One page the launcher finds.
@@ -65,7 +65,7 @@ const fn windows(
     }
 }
 
-const fn dockmax(
+const fn dockyard(
     id: &'static str,
     name: &'static str,
     aliases: &'static [&'static str],
@@ -75,7 +75,7 @@ const fn dockmax(
         id,
         name,
         aliases,
-        target: Target::DockMax(section),
+        target: Target::Dockyard(section),
     }
 }
 
@@ -265,31 +265,31 @@ pub const PAGES: &[Page] = &[
         &["sistema", "nome do computador", "especificacoes"],
         "ms-settings:about",
     ),
-    dockmax(
+    dockyard(
         "dockmax-general",
-        "Configurações do DockMax",
-        &["dockmax", "dock", "lancador"],
+        "Configurações do Dockyard",
+        &["dockyard", "dockmax", "dock", "lancador"],
         Section::General,
     ),
-    dockmax(
+    dockyard(
         "dockmax-workspaces",
         "Espaços de trabalho",
         &["espacos", "workspaces", "novo espaco"],
         Section::Workspaces,
     ),
-    dockmax(
+    dockyard(
         "dockmax-look",
         "Aparência do dock",
         &["estilo do dock", "tema do dock", "pacote de icones"],
         Section::Look,
     ),
-    dockmax(
+    dockyard(
         "dockmax-apps",
         "Apps do dock",
         &["fixar apps", "apps fixados"],
         Section::Apps,
     ),
-    dockmax(
+    dockyard(
         "dockmax-items",
         "Widgets do dock",
         &[
@@ -302,16 +302,16 @@ pub const PAGES: &[Page] = &[
         ],
         Section::Items,
     ),
-    dockmax(
+    dockyard(
         "dockmax-accounts",
-        "Contas do DockMax",
+        "Contas do Dockyard",
         &["contas google", "google agenda", "conectar conta", "agenda"],
         Section::Accounts,
     ),
-    dockmax(
+    dockyard(
         "dockmax-about",
-        "Sobre o DockMax",
-        &["versao do dockmax"],
+        "Sobre o Dockyard",
+        &["versao do dockyard", "versao do dockmax"],
         Section::About,
     ),
 ];
@@ -386,7 +386,7 @@ mod tests {
             assert!(
                 PAGES
                     .iter()
-                    .any(|page| page.target == Target::DockMax(section)),
+                    .any(|page| page.target == Target::Dockyard(section)),
                 "{}",
                 section.as_str()
             );
