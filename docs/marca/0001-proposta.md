@@ -4,12 +4,15 @@ Recorte G6 da [spec 0019](../specs/0019-fase-g-extras.md). Só proposta: o códi
 
 **Status:** decidido pelo autor em 2026-10-29: o nome passa a ser **Dockyard** e a logo é o conceito **B (lançamento)** em esmalte **cobalto**.
 
+**Atualização em 2026-10-30:** depois de quatro rodadas de desenho, o ícone do app passou a ser o **D + Salto** (desenho 7) em cobalto, no lugar do B, e o ícone da bandeja é a versão **monocromática** do mesmo glifo. Veja a seção 3.1.
+
 ## 1. Decisão
 
 | | |
 |---|---|
 | Nome | **Dockyard** |
-| Ícone | [`dockyard-icone.svg`](dockyard-icone.svg): o ladrilho do lançador (o prompt `›_` do Alt+Space) saindo da barra do dock, com linhas de impulso |
+| Ícone | [`dockyard-icone.svg`](dockyard-icone.svg): o **D + Salto** (desde 2026-10-30). A haste do D é a barra do dock e o ladrilho do meio saltou para dentro do bojo. Para 16/20/24 px, [`dockyard-icone-16.svg`](dockyard-icone-16.svg), com a haste sólida e partida |
+| Bandeja | [`dockyard-bandeja-clara.svg`](dockyard-bandeja-clara.svg) (glifo preto, barra clara) e [`dockyard-bandeja-escura.svg`](dockyard-bandeja-escura.svg) (glifo branco, barra escura): só o glifo, sem esquadro, como os ícones de rede e volume |
 | Logotipo | [`dockyard-logotipo.svg`](dockyard-logotipo.svg) (fundo claro) e [`dockyard-logotipo-escuro.svg`](dockyard-logotipo-escuro.svg) (fundo escuro) |
 | Esmalte | Cobalto, `hsl(224 58% 52%)` → `hsl(224 58% 34%)`, da família do destaque do app (`#2f5bd3`) |
 
@@ -48,6 +51,22 @@ Todos em [`conceitos/`](conceitos/). A página [`conceitos/conceitos.html`](conc
 | DockMax · Ampliação | Ladrilhos crescendo em curva até o do meio, como a ampliação | Referência, caso o nome não mudasse |
 
 Os SVGs seguem o DESIGN.md: superelipse com esmalte de dois tons da mesma matiz, brilho no topo, fio de luz e glifo branco. O logotipo usa Segoe UI Variable Display 600 como texto; **antes de usar fora do repositório, converter o texto em contorno**, porque a fonte não existe fora do Windows.
+
+### 3.1. Ícone D + Salto (2026-10-30)
+
+O ícone do conceito B (o prompt saindo da barra) não agradou no tamanho real. Mais quatro rodadas:
+
+1. Seis ideias novas (doca, letra D, pilha, guindaste, âncora, salto).
+2. Oito variações das que sobraram.
+3. Confronto do **7 · D + Salto** com o **8 · Doca + Salto**, em contexto e tamanho real: bandeja, barra de título, barra de tarefas, menu Iniciar, dock e 256 px ([`conceitos/confronto-d-salto.png`](conceitos/confronto-d-salto.png)). **Escolhido o 7**, em cobalto.
+4. Três opções para a bandeja: colorido, monocromático e contorno ([`conceitos/bandeja-opcoes.png`](conceitos/bandeja-opcoes.png)). **Escolhido o monocromático (B)**: preto na barra clara, branco na escura.
+
+No app:
+
+- `src-tauri/icons/` foi gerado com `pnpm tauri icon docs/marca/dockyard-icone.svg`. O `icon.ico` foi montado à mão: 16, 20 e 24 px vêm de `dockyard-icone-16.svg`; 32, 40, 48, 64 e 256 px, de `dockyard-icone.svg`, cada um rasterizado direto do SVG no seu tamanho.
+- A bandeja (`src-tauri/src/tray.rs`) embute os PNGs de `src-tauri/icons/tray/` (preto e branco, a 16, 20, 24 e 32 px). A cor segue o tema da **barra de tarefas** (`SystemUsesLightTheme`), não o dos apps; o tamanho segue a escala do monitor principal.
+- As cores `hsl()` dos SVGs foram gravadas em hex (`#4267cd` → `#2a499d`, a mesma cor), para qualquer rasterizador ler.
+- Os logotipos (`dockyard-logotipo*.svg`) ainda trazem o símbolo do B e ficam para outro recorte.
 
 ## 4. O que o renome exige no código (recorte futuro)
 

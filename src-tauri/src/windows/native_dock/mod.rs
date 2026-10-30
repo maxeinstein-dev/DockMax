@@ -3235,6 +3235,15 @@ fn show_dock_menu(edge: DockEdge, items: Vec<MenuEntry>) -> Option<MenuChoice> {
     choices.get(chosen).copied().flatten()
 }
 
+/// Has the tray icon checked against the taskbar's theme and the primary
+/// monitor's scale, on the main thread: a dock gets the system's broadcasts
+/// (every dock does, so the check sets the icon only when it changed).
+fn check_tray_icon() {
+    if let Some(app) = APP.get() {
+        crate::tray::refresh_soon(app);
+    }
+}
+
 /// The tray icon's menu (spec 0014 R3: the Dockyard's own, as the dock's),
 /// opened at the pointer: what the dock's has, without the workspaces.
 pub fn tray_menu(app: &AppHandle) {
@@ -3387,18 +3396,30 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
             }),
             _ => handled = false,
         },
-        WM_SETTINGCHANGE => with_dock(hwnd, |dock| {
-            dock.dark = theme::system_dark();
-            dock.motion = system_motion();
-            dock.place();
-            dock.paint();
-        }),
+        WM_SETTINGCHANGE => {
+            // "ImmersiveColorSet" among them: the taskbar's theme, which the
+            // tray icon's ink follows.
+            check_tray_icon();
+            with_dock(hwnd, |dock| {
+                dock.dark = theme::system_dark();
+                dock.motion = system_motion();
+                dock.place();
+                dock.paint();
+            });
+        }
         // A monitor came, went or changed: a dock each, placed again.
-        WM_DISPLAYCHANGE => with_docks(sync),
-        WM_DPICHANGED => with_dock(hwnd, |dock| {
-            dock.place();
-            dock.paint();
-        }),
+        WM_DISPLAYCHANGE => {
+            check_tray_icon();
+            with_docks(sync);
+        }
+        WM_DPICHANGED => {
+            // The tray icon's size follows the primary monitor's scale.
+            check_tray_icon();
+            with_dock(hwnd, |dock| {
+                dock.place();
+                dock.paint();
+            });
+        }
         // Alt+F4 hides the dock instead of closing it.
         WM_CLOSE => with_dock(hwnd, Dock::hide),
         WM_GETOBJECT => match access::get_object(hwnd, wparam, lparam) {
