@@ -435,7 +435,7 @@ def traco(glifo, lado, estilo):
     mascara = Mascara(lado)
     for d in glifo["caminhos"]:
         mascara.tracar(mover(achatar(d), escala, margem, margem), largura * escala)
-    cor = tuple(int(estilo["cor"][i : i + 2], 16) for i in (1, 3, 5))
+    cor = tuple(int(tinta_traco(glifo, estilo)[i : i + 2], 16) for i in (1, 3, 5))
     linhas = []
     for fileira in mascara.cobertura():
         linha = bytearray()
@@ -445,12 +445,20 @@ def traco(glifo, lado, estilo):
     return linhas
 
 
+def tinta_traco(glifo, estilo):
+    """A cor do glifo, `#RRGGBB`: a do estilo, ou com `cor: matiz` a matiz do
+    esmalte do glifo na `saturacao` e na `luz` do estilo."""
+    if estilo["cor"] != "matiz":
+        return estilo["cor"]
+    return hex_de(hsl(glifo["esmalte"][0], float(estilo["saturacao"]), float(estilo["luz"])))
+
+
 def svg_traco(glifo, lado, estilo):
     escala, margem, largura = geometria_traco(estilo, lado)
     caminhos = "".join(f'<path d="{d}"/>' for d in glifo["caminhos"])
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{lado}" height="{lado}" viewBox="0 0 {lado} {lado}">'
-        f'<g transform="translate({n(margem)} {n(margem)}) scale({n(escala)})" fill="none" stroke="{estilo["cor"]}" '
+        f'<g transform="translate({n(margem)} {n(margem)}) scale({n(escala)})" fill="none" stroke="{tinta_traco(glifo, estilo)}" '
         f'stroke-width="{largura}" stroke-linecap="round" stroke-linejoin="round">{caminhos}</g></svg>\n'
     )
 
@@ -459,6 +467,20 @@ ESTILOS = {
     "esmalte": (lambda glifo, lado, _: esmalte(glifo, lado), lambda glifo, lado, _: svg_esmalte(glifo, lado)),
     "traco": (traco, svg_traco),
 }
+
+
+def estilo_de(nome):
+    """O rasterizador e o desenhista de SVG do estilo `nome`: os daqui, ou os
+    feitos de camadas (camadas.py)."""
+    if nome in ESTILOS:
+        return ESTILOS[nome]
+    import camadas
+
+    fazer = camadas.ESTILOS[nome]
+    return (
+        lambda glifo, lado, estilo: camadas.rasterizar(fazer(glifo, lado, estilo), lado),
+        lambda glifo, lado, estilo: camadas.svg(fazer(glifo, lado, estilo), lado),
+    )
 
 
 def n(v):
@@ -511,7 +533,7 @@ def main():
     meta, estilo = ler_pacote(AQUI / f"{pacote}.txt")
     glifos = ler_glifos(AQUI / "glifos.txt")
     lado = int(estilo.get("lado", "128"))
-    rasterizar, desenhar = ESTILOS[estilo["estilo"]]
+    rasterizar, desenhar = estilo_de(estilo["estilo"])
     destino = AQUI.parent / pacote
     # O estilo do tema escuro: cada "chave-escuro" no lugar da "chave".
     claro = {k: v for k, v in estilo.items() if not k.endswith("-escuro")}

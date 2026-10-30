@@ -113,9 +113,9 @@ describe("LookPanel", () => {
     render(<LookPanel settings={SETTINGS} onBack={vi.fn()} />);
     await flush();
 
-    fireEvent.change(screen.getByRole("combobox", { name: text.iconPack }), {
-      target: { value: "cores" },
-    });
+    fireEvent.click(
+      within(group(text.iconPack)).getByRole("button", { name: "Cores lisas" }),
+    );
 
     expect(sentSettings().dock.iconPack).toBe("cores");
   });

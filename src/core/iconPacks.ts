@@ -49,6 +49,7 @@ export interface IconPackInfo {
 
 export const ICON_PACK_COMMANDS = {
   list: "list_icon_packs",
+  preview: "icon_pack_preview",
   reload: "reload_icon_packs",
   openFolder: "open_icon_packs_folder",
 } as const;
@@ -76,6 +77,26 @@ export function reloadIconPacks(): Promise<IconPackInfo[]> {
       throw error;
     },
   );
+}
+
+/** The most programs a miniature of a pack shows (`PREVIEW_APPS` in
+ * `src-tauri/src/commands/apps.rs`). */
+export const PREVIEW_APPS = 6;
+
+/** The icons `pack` (null: the programs' own) gives the programs `appIds`,
+ * in that order, as `data:` URLs, in the dock's theme: the miniature of the
+ * pack's card. */
+export function iconPackPreview(
+  pack: string | null,
+  appIds: readonly string[],
+): Promise<(string | null)[]> {
+  return invoke<(string | null)[]>(ICON_PACK_COMMANDS.preview, {
+    pack,
+    appIds: appIds.slice(0, PREVIEW_APPS),
+  }).catch((error: unknown) => {
+    log.warn(`icons: preview failed: ${errorKind(error)}`);
+    throw error;
+  });
 }
 
 /** Opens the packs folder in File Explorer. */

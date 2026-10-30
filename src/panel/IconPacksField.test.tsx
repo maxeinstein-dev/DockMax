@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { IconPackInfo } from "../core/iconPacks";
 import { ptBR } from "../i18n/pt-BR";
@@ -34,19 +35,45 @@ function pack(change: Partial<IconPackInfo>): IconPackInfo {
   };
 }
 
+/** The packs the folder has; each preview is one URL per program, named
+ * after the pack. */
 function answer(packs: IconPackInfo[]) {
-  invoke.mockImplementation((command: string) =>
-    command === "list_icon_packs" || command === "reload_icon_packs"
-      ? Promise.resolve(packs)
-      : Promise.resolve(undefined),
+  invoke.mockImplementation(
+    (command: string, args?: { pack: string | null; appIds: string[] }) => {
+      if (command === "list_icon_packs" || command === "reload_icon_packs") {
+        return Promise.resolve(packs);
+      }
+      if (command === "icon_pack_preview" && args) {
+        return Promise.resolve(
+          args.appIds.map(
+            (id) => `data:image/png;base64,${args.pack ?? "own"}-${id}`,
+          ),
+        );
+      }
+      return Promise.resolve(undefined);
+    },
   );
 }
 
-const list = () => screen.getByRole("combobox", { name: text.iconPack });
-const labels = () =>
-  within(list())
-    .getAllByRole("option")
-    .map((option) => option.textContent);
+function field(props: Partial<ComponentProps<typeof IconPacksField>> = {}) {
+  return (
+    <IconPacksField
+      selected={null}
+      dock={null}
+      appIds={[]}
+      onSelect={vi.fn()}
+      {...props}
+    />
+  );
+}
+
+const group = () => screen.getByRole("group", { name: text.iconPack });
+const cards = () => within(group()).getAllByRole("button");
+const names = () =>
+  cards().map(
+    (card) => card.querySelector(".choice-card-name")?.textContent ?? "",
+  );
+const card = (name: string) => within(group()).getByRole("button", { name });
 
 describe("IconPacksField", () => {
   beforeEach(() => {
@@ -54,92 +81,137 @@ describe("IconPacksField", () => {
     log.warn.mockReset();
   });
 
-  it("offers the original icons first and a pack with what it covers", async () => {
+  it("offers the original icons first and a card per pack, with what it covers", async () => {
     answer([pack({})]);
 
-    render(<IconPacksField selected={null} onSelect={vi.fn()} />);
+    render(field());
     await flush();
 
-    expect(labels()).toEqual(["Original", "Cores lisas · veste 3 de 5 apps"]);
-    expect(list()).toHaveValue("");
+    expect(names()).toEqual(["Original", "Cores lisas"]);
+    expect(card("Cores lisas")).toHaveAccessibleDescription(
+      "Veste 3 de 5 apps",
+    );
+    expect(card("Original")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("counts the icons of a pack while no app is pinned", async () => {
     answer([pack({ total: 0, covers: 0 })]);
 
-    render(<IconPacksField selected={null} onSelect={vi.fn()} />);
+    render(field());
     await flush();
 
-    expect(labels()).toContain("Cores lisas · 12 ícones");
+    expect(card("Cores lisas")).toHaveAccessibleDescription("12 ícones");
+  });
+
+  it("draws each card's dock with the first pinned apps in its icons", async () => {
+    answer([pack({})]);
+    const appIds = ["a", "b", "c", "d", "e", "f", "g"];
+
+    render(field({ appIds }));
+    await flush();
+    await flush();
+
+    expect(invoke).toHaveBeenCalledWith("icon_pack_preview", {
+      pack: "cores",
+      appIds: ["a", "b", "c", "d", "e"],
+    });
+    expect(invoke).toHaveBeenCalledWith("icon_pack_preview", {
+      pack: null,
+      appIds: ["a", "b", "c", "d", "e"],
+    });
+    const pictures = card("Cores lisas").querySelectorAll("img");
+    expect([...pictures].map((img) => img.getAttribute("src"))).toEqual(
+      ["a", "b", "c", "d", "e"].map(
+        (id) => `data:image/png;base64,cores-${id}`,
+      ),
+    );
+  });
+
+  it("asks no preview without pinned apps", async () => {
+    answer([pack({})]);
+
+    render(field());
+    await flush();
+
+    expect(invoke).not.toHaveBeenCalledWith(
+      "icon_pack_preview",
+      expect.anything(),
+    );
   });
 
   it("shows the chosen pack as chosen", async () => {
     answer([pack({}), pack({ id: "outro", name: "Outro" })]);
 
-    render(<IconPacksField selected="outro" onSelect={vi.fn()} />);
+    render(field({ selected: "outro" }));
     await flush();
 
-    expect(list()).toHaveValue("outro");
+    expect(card("Outro")).toHaveAttribute("aria-pressed", "true");
+    expect(card("Original")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("chooses a pack, and the original with null", async () => {
     answer([pack({})]);
     const onSelect = vi.fn();
-    const { rerender } = render(
-      <IconPacksField selected={null} onSelect={onSelect} />,
-    );
+    const { rerender } = render(field({ onSelect }));
     await flush();
 
-    fireEvent.change(list(), { target: { value: "cores" } });
+    fireEvent.click(card("Cores lisas"));
     expect(onSelect).toHaveBeenLastCalledWith("cores");
 
-    rerender(<IconPacksField selected="cores" onSelect={onSelect} />);
-    fireEvent.change(list(), { target: { value: "" } });
+    rerender(field({ selected: "cores", onSelect }));
+    fireEvent.click(card("Original"));
     expect(onSelect).toHaveBeenLastCalledWith(null);
   });
 
-  it("keeps a chosen pack that is gone in the list, as unavailable", async () => {
+  it("keeps a chosen pack that is gone, as unavailable", async () => {
     answer([pack({})]);
 
-    render(<IconPacksField selected="sumiu" onSelect={vi.fn()} />);
-    expect(labels()).toContain("sumiu");
+    render(field({ selected: "sumiu" }));
+    expect(card("sumiu")).toHaveAccessibleDescription(text.iconPackLoading);
     await flush();
 
-    expect(labels()).toContain("sumiu (indisponível)");
-    expect(list()).toHaveValue("sumiu");
+    expect(card("sumiu")).toHaveAccessibleDescription("Indisponível");
+    expect(card("sumiu")).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("names the packs that cannot be used and leaves them out of the list", async () => {
+  it("names the packs that cannot be used and leaves them out of the cards", async () => {
     answer([
       pack({}),
       pack({ id: "quebrado", name: "quebrado", error: "manifestInvalid" }),
     ]);
 
-    render(<IconPacksField selected={null} onSelect={vi.fn()} />);
+    render(field());
     await flush();
 
-    expect(labels()).not.toContain("quebrado");
+    expect(names()).not.toContain("quebrado");
     expect(
       screen.getByText("Pacote quebrado: o pack.json não é válido"),
     ).toBeInTheDocument();
   });
 
-  it("reads the folder again with the reload button", async () => {
+  it("reads the folder again with the reload button, and the previews too", async () => {
     answer([pack({})]);
-    render(<IconPacksField selected={null} onSelect={vi.fn()} />);
+    render(field({ appIds: ["a"] }));
+    await flush();
     await flush();
     answer([pack({}), pack({ id: "novo", name: "Novo" })]);
+    invoke.mockClear();
 
     fireEvent.click(screen.getByRole("button", { name: text.reloadPacks }));
     await flush();
+    await flush();
 
     expect(invoke).toHaveBeenCalledWith("reload_icon_packs");
-    expect(labels()).toContain("Novo · veste 3 de 5 apps");
+    expect(names()).toContain("Novo");
+    expect(invoke).toHaveBeenCalledWith("icon_pack_preview", {
+      pack: "cores",
+      appIds: ["a"],
+    });
   });
 
   it("opens the packs folder", async () => {
     answer([]);
-    render(<IconPacksField selected={null} onSelect={vi.fn()} />);
+    render(field());
     await flush();
 
     fireEvent.click(screen.getByRole("button", { name: text.openPacksFolder }));
@@ -150,20 +222,20 @@ describe("IconPacksField", () => {
   it("says when the packs cannot be read, and keeps the original", async () => {
     invoke.mockRejectedValue(new Error("boom"));
 
-    render(<IconPacksField selected={null} onSelect={vi.fn()} />);
+    render(field());
     await flush();
 
     expect(screen.getByText(text.iconPackFailed)).toBeInTheDocument();
-    expect(labels()).toEqual(["Original"]);
+    expect(names()).toEqual(["Original"]);
     expect(log.warn).toHaveBeenCalled();
   });
 
   it("can be turned off", async () => {
     answer([pack({})]);
 
-    render(<IconPacksField selected={null} disabled onSelect={vi.fn()} />);
+    render(field({ disabled: true }));
     await flush();
 
-    expect(list()).toBeDisabled();
+    for (const button of cards()) expect(button).toBeDisabled();
   });
 });
