@@ -1,0 +1,18 @@
+# Pacote Tom sobre tom (spec 0019): placa da matiz do app e glifo da mesma
+# matiz, como os ícones temáticos: placa clara e glifo escuro no tema claro,
+# placa escura e glifo claro no escuro.
+# Para gerar de novo: python vetor.py tom-sobre-tom
+
+pack.name: Tom sobre tom
+pack.author: Dockyard
+pack.version: 1.0.0
+pack.description: Placas suaves na matiz de cada app, com o glifo no mesmo tom.
+pack.accent: #6F8FAF
+
+estilo: tom
+lado: 128
+saturacao: 1.1
+fundo: 82
+fundo-escuro: 24
+glifo: 30
+glifo-escuro: 80

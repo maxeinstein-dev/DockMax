@@ -282,8 +282,609 @@ pub const CLASSICO_98: Bundled = Bundled {
     ),
 };
 
+/// Círculo: the glyphs in white on a flat disc in the app's color, drawn
+/// by `icon-packs/fonte/vetor.py` from layers (`camadas.py`).
+pub const CIRCULO: Bundled = Bundled {
+    id: "circulo",
+    files: pack_files!("circulo":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
+/// Contorno colorido: the glyphs alone, each in its app's hue, darker for
+/// the light theme (`apps/`) and lighter for the dark (`escuro/`).
+pub const CONTORNO: Bundled = Bundled {
+    id: "contorno",
+    files: pack_files!("contorno":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+        "escuro/bloco-de-notas.png",
+        "escuro/brave.png",
+        "escuro/calculadora.png",
+        "escuro/captura.png",
+        "escuro/chatgpt.png",
+        "escuro/chrome.png",
+        "escuro/claude.png",
+        "escuro/configuracoes.png",
+        "escuro/discord.png",
+        "escuro/docker.png",
+        "escuro/edge.png",
+        "escuro/excel.png",
+        "escuro/explorador.png",
+        "escuro/figma.png",
+        "escuro/filezilla.png",
+        "escuro/firefox.png",
+        "escuro/fotos.png",
+        "escuro/gerenciador.png",
+        "escuro/github.png",
+        "escuro/grade.png",
+        "escuro/lixeira.png",
+        "escuro/notion.png",
+        "escuro/obs.png",
+        "escuro/onenote.png",
+        "escuro/opera.png",
+        "escuro/outlook.png",
+        "escuro/paint.png",
+        "escuro/powerpoint.png",
+        "escuro/powershell.png",
+        "escuro/prompt.png",
+        "escuro/slack.png",
+        "escuro/spotify.png",
+        "escuro/steam.png",
+        "escuro/store.png",
+        "escuro/teams.png",
+        "escuro/telegram.png",
+        "escuro/terminal.png",
+        "escuro/vlc.png",
+        "escuro/vscode.png",
+        "escuro/whatsapp.png",
+        "escuro/word.png",
+        "escuro/xbox.png",
+        "escuro/zoom.png",
+    ),
+};
+
+/// Tom sobre tom: a tile and a glyph of the app's hue, a light tile in the
+/// light theme and a dark one in the dark.
+pub const TOM_SOBRE_TOM: Bundled = Bundled {
+    id: "tom-sobre-tom",
+    files: pack_files!("tom-sobre-tom":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+        "escuro/bloco-de-notas.png",
+        "escuro/brave.png",
+        "escuro/calculadora.png",
+        "escuro/captura.png",
+        "escuro/chatgpt.png",
+        "escuro/chrome.png",
+        "escuro/claude.png",
+        "escuro/configuracoes.png",
+        "escuro/discord.png",
+        "escuro/docker.png",
+        "escuro/edge.png",
+        "escuro/excel.png",
+        "escuro/explorador.png",
+        "escuro/figma.png",
+        "escuro/filezilla.png",
+        "escuro/firefox.png",
+        "escuro/fotos.png",
+        "escuro/gerenciador.png",
+        "escuro/github.png",
+        "escuro/grade.png",
+        "escuro/lixeira.png",
+        "escuro/notion.png",
+        "escuro/obs.png",
+        "escuro/onenote.png",
+        "escuro/opera.png",
+        "escuro/outlook.png",
+        "escuro/paint.png",
+        "escuro/powerpoint.png",
+        "escuro/powershell.png",
+        "escuro/prompt.png",
+        "escuro/slack.png",
+        "escuro/spotify.png",
+        "escuro/steam.png",
+        "escuro/store.png",
+        "escuro/teams.png",
+        "escuro/telegram.png",
+        "escuro/terminal.png",
+        "escuro/vlc.png",
+        "escuro/vscode.png",
+        "escuro/whatsapp.png",
+        "escuro/word.png",
+        "escuro/xbox.png",
+        "escuro/zoom.png",
+    ),
+};
+
+/// Vidro: a translucent tile tinted with the app's hue and a white glyph;
+/// more opaque in the light theme.
+pub const VIDRO: Bundled = Bundled {
+    id: "vidro",
+    files: pack_files!("vidro":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+        "escuro/bloco-de-notas.png",
+        "escuro/brave.png",
+        "escuro/calculadora.png",
+        "escuro/captura.png",
+        "escuro/chatgpt.png",
+        "escuro/chrome.png",
+        "escuro/claude.png",
+        "escuro/configuracoes.png",
+        "escuro/discord.png",
+        "escuro/docker.png",
+        "escuro/edge.png",
+        "escuro/excel.png",
+        "escuro/explorador.png",
+        "escuro/figma.png",
+        "escuro/filezilla.png",
+        "escuro/firefox.png",
+        "escuro/fotos.png",
+        "escuro/gerenciador.png",
+        "escuro/github.png",
+        "escuro/grade.png",
+        "escuro/lixeira.png",
+        "escuro/notion.png",
+        "escuro/obs.png",
+        "escuro/onenote.png",
+        "escuro/opera.png",
+        "escuro/outlook.png",
+        "escuro/paint.png",
+        "escuro/powerpoint.png",
+        "escuro/powershell.png",
+        "escuro/prompt.png",
+        "escuro/slack.png",
+        "escuro/spotify.png",
+        "escuro/steam.png",
+        "escuro/store.png",
+        "escuro/teams.png",
+        "escuro/telegram.png",
+        "escuro/terminal.png",
+        "escuro/vlc.png",
+        "escuro/vscode.png",
+        "escuro/whatsapp.png",
+        "escuro/word.png",
+        "escuro/xbox.png",
+        "escuro/zoom.png",
+    ),
+};
+
+/// Neon: the glyph as a neon tube of the app's hue, glowing; on a dark tile
+/// in the light theme, loose in the dark.
+pub const NEON: Bundled = Bundled {
+    id: "neon",
+    files: pack_files!("neon":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+        "escuro/bloco-de-notas.png",
+        "escuro/brave.png",
+        "escuro/calculadora.png",
+        "escuro/captura.png",
+        "escuro/chatgpt.png",
+        "escuro/chrome.png",
+        "escuro/claude.png",
+        "escuro/configuracoes.png",
+        "escuro/discord.png",
+        "escuro/docker.png",
+        "escuro/edge.png",
+        "escuro/excel.png",
+        "escuro/explorador.png",
+        "escuro/figma.png",
+        "escuro/filezilla.png",
+        "escuro/firefox.png",
+        "escuro/fotos.png",
+        "escuro/gerenciador.png",
+        "escuro/github.png",
+        "escuro/grade.png",
+        "escuro/lixeira.png",
+        "escuro/notion.png",
+        "escuro/obs.png",
+        "escuro/onenote.png",
+        "escuro/opera.png",
+        "escuro/outlook.png",
+        "escuro/paint.png",
+        "escuro/powerpoint.png",
+        "escuro/powershell.png",
+        "escuro/prompt.png",
+        "escuro/slack.png",
+        "escuro/spotify.png",
+        "escuro/steam.png",
+        "escuro/store.png",
+        "escuro/teams.png",
+        "escuro/telegram.png",
+        "escuro/terminal.png",
+        "escuro/vlc.png",
+        "escuro/vscode.png",
+        "escuro/whatsapp.png",
+        "escuro/word.png",
+        "escuro/xbox.png",
+        "escuro/zoom.png",
+    ),
+};
+
+/// Argila: a soft clay tile of the app's color, lit inside, with a white
+/// glyph in relief.
+pub const ARGILA: Bundled = Bundled {
+    id: "argila",
+    files: pack_files!("argila":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
+/// Fósforo: pixel art made from `icon-packs/fonte/fosforo.txt` by
+/// `icon-packs/fonte/gerar.py`. A test checks this list against the pack.
+pub const FOSFORO: Bundled = Bundled {
+    id: "fosforo",
+    files: pack_files!("fosforo":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
+/// Game Boy: pixel art made from `icon-packs/fonte/game-boy.txt` by
+/// `icon-packs/fonte/gerar.py`. A test checks this list against the pack.
+pub const GAME_BOY: Bundled = Bundled {
+    id: "game-boy",
+    files: pack_files!("game-boy":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/cartucho.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
 /// Every pack in the binary.
-pub const ALL: &[Bundled] = &[RETRO_8BIT, ESMALTE, TRACO, CLASSICO_98];
+pub const ALL: &[Bundled] = &[
+    RETRO_8BIT,
+    ESMALTE,
+    TRACO,
+    CLASSICO_98,
+    CIRCULO,
+    CONTORNO,
+    TOM_SOBRE_TOM,
+    VIDRO,
+    NEON,
+    ARGILA,
+    FOSFORO,
+    GAME_BOY,
+];
 
 impl Bundled {
     /// The `pack.json` of the pack, as in the binary.
@@ -346,8 +947,11 @@ mod tests {
 
     const SOURCE: &str = include_str!("../../icon-packs/fonte/retro-8bit.txt");
     const CLASSIC: &str = include_str!("../../icon-packs/fonte/classico-98.txt");
+    const PHOSPHOR: &str = include_str!("../../icon-packs/fonte/fosforo.txt");
+    const GAME_BOY_SOURCE: &str = include_str!("../../icon-packs/fonte/game-boy.txt");
     const GLYPHS: &str = include_str!("../../icon-packs/fonte/glifos.txt");
     const LINE: &str = include_str!("../../icon-packs/fonte/traco.txt");
+    const OUTLINE: &str = include_str!("../../icon-packs/fonte/contorno.txt");
 
     /// The folder of the repository a pack is made from.
     fn folder(path: &str) -> std::path::PathBuf {
@@ -371,6 +975,14 @@ mod tests {
             (ESMALTE, "Esmalte"),
             (TRACO, "Traço"),
             (CLASSICO_98, "Clássico 98"),
+            (FOSFORO, "Fósforo"),
+            (GAME_BOY, "Game Boy"),
+            (CIRCULO, "Círculo"),
+            (CONTORNO, "Contorno colorido"),
+            (TOM_SOBRE_TOM, "Tom sobre tom"),
+            (VIDRO, "Vidro"),
+            (NEON, "Neon"),
+            (ARGILA, "Argila"),
         ] {
             let manifest = pack.manifest();
             assert_eq!(manifest.name, name);
@@ -438,7 +1050,7 @@ mod tests {
                 assert!(pack.manifest.covers(&[app]), "{} {app}", pack.id);
             }
             let fallback = match pack.id.as_str() {
-                "retro-8bit" => "apps/cartucho.png",
+                "retro-8bit" | "game-boy" => "apps/cartucho.png",
                 _ => "apps/grade.png",
             };
             assert_eq!(
@@ -568,7 +1180,12 @@ mod tests {
 
     #[test]
     fn the_images_are_the_drawings_of_the_source() {
-        for (pack, text) in [(RETRO_8BIT, SOURCE), (CLASSICO_98, CLASSIC)] {
+        for (pack, text) in [
+            (RETRO_8BIT, SOURCE),
+            (CLASSICO_98, CLASSIC),
+            (FOSFORO, PHOSPHOR),
+            (GAME_BOY, GAME_BOY_SOURCE),
+        ] {
             pixels_are_drawings(pack, text);
         }
     }
@@ -839,6 +1456,136 @@ mod tests {
             for i in 0..=last {
                 assert_eq!((row(last)[i], row(i)[last]), (b'0', b'0'), "{path} {i}");
             }
+        }
+    }
+
+    /// The PNGs of `pack` in `folder` (`apps/` or `escuro/`), by path.
+    fn images_in(pack: &Bundled, folder: &str) -> BTreeMap<&'static str, &'static [u8]> {
+        pack.files
+            .iter()
+            .filter(|(path, _)| path.starts_with(folder))
+            .copied()
+            .collect()
+    }
+
+    #[test]
+    fn every_vector_pack_draws_every_glyph_in_each_of_its_themes() {
+        for (pack, themes) in [
+            (CIRCULO, &["apps/"][..]),
+            (CONTORNO, &["apps/", "escuro/"][..]),
+            (TOM_SOBRE_TOM, &["apps/", "escuro/"][..]),
+            (VIDRO, &["apps/", "escuro/"][..]),
+            (NEON, &["apps/", "escuro/"][..]),
+            (ARGILA, &["apps/"][..]),
+        ] {
+            let manifest = pack.manifest();
+            let svg_folder = |theme: &str| match theme {
+                "apps/" => format!("fonte/{}-svg", pack.id),
+                _ => format!("fonte/{}-escuro-svg", pack.id),
+            };
+            for theme in themes {
+                let images = images_in(&pack, theme);
+                let expected: Vec<String> = glyphs()
+                    .keys()
+                    .map(|path| path.replace("apps/", theme))
+                    .collect();
+                assert_eq!(
+                    images
+                        .keys()
+                        .map(|path| path.to_string())
+                        .collect::<Vec<_>>(),
+                    expected,
+                    "{} {theme}",
+                    pack.id
+                );
+                // The SVG each PNG was drawn from is in the repository too.
+                assert_eq!(
+                    names_in(&svg_folder(theme), theme)
+                        .iter()
+                        .map(|name| name.replace(".svg", ".png"))
+                        .collect::<Vec<_>>(),
+                    expected,
+                    "{} {theme}",
+                    pack.id
+                );
+                for (path, bytes) in images {
+                    let (side, pixels) = decode(bytes);
+                    assert_eq!(side, 128, "{} {path}", pack.id);
+                    let pixels = pixels.as_chunks::<4>().0;
+                    // A corner is free (the shapes keep a margin) and the
+                    // middle has something drawn.
+                    assert!(pixels[0][3] <= 8, "{} {path}", pack.id);
+                    let drawn = pixels.iter().filter(|p| p[3] == 255).count();
+                    assert!(drawn > 100, "{} {path}: {drawn}", pack.id);
+                }
+            }
+            // A pack with a dark theme has a dark image for every image.
+            if themes.len() == 2 {
+                assert_eq!(manifest.dark.len(), glyphs().len(), "{}", pack.id);
+            } else {
+                assert!(manifest.dark.is_empty(), "{}", pack.id);
+            }
+        }
+    }
+
+    #[test]
+    fn the_outline_glyphs_take_their_apps_hue_and_read_on_both_themes() {
+        let value = |key: &str| -> f64 {
+            OUTLINE
+                .lines()
+                .find_map(|line| line.strip_prefix(key))
+                .unwrap()
+                .trim()
+                .parse()
+                .unwrap()
+        };
+        let saturation = value("saturacao:");
+        for (folder_of, lightness, surface) in [
+            ("apps/", value("luz:"), [247, 247, 249]),
+            ("escuro/", value("luz-escuro:"), [38, 39, 44]),
+        ] {
+            let images = images_in(&CONTORNO, folder_of);
+            for (path, [hue, _, _]) in glyphs() {
+                let rgb = hsl([hue, saturation, lightness]);
+                let ink = rgb.map(|c| c.round() as u8);
+                // Every hue reads on the dock's surface of its theme.
+                assert!(
+                    contrast(ink, surface) >= 3.0,
+                    "{path} {folder_of}: {:.2}",
+                    contrast(ink, surface)
+                );
+                let (_, pixels) = decode(images[path.replace("apps/", folder_of).as_str()]);
+                for pixel in pixels.as_chunks::<4>().0.iter().filter(|p| p[3] > 0) {
+                    for (got, want) in pixel[..3].iter().zip(ink) {
+                        assert!(got.abs_diff(want) <= 1, "{path} {folder_of}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_game_boy_has_its_four_greens_and_the_phosphor_its_screen() {
+        let Source { palette, .. } = source(GAME_BOY_SOURCE);
+        assert_eq!(palette.len(), 4);
+        // From dark to light, every green lighter than the one before.
+        let lights: Vec<f64> = ['0', '1', '2', '3']
+            .iter()
+            .map(|c| luminance(palette[c]))
+            .collect();
+        assert!(
+            lights.windows(2).all(|pair| pair[1] > pair[0] * 1.8),
+            "{lights:?}"
+        );
+        let Source { drawings, .. } = source(PHOSPHOR);
+        for (path, rows) in drawings {
+            // The screen, inside the bezel, is scan lines or lit phosphor.
+            for row in &rows[3..29] {
+                for cell in row[3..29].chars() {
+                    assert!("01234".contains(cell), "{path}");
+                }
+            }
+            assert!(rows.iter().any(|row| row.contains('4')), "{path}");
         }
     }
 }

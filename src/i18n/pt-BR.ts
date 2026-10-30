@@ -293,15 +293,16 @@ const messages = {
         uniform: "Mesmo tamanho",
         original: "Como vieram",
       } satisfies Record<IconShape, string>,
-      /** The icon packs (spec 0007). `{name}`, `{covers}`, `{total}`,
-       * `{count}` and `{id}` are filled in by the panel. */
+      /** The icon packs (spec 0007), as cards with the pack's name; the
+       * line under it. `{covers}`, `{total}` and `{count}` are filled in by
+       * the panel. */
       iconPack: "Ícones dos apps",
       iconPackHint:
         "Troque os ícones de todos os apps por um pacote da pasta de pacotes",
       iconPackOriginal: "Original",
-      iconPackCovers: "{name} · veste {covers} de {total} apps",
-      iconPackCount: "{name} · {count} ícones",
-      iconPackMissing: "{id} (indisponível)",
+      iconPackCovers: "Veste {covers} de {total} apps",
+      iconPackCount: "{count} ícones",
+      iconPackMissing: "Indisponível",
       iconPackLoading: "Lendo os pacotes…",
       iconPackFailed: "Não foi possível ler os pacotes",
       openPacksFolder: "Abrir pasta de pacotes",

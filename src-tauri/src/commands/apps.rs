@@ -21,6 +21,7 @@ use crate::domain::apps::{
     AppError, AppErrorCode, AppsSnapshot, PinnedApp, is_pinnable_path, is_valid_app_id,
     is_valid_app_name,
 };
+use crate::domain::icon_pack::is_valid_pack_id;
 use crate::domain::open_apps::OpenSnapshot;
 use crate::domain::widgets::{MoveDirection, WidgetId};
 use crate::persistence::apps_repo;
@@ -345,6 +346,53 @@ pub async fn app_icon(
     let icon = read.map(|png| format!("data:image/png;base64,{}", STANDARD.encode(png)));
     remember_icon(key, icon.clone());
     Ok(icon)
+}
+
+/// The most programs a miniature of an icon pack shows.
+pub const PREVIEW_APPS: usize = 6;
+
+/// The icons `pack` gives the programs `app_ids`, in that order, as PNG
+/// `data:` URLs (`null` for a program with no icon): the miniature of the
+/// pack's card in Configurações (spec 0007 §3.5). In the dock's theme and at
+/// its size; without a pack, the programs' own icons. At most
+/// [`PREVIEW_APPS`] programs.
+#[tauri::command]
+pub async fn icon_pack_preview(
+    app: AppHandle,
+    pack: Option<String>,
+    app_ids: Vec<String>,
+) -> Result<Vec<Option<String>>, AppCommandError> {
+    if app_ids.len() > PREVIEW_APPS || !app_ids.iter().all(|id| is_valid_app_id(id)) {
+        return Err(AppError::InvalidApp.into());
+    }
+    if pack.as_deref().is_some_and(|id| !is_valid_pack_id(id)) {
+        return Err(AppError::InvalidApp.into());
+    }
+    let dark = pack.is_some() && super::settings::dark_now(&app);
+    let mut icons = Vec::with_capacity(app_ids.len());
+    for app_id in app_ids {
+        let key = (pack.clone(), app_id, ICON_SIZES[1], dark);
+        if let Some(icon) = cached_icon(&key) {
+            icons.push(icon);
+            continue;
+        }
+        let app = app.clone();
+        let lookup = key.clone();
+        let read = tauri::async_runtime::spawn_blocking(move || {
+            let (pack, app_id, size, dark) = lookup;
+            let from_pack = pack.and_then(|pack| {
+                let shown = apps::name_of(&app_id).unwrap_or_default();
+                icons::pack_icon(&app, &pack, &icons::names_of(&app_id, &shown), dark)
+            });
+            from_pack.or_else(|| apps::icon_png(&app_id, size))
+        })
+        .await
+        .map_err(|_| AppCommandError::from(AppError::Unavailable))?;
+        let icon = read.map(|png| format!("data:image/png;base64,{}", STANDARD.encode(png)));
+        remember_icon(key, icon.clone());
+        icons.push(icon);
+    }
+    Ok(icons)
 }
 
 /// The icon the dock draws for a program (spec 0011 H3), as PNG: the icon

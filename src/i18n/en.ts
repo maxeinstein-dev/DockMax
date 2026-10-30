@@ -237,9 +237,9 @@ export const en: Messages = {
       iconPackHint:
         "Replace every app's icon with a pack from the packs folder",
       iconPackOriginal: "Original",
-      iconPackCovers: "{name} · covers {covers} of {total} apps",
-      iconPackCount: "{name} · {count} icons",
-      iconPackMissing: "{id} (unavailable)",
+      iconPackCovers: "Covers {covers} of {total} apps",
+      iconPackCount: "{count} icons",
+      iconPackMissing: "Unavailable",
       iconPackLoading: "Reading the packs…",
       iconPackFailed: "The packs couldn't be read",
       openPacksFolder: "Open packs folder",
