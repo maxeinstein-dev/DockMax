@@ -81,8 +81,61 @@ pub const RETRO_8BIT: Bundled = Bundled {
     ),
 };
 
+/// Esmalte: the glyphs of `icon-packs/fonte/glifos.txt` in white on the
+/// dock's glazed tile, drawn as SVG and rasterized by
+/// `icon-packs/fonte/vetor.py`. A test checks this list against the pack.
+pub const ESMALTE: Bundled = Bundled {
+    id: "esmalte",
+    files: pack_files!("esmalte":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
 /// Every pack in the binary.
-pub const ALL: &[Bundled] = &[RETRO_8BIT];
+pub const ALL: &[Bundled] = &[RETRO_8BIT, ESMALTE];
 
 impl Bundled {
     /// The `pack.json` of the pack, as in the binary.
@@ -144,93 +197,148 @@ mod tests {
     use tempfile::TempDir;
 
     const SOURCE: &str = include_str!("../../icon-packs/fonte/retro-8bit.txt");
+    const GLYPHS: &str = include_str!("../../icon-packs/fonte/glifos.txt");
+
+    /// The folder of the repository a pack is made from.
+    fn folder(path: &str) -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("icon-packs")
+            .join(path)
+    }
+
+    /// The names of the files in `dir`, as `<prefix><name>`.
+    fn names_in(dir: &str, prefix: &str) -> BTreeSet<String> {
+        fs::read_dir(folder(dir))
+            .unwrap()
+            .map(|entry| format!("{prefix}{}", entry.unwrap().file_name().to_string_lossy()))
+            .collect()
+    }
 
     #[test]
     fn the_list_of_files_is_the_pack() {
-        let manifest = RETRO_8BIT.manifest();
-        assert_eq!(manifest.name, "Retrô 8-bit");
-        let named: BTreeSet<&str> = manifest
-            .icons
-            .values()
-            .chain(manifest.fallback.iter())
-            .map(String::as_str)
-            .collect();
-        let listed: BTreeSet<&str> = RETRO_8BIT
-            .files
-            .iter()
-            .map(|(path, _)| *path)
-            .filter(|path| *path != "pack.json")
-            .collect();
-        assert_eq!(named, listed);
-        let on_disk: BTreeSet<String> =
-            fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("icon-packs/retro-8bit/apps"))
-                .unwrap()
-                .map(|entry| format!("apps/{}", entry.unwrap().file_name().to_string_lossy()))
+        for (pack, name) in [(RETRO_8BIT, "Retrô 8-bit"), (ESMALTE, "Esmalte")] {
+            let manifest = pack.manifest();
+            assert_eq!(manifest.name, name);
+            let named: BTreeSet<&str> = manifest
+                .icons
+                .values()
+                .chain(manifest.fallback.iter())
+                .map(String::as_str)
                 .collect();
-        assert_eq!(
-            on_disk,
-            listed.iter().map(|path| path.to_string()).collect()
-        );
+            let listed: BTreeSet<&str> = pack
+                .files
+                .iter()
+                .map(|(path, _)| *path)
+                .filter(|path| *path != "pack.json")
+                .collect();
+            assert_eq!(named, listed, "{name}");
+            assert_eq!(
+                names_in(&format!("{}/apps", pack.id), "apps/"),
+                listed.iter().map(|path| path.to_string()).collect(),
+                "{name}"
+            );
+        }
     }
 
     #[test]
-    fn the_installed_pack_is_one_the_app_takes() {
+    fn the_installed_packs_are_ones_the_app_takes() {
         let root = TempDir::new().unwrap();
         assert!(install(root.path(), ALL).unwrap());
         let found = icon_packs::scan(root.path());
-        assert_eq!(found.len(), 1);
-        let pack = found[0].pack.clone().expect("the pack is valid");
-        assert_eq!(pack.id, "retro-8bit");
-        for path in pack
-            .manifest
-            .icons
-            .values()
-            .chain(pack.manifest.fallback.iter())
-        {
-            assert!(icon_packs::read_image(&pack, path).is_some(), "{path}");
+        assert_eq!(found.len(), ALL.len());
+        for found in found {
+            let pack = found.pack.clone().expect("the pack is valid");
+            assert!(ALL.iter().any(|bundled| bundled.id == pack.id));
+            for path in pack
+                .manifest
+                .icons
+                .values()
+                .chain(pack.manifest.fallback.iter())
+            {
+                assert!(icon_packs::read_image(&pack, path).is_some(), "{path}");
+            }
+            // The author's dock, by the names Windows shows.
+            for app in [
+                "Explorador de Arquivos",
+                "FileZilla",
+                "Google Chrome",
+                "WhatsApp",
+                "Terminal",
+                "Visual Studio Code",
+                "Bloco de notas",
+            ] {
+                assert!(pack.manifest.covers(&[app]), "{} {app}", pack.id);
+            }
+            let fallback = match pack.id.as_str() {
+                "retro-8bit" => "apps/cartucho.png",
+                _ => "apps/grade.png",
+            };
+            assert_eq!(
+                pack.manifest.image_for(&["Um programa qualquer"]),
+                Some(fallback)
+            );
         }
-        // The author's dock, by the names Windows shows.
-        for app in [
-            "Explorador de Arquivos",
-            "FileZilla",
-            "Google Chrome",
-            "WhatsApp",
-            "Terminal",
-            "Visual Studio Code",
-            "Bloco de notas",
-        ] {
-            assert!(pack.manifest.covers(&[app]), "{app}");
-        }
-        assert_eq!(
-            pack.manifest.image_for(&["Um programa qualquer"]),
-            Some("apps/cartucho.png")
-        );
     }
 
     #[test]
-    fn no_two_names_of_the_pack_are_one_key() {
-        let manifest = RETRO_8BIT.manifest();
-        let mut seen = BTreeSet::new();
-        for name in manifest.icons.keys() {
-            assert!(seen.insert(normalize_key(name)), "{name}");
+    fn no_two_names_of_a_pack_are_one_key() {
+        for pack in ALL {
+            let manifest = pack.manifest();
+            let mut seen = BTreeSet::new();
+            for name in manifest.icons.keys() {
+                assert!(seen.insert(normalize_key(name)), "{} {name}", pack.id);
+            }
         }
     }
 
     #[test]
     fn a_pack_is_copied_once_per_version() {
         let root = TempDir::new().unwrap();
-        assert!(install(root.path(), ALL).unwrap());
-        assert!(!install(root.path(), ALL).unwrap());
+        let packs = &[RETRO_8BIT];
+        assert!(install(root.path(), packs).unwrap());
+        assert!(!install(root.path(), packs).unwrap());
         // Deleted by the user: it stays deleted.
         fs::remove_dir_all(root.path().join("retro-8bit")).unwrap();
-        assert!(!install(root.path(), ALL).unwrap());
+        assert!(!install(root.path(), packs).unwrap());
         assert!(!root.path().join("retro-8bit").exists());
         // A new version comes back.
-        fs::write(root.path().join(MARKER), "retro-8bit 0.9.0\n").unwrap();
-        assert!(install(root.path(), ALL).unwrap());
+        fs::write(
+            root.path().join(MARKER),
+            "retro-8bit 0.9.0
+",
+        )
+        .unwrap();
+        assert!(install(root.path(), packs).unwrap());
         assert!(root.path().join("retro-8bit/pack.json").is_file());
         let marker = fs::read_to_string(root.path().join(MARKER)).unwrap();
-        assert_eq!(marker, format!("retro-8bit 0.9.0\n{}\n", RETRO_8BIT.line()));
+        assert_eq!(
+            marker,
+            format!(
+                "retro-8bit 0.9.0
+{}
+",
+                RETRO_8BIT.line()
+            )
+        );
+    }
+
+    #[test]
+    fn every_pack_is_noted_once() {
+        let root = TempDir::new().unwrap();
+        assert!(install(root.path(), ALL).unwrap());
+        let marker = fs::read_to_string(root.path().join(MARKER)).unwrap();
+        let lines: Vec<String> = ALL.iter().map(Bundled::line).collect();
+        assert_eq!(
+            marker,
+            format!(
+                "{}
+",
+                lines.join(
+                    "
+"
+                )
+            )
+        );
     }
 
     /// What `retro-8bit.txt` says about the images.
@@ -327,6 +435,110 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    /// The glyphs of `glifos.txt`: the file of each and its glaze (hue,
+    /// saturation, lightness).
+    fn glyphs() -> BTreeMap<String, [f64; 3]> {
+        let mut glyphs = BTreeMap::new();
+        let mut current = String::new();
+        for line in GLYPHS.lines().map(str::trim) {
+            if let Some(id) = line.strip_prefix('@') {
+                current = format!("apps/{id}.png");
+            } else if let Some(glaze) = line.strip_prefix("esmalte:") {
+                let values: Vec<f64> = glaze
+                    .split_whitespace()
+                    .map(|v| v.parse().unwrap())
+                    .collect();
+                glyphs.insert(current.clone(), [values[0], values[1], values[2]]);
+            }
+        }
+        glyphs
+    }
+
+    /// `hsl(h s% l%)` as 8-bit RGB.
+    fn hsl([h, s, l]: [f64; 3]) -> [f64; 3] {
+        let (s, l) = (s / 100.0, l / 100.0);
+        let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+        let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+        let (r, g, b) = match (h / 60.0) as u32 {
+            0 => (c, x, 0.0),
+            1 => (x, c, 0.0),
+            2 => (0.0, c, x),
+            3 => (0.0, x, c),
+            4 => (x, 0.0, c),
+            _ => (c, 0.0, x),
+        };
+        let m = l - c / 2.0;
+        [(r + m) * 255.0, (g + m) * 255.0, (b + m) * 255.0]
+    }
+
+    fn decode(bytes: &[u8]) -> (u32, Vec<u8>) {
+        let mut reader = png::Decoder::new(bytes).read_info().unwrap();
+        let mut pixels = vec![0; reader.output_buffer_size()];
+        let frame = reader.next_frame(&mut pixels).unwrap();
+        assert_eq!(frame.color_type, png::ColorType::Rgba);
+        assert_eq!(frame.width, frame.height);
+        (frame.width, pixels)
+    }
+
+    #[test]
+    fn the_glazed_tiles_are_the_glyphs_of_the_source() {
+        let glyphs = glyphs();
+        let images: BTreeMap<&str, &[u8]> = ESMALTE
+            .files
+            .iter()
+            .filter(|(path, _)| *path != "pack.json")
+            .copied()
+            .collect();
+        assert_eq!(
+            glyphs.keys().map(String::as_str).collect::<Vec<_>>(),
+            images.keys().copied().collect::<Vec<_>>()
+        );
+        // The SVG each PNG was rasterized from is in the repository too.
+        assert_eq!(
+            names_in("fonte/esmalte-svg", "apps/")
+                .iter()
+                .map(|name| name.replace(".svg", ".png"))
+                .collect::<Vec<_>>(),
+            images
+                .keys()
+                .map(|path| path.to_string())
+                .collect::<Vec<_>>()
+        );
+        for (path, glaze) in &glyphs {
+            let (side, pixels) = decode(images[path.as_str()]);
+            assert_eq!(side, 128, "{path}");
+            let at = |x: u32, y: u32| {
+                let i = ((y * side + x) * 4) as usize;
+                [pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3]]
+            };
+            // Outside the superellipse, nothing.
+            assert_eq!(at(0, 0), [0, 0, 0, 0], "{path}");
+            assert_eq!(at(127, 0), [0, 0, 0, 0], "{path}");
+            // On the tile (112 px from (8, 4)), left of the glyph and below
+            // the sheen: the glaze of the source, between its two tones.
+            let [r, g, b, a] = at(20, 64);
+            assert_eq!(a, 255, "{path}");
+            let [h, s, l] = *glaze;
+            let f = (64.5 - 4.0) / 112.0;
+            let (top, bottom) = (hsl([h, s, l + 7.0]), hsl([h, s, l - 5.0]));
+            for (channel, (top, bottom)) in [r, g, b].into_iter().zip(top.into_iter().zip(bottom)) {
+                let expected = top + (bottom - top) * f;
+                assert!(
+                    (f64::from(channel) - expected).abs() <= 2.0,
+                    "{path}: {channel} for {expected}"
+                );
+            }
+            // And the white glyph on it.
+            let white = pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .filter(|p| **p == [255; 4])
+                .count();
+            assert!(white > 100, "{path}: {white} white pixels");
         }
     }
 }
