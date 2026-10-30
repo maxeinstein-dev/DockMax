@@ -67,7 +67,7 @@ pub struct Settings {
     pub version: u32,
     pub theme: Theme,
     pub dock: DockSettings,
-    /// Whether the DockMax opens when the user signs in to Windows (the entry
+    /// Whether the Dockyard opens when the user signs in to Windows (the entry
     /// in the user's `Run` key). Off unless the user turns it on.
     pub launch_at_login: bool,
     /// Whether Alt+Space opens the launcher (spec 0012). On unless the user

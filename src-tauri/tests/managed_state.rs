@@ -6,7 +6,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
 
-use dockmax_lib::{managed_state, with_state};
+use dockyard_lib::{managed_state, with_state};
 use tauri::test::{mock_builder, mock_context, noop_assets};
 
 const ALL: [&str; 1] = ["Mutex<PanelState>"];

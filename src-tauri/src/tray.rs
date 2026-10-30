@@ -2,9 +2,9 @@ use tauri::AppHandle;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
 /// The product name: the same in every locale.
-const TOOLTIP: &str = "DockMax";
+const TOOLTIP: &str = "Dockyard";
 
-/// Adds the DockMax icon to the notification area. Its menu, the DockMax's
+/// Adds the Dockyard icon to the notification area. Its menu, the Dockyard's
 /// own (spec 0014 R3), opens on right-click with what the dock's own menu
 /// has.
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {

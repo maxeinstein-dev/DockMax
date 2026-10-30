@@ -2,7 +2,7 @@
 
 Fase G da [spec 0004](0004-paridade-primodock.md) (§6), depois da fase F ([spec 0017](0017-fase-f-widgets.md), concluída em 2026-10-29).
 
-**Status:** em andamento: G1 (idioma inglês, #75) entregue; G2 (tour) em curso. Ordem decidida pelo autor em 2026-10-29: tour, pacote de ícones, nome e logo, estudo do Linux e, por último, atualização automática.
+**Status:** em andamento: G1 (idioma inglês, #75), G2 (tour, #79), G4 (ícones retrô, #80), G5 (estudo do Linux, #76) e G6 (nome e logo, #77) entregues; o renome para **Dockyard** (R1) entrou em 2026-10-30, com o repositório renomeado para `maxeinstein-dev/Dockyard`. Falta a G3 (atualização automática). Ordem decidida pelo autor em 2026-10-29: tour, pacote de ícones, nome e logo, estudo do Linux e, por último, atualização automática.
 
 ## 1. Decisões do autor (2026-10-29)
 
@@ -25,10 +25,10 @@ O que entra na fase, no lugar da lista da spec 0004 (mascote, onboarding, config
 |---|---|
 | **G1. Idioma inglês** | Seletor **Idioma** em Configurações (Sistema, Português, English); toda a interface em inglês, do front (`src/i18n/en.ts`) e do Rust (`i18n.rs`: menus, nomes do dock, lançador); datas e números no formato do idioma. "Sistema" segue o idioma de exibição do Windows: português se for um, inglês nos outros. A troca vale na hora, sem reabrir o app. |
 | **G2. Tour de boas-vindas** | Uma janela pequena com 6 passos (boas-vindas, apps, espaços, widgets, lançador, pronto), com Próximo, Voltar e Pular; no fim, Começar ou Abrir Configurações. Abre sozinha na primeira execução e em Sobre › Ver o tour. |
-| G3. Atualização automática | A definir (onde publicar as versões). |
+| G3. Atualização automática | Releases do GitHub do repositório (público), com o updater do Tauri; detalhes no §5. |
 | **G4. Pacote de ícones retrô / 8-bit** | O primeiro pacote próprio, **Retrô 8-bit**: 43 ícones em pixel art 16×16 na paleta do PICO-8 (o dock do autor e uns 35 apps comuns, mais um cartucho de reserva), no formato do B4a ([spec 0007](0007-fase-b4-icones.md) §3). Vem embutido e o app o copia para `IconPacks` ao abrir; o usuário o escolhe em Aparência › Ícones dos apps. |
 | **G5. Linux** | Feito: [estudo 0001](../estudos/0001-linux.md). Recomenda não portar agora; se o Linux virar meta, separar o Windows atrás de traits e fazer um dock para KDE Plasma e wlroots com layer-shell. GNOME/Zorin só com uma extensão do Shell, à parte. Decisões do autor no §6 do estudo. |
-| **G6. Nome e logo** | **Decidido em 2026-10-29:** o nome passa a ser **Dockyard**, com o ícone do lançador saindo da barra em esmalte cobalto ([marca 0001](../marca/0001-proposta.md)). Só proposta e SVGs; o renome no código é um recorte futuro, com os passos na proposta. |
+| **G6. Nome e logo** | **Decidido em 2026-10-29:** o nome passa a ser **Dockyard**, com o ícone do lançador saindo da barra em esmalte cobalto ([marca 0001](../marca/0001-proposta.md)). **R1 feito em 2026-10-30:** nome, exe, ícone, textos, iniciar com o Windows e repositório; o identificador e as pastas de dados continuam `dockmax`, sem migração. |
 
 ## 3. G1 em detalhe
 
@@ -53,3 +53,13 @@ Decisões do autor (2026-10-29): lista grande de apps mais os do dock dele; pale
 - **Instalação:** os arquivos vão no binário (`include_bytes!`). Ao abrir, antes do dock ler um ícone, o app copia o pacote para `IconPacks\retro-8bit\` e anota `retro-8bit <versão>` em `IconPacks\.embutidos`. Só copia de novo quando a versão do `pack.json` muda: um pacote que o usuário apagou fica apagado até a próxima versão, e uma edição dele só é sobrescrita por uma versão nova. Uma pasta do pacote que é link fica como está. O pacote nunca se liga sozinho.
 - **Testes** (`persistence::bundled_packs`): a lista embutida é a do `pack.json` e a da pasta; o pacote instalado passa pelo `icon_packs::scan` e cada imagem pelo `read_image`; cobre os sete apps do dock do autor e cai no cartucho para o resto; nenhuma chave repete outra depois de normalizada; a cópia é uma por versão; e cada PNG é, pixel a pixel, o desenho da fonte.
 - **Verificado** (2026-10-29, build de teste em release, dados numa pasta temporária com uma cópia do banco do autor): ao abrir, `IconPacks` ganhou `retro-8bit` (43 PNGs) e `.embutidos` com `retro-8bit 1.0.0`; em Aparência › Ícones dos apps o seletor mostrou "Retrô 8-bit · veste 7 de 7 apps", e escolhido, o `settings.json` gravou `dock.iconPack: "retro-8bit"` e o dock trocou os ícones dos fixados e dos abertos (Claude, Chrome de outro perfil) sem reabrir. Antes e depois em [`docs/fotos/g4-dock-retro-8bit.png`](../fotos/g4-dock-retro-8bit.png).
+
+## 5. G3 em detalhe
+
+Decisões do autor (2026-10-30):
+
+- **Onde:** Releases do GitHub de `maxeinstein-dev/Dockyard`, que é público. O app lê `releases/latest/download/latest.json`.
+- **Como atualiza:** avisa e o usuário confirma. Procura ao abrir e a cada 6 horas; com versão nova, mostra uma notificação e um aviso em Sobre com **Atualizar**. Só baixa, instala e reabre depois do clique.
+- **Como publica:** uma tag `vX.Y.Z` dispara a CI, que compila o instalador NSIS, assina e publica o Release com o `latest.json`.
+- **Chave de assinatura:** nos secrets do repositório (`TAURI_SIGNING_PRIVATE_KEY` e `..._PASSWORD`), com cópia em `%USERPROFILE%\.tauri\dockyard.key` e a senha no Gerenciador de Credenciais (`Dockyard/updater-key-password`). Sem a chave, quem já instalou não recebe mais atualizações.
+- **Instalador:** português e inglês, seguindo o idioma do Windows.

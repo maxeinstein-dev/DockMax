@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import parts from "../panel/parts/parts.css?raw";
 import css from "./tokens.css?raw";
 
-// WCAG 2.x contrast of the text and glyphs DockMax draws, computed from the
+// WCAG 2.x contrast of the text and glyphs Dockyard draws, computed from the
 // tokens in tokens.css (DESIGN.md "Colors"), in both themes. Text needs AA
 // (4.5:1); the tile glyph is a large icon stroke, a non-text graphic (3:1).
 //

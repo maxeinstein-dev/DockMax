@@ -122,7 +122,7 @@ function SettingsApp() {
     <div className="settings-app">
       <nav className="settings-nav" aria-label={text.nav}>
         <div className="settings-brand" aria-hidden="true">
-          <span className="settings-brand-name">DockMax</span>
+          <span className="settings-brand-name">Dockyard</span>
           <span className="settings-brand-sub">{text.brand}</span>
         </div>
         {SECTIONS.map((each) => (

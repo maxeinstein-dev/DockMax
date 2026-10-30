@@ -250,7 +250,7 @@ export interface Settings {
   version: number;
   theme: Theme;
   dock: DockSettings;
-  /** Whether the DockMax opens when the user signs in to Windows. */
+  /** Whether the Dockyard opens when the user signs in to Windows. */
   launchAtLogin: boolean;
   /** Whether the hotkey opens the launcher (spec 0012); the menus open it
    * either way. */

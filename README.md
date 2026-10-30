@@ -1,14 +1,14 @@
-# DockMax
+# Dockyard
 
-[![CI](https://github.com/maxeinstein-dev/DockMax/actions/workflows/ci.yml/badge.svg)](https://github.com/maxeinstein-dev/DockMax/actions/workflows/ci.yml)
+[![CI](https://github.com/maxeinstein-dev/Dockyard/actions/workflows/ci.yml/badge.svg)](https://github.com/maxeinstein-dev/Dockyard/actions/workflows/ci.yml)
 
 Aplicativo desktop para Windows inspirado em docks personalizáveis, com foco em produtividade, widgets integrados e integração progressiva com o sistema operacional.
 
-> **Status:** versão 0.3.0, o **MVP**: um dock que ocupa o lugar da barra de tarefas do Windows (com restauração garantida), nove estilos de barra, apps fixados com o ícone real e o menu do programa, relógio, bandeja do sistema, os widgets Relógio, Progresso do tempo e Nota, início com o Windows e dados locais em SQLite. O que ainda não existe (apps abertos, prévias, espaços de trabalho, mais widgets, ícones personalizados) está em [limitações](docs/limitacoes.md) e no [escopo do MVP](docs/roadmap.md). O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O DockMax é um projeto independente e não é afiliado ao PrimoDock.
+> **Status:** versão 0.3.0, o **MVP**: um dock que ocupa o lugar da barra de tarefas do Windows (com restauração garantida), nove estilos de barra, apps fixados com o ícone real e o menu do programa, relógio, bandeja do sistema, os widgets Relógio, Progresso do tempo e Nota, início com o Windows e dados locais em SQLite. O que ainda não existe (apps abertos, prévias, espaços de trabalho, mais widgets, ícones personalizados) está em [limitações](docs/limitacoes.md) e no [escopo do MVP](docs/roadmap.md). O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O Dockyard é um projeto independente e não é afiliado ao PrimoDock.
 
 ## Instalar
 
-Gere o instalador (`pnpm tauri build`, ver abaixo) e execute `src-tauri/target/release/bundle/nsis/DockMax_0.3.0_x64-setup.exe`. Ele instala **só para o seu usuário** (sem pedir administrador) e é **em português**. O instalador **não é assinado**: o SmartScreen do Windows avisa, e é preciso escolher "Mais informações › Executar assim mesmo". Em Configurações, "Iniciar com o Windows" abre o DockMax ao entrar. Para desinstalar, use "Aplicativos instalados" do Windows; os seus dados ficam, a menos que você peça para apagá-los.
+Gere o instalador (`pnpm tauri build`, ver abaixo) e execute `src-tauri/target/release/bundle/nsis/Dockyard_0.3.0_x64-setup.exe`. Ele instala **só para o seu usuário** (sem pedir administrador) e é **em português**. O instalador **não é assinado**: o SmartScreen do Windows avisa, e é preciso escolher "Mais informações › Executar assim mesmo". Em Configurações, "Iniciar com o Windows" abre o Dockyard ao entrar. Para desinstalar, use "Aplicativos instalados" do Windows; os seus dados ficam, a menos que você peça para apagá-los.
 
 ## Objetivos
 
@@ -21,7 +21,7 @@ Gere o instalador (`pnpm tauri build`, ver abaixo) e execute `src-tauri/target/r
 ## Documentos
 
 - [`roadmap.md`](docs/roadmap.md): etapas, entregas, escopo do MVP e critérios de aceitação.
-- [`limitacoes.md`](docs/limitacoes.md): o que o DockMax não faz hoje e o que pode surpreender.
+- [`limitacoes.md`](docs/limitacoes.md): o que o Dockyard não faz hoje e o que pode surpreender.
 - [`architecture.md`](docs/architecture.md): arquitetura, componentes, dados e contratos.
 - [`adr/README.md`](docs/adr/README.md): registro de decisões arquiteturais.
 - [`adr/0001-stack-desktop.md`](docs/adr/0001-stack-desktop.md): stack.
@@ -91,7 +91,7 @@ cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked
 ```
 
-Testes end-to-end (a CI roda o job `e2e` com estes mesmos comandos). O build de teste usa uma identidade e uma pasta de dados temporária próprias: **não abre o seu DockMax nem toca nos seus dados**, mas mostra um segundo dock na tela por alguns segundos.
+Testes end-to-end (a CI roda o job `e2e` com estes mesmos comandos). O build de teste usa uma identidade e uma pasta de dados temporária próprias: **não abre o seu Dockyard nem toca nos seus dados**, mas mostra um segundo dock na tela por alguns segundos.
 
 ```bash
 pnpm test:e2e:build       # gera o build de teste (feature e2e)
@@ -110,13 +110,13 @@ pnpm test:e2e             # roda os specs do WebdriverIO
 
 ## Estado atual
 
-O DockMax abre um dock que **ocupa o lugar da barra de tarefas do Windows**: reserva a borda da tela, esconde a barra nativa (por padrão; dá para deixá-la visível ou automática em Configurações) e a devolve exatamente como estava ao encerrar, de qualquer jeito que o programa termine ([ADR 0009](docs/adr/0009-dock-substitui-a-barra-de-tarefas.md)):
+O Dockyard abre um dock que **ocupa o lugar da barra de tarefas do Windows**: reserva a borda da tela, esconde a barra nativa (por padrão; dá para deixá-la visível ou automática em Configurações) e a devolve exatamente como estava ao encerrar, de qualquer jeito que o programa termine ([ADR 0009](docs/adr/0009-dock-substitui-a-barra-de-tarefas.md)):
 
 - ícones com ampliação, rótulo e ponto indicador; o clique atravessa a área transparente em volta do dock;
 - **apps fixados** ([spec 0006](docs/specs/0006-fase-b-apps.md)): escolha na lista de programas instalados (a mesma do menu Iniciar) ou **solte um programa ou atalho no dock** para fixá-lo, com o ícone real; o clique abre o programa e o botão direito mostra o mesmo menu da barra do Windows (tarefas, recentes, Abrir, Remover); **arraste um app no dock** para mudar a ordem (ou use Configurações › Apps do dock);
 - **programas abertos** ([spec 0009](docs/specs/0009-fase-d-janelas.md)): os apps fixados que estão abertos ganham o indicador, e o clique traz a janela para a frente, minimiza ou passa para a próxima janela do programa; os abertos que não estão fixados aparecem depois dos widgets (dá para esconder em Configurações); o botão do meio do mouse abre uma nova instância e o botão direito abre um menu (fechar janela, fixar no dock);
 - nove **estilos de barra** (Nativo, Liquid Glass, Meia-noite, Rocket, Prateleira Aqua, Neon, Canarinho, Papel e Flutuante), efeito ao passar o mouse e indicador, em Configurações › Aparência do dock;
-- **relógio com data** no fim do dock e **bandeja do sistema** hospedada pelo DockMax: o botão direito num ícone abre o menu do próprio programa;
+- **relógio com data** no fim do dock e **bandeja do sistema** hospedada pelo Dockyard: o botão direito num ícone abre o menu do próprio programa;
 - **widgets**, cada um um item do dock que abre o próprio painel:
   - **Relógio**: hora viva no ícone (digital ou analógica), fuso, 12/24 h e segundos no painel;
   - **Progresso do tempo**: anel no ícone e painel com dia, semana, mês, ano e expediente;
@@ -132,7 +132,7 @@ Onde ficam os seus dados (nada sai da máquina):
 |---|---|
 | Preferências | `%APPDATA%\dev.maxsueleinstein.dockmax\settings.json` |
 | Widgets e notas | `%APPDATA%\dev.maxsueleinstein.dockmax\dockmax.db` (SQLite) |
-| Cópias de segurança e recuperação | `dockmax.db.bak-v*` e `dockmax.db.corrompido-*`, na mesma pasta: o DockMax nunca apaga seu banco nem esses arquivos, só renomeia um banco danificado |
+| Cópias de segurança e recuperação | `dockmax.db.bak-v*` e `dockmax.db.corrompido-*`, na mesma pasta: o Dockyard nunca apaga seu banco nem esses arquivos, só renomeia um banco danificado |
 | Pacotes de ícones (opcional) | `%APPDATA%\dev.maxsueleinstein.dockmax\IconPacks\<id>\` |
 | Logs, sem dados pessoais | `%LOCALAPPDATA%\dev.maxsueleinstein.dockmax\logs` |
 

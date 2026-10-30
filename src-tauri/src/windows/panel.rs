@@ -932,7 +932,7 @@ fn place(
 }
 
 /// Focuses the panel only when the user just clicked the dock (the click is
-/// the last input, so Windows lets DockMax take the foreground) or DockMax
+/// the last input, so Windows lets Dockyard take the foreground) or Dockyard
 /// owns the foreground already. Otherwise tao's `set_focus` would fake an
 /// Alt key press to steal the foreground from the app in use.
 fn focus(window: &WebviewWindow) -> tauri::Result<()> {

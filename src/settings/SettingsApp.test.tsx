@@ -57,7 +57,7 @@ const sectionButton = (name: string) =>
 
 describe("SettingsApp", () => {
   beforeEach(() => {
-    delete window.__DOCKMAX_SECTION__;
+    delete window.__DOCKYARD_SECTION__;
     listeners.clear();
     close.mockClear();
     invoke.mockReset();
@@ -278,14 +278,14 @@ describe("SettingsApp", () => {
   });
 
   it("starts on the section the launcher asked for", async () => {
-    window.__DOCKMAX_SECTION__ = "items";
+    window.__DOCKYARD_SECTION__ = "items";
     await renderApp();
 
     expect(sectionButton("Widgets")).toHaveAttribute("aria-current", "page");
   });
 
   it("starts on Geral when asked for a section it does not have", async () => {
-    window.__DOCKMAX_SECTION__ = "developer";
+    window.__DOCKYARD_SECTION__ = "developer";
     await renderApp();
 
     expect(sectionButton("Geral")).toHaveAttribute("aria-current", "page");

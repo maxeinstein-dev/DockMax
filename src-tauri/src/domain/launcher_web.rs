@@ -1,5 +1,5 @@
-//! The launcher's web search by keyword (spec 0012 §5, L2): `g dockmax`
-//! gives one result, "Buscar “dockmax” no Google". The keywords come ready
+//! The launcher's web search by keyword (spec 0012 §5, L2): `g dockyard`
+//! gives one result, "Buscar “dockyard” no Google". The keywords come ready
 //! and are edited in Configurações: a word, a name and an address with `%s`
 //! where the term goes. The address must start with `https://`, and the term
 //! is encoded for a URL. Pure.
@@ -228,8 +228,8 @@ mod tests {
     #[test]
     fn a_query_starting_with_a_keyword_and_a_space_searches() {
         let keywords = defaults();
-        let (found, term) = matching(&keywords, "g dockmax").unwrap();
-        assert_eq!((found.name.as_str(), term), ("Google", "dockmax"));
+        let (found, term) = matching(&keywords, "g dockyard").unwrap();
+        assert_eq!((found.name.as_str(), term), ("Google", "dockyard"));
         let (found, term) = matching(&keywords, "YT  lo-fi beats ").unwrap();
         assert_eq!((found.name.as_str(), term), ("YouTube", "lo-fi beats"));
         assert!(matching(&keywords, "g").is_none(), "no space");
@@ -238,7 +238,7 @@ mod tests {
             matching(&keywords, "google chrome").is_none(),
             "not a keyword"
         );
-        assert!(matching(&keywords, "gdockmax").is_none());
+        assert!(matching(&keywords, "gdockyard").is_none());
     }
 
     #[test]

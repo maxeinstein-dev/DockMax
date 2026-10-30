@@ -109,7 +109,7 @@ const OPENING: Duration = Duration::from_millis(1500);
 /// (spec 0011 H2).
 const WARM_DELAY: u32 = 150;
 /// For how long after a click on the dock the panel it opens may take the
-/// focus: the click is the last input, so Windows lets DockMax have it.
+/// focus: the click is the last input, so Windows lets Dockyard have it.
 const CLICK_GRANTS_FOCUS: Duration = Duration::from_secs(2);
 
 /// What other threads read about one dock.
@@ -415,7 +415,7 @@ fn make_dock(app: &AppHandle, monitor: Monitor) -> Option<Dock> {
         CreateWindowExW(
             WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
             CLASS,
-            w!("DockMax"),
+            w!("Dockyard"),
             WS_POPUP,
             0,
             0,
@@ -2927,7 +2927,7 @@ fn near_dock(point: (i32, i32), window: Rect, monitor: Rect, edge: DockEdge) -> 
 /// dock opened): the dock stays up under it.
 fn menu_on_screen() -> bool {
     use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, IsWindowVisible};
-    // Windows' menus (a tray icon's) and the DockMax's own (spec 0014 R3).
+    // Windows' menus (a tray icon's) and the Dockyard's own (spec 0014 R3).
     [w!("#32768"), menu::CLASS].into_iter().any(|class| {
         unsafe { FindWindowW(class, None) }
             .is_ok_and(|menu| unsafe { IsWindowVisible(menu) }.as_bool())
@@ -3235,7 +3235,7 @@ fn show_dock_menu(edge: DockEdge, items: Vec<MenuEntry>) -> Option<MenuChoice> {
     choices.get(chosen).copied().flatten()
 }
 
-/// The tray icon's menu (spec 0014 R3: the DockMax's own, as the dock's),
+/// The tray icon's menu (spec 0014 R3: the Dockyard's own, as the dock's),
 /// opened at the pointer: what the dock's has, without the workspaces.
 pub fn tray_menu(app: &AppHandle) {
     let auto_hide = crate::commands::settings::current(app).dock.auto_hide;

@@ -102,7 +102,7 @@ describe("Launcher", () => {
         view.results.some(
           (name, at) =>
             name === "Aparência do dock" &&
-            view.subtitles[at] === "Configurações do DockMax",
+            view.subtitles[at] === "Configurações do Dockyard",
         ),
       "'aparencia' did not find the dock's look",
     );

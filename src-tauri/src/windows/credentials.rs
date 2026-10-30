@@ -1,4 +1,4 @@
-//! The DockMax's secrets in the Windows vault (ADR 0012): generic
+//! The Dockyard's secrets in the Windows vault (ADR 0012): generic
 //! credentials of the user who is signed in, encrypted by Windows. The
 //! names start with `DockMax/`; the values are UTF-8 text.
 

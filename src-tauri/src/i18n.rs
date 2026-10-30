@@ -29,7 +29,7 @@ pub struct LauncherMessages {
     pub app: &'static str,
     /// What the other results are, under their names (spec 0012 L2).
     pub windows_page: &'static str,
-    pub dockmax_page: &'static str,
+    pub dockyard_page: &'static str,
     pub calculator: &'static str,
     pub web: &'static str,
     /// A web search's name and what is under it; `{term}` and `{name}` are
@@ -200,8 +200,8 @@ const PT_BR: Messages = Messages {
         icons: "{n} ícones",
     },
     settings: SettingsMessages {
-        window_title: "Configurações do DockMax",
-        tour_title: "Boas-vindas ao DockMax",
+        window_title: "Configurações do Dockyard",
+        tour_title: "Boas-vindas ao Dockyard",
     },
     dock: DockMessages {
         settings: "Configurações",
@@ -253,7 +253,7 @@ const PT_BR: Messages = Messages {
         calendar_late: "atrasada",
         calendar_nothing: "Nada marcado",
         cycle_notice_title: "Lembrete do Ciclo",
-        cycle_notice_line: "Abra o Ciclo no DockMax para ver.",
+        cycle_notice_line: "Abra o Ciclo no Dockyard para ver.",
         calendar_busy: "Ocupado",
         calendar_untitled: "(sem título)",
         calendar_then: "Depois",
@@ -275,11 +275,11 @@ const PT_BR: Messages = Messages {
         battery_charging: "Bateria: {n}% (carregando)",
     },
     launcher: LauncherMessages {
-        title: "Lançador do DockMax",
+        title: "Lançador do Dockyard",
         placeholder: "Buscar apps",
         app: "App",
         windows_page: "Configurações do Windows",
-        dockmax_page: "Configurações do DockMax",
+        dockyard_page: "Configurações do Dockyard",
         calculator: "Calculadora · Enter copia o resultado",
         web: "Busca na web",
         search_for: "Buscar “{term}”",
@@ -310,8 +310,8 @@ const EN: Messages = Messages {
         icons: "{n} icons",
     },
     settings: SettingsMessages {
-        window_title: "DockMax Settings",
-        tour_title: "Welcome to DockMax",
+        window_title: "Dockyard Settings",
+        tour_title: "Welcome to Dockyard",
     },
     dock: DockMessages {
         settings: "Settings",
@@ -363,7 +363,7 @@ const EN: Messages = Messages {
         calendar_late: "overdue",
         calendar_nothing: "Nothing scheduled",
         cycle_notice_title: "Cycle reminder",
-        cycle_notice_line: "Open Cycle in DockMax to see it.",
+        cycle_notice_line: "Open Cycle in Dockyard to see it.",
         calendar_busy: "Busy",
         calendar_untitled: "(no title)",
         calendar_then: "Then",
@@ -385,11 +385,11 @@ const EN: Messages = Messages {
         battery_charging: "Battery: {n}% (charging)",
     },
     launcher: LauncherMessages {
-        title: "DockMax launcher",
+        title: "Dockyard launcher",
         placeholder: "Search apps",
         app: "App",
         windows_page: "Windows Settings",
-        dockmax_page: "DockMax Settings",
+        dockyard_page: "Dockyard Settings",
         calculator: "Calculator · Enter copies the result",
         web: "Web search",
         search_for: "Search “{term}”",

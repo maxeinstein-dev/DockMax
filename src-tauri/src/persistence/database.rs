@@ -11,7 +11,7 @@
 //! - An existing file at an older schema version is copied to
 //!   `dockmax.db.bak-v<n>` with `VACUUM INTO` and then migrated, all
 //!   migrations in one transaction. If the copy fails, nothing is migrated.
-//! - A file from a newer DockMax, or one whose migration fails, is left as it
+//! - A file from a newer Dockyard, or one whose migration fails, is left as it
 //!   was and the widgets are unavailable in this run.
 //! - A file SQLite says is not a database or is corrupt is renamed to
 //!   `dockmax.db.corrompido-<UTC date>` (never deleted), along with its

@@ -313,7 +313,7 @@ pub const MAX_URI: usize = 2048;
 pub enum Action {
     /// Opens a program of the Apps folder, by its id.
     OpenApp(String),
-    /// Opens a section of the DockMax's Configurações.
+    /// Opens a section of the Dockyard's Configurações.
     OpenSection(Section),
     /// Opens an address: a Windows settings page of the fixed list, or an
     /// `https://` search of a keyword.
@@ -571,10 +571,10 @@ mod tests {
     #[test]
     fn in_the_same_band_the_apps_come_before_the_pages() {
         // The app "Configurações" is the exact name; the page "Configurações
-        // do DockMax" only starts with it.
+        // do Dockyard" only starts with it.
         assert_eq!(
             find_all("configuracoes")[..2],
-            ["Configurações", "Configurações do DockMax"]
+            ["Configurações", "Configurações do Dockyard"]
         );
         // "Paint" (an app) and "Plano de fundo" (a page) both start with p:
         // the app first, even with the page used a lot.

@@ -2,7 +2,7 @@
 //! anywhere, or by "Buscar apps…" in the dock's and the tray's menus, that
 //! finds the programs of the Apps folder and opens them (L1); and, mixed in
 //! the same list (L2), the result of a sum, a web search by keyword and the
-//! settings pages of Windows and of the DockMax. Each result does one action
+//! settings pages of Windows and of the Dockyard. Each result does one action
 //! of a closed list (`search::Action`), checked before it runs.
 //!
 //! A native window, not WebView2 (author's decision, 2026-10-26): it opens in
@@ -141,7 +141,7 @@ thread_local! {
 enum Kind {
     App,
     WindowsPage,
-    DockMaxPage,
+    DockyardPage,
     Calculator,
     Web,
 }
@@ -149,13 +149,13 @@ enum Kind {
 impl Kind {
     /// Opening it is kept in the use (the apps and the pages).
     fn remembered(self) -> bool {
-        matches!(self, Kind::App | Kind::WindowsPage | Kind::DockMaxPage)
+        matches!(self, Kind::App | Kind::WindowsPage | Kind::DockyardPage)
     }
 
     fn glyph(self) -> Option<char> {
         match self {
             Kind::App => None,
-            Kind::WindowsPage | Kind::DockMaxPage => Some(SETTINGS_GLYPH),
+            Kind::WindowsPage | Kind::DockyardPage => Some(SETTINGS_GLYPH),
             Kind::Calculator => Some(CALCULATOR_GLYPH),
             Kind::Web => Some(WEB_GLYPH),
         }
@@ -192,7 +192,7 @@ impl Found {
         match self.kind {
             Kind::App => text.app,
             Kind::WindowsPage => text.windows_page,
-            Kind::DockMaxPage => text.dockmax_page,
+            Kind::DockyardPage => text.dockyard_page,
             Kind::Calculator => text.calculator,
             Kind::Web => text.web,
         }
@@ -201,7 +201,7 @@ impl Found {
     fn page(page: &launcher_pages::Page) -> Found {
         let (kind, action) = match page.target {
             Target::Windows(uri) => (Kind::WindowsPage, Action::OpenUri(uri.to_owned())),
-            Target::DockMax(section) => (Kind::DockMaxPage, Action::OpenSection(section)),
+            Target::Dockyard(section) => (Kind::DockyardPage, Action::OpenSection(section)),
         };
         Found {
             key: launcher_pages::page_key(page.id),

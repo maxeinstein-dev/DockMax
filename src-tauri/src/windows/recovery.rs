@@ -3,7 +3,7 @@
 //! The GPU work runs inside the browser process (`--in-process-gpu`), which
 //! saves a process and tens of megabytes; the price is that a failing video
 //! driver takes the browser process down, and both windows with it. Then the
-//! DockMax gives the taskbar back the way it does on exit and starts again.
+//! Dockyard gives the taskbar back the way it does on exit and starts again.
 //! Once: a second failure within `QUIET` of the first leaves it closed, so a
 //! driver that keeps failing does not make it blink forever (the taskbar is
 //! back either way).
@@ -55,7 +55,7 @@ fn browser_gone(app: &AppHandle) {
         app.exit(1);
         return;
     }
-    log::warn!("webview: restarting the DockMax");
+    log::warn!("webview: restarting the Dockyard");
     // The new process must not find this one's single-instance lock.
     tauri_plugin_single_instance::destroy(app);
     app.restart();

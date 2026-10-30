@@ -49,7 +49,7 @@ pub fn foreground_is_other_visible_window() -> bool {
     process_id != std::process::id() && unsafe { IsWindowVisible(window) }.as_bool()
 }
 
-/// The extended style DockMax keeps: a tool window without
+/// The extended style Dockyard keeps: a tool window without
 /// `WS_EX_APPWINDOW` is left out of Alt+Tab. Any other bit is left as tao
 /// set it.
 fn ex_style(style: u32) -> u32 {
