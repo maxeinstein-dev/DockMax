@@ -22,6 +22,7 @@ pub mod launcher_clipboard;
 pub mod launcher_files;
 pub mod launcher_pages;
 pub mod launcher_paths;
+pub mod launcher_units;
 pub mod launcher_web;
 pub mod launcher_windows;
 pub mod live_faces;

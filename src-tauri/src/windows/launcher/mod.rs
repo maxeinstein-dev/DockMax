@@ -31,6 +31,7 @@ pub(crate) mod layout;
 mod open_windows;
 mod paint;
 mod paths;
+mod rates;
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -84,6 +85,7 @@ use crate::domain::launcher_clipboard::{ClipQuery, History};
 use crate::domain::launcher_files::{self, FileHit, FileQuery, Generation, Mode};
 use crate::domain::launcher_pages::{self, Target};
 use crate::domain::launcher_paths::{self, Browse, Entry, PathQuery, Problem, Reading};
+use crate::domain::launcher_units;
 use crate::domain::launcher_web::{self, WebKeyword};
 use crate::domain::launcher_windows::{self, Window, WindowQuery};
 use crate::persistence::database::Storage;
@@ -149,6 +151,8 @@ const SEARCH_GLYPH: &str = "\u{E721}";
 const SETTINGS_GLYPH: char = '\u{E713}';
 const CALCULATOR_GLYPH: char = '\u{E8EF}';
 const WEB_GLYPH: char = '\u{E774}';
+/// A conversion's (spec 0012 §5b).
+const CONVERSION_GLYPH: char = '\u{E8AB}';
 /// A file's and a folder's, while their icon is read.
 const FILE_GLYPH: char = '\u{E7C3}';
 const FOLDER_GLYPH: char = '\u{E8B7}';
@@ -195,6 +199,8 @@ enum Kind {
     WindowsPage,
     DockyardPage,
     Calculator,
+    /// A conversion of units or currencies (§5b).
+    Conversion,
     Web,
     File,
     Folder,
@@ -219,6 +225,7 @@ impl Kind {
             Kind::App => None,
             Kind::WindowsPage | Kind::DockyardPage => Some(SETTINGS_GLYPH),
             Kind::Calculator => Some(CALCULATOR_GLYPH),
+            Kind::Conversion => Some(CONVERSION_GLYPH),
             Kind::Web => Some(WEB_GLYPH),
             Kind::File => Some(FILE_GLYPH),
             Kind::Folder => Some(FOLDER_GLYPH),
@@ -292,6 +299,7 @@ impl Found {
             Kind::WindowsPage => text.windows_page,
             Kind::DockyardPage => text.dockyard_page,
             Kind::Calculator => text.calculator,
+            Kind::Conversion => text.conversion,
             Kind::Web => text.web,
             Kind::File => text.file,
             Kind::Folder => text.folder,
@@ -985,6 +993,34 @@ pub(crate) fn text_scale() -> f64 {
     }
 }
 
+/// The conversions `query` asks for (§5b), as rows: "= 6,21 milhas" over
+/// "10 km"; Enter copies the number.
+fn conversions(query: &str, decimal: char) -> Vec<Found> {
+    let text = &crate::i18n::messages().launcher;
+    let cache = rates::current();
+    let rates = cache.as_deref().map(|cache| &cache.rates);
+    launcher_units::convert(query, rates)
+        .iter()
+        .enumerate()
+        .map(|(index, conversion)| {
+            let shown = launcher_units::show(
+                conversion,
+                decimal,
+                |id, plural| text.unit_name(id, plural),
+                text.rates_of,
+            );
+            Found {
+                key: format!("convert:{index}"),
+                kind: Kind::Conversion,
+                name: shown.title,
+                subtitle: Some(shown.subtitle),
+                action: Action::Copy(shown.copied),
+                window: None,
+            }
+        })
+        .collect()
+}
+
 /// The decimal mark of the user's region (Windows' "Formato regional").
 fn decimal_mark() -> char {
     use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_SZ, RegGetValueW};
@@ -1120,6 +1156,7 @@ impl Launcher {
             let _ = SetWindowTextW(self.edit, w!(""));
         }
         self.read_catalog();
+        rates::prepare(&self.app, || post(Launcher::rates_arrived));
         self.refresh();
         let height = BOX + self.list_height();
         let placed = layout::place(monitor.rect, self.scale, height);
@@ -1453,6 +1490,9 @@ impl Launcher {
                     action: Action::Copy(shown),
                     window: None,
                 });
+            } else {
+                // A conversion, first too (§5b).
+                results.extend(conversions(&query, self.decimal));
             }
             if let Some((keyword, term)) = launcher_web::matching(&self.keywords, &query) {
                 results.extend(Found::web(keyword, term));
@@ -1482,6 +1522,19 @@ impl Launcher {
         };
         self.selected = 0;
         self.first = 0;
+    }
+
+    /// The currency rates came (§5b): a currency typed meanwhile converts.
+    fn rates_arrived(&mut self) {
+        let cache = rates::current();
+        let rates = cache.as_deref().map(|cache| &cache.rates);
+        if is_open()
+            && self.path_query.is_none()
+            && launcher_units::is_currency(&launcher_units::convert(self.query.trim(), rates))
+        {
+            self.refresh();
+            self.after_change();
+        }
     }
 
     /// The results of a path typed (L5), alone: the entries of its folder
@@ -2292,7 +2345,8 @@ impl Launcher {
             Kind::Folder => Subject::Folder,
             Kind::WindowsPage | Kind::DockyardPage => Subject::Page,
             Kind::Web => Subject::Web,
-            Kind::Calculator => Subject::Calculator,
+            // A conversion copies its number, as a sum (§5b).
+            Kind::Calculator | Kind::Conversion => Subject::Calculator,
             Kind::Window => Subject::Window {
                 revealable: found
                     .window
@@ -3035,4 +3089,84 @@ pub fn press_key(key: String) -> bool {
         let _ = PostMessageW(Some(launcher.edit), message, WPARAM(code), LPARAM(0));
     });
     frame != 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn app(name: &str) -> Found {
+        Found {
+            key: format!("app:{name}"),
+            kind: Kind::App,
+            name: name.to_owned(),
+            subtitle: None,
+            action: Action::OpenApp(name.to_owned()),
+            window: None,
+        }
+    }
+
+    #[test]
+    fn a_conversion_is_a_row_that_copies_its_number() {
+        let rows = conversions("10 km em milhas", ',');
+        assert_eq!(rows.len(), 1);
+        let row = &rows[0];
+        assert_eq!(row.kind, Kind::Conversion);
+        assert_eq!(row.name, "= 6,21 milhas");
+        assert_eq!(row.subtitle(), "10 km");
+        assert_eq!(row.action, Action::Copy("6,21".into()));
+        assert!(search::is_allowed(&row.action));
+        assert!(
+            !row.kind.remembered(),
+            "a conversion is not kept in the use"
+        );
+        // "Copiar resultado", as a sum's: Enter, Shift+Enter and Ctrl+C.
+        let verbs = launcher_actions::verbs(Subject::Calculator);
+        assert_eq!(verbs, [Verb::CopyResult]);
+        assert_eq!(
+            launcher_actions::action(Verb::CopyResult, &row.action, None),
+            Some(Action::Copy("6,21".into()))
+        );
+        // A unit alone: its common conversions, each its own row.
+        let keys: Vec<String> = conversions("10 km", ',')
+            .into_iter()
+            .map(|row| row.key)
+            .collect();
+        assert_eq!(keys, ["convert:0", "convert:1", "convert:2"]);
+    }
+
+    #[test]
+    fn a_conversion_comes_first_and_holds_the_web_search_back() {
+        let mut first = conversions("5 gb em mb", ',');
+        first.push(app("Gerenciador de Tarefas"));
+        let fallback = Some(app("web"));
+        let mixed = launcher_windows::mix(
+            first,
+            vec![app("janela")],
+            vec![app("arquivo")],
+            fallback.clone(),
+        );
+        let names: Vec<&str> = mixed.iter().map(|row| row.name.as_str()).collect();
+        assert_eq!(
+            names,
+            ["= 5000 MB", "Gerenciador de Tarefas", "janela", "arquivo"]
+        );
+        // Alone, it is still a result: no search on the web.
+        let mixed = launcher_windows::mix(
+            conversions("5 gb em mb", ','),
+            Vec::new(),
+            Vec::new(),
+            fallback,
+        );
+        assert_eq!(mixed.len(), 1);
+        assert_eq!(mixed[0].kind, Kind::Conversion);
+    }
+
+    #[test]
+    fn without_rates_a_currency_is_no_row() {
+        // No rates are fetched in the tests: the currencies give nothing.
+        assert!(rates::current().is_none());
+        assert!(conversions("100 usd em brl", ',').is_empty());
+        assert!(conversions("50 euros para reais", ',').is_empty());
+    }
 }

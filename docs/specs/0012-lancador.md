@@ -1,6 +1,6 @@
 # Spec 0012 — Lançador: buscar e abrir pelo teclado
 
-**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado; L6 (menu de ações por resultado) implementado; L7 (janelas abertas) implementado; a área de transferência (seção 8i) implementada.
+**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado; L6 (menu de ações por resultado) implementado; L7 (janelas abertas) implementado; conversão de unidades e moedas implementada (seção 5b); a área de transferência (seção 8i) implementada.
 **Origem:** pedido do autor (2026-10-26) de um lançador no estilo do [Ulauncher](https://ulauncher.io/): uma caixa de busca aberta por um atalho de teclado global, que acha e abre apps e, no futuro, arquivos e extensões. O PrimoDock tem algo parecido ("O botão Iniciar abre: Apps do PrimoDock", [interface](../reference/primodock/interface.md)), mas só pelo mouse e sem busca por teclado.
 
 ## 1. Decisões do autor (2026-10-26)
@@ -30,7 +30,7 @@ L1 e L2 formam o primeiro recorte do produto. Cada um é um PR; o L2 só começa
 
 - **Extensões** (seção 9): só a forma interna dos provedores nasce no L1, preparada para elas.
 - A **tecla Win sozinha** ou a tecla Copilot como atalho (exigem um hook de teclado de baixo nível).
-- A conversão de unidades e o histórico de contas. (A área de transferência saiu desta lista: seção 8i.)
+- O histórico de contas. (A conversão de unidades e a área de transferência saíram desta lista: seções 5b e 8i.)
 - ~~Um item no dock que abre o lançador (o "botão Iniciar" do PrimoDock).~~ **Feito** (seção 8h).
 
 ## 3. O atalho
@@ -130,6 +130,29 @@ O Windows dá ao processo que recebe um atalho registrado o direito de trazer um
 
 O desenho e o que foi medido estão em "Como o L4 ficou" (seção 8d).
 
+## 5b. Conversão de unidades
+
+Um provedor como a calculadora (`domain/launcher_units.rs`, puro e testado; `windows/launcher/rates.rs`, as cotações). O analisador é próprio e só converte: nada é executado.
+
+- **A forma:** `<número> <unidade> em|para|pra|to|in <unidade>` dá um resultado (`10 km em milhas`, `30c em f`, `5 gb em mb`, `2 horas em minutos`, `10 in in cm`). Só `<número> <unidade>` mostra as conversões mais comuns daquela unidade, até **3** linhas (`10 km` → milhas, metros, milhas náuticas). O número aceita a vírgula ou o ponto decimal e o sinal, como a calculadora; `°`, `²` e `³` valem (`30°C`, `m²`, `m³`).
+- **As grandezas e as unidades** (nomes em português e inglês, sem diferenciar maiúsculas nem acentos, singular e plural): comprimento (mm, cm, m, km, in/pol/polegada, ft/pé, yd/jarda, mi/milha, milha náutica); massa (mg, g, kg/quilo, t/tonelada, oz/onça, lb/libra); temperatura (°C/c/celsius/graus, °F/f/fahrenheit, K/kelvin), convertida pelo kelvin porque não é proporcional; volume (ml, l, m³, gal US/galão, fl oz/onça fluida, xícara); área (m², km², ha, acre, ft²); velocidade (km/h, m/s, mph, nós); dados (B, KB, MB, GB, TB, potências de 1000, e KiB, MiB, GiB, TiB, de 1024); tempo (s, min, h/hora, dia, semana).
+- **Decisões:** a **xícara** é a americana legal, **240 ml**; o **galão** é o americano (3,785 l); `t` e `tonelada` são a métrica (1000 kg); `graus` sozinho é Celsius; `m` é metro, nunca minuto; `libra` é massa ou moeda pelo que encontra do outro lado (`10 libras em kg`, `10 libras em reais`) e, sozinha, massa. **Uma unidade de uma letra colada ao número** sem o `em` (`3d`, `30c`) não converte, para `3d` continuar achando apps; com espaço (`30 c`) ou com o `em` (`30c em f`), converte.
+- **Grandezas diferentes não convertem** (`10 km em kg`): sem resultado, e a consulta segue para os outros provedores.
+- **O resultado** vem **primeiro**, como a conta (a conta, quando a consulta é uma, tem a vez e a conversão nem é tentada), com o título "= 6,21 milhas" e o subtítulo "10 km": o nome da unidade de destino (do `i18n.rs`, singular quando o valor é 1) e o valor de origem com o símbolo. A marca decimal é a da região. **Arredondamento:** 2 casas a partir de 1; abaixo de 1, 3 algarismos significativos (até 10 casas), para `1 mm em km` não virar 0; sem zeros no fim. Os apps, as janelas e os arquivos continuam abaixo; a busca na web padrão não aparece, porque há resultado.
+- **Enter copia o número**, sem a unidade ("6,21"), e o lançador fecha dizendo "Resultado copiado", como a conta. No menu de ações (L6), a conversão é como a conta: uma ação só, **Copiar resultado** (Shift+Enter a faz direto; Ctrl+C sem seleção também copia). Não conta no uso nem aparece nos recentes. Na UI Automation, o tipo é "Conversão".
+
+**Moedas, com internet:**
+
+- **Fonte:** a Frankfurter, com as cotações de referência do **Banco Central Europeu**, sem chave. Conferido em 2026-10-30: `api.frankfurter.app/latest` responde 301 para **`https://api.frankfurter.dev/v1/latest`**, que é o endereço usado; o v1 está marcado como substituído pelo v2, mas "continua funcionando". A resposta é `{"amount":1.0,"base":"EUR","date":"2026-10-30","rates":{"BRL":6.0692,"USD":1.1172,…}}` (30 moedas). Uma resposta fora desse formato (outra base, data inválida, cotação não positiva, código que não é de 3 letras maiúsculas) é descartada.
+- **Uma vez por dia:** as cotações ficam em `currency-rates.json` na pasta de dados (o dia em que foram buscadas, em UTC, e a resposta, uns 1 KB). Ao abrir, o lançador pede as cotações: na primeira vez lê o arquivo; se ele não é de hoje, busca de novo. **Tudo numa thread `launcher-rates`, pelo WinHTTP do projeto (`http::get`)**; a lista nunca espera. Uma busca que falha é tentada de novo só depois de 1 h, numa abertura seguinte. Quando as cotações chegam com o lançador aberto e o texto digitado é uma moeda, a lista se refaz.
+- **Sem rede:** com um arquivo de outro dia, ele continua valendo (o subtítulo diz de que dia é a cotação). **Sem arquivo e sem rede, a moeda não responde** e a consulta segue para os outros provedores.
+- **Como se digita:** o código ISO de qualquer moeda da resposta (`100 usd em brl`, `1 eur em jpy`), alguns nomes (`dólar`/`dollar`, `euro`, `real`/`reais`, `libra`/`libra esterlina`, `iene`/`yen`) e os símbolos `R$`, `US$`, `$` (dólar americano), `€` e `£`, antes ou depois do número (`R$ 60 em eur`, `100 € em r$`). Só a moeda (`100 usd`) mostra o real, o dólar, o euro e a libra, menos ela mesma, até 3.
+- **O resultado:** "= 545,45 BRL", sempre com **2 casas**, e o subtítulo "100 USD · Cotação BCE de 30/10/2026" (a data da cotação, não a da busca). Enter copia "545,45".
+
+**Testes de unidade:** cada grandeza (temperatura incluída: 30 °C = 86 °F, −40 = −40, 0 K), os nomes em português e inglês, a vírgula e o ponto, a recusa entre grandezas, o que não é conversão (`2024`, `3d`, `2+2`, `g 10 km`), as conversões comuns de uma unidade sozinha, o título e o subtítulo, a ordem na lista (a conversão primeiro, a busca na web contida), as moedas com uma cotação fixa de teste (nomes, símbolos, `libra` nos dois sentidos, 2 casas, a data), a leitura da resposta da Frankfurter, o cache vencido no dia seguinte e a falta de rede (fica a cotação velha; sem ela, nada). Um teste ignorado (`frankfurter_answers`) busca a Frankfurter de verdade.
+
+**Não verificado (só ao vivo):** a linha na tela (o glifo, o título e o subtítulo), o Enter e o Ctrl+C copiando, a primeira abertura do dia buscando as cotações e a lista se refazendo quando elas chegam, a gravação do `currency-rates.json` na pasta de dados de verdade, a abertura sem rede e o Narrador lendo "Conversão".
+
 ## 6. Teclado
 
 | Tecla | Ação |
@@ -176,6 +199,7 @@ O mouse também funciona: passar o ponteiro seleciona, o clique abre e o botão 
 - L4: a mistura e a ordem dos arquivos, o `f `, o limite, a junção sem repetir caminho, a abreviação com `~`, o descarte de uma geração antiga, os buffers da IPC do Everything e o escape do termo para cada fonte;
 - L6: as ações por tipo de resultado, o Fixar e Desafixar e o Ctrl+C com e sem seleção (seção 8f);
 - L7: a regra de que janela conta, a mistura e a ordem com apps e arquivos, o `j `, a exclusão do Dockyard e as ações de janela (seção 8g);
+- a conversão de unidades e moedas (seção 5b);
 - L5: o reconhecimento de um caminho, a expansão de `~` e `%VAR%`, a pasta e o filtro, a ordem e os ocultos, o Tab, o Backspace e o descarte de uma leitura antiga (seção 8e);
 - a migração de `launcher_usage` e "Limpar o histórico".
 
