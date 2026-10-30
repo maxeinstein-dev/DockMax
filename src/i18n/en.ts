@@ -204,7 +204,6 @@ export const en: Messages = {
         rocket: "Rocket",
         aquaShelf: "Aqua Shelf",
         neon: "Neon",
-        canary: "Canary",
         paper: "Paper",
         floating: "Floating",
       },

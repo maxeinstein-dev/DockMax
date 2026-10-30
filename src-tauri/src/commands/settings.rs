@@ -60,6 +60,7 @@ struct DockSettingsInput {
     icon_size: u16,
     opacity: DockOpacity,
     style: DockStyle,
+    #[serde(deserialize_with = "crate::domain::settings::deserialize_tweaks")]
     tweaks: BTreeMap<DockStyle, StyleTweaks>,
     hover: HoverEffect,
     hover_scale: u16,

@@ -23,7 +23,6 @@ const RUST_NAMES: Readonly<Record<DockStyle, string>> = {
   rocket: "Rocket",
   aquaShelf: "AquaShelf",
   neon: "Neon",
-  canary: "Canary",
   paper: "Paper",
   floating: "Floating",
 };

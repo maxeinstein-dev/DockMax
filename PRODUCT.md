@@ -37,7 +37,7 @@ Dock para Windows construído com Tauri (leve, local, sem conta, sem analytics),
   - ampliação viável, com captura do mouse só na barra e no ícone ampliado;
   - **sem desfoque real do fundo**: o vidro é simulado em CSS (camada tingida translúcida), porque o backdrop do Windows não respeita cantos arredondados;
   - CSP estrita em release: sem estilos inline injetados, sem `eval`.
-- **Paridade com o PrimoDock** (spec 0004): 9 temas, formatos de ícone, efeitos de passar o mouse, animações de abertura, indicadores, workspaces, galeria de ícones, widgets em quadrados e cartões, pet, controle da barra de tarefas nativa. A ordem e o escopo ficam na spec.
+- **Paridade com o PrimoDock** (spec 0004): 8 temas, formatos de ícone, efeitos de passar o mouse, animações de abertura, indicadores, workspaces, galeria de ícones, widgets em quadrados e cartões, pet, controle da barra de tarefas nativa. A ordem e o escopo ficam na spec.
 - Interface em PT-BR, estruturada para receber inglês depois.
 
 ## Brand Commitments
@@ -47,7 +47,7 @@ Dock para Windows construído com Tauri (leve, local, sem conta, sem analytics),
 - Identidade **própria do Dockyard**, sem ligação com a marca pessoal do autor, isolada em tokens para poder mudar depois.
 - **Personalização é requisito:** o dock precisa ser ajustável o suficiente para ficar do gosto de quem usa. Toda a identidade vive em tokens trocáveis; os ajustes da Fase 1 são tema, posição, tamanho e opacidade, e a arquitetura não pode impedir outros (destaque, estilo dos ícones etc.).
 - **Destino:** substituir a barra de tarefas do Windows, em harmonia com as janelas abertas (ADR 0009, que substitui a convivência do ADR 0004). Enquanto isso não chega, o dock convive com a barra.
-- Ficar próximo do PrimoDock e do dock do macOS é desejado. Os temas chamativos (Neon, Rocket, Canarinho) existem como opção; o padrão continua discreto.
+- Ficar próximo do PrimoDock e do dock do macOS é desejado. Os temas chamativos (Neon, Rocket) existem como opção; o padrão continua discreto.
 - Referência visual principal: o PrimoDock, observado pelas telas de configuração e pelo uso (capturas do autor). Referências secundárias: dock do macOS (Big Sur), WhiteSur, Zorin OS, Plank, Latte Dock, Cairo-Dock.
 - **Regra de implementação do zero:** o Dockyard copia funcionalidade, organização e aparência, nunca arquivos. Nada do executável do PrimoDock, do código descompilado, da pasta `IconPacks`, do catálogo da galeria nem dos sprites do pet entra no repositório. Ícones, pacotes e pet são desenhados do zero, e pacotes de terceiros (GPL, por exemplo) também ficam de fora. Ter visto o produto original não é um "clean room" estrito; a proteção é a regra de não copiar arquivos nem código.
 

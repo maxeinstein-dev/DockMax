@@ -47,7 +47,7 @@ O autor rodou os blocos 1 a 4 com o build do main depois do #29.
 ## 2. Aparência do dock nativo (uns 15 minutos)
 
 - [ ] Os três efeitos ao passar o mouse (Ampliação, Escala, Nenhum), com o mouse passando devagar e depressa.
-- [ ] Os nove estilos, um por um, e os reflexos onde o estilo tem.
+- [ ] Os oito estilos, um por um, e os reflexos onde o estilo tem.
 - [ ] O dock na **borda de cima**: posição, faixa reservada, menus abrindo para baixo, arrasto, ocultar automaticamente.
 - [ ] **Escala de 150 %** num monitor: o dock nítido, no tamanho certo e com a faixa certa.
 - [ ] As opções novas de Configurações (Dock em todos os monitores, Ocultar automaticamente e os dois tempos), vistas no app de Configurações de verdade.

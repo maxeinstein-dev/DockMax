@@ -28,7 +28,6 @@ export const STYLE_LOOKS: Readonly<Record<DockStyle, StyleLook>> = {
   rocket: { border: true, corners: 25, reflections: false },
   aquaShelf: { border: false, corners: 0, reflections: true },
   neon: { border: true, corners: 70, reflections: false },
-  canary: { border: true, corners: 100, reflections: false },
   paper: { border: false, corners: 40, reflections: false },
   floating: { border: false, corners: 40, reflections: true },
 };

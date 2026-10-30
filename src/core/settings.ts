@@ -32,7 +32,6 @@ export type DockStyle =
   | "rocket"
   | "aquaShelf"
   | "neon"
-  | "canary"
   | "paper"
   | "floating";
 
@@ -44,7 +43,6 @@ export const DOCK_STYLES: readonly DockStyle[] = [
   "rocket",
   "aquaShelf",
   "neon",
-  "canary",
   "paper",
   "floating",
 ];
