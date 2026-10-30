@@ -43,7 +43,7 @@ describe("StyleGallery", () => {
     );
     await act(async () => {});
 
-    expect(within(gallery()).getAllByRole("button")).toHaveLength(9);
+    expect(within(gallery()).getAllByRole("button")).toHaveLength(8);
     expect(card("Neon")).toHaveAttribute("aria-pressed", "true");
     expect(card("Papel")).toHaveAttribute("aria-pressed", "false");
     const images = [...card("Papel").querySelectorAll("img")];
@@ -141,8 +141,8 @@ describe("StyleGallery", () => {
     expect(card("Nativo")).toHaveFocus();
     expect(onSelect).not.toHaveBeenCalled();
 
-    fireEvent.click(card("Canarinho"));
-    expect(onSelect).toHaveBeenCalledWith("canary");
+    fireEvent.click(card("Papel"));
+    expect(onSelect).toHaveBeenCalledWith("paper");
     fireEvent.click(card("Nativo"));
     expect(onSelect).toHaveBeenCalledTimes(1);
   });

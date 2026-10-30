@@ -67,7 +67,6 @@ fn own(style: DockStyle) -> (bool, u8, bool) {
         DockStyle::Rocket => (true, 25, false),
         DockStyle::AquaShelf => (false, 0, true),
         DockStyle::Neon => (true, 70, false),
-        DockStyle::Canary => (true, 100, false),
         DockStyle::Paper => (false, 40, false),
         DockStyle::Floating => (false, 40, true),
     }
@@ -148,21 +147,6 @@ impl Look {
                     .border
                     .then_some((Color::rgb(0x00, 0xe5, 0xff), Color::rgb(0xff, 0x2b, 0xd6))),
                 indicator: Some(Color::rgb(0x00, 0xe5, 0xff)),
-                ..base
-            },
-            DockStyle::Canary => Look {
-                fill: Some(Fill::Gradient {
-                    base: None,
-                    stops: vec![
-                        (0.0, Color::rgb(0xf3, 0xef, 0x3d)),
-                        (0.58, Color::rgb(0x8e, 0xd1, 0x2c)),
-                        (1.0, Color::rgb(0x34, 0xa5, 0x2c)),
-                    ],
-                    over: vec![(0.0, WHITE.with_alpha(0.42)), (0.46, WHITE.with_alpha(0.0))],
-                }),
-                separator: Some(Color::rgba(24, 84, 18, 0.3)),
-                ink: Some(Color::rgb(0x10, 0x30, 0x0b)),
-                indicator: Some(Color::rgb(0x1c, 0x4a, 0x12)),
                 ..base
             },
             DockStyle::Paper => Look {

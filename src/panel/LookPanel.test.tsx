@@ -120,7 +120,7 @@ describe("LookPanel", () => {
     expect(sentSettings().dock.iconPack).toBe("cores");
   });
 
-  it("lists the nine styles in order, with the one in use chosen", () => {
+  it("lists the eight styles in order, with the one in use chosen", () => {
     render(
       <LookPanel settings={withDock({ style: "neon" })} onBack={vi.fn()} />,
     );
@@ -133,7 +133,6 @@ describe("LookPanel", () => {
       "Rocket",
       "Prateleira Aqua",
       "Neon",
-      "Canarinho",
       "Papel",
       "Flutuante",
     ]);

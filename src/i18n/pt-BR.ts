@@ -263,7 +263,6 @@ const messages = {
         rocket: "Rocket",
         aquaShelf: "Prateleira Aqua",
         neon: "Neon",
-        canary: "Canarinho",
         paper: "Papel",
         floating: "Flutuante",
       } satisfies Record<DockStyle, string>,

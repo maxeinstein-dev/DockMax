@@ -19,6 +19,8 @@ O que entra na fase, no lugar da lista da spec 0004 (mascote, onboarding, config
 | **Linux** | Entra como estudo: como fazer o DockMax funcionar no Linux |
 | **Nome e logo** | Talvez: um nome e uma logo mais "comerciáveis" que DockMax. Decidido: **Dockyard** (G6) |
 
+*Nota: Canarinho removido em 2026-10-30, a pedido do autor. Um `settings.json` antigo com `"style": "canary"` abre no tema padrão (Nativo), sem erro e com os outros ajustes intactos.*
+
 ## 2. Recortes
 
 | Recorte | Entrega |
