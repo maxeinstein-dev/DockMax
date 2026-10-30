@@ -58,14 +58,17 @@ impl Cell {
                 },
                 1.0,
             ),
-            // Battery0 to Battery9, then Battery10.
+            // Battery0 to Battery9, then Battery10; on the charger, the same
+            // levels with the bolt: BatteryCharging0 to 8, then 9 and 10 apart.
             Cell::Battery(battery) => {
                 let level = (u32::from(battery.percent) + 5) / 10;
                 (
-                    if level >= 10 {
-                        '\u{E83F}'
-                    } else {
-                        char::from_u32(0xE850 + level).unwrap_or('\u{E850}')
+                    match (battery.charging, level) {
+                        (false, 10..) => '\u{E83F}',
+                        (false, _) => char::from_u32(0xE850 + level).unwrap_or('\u{E850}'),
+                        (true, 10..) => '\u{EA93}',
+                        (true, 9) => '\u{E83E}',
+                        (true, _) => char::from_u32(0xE85A + level).unwrap_or('\u{E85A}'),
                     },
                     1.0,
                 )
@@ -199,18 +202,20 @@ mod tests {
 
     #[test]
     fn the_glyphs_follow_the_state() {
-        let battery = |percent| {
-            Cell::Battery(Battery {
-                percent,
-                charging: false,
-            })
-            .glyph(DockEdge::Bottom)
-            .unwrap()
-            .0
+        let battery = |percent, charging| {
+            Cell::Battery(Battery { percent, charging })
+                .glyph(DockEdge::Bottom)
+                .unwrap()
+                .0
         };
-        assert_eq!(battery(0), '\u{E850}');
-        assert_eq!(battery(78), '\u{E858}');
-        assert_eq!(battery(100), '\u{E83F}');
+        assert_eq!(battery(0, false), '\u{E850}');
+        assert_eq!(battery(78, false), '\u{E858}');
+        assert_eq!(battery(100, false), '\u{E83F}');
+        // On the charger the icon shows the bolt, at every level.
+        assert_eq!(battery(0, true), '\u{E85A}');
+        assert_eq!(battery(78, true), '\u{E862}');
+        assert_eq!(battery(90, true), '\u{E83E}');
+        assert_eq!(battery(100, true), '\u{EA93}');
         let volume = |percent, muted| {
             Cell::Volume(Volume { percent, muted })
                 .glyph(DockEdge::Bottom)

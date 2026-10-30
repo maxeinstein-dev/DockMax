@@ -2847,7 +2847,7 @@ impl Dock {
             .collect();
         let mut items = widget
             .as_ref()
-            .map(|widget| width_items(widget.config.widths(), widget.config.width()))
+            .map(|widget| widget_items(widget.config.widths(), widget.config.width()))
             .unwrap_or_default();
         items.extend(dock_menu_items(
             self.data.settings.dock.auto_hide,
@@ -2863,7 +2863,14 @@ impl Dock {
             let chosen = show_dock_menu(edge, items);
             post_to(hwnd, |dock: &mut Dock| dock.menu_open = false);
             if let Some(choice) = chosen {
-                act(app, choice, &monitor, &ids, widget.as_ref());
+                act(
+                    app,
+                    choice,
+                    &monitor,
+                    &ids,
+                    widget.as_ref(),
+                    shown.as_deref(),
+                );
             }
         }));
     }
@@ -3093,6 +3100,8 @@ enum MenuChoice {
     NewWorkspace,
     /// The widget clicked becomes this many icons wide (spec 0017 F1b).
     Width(u8),
+    /// The widget clicked leaves the dock (of the workspace shown).
+    RemoveWidget,
 }
 
 /// One line of the dock's menu: what it does and how it shows (spec 0014
@@ -3110,6 +3119,7 @@ const ADD_GLYPH: char = '\u{E710}';
 const SETTINGS_GLYPH: char = '\u{E713}';
 const HIDE_GLYPH: char = '\u{E70D}';
 const QUIT_GLYPH: char = '\u{E7E8}';
+const REMOVE_GLYPH: char = '\u{E711}';
 
 impl MenuEntry {
     fn item(choice: MenuChoice, item: menu::Item) -> MenuEntry {
@@ -3228,6 +3238,19 @@ fn width_items(widths: std::ops::RangeInclusive<u8>, current: u8) -> Vec<MenuEnt
     items
 }
 
+/// What a widget's menu has before the dock's: its widths, when it takes
+/// more than one, then "Remover do dock".
+fn widget_items(widths: std::ops::RangeInclusive<u8>, current: u8) -> Vec<MenuEntry> {
+    let text = &crate::i18n::messages().tray;
+    let mut items = width_items(widths, current);
+    items.push(MenuEntry::item(
+        MenuChoice::RemoveWidget,
+        menu::Item::new(text.remove_widget, REMOVE_GLYPH),
+    ));
+    items.push(MenuEntry::separator());
+    items
+}
+
 /// Shows the menu `items` at the pointer, opening away from the screen edge,
 /// and returns what was chosen.
 fn show_dock_menu(edge: DockEdge, items: Vec<MenuEntry>) -> Option<MenuChoice> {
@@ -3259,7 +3282,7 @@ pub fn tray_menu(app: &AppHandle) {
         show();
     }
     if let Some(choice) = chosen {
-        act(app, choice, "", &[], None);
+        act(app, choice, "", &[], None, None);
     }
 }
 
@@ -3272,6 +3295,7 @@ fn act(
     monitor: &str,
     ids: &[String],
     widget: Option<&crate::domain::widgets::WidgetId>,
+    workspace: Option<&str>,
 ) {
     match choice {
         MenuChoice::TaskManager => {
@@ -3305,6 +3329,11 @@ fn act(
         MenuChoice::Width(width) => {
             if let Some(id) = widget {
                 crate::commands::widgets::resize(app, id, width);
+            }
+        }
+        MenuChoice::RemoveWidget => {
+            if let Some(id) = widget {
+                crate::commands::widgets::remove_from_dock(app, id, workspace);
             }
         }
     }
@@ -3923,6 +3952,27 @@ mod tests {
         assert_eq!(items[3].choice, Some(MenuChoice::Width(3)));
         // One width: nothing to choose.
         assert!(width_items(1..=1, 1).is_empty());
+    }
+
+    #[test]
+    fn a_widget_menu_can_remove_it_with_or_without_widths() {
+        let items = widget_items(1..=3, 2);
+        assert_eq!(
+            labels(&items),
+            [
+                "# Tamanho",
+                "1 ícone",
+                "2 ícones ✓",
+                "3 ícones",
+                "—",
+                "Remover do dock",
+                "—"
+            ]
+        );
+        assert_eq!(items[5].choice, Some(MenuChoice::RemoveWidget));
+        // A note takes one width: only the removal.
+        let items = widget_items(1..=1, 1);
+        assert_eq!(labels(&items), ["Remover do dock", "—"]);
     }
 
     #[test]
