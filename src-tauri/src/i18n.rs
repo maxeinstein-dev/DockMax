@@ -104,6 +104,9 @@ pub struct LauncherMessages {
     /// Whose rates a currency's conversion uses; `{d}`, `{m}` and `{y}` are
     /// the day's.
     pub rates_of: &'static str,
+    /// The signs of a conversion's sum as assistive technology says them
+    /// (`×` as "vezes"): the sign and its words.
+    pub spoken: &'static [(&'static str, &'static str)],
     /// Each unit's name, by the id of `launcher_units`: singular and plural.
     pub units: &'static [(&'static str, &'static str, &'static str)],
 }
@@ -410,7 +413,14 @@ const PT_BR: Messages = Messages {
         action_copy: "Copiar",
         action_open_link: "Abrir como link",
         conversion: "Conversão · Enter copia o resultado",
-        rates_of: "Cotação BCE de {d}/{m}/{y}",
+        rates_of: "BCE {d}/{m}/{y}",
+        spoken: &[
+            ("×", "vezes"),
+            ("−", "menos"),
+            ("9/5", "9 quintos"),
+            ("5/9", "5 nonos"),
+            (" · ", ", cotação "),
+        ],
         units: &[
             ("mm", "milímetro", "milímetros"),
             ("cm", "centímetro", "centímetros"),
@@ -608,7 +618,14 @@ const EN: Messages = Messages {
         action_copy: "Copy",
         action_open_link: "Open as link",
         conversion: "Conversion · Enter copies the result",
-        rates_of: "ECB rate of {y}-{m}-{d}",
+        rates_of: "ECB {y}-{m}-{d}",
+        spoken: &[
+            ("×", "times"),
+            ("−", "minus"),
+            ("9/5", "9 fifths"),
+            ("5/9", "5 ninths"),
+            (" · ", ", rate of "),
+        ],
         units: &[
             ("mm", "millimeter", "millimeters"),
             ("cm", "centimeter", "centimeters"),
@@ -747,6 +764,12 @@ mod tests {
         assert_eq!(EN.launcher.unit_name("ft", true), Some("feet"));
         assert!(PT_BR.launcher.rates_of.contains("{d}"));
         assert!(EN.launcher.rates_of.contains("{y}"));
+        for messages in [&PT_BR, &EN] {
+            let words = messages.launcher.spoken;
+            for sign in ["×", "−", "9/5", "5/9", " · "] {
+                assert!(words.iter().any(|(each, _)| *each == sign), "{sign}");
+            }
+        }
     }
 
     #[test]
