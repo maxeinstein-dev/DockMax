@@ -4,7 +4,9 @@
 //! the same list (L2), the result of a sum, a web search by keyword and the
 //! settings pages of Windows and of the Dockyard; and, under them (L4), the
 //! files and folders of the computer (`files`, in the helper process); and,
-//! alone, the folder of a path typed (L5, `paths`). Each result does one
+//! alone, the folder of a path typed (L5, `paths`); and, between the apps
+//! and the files, or alone with `j ` (L7, `open_windows`), the open windows.
+//! Each result does one
 //! action of a closed list (`search::Action`), checked before it runs; its
 //! menu of actions (L6: Shift+Enter, the Menu key, the right button) offers
 //! the others its kind has (`launcher_actions`), in the app's own menu.
@@ -25,6 +27,7 @@ mod access;
 mod files;
 pub mod icons;
 pub(crate) mod layout;
+mod open_windows;
 mod paint;
 mod paths;
 
@@ -80,6 +83,7 @@ use crate::domain::launcher_files::{self, FileHit, FileQuery, Generation, Mode};
 use crate::domain::launcher_pages::{self, Target};
 use crate::domain::launcher_paths::{self, Browse, Entry, PathQuery, Problem, Reading};
 use crate::domain::launcher_web::{self, WebKeyword};
+use crate::domain::launcher_windows::{self, Window, WindowQuery};
 use crate::persistence::database::Storage;
 
 /// The classes of the frame and of the list.
@@ -146,6 +150,9 @@ const WEB_GLYPH: char = '\u{E774}';
 /// A file's and a folder's, while their icon is read.
 const FILE_GLYPH: char = '\u{E7C3}';
 const FOLDER_GLYPH: char = '\u{E8B7}';
+/// An open window's, while its program's icon is read, or when it has none
+/// (L7).
+const WINDOW_GLYPH: char = '\u{E737}';
 
 /// Event sent to the windows when the hotkey's state changes (Configurações
 /// shows it).
@@ -187,10 +194,13 @@ enum Kind {
     Web,
     File,
     Folder,
+    /// An open window (L7).
+    Window,
 }
 
 impl Kind {
-    /// Opening it is kept in the use (the apps, the pages and the files).
+    /// Opening it is kept in the use (the apps, the pages and the files);
+    /// switching to a window is not (a window lives a short while).
     fn remembered(self) -> bool {
         matches!(
             self,
@@ -206,6 +216,7 @@ impl Kind {
             Kind::Web => Some(WEB_GLYPH),
             Kind::File => Some(FILE_GLYPH),
             Kind::Folder => Some(FOLDER_GLYPH),
+            Kind::Window => Some(WINDOW_GLYPH),
         }
     }
 }
@@ -221,6 +232,8 @@ struct Found {
     /// What it shows under its name; the kind's when `None`.
     subtitle: Option<String>,
     action: Action,
+    /// The open window it is, for one (L7).
+    window: Option<Window>,
 }
 
 impl Found {
@@ -229,6 +242,30 @@ impl Found {
         match &self.action {
             Action::OpenApp(id) if self.kind == Kind::App => Some(id),
             _ => None,
+        }
+    }
+
+    /// The id its icon is read by, and its program's name: a program's, or
+    /// an open window's program's (L7).
+    fn icon_app(&self) -> Option<(&str, &str)> {
+        if let Some(id) = self.app_id() {
+            return Some((id, &self.name));
+        }
+        let window = self.window.as_ref()?;
+        Some((window.icon.as_deref()?, &window.app))
+    }
+
+    /// An open window (L7): its title, and under it "Janela · <program>".
+    fn window(window: &Window) -> Found {
+        let text = &crate::i18n::messages().launcher;
+        Found {
+            key: launcher_windows::key(window.hwnd),
+            kind: Kind::Window,
+            name: window.title.clone(),
+            subtitle: (!window.app.is_empty())
+                .then(|| text.window_of.replace("{app}", &window.app)),
+            action: Action::FocusWindow(window.hwnd),
+            window: Some(window.clone()),
         }
     }
 
@@ -251,6 +288,7 @@ impl Found {
             Kind::Web => text.web,
             Kind::File => text.file,
             Kind::Folder => text.folder,
+            Kind::Window => text.window,
         }
     }
 
@@ -263,6 +301,7 @@ impl Found {
             name: hit.name().to_owned(),
             subtitle: Some(launcher_files::abbreviate(hit.parent(), profile)),
             action: Action::OpenFile(hit.path.clone()),
+            window: None,
         }
     }
 
@@ -281,6 +320,7 @@ impl Found {
             name: entry.name.clone(),
             subtitle: None,
             action: Action::OpenFile(hit.path),
+            window: None,
         })
     }
 
@@ -309,7 +349,7 @@ impl Found {
     /// id, or a file's `launcher_files::icon_key` behind a control
     /// character no program's id has.
     fn icon_key(&self, pack: &Option<String>) -> Option<(Option<String>, String)> {
-        if let Some(id) = self.app_id() {
+        if let Some((id, _)) = self.icon_app() {
             return Some((pack.clone(), id.to_owned()));
         }
         let hit = self.file_hit()?;
@@ -332,6 +372,7 @@ impl Found {
             name: page.name.to_owned(),
             subtitle: None,
             action,
+            window: None,
         }
     }
 
@@ -345,6 +386,7 @@ impl Found {
             name: text.search_for.replace("{term}", term),
             subtitle: Some(text.search_with.replace("{name}", &keyword.name)),
             action: Action::OpenUri(url),
+            window: None,
         })
     }
 }
@@ -450,6 +492,14 @@ pub struct Launcher {
     app_files: HashMap<String, Option<String>>,
     /// The menu of actions was asked for, and where it opens.
     menu_request: Option<Placement>,
+    /// What is typed asks for the open windows (L7), and the windows read
+    /// for it, in the stacking order; with what describes their programs:
+    /// the Apps folder's programs (id, name) and the dock's pinned ones
+    /// (the dock's id, the program's id, its name), read on opening.
+    window_query: Option<WindowQuery>,
+    windows: Vec<Window>,
+    apps: Vec<(String, String)>,
+    pinned: Vec<(String, String, String)>,
 }
 
 /// Where the menu of actions opens.
@@ -479,6 +529,8 @@ const PIN_GLYPH: char = '\u{E718}';
 const UNPIN_GLYPH: char = '\u{E77A}';
 const REVEAL_GLYPH: char = '\u{E838}';
 const COPY_GLYPH: char = '\u{E8C8}';
+const SWITCH_GLYPH: char = '\u{E8A7}';
+const CLOSE_GLYPH: char = '\u{E8BB}';
 
 /// A line of the menu of actions: its text, its glyph and the keys that do
 /// the same without the menu.
@@ -492,6 +544,8 @@ fn menu_line(verb: Verb) -> super::menu::Line {
         Verb::Reveal => (text.action_reveal, REVEAL_GLYPH, None),
         Verb::CopyPath => (text.action_copy_path, COPY_GLYPH, Some("Ctrl+C")),
         Verb::CopyResult => (text.action_copy_result, COPY_GLYPH, Some("Ctrl+C")),
+        Verb::Switch => (text.action_switch, SWITCH_GLYPH, Some("Enter")),
+        Verb::CloseWindow => (text.action_close_window, CLOSE_GLYPH, None),
     };
     let item = super::menu::Item::new(label, glyph);
     super::menu::Line::Item(match keys {
@@ -688,6 +742,10 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
         pointer: None,
         app_files: HashMap::new(),
         menu_request: None,
+        window_query: None,
+        windows: Vec::new(),
+        apps: Vec::new(),
+        pinned: Vec::new(),
     };
     LAUNCHER.with(|slot| *slot.borrow_mut() = Some(launcher));
     register(crate::commands::settings::current(app).launcher);
@@ -1035,6 +1093,9 @@ impl Launcher {
         self.failed = None;
         self.launching = None;
         self.pointer = None;
+        self.window_query = None;
+        self.pinned = self.read_pinned();
+        self.read_windows();
         unsafe {
             let _ = SetWindowTextW(self.edit, w!(""));
         }
@@ -1091,6 +1152,8 @@ impl Launcher {
         self.generation.next();
         self.path_query = None;
         self.browse.clear();
+        self.window_query = None;
+        self.windows.clear();
         access::publish(Vec::new());
         // The helper leaves, and the memory of reading the icons and of
         // searching the files with it; the icons it had not answered are
@@ -1288,6 +1351,10 @@ impl Launcher {
             .iter()
             .map(|app| Candidate::app(&app.id, &app.name))
             .collect();
+        self.apps = apps
+            .iter()
+            .map(|app| (app.id.clone(), app.name.clone()))
+            .collect();
         let mut entries: Vec<Found> = apps
             .into_iter()
             .map(|app| Found {
@@ -1296,6 +1363,7 @@ impl Launcher {
                 name: app.name,
                 subtitle: None,
                 action: Action::OpenApp(app.id),
+                window: None,
             })
             .collect();
         entries.extend(pages);
@@ -1324,7 +1392,21 @@ impl Launcher {
             .iter()
             .map(|hit| Found::file(hit, &self.profile))
             .collect();
-        if query.is_empty() {
+        let windows: Vec<Found> = match &self.window_query {
+            Some(wanted) => launcher_windows::rank(&self.windows, wanted)
+                .into_iter()
+                .map(|index| Found::window(&self.windows[index]))
+                .collect(),
+            None => Vec::new(),
+        };
+        let windows_only = self
+            .window_query
+            .as_ref()
+            .is_some_and(|wanted| wanted.mode == launcher_windows::Mode::Only);
+        if windows_only {
+            // `j `: the open windows alone, every one with nothing after it.
+            results = windows;
+        } else if query.is_empty() {
             results = self.recents();
         } else if self
             .file_query
@@ -1342,6 +1424,7 @@ impl Launcher {
                     name: format!("= {shown}"),
                     subtitle: None,
                     action: Action::Copy(shown),
+                    window: None,
                 });
             }
             if let Some((keyword, term)) = launcher_web::matching(&self.keywords, &query) {
@@ -1353,14 +1436,13 @@ impl Launcher {
                         .into_iter()
                         .map(|index| self.entries[index].clone()),
                 );
-                if results.is_empty()
-                    && files.is_empty()
-                    && let Some(keyword) = self.keywords.first()
-                {
-                    results.extend(Found::web(keyword, &query));
-                }
-                // The files in a band of their own, after everything else.
-                results.extend(files);
+                let fallback = self
+                    .keywords
+                    .first()
+                    .and_then(|keyword| Found::web(keyword, &query));
+                // The windows in a band of their own after the apps and
+                // the pages (L7), then the files, after everything else.
+                results = launcher_windows::mix(results, windows, files, fallback);
             }
         }
         self.recent = query.is_empty();
@@ -1545,15 +1627,80 @@ impl Launcher {
     /// What `query` asks of the files, if anything: not with a sum nor a
     /// keyword's web search, which come alone.
     fn file_query_for(&self, query: &str) -> Option<FileQuery> {
+        let wanted = launcher_files::parse(query, self.files_keyword_taken())?;
+        let alone = launcher_calc::evaluate(query).is_some()
+            || launcher_web::matching(&self.keywords, query).is_some();
+        // `j term` (L7, read first) shows the windows alone: no files.
+        let windows_only = self
+            .window_query
+            .as_ref()
+            .is_some_and(|windows| windows.mode == launcher_windows::Mode::Only);
+        (wanted.mode == Mode::Only || (!alone && !windows_only)).then_some(wanted)
+    }
+
+    /// What `typed` (as typed) asks of the open windows (L7), if anything:
+    /// not with a sum nor a keyword's web search, which come alone; `j `
+    /// asks for them alone, unless the user made `j` a web keyword.
+    fn window_query_for(&self, typed: &str) -> Option<WindowQuery> {
         let taken = self.keywords.iter().any(|keyword| {
             keyword
                 .keyword
-                .eq_ignore_ascii_case(launcher_files::KEYWORD)
+                .eq_ignore_ascii_case(launcher_windows::KEYWORD)
         });
-        let wanted = launcher_files::parse(query, taken)?;
+        let wanted = launcher_windows::parse(typed, taken)?;
+        let query = typed.trim();
         let alone = launcher_calc::evaluate(query).is_some()
-            || launcher_web::matching(&self.keywords, query).is_some();
-        (wanted.mode == Mode::Only || !alone).then_some(wanted)
+            || launcher_web::matching(&self.keywords, query).is_some()
+            || launcher_files::parse(query, self.files_keyword_taken())
+                .is_some_and(|files| files.mode == Mode::Only);
+        (wanted.mode == launcher_windows::Mode::Only || !alone).then_some(wanted)
+    }
+
+    /// Whether the user made `f` a web keyword (which then wins over the
+    /// files').
+    fn files_keyword_taken(&self) -> bool {
+        self.keywords.iter().any(|keyword| {
+            keyword
+                .keyword
+                .eq_ignore_ascii_case(launcher_files::KEYWORD)
+        })
+    }
+
+    /// The dock's pinned programs (its id, the program's id and name), for
+    /// the windows' names and icons (L7).
+    fn read_pinned(&self) -> Vec<(String, String, String)> {
+        let Some(state) = self.app.try_state::<Mutex<Storage>>() else {
+            return Vec::new();
+        };
+        let storage = state.lock().unwrap_or_else(PoisonError::into_inner);
+        storage
+            .apps_snapshot()
+            .map(|snapshot| {
+                snapshot
+                    .apps
+                    .into_iter()
+                    .map(|app| (app.id.to_string(), app.app_id, app.name))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Reads the open windows again (L7), on this thread: it takes well
+    /// under 5 ms (`open_windows`).
+    fn read_windows(&mut self) {
+        let start = std::time::Instant::now();
+        self.windows = open_windows::read(&open_windows::Programs {
+            pinned: &self.pinned,
+            catalog: &self.apps,
+        });
+        let took = start.elapsed();
+        if took > std::time::Duration::from_millis(5) {
+            log::info!(
+                "launcher: reading {} windows took {} ms",
+                self.windows.len(),
+                took.as_millis()
+            );
+        }
     }
 
     /// The results changed under the selection: it stays on the same result
@@ -1645,6 +1792,7 @@ impl Launcher {
         if let Some(path) = path {
             self.file_query = None;
             self.files.clear();
+            self.window_query = None;
             let _ = unsafe { KillTimer(Some(self.frame), FILES_TIMER) };
             self.browse_path(path);
             self.refresh();
@@ -1655,6 +1803,12 @@ impl Launcher {
         if self.path_query.take().is_some() {
             self.browse.clear();
             let _ = unsafe { KillTimer(Some(self.frame), FOLDER_TIMER) };
+        }
+        // The open windows (L7) are read again at each key: cheap, and a
+        // window opened or closed meanwhile shows up or goes.
+        self.window_query = self.window_query_for(&self.query);
+        if self.window_query.is_some() {
+            self.read_windows();
         }
         let wanted = self.file_query_for(self.query.trim());
         match &wanted {
@@ -1741,7 +1895,10 @@ impl Launcher {
         }
         let shown: Vec<(String, String)> = self.results[visible]
             .iter()
-            .filter_map(|found| Some((found.app_id()?.to_owned(), found.name.clone())))
+            .filter_map(|found| {
+                let (id, name) = found.icon_app()?;
+                Some((id.to_owned(), name.to_owned()))
+            })
             .collect();
         for (id, name) in shown {
             let key = (pack.clone(), id.clone());
@@ -1909,9 +2066,17 @@ impl Launcher {
         let Some(found) = self.results.get(index).cloned() else {
             return;
         };
-        let file = found
-            .app_id()
-            .and_then(|id| self.app_files.get(id).cloned().flatten());
+        // The program's file: a classic program's, as the shell answered; a
+        // window's program's (L7), as its process says.
+        let file = match &found.window {
+            Some(window) => window
+                .exe
+                .clone()
+                .filter(|exe| launcher_windows::is_revealable(exe)),
+            None => found
+                .app_id()
+                .and_then(|id| self.app_files.get(id).cloned().flatten()),
+        };
         match launcher_actions::action(verb, &found.action, file.as_deref()) {
             Some(action) => self.perform(&found, action),
             None => log::warn!("launcher: an action does not apply to its result"),
@@ -1974,7 +2139,30 @@ impl Launcher {
             Action::CopyPath(path) => self.copy(&key, &path, text.path_copied),
             Action::PinApp(id) => self.pin(&key, &id, &found.name, true),
             Action::UnpinApp(id) => self.pin(&key, &id, &found.name, false),
+            Action::FocusWindow(hwnd) => self.window_action(&key, hwnd, true),
+            Action::CloseWindow(hwnd) => self.window_action(&key, hwnd, false),
         }
+    }
+
+    /// Brings the window `hwnd` to the front (`focus`), restoring it if it
+    /// is minimized, or asks it to close (L7), with the dock's own calls;
+    /// the launcher closes. Never counted in the use. A window that is gone
+    /// since it was listed (or whose handle went to another) says it could
+    /// not.
+    fn window_action(&mut self, key: &str, hwnd: isize, focus: bool) {
+        if !open_windows::still_listed(hwnd) {
+            log::info!("launcher: a window was gone");
+            self.launched(key, false, false);
+            return;
+        }
+        if focus {
+            // The launcher is in front: Windows lets it hand the front over.
+            super::openwin::focus(hwnd);
+        } else {
+            super::openwin::close(hwnd);
+        }
+        super::open_apps::wake(&self.app);
+        self.launched(key, false, true);
     }
 
     /// Pins the program `id` to the dock (`wanted`) or takes it out, as the
@@ -2069,6 +2257,13 @@ impl Launcher {
             Kind::WindowsPage | Kind::DockyardPage => Subject::Page,
             Kind::Web => Subject::Web,
             Kind::Calculator => Subject::Calculator,
+            Kind::Window => Subject::Window {
+                revealable: found
+                    .window
+                    .as_ref()
+                    .and_then(|window| window.exe.as_deref())
+                    .is_some_and(launcher_windows::is_revealable),
+            },
         }
     }
 

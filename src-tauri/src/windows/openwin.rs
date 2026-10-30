@@ -41,13 +41,13 @@ mod imp {
         BringWindowToTop, EnumWindows, GA_ROOTOWNER, GW_OWNER, GWL_EXSTYLE, GetAncestor,
         GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
         GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, PostMessageW, SW_MINIMIZE,
-        SW_RESTORE, SetForegroundWindow, ShowWindow, WM_CLOSE, WS_EX_APPWINDOW, WS_EX_NOACTIVATE,
-        WS_EX_TOOLWINDOW,
+        SW_RESTORE, SetForegroundWindow, ShowWindow, WM_CLOSE,
     };
     use ::windows::core::{BOOL, PWSTR};
 
     use super::OpenWindow;
     use crate::domain::fullscreen::{Bounds, Candidate};
+    use crate::domain::open_apps::{ButtonFacts, has_button as taskbar_rule};
     use ::windows::Win32::Foundation::RECT;
     use ::windows::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromWindow};
     use ::windows::Win32::UI::WindowsAndMessaging::{
@@ -77,23 +77,24 @@ mod imp {
     /// window, not owned by another (a dialog), not hidden by the shell (a
     /// window on another virtual desktop, a suspended Store app), not one
     /// that never takes the focus.
+    ///
+    /// The rule is `domain::open_apps::has_button`; the facts are read only
+    /// as far as they are needed (most windows are hidden).
     fn has_button(hwnd: HWND) -> bool {
         if !unsafe { IsWindowVisible(hwnd) }.as_bool() {
             return false;
         }
-        let style = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) } as u32;
-        let app_window = style & WS_EX_APPWINDOW.0 != 0;
-        if style & WS_EX_TOOLWINDOW.0 != 0 && !app_window {
-            return false;
-        }
-        if style & WS_EX_NOACTIVATE.0 != 0 && !app_window {
-            return false;
-        }
+        let ex_style = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) } as u32;
         let owned = unsafe { GetWindow(hwnd, GW_OWNER) }.is_ok_and(|owner| !owner.is_invalid());
-        if owned && !app_window {
-            return false;
-        }
-        !is_cloaked(hwnd)
+        // Whether it is cloaked is asked of the DWM last, only of a window
+        // that would have a button otherwise.
+        let facts = ButtonFacts {
+            visible: true,
+            ex_style,
+            owned,
+            cloaked: false,
+        };
+        taskbar_rule(facts) && !is_cloaked(hwnd)
     }
 
     fn title_of(hwnd: HWND) -> String {
@@ -364,6 +365,17 @@ pub fn focus(hwnd: isize) {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_taskbar_rule_reads_windows_own_styles() {
+        use crate::domain::open_apps;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            WS_EX_APPWINDOW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+        };
+        assert_eq!(open_apps::WS_EX_APPWINDOW, WS_EX_APPWINDOW.0);
+        assert_eq!(open_apps::WS_EX_NOACTIVATE, WS_EX_NOACTIVATE.0);
+        assert_eq!(open_apps::WS_EX_TOOLWINDOW, WS_EX_TOOLWINDOW.0);
+    }
 
     /// Not a check: prints what is open on this machine, to see what the
     /// shell would call each window. `cargo test spike_ -- --ignored --nocapture`.

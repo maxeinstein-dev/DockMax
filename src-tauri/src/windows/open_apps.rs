@@ -535,6 +535,35 @@ pub fn group_key_of_other(key: &str) -> Option<String> {
         .map(|other| other.key.clone())
 }
 
+/// What the dock shows the program of each open window as, by the window's
+/// handle, as at its last look: the id `app_icon` takes for it and its name.
+/// A pinned program's come from `pinned` (the dock's id, the program's id
+/// and its name); an open one that is not pinned, from what the dock
+/// described it as. Never asks the shell. For the launcher's windows (spec
+/// 0012 L7).
+pub fn programs_of_windows(
+    pinned: &[(String, String, String)],
+) -> HashMap<isize, (String, String)> {
+    let state = state();
+    let mut programs = HashMap::new();
+    for found in &state.found {
+        let Some((_, app_id, name)) = pinned.iter().find(|(id, ..)| *id == found.id) else {
+            continue;
+        };
+        for hwnd in &found.hwnds {
+            programs.insert(*hwnd, (app_id.clone(), name.clone()));
+        }
+    }
+    for other in &state.others {
+        for hwnd in &other.hwnds {
+            programs
+                .entry(*hwnd)
+                .or_insert_with(|| (other.app_id.clone(), other.name.clone()));
+        }
+    }
+    programs
+}
+
 /// What the shell calls the pinned program `app_id`, if it was read already
 /// (the looks at the windows read it): never asks the shell.
 pub fn known_identity(app_id: &str) -> Option<Identity> {
