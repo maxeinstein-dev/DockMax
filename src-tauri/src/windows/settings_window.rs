@@ -2,13 +2,21 @@
 //! when the user opens the settings and destroyed when it is closed, so
 //! nothing of it stays loaded the rest of the day. The dock's Configurações
 //! item and the tray's "Configurações" open it; opening it again brings the
-//! one that is open to the front.
+//! one that is open to the front, and so does a click while it is still
+//! being made (`Opening`): one window, never two.
+//!
+//! The first WebView2 of the process starts cold (400-700 ms on the
+//! author's machine, more on a busy one): the window shows at once in the
+//! theme's surface color, takes the focus when it is done, and the pointer
+//! resting on Configurações in the menu warms WebView2 (`warm`).
 
 use std::error::Error;
 
+use tauri::webview::{Color, PageLoadEvent};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::domain::launcher_pages::Section;
+use crate::domain::settings::Theme;
 
 /// The window's label: the capability `settings` is granted to it.
 pub const LABEL: &str = "settings";
@@ -37,6 +45,120 @@ pub fn open_section(app: &AppHandle, section: Section) -> Result<(), Box<dyn Err
     open_at(app, Some(section))
 }
 
+/// The pointer rests on Configurações in the dock's (or the tray's) menu:
+/// starts WebView2 now, so the click finds it warm (~110 ms to the page
+/// instead of 400-700 ms cold, spec 0011 §2). It reuses the panel's warm-up
+/// (H2): the hidden panel window, destroyed after `KEEP_WARM` unused, so
+/// nothing stays loaded the rest of the day. Nothing to do when Configurações
+/// is open or being made: WebView2 is already up.
+pub fn warm(app: &AppHandle) {
+    if app.get_webview_window(LABEL).is_some() || opening().making {
+        return;
+    }
+    super::panel_window::warm(app);
+}
+
+/// A window being made, and what was asked of it meanwhile (spec 0011 H1):
+/// the window is made off the main thread and only exists for
+/// `get_webview_window` once it is done, so a second click during a slow
+/// first start would make a second window.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct Opening {
+    /// A window is being made.
+    making: bool,
+    /// The section the window starts on (its initialization script).
+    start: Option<Section>,
+    /// The last section asked for, by the first request or a later one.
+    latest: Option<Section>,
+    /// Asked again while it was being made.
+    again: bool,
+}
+
+/// What a request to open Configurações does, when no window is there.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Step {
+    /// Makes the window, starting on this section.
+    Make(Option<Section>),
+    /// One is being made: it shows up for this request too when done.
+    Wait,
+}
+
+/// What is left to do once the window is made.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Ready {
+    /// A section asked for while it was being made, other than the one it
+    /// started on: sent to the page once it has loaded.
+    section: Option<Section>,
+    /// It was asked for again while being made.
+    again: bool,
+}
+
+impl Opening {
+    /// A request for the window, on `section` (`None`: as it is).
+    fn ask(&mut self, section: Option<Section>) -> Step {
+        if self.making {
+            // A plain open keeps the section a page search asked for.
+            if section.is_some() {
+                self.latest = section;
+            }
+            self.again = true;
+            return Step::Wait;
+        }
+        *self = Opening {
+            making: true,
+            start: section,
+            latest: section,
+            again: false,
+        };
+        Step::Make(section)
+    }
+
+    /// The making ended, made or failed: the next request makes a window
+    /// again (the window, if made, is found by its label from now on).
+    fn finish(&mut self) -> Ready {
+        let ready = Ready {
+            section: self.latest.filter(|&latest| Some(latest) != self.start),
+            again: self.again,
+        };
+        *self = Opening::default();
+        ready
+    }
+}
+
+static OPENING: std::sync::Mutex<Opening> = std::sync::Mutex::new(Opening {
+    making: false,
+    start: None,
+    latest: None,
+    again: false,
+});
+
+fn opening() -> std::sync::MutexGuard<'static, Opening> {
+    OPENING
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// The window's background before its page paints: the surface of the
+/// theme (`--surface-rgb` in `src/themes/tokens.css`), so a cold start shows
+/// the window at once in the app's colors instead of a white square.
+fn background(theme: Theme, system_dark: bool) -> (u8, u8, u8) {
+    let dark = match theme {
+        Theme::Dark => true,
+        Theme::Light => false,
+        Theme::System => system_dark,
+    };
+    if dark { (38, 39, 44) } else { (247, 247, 249) }
+}
+
+fn system_dark() -> bool {
+    #[cfg(windows)]
+    {
+        super::native_dock::system_dark()
+    }
+    #[cfg(not(windows))]
+    false
+}
+
 fn open_at(app: &AppHandle, section: Option<Section>) -> Result<(), Box<dyn Error>> {
     let _ = APP.set(app.clone());
     if let Some(window) = app.get_webview_window(LABEL) {
@@ -48,17 +170,27 @@ fn open_at(app: &AppHandle, section: Option<Section>) -> Result<(), Box<dyn Erro
         }
         return Ok(());
     }
+    let Step::Make(section) = opening().ask(section) else {
+        return Ok(());
+    };
+    // Nothing left over from a window closed before its page loaded.
+    *PENDING_SECTION
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
     // A new window starts on the section: its name, from a closed list, is
     // set before the page's scripts run.
     let start =
         section.map(|section| format!("window.__DOCKYARD_SECTION__ = \"{}\";", section.as_str()));
+    let (red, green, blue) =
+        background(crate::commands::settings::current(app).theme, system_dark());
     // Made off the main thread: the callers (a command, the tray menu) run on
     // it, and building a webview window there waits on the main thread
     // itself, which never answers.
     let app = app.clone();
-    std::thread::Builder::new()
+    let spawned = std::thread::Builder::new()
         .name("settings-window".into())
         .spawn(move || {
+            let asked = std::time::Instant::now();
             let title = crate::i18n::messages().settings.window_title;
             let mut builder =
                 WebviewWindowBuilder::new(&app, LABEL, WebviewUrl::App("settings.html".into()))
@@ -67,13 +199,55 @@ fn open_at(app: &AppHandle, section: Option<Section>) -> Result<(), Box<dyn Erro
                     .min_inner_size(720.0, 480.0)
                     .center()
                     .resizable(true)
-                    .additional_browser_args(super::BROWSER_ARGS);
+                    .background_color(Color(red, green, blue, 255))
+                    .additional_browser_args(super::BROWSER_ARGS)
+                    // A section asked for while the window was being made
+                    // reaches the page once it has loaded and listens.
+                    .on_page_load(|webview, payload| {
+                        if payload.event() != PageLoadEvent::Finished {
+                            return;
+                        }
+                        let Some(section) = PENDING_SECTION
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .take()
+                        else {
+                            return;
+                        };
+                        if let Err(error) = webview.emit_to(LABEL, SECTION_EVENT, section.as_str())
+                        {
+                            log::warn!(
+                                "settings: the section asked for did not reach the page: {error}"
+                            );
+                        }
+                    });
             if let Some(start) = &start {
                 builder = builder.initialization_script(start);
             }
-            match builder.build() {
-                // The subclass on the window's own thread.
+            let built = builder.build();
+            let ready = opening().finish();
+            match built {
                 Ok(window) => {
+                    log::info!(
+                        "settings: window made in {} ms{}",
+                        asked.elapsed().as_millis(),
+                        if ready.again {
+                            ", asked again meanwhile"
+                        } else {
+                            ""
+                        }
+                    );
+                    if let Some(section) = ready.section {
+                        *PENDING_SECTION
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(section);
+                    }
+                    // In front, even when making it took long enough for
+                    // the click's right to the foreground to lapse.
+                    if let Err(error) = window.set_focus() {
+                        log::warn!("settings: the window could not take the focus: {error}");
+                    }
+                    // The subclass on the window's own thread.
                     let installed = app.run_on_main_thread(move || {
                         if let Err(error) = install(&window) {
                             log::warn!("settings: Alt+Space is not handed to the capture: {error}");
@@ -85,9 +259,17 @@ fn open_at(app: &AppHandle, section: Option<Section>) -> Result<(), Box<dyn Erro
                 }
                 Err(error) => log::warn!("settings: the window could not be made: {error}"),
             }
-        })?;
+        });
+    if let Err(error) = spawned {
+        opening().finish();
+        return Err(error.into());
+    }
     Ok(())
 }
+
+/// A section asked for while the window was being made, for its page once
+/// loaded.
+static PENDING_SECTION: std::sync::Mutex<Option<Section>> = std::sync::Mutex::new(None);
 
 /// Hands Alt+Space to the hotkey's capture instead of opening the window's
 /// menu, while the capture runs.
@@ -161,6 +343,97 @@ unsafe extern "system" fn subclass_proc(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn the_first_request_makes_the_window_on_its_section() {
+        let mut opening = Opening::default();
+
+        assert_eq!(
+            opening.ask(Some(Section::Look)),
+            Step::Make(Some(Section::Look))
+        );
+        assert!(opening.making);
+    }
+
+    #[test]
+    fn a_second_click_while_it_is_being_made_makes_no_second_window() {
+        let mut opening = Opening::default();
+        assert_eq!(opening.ask(None), Step::Make(None));
+
+        assert_eq!(opening.ask(None), Step::Wait);
+        assert_eq!(opening.ask(None), Step::Wait);
+        assert_eq!(
+            opening.finish(),
+            Ready {
+                section: None,
+                again: true
+            }
+        );
+    }
+
+    #[test]
+    fn the_window_ends_on_the_last_section_asked_for() {
+        let mut opening = Opening::default();
+        opening.ask(None);
+        opening.ask(Some(Section::Items));
+        opening.ask(Some(Section::About));
+        // A plain open (the dock's menu) keeps the page search's section.
+        opening.ask(None);
+
+        assert_eq!(opening.finish().section, Some(Section::About));
+    }
+
+    #[test]
+    fn the_section_it_started_on_is_not_sent_again() {
+        let mut opening = Opening::default();
+        opening.ask(Some(Section::Apps));
+        opening.ask(Some(Section::Apps));
+
+        assert_eq!(opening.finish().section, None);
+    }
+
+    #[test]
+    fn a_window_made_alone_needs_nothing_more() {
+        let mut opening = Opening::default();
+        opening.ask(Some(Section::General));
+
+        assert_eq!(
+            opening.finish(),
+            Ready {
+                section: None,
+                again: false
+            }
+        );
+    }
+
+    #[test]
+    fn after_the_making_ends_made_or_failed_the_next_request_makes_one_again() {
+        let mut opening = Opening::default();
+        opening.ask(None);
+        opening.ask(Some(Section::Look));
+        opening.finish();
+
+        assert_eq!(opening, Opening::default());
+        assert_eq!(opening.ask(None), Step::Make(None));
+    }
+
+    #[test]
+    fn the_background_is_the_surface_of_the_theme() {
+        let dark = (38, 39, 44);
+        let light = (247, 247, 249);
+        assert_eq!(background(Theme::Dark, false), dark);
+        assert_eq!(background(Theme::Light, true), light);
+        assert_eq!(background(Theme::System, true), dark);
+        assert_eq!(background(Theme::System, false), light);
+        // The same colors as the page's surface, light and dark.
+        let tokens = include_str!("../../../src/themes/tokens.css");
+        for (red, green, blue) in [dark, light] {
+            let surface = format!("--surface-rgb: {red} {green} {blue};");
+            assert!(tokens.contains(&surface), "{surface}");
+        }
+    }
+
     #[test]
     fn the_settings_window_shares_the_browser_arguments_of_the_others() {
         let config: serde_json::Value =

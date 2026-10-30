@@ -36,6 +36,7 @@ Os testes de ponta a ponta rodavam ao mesmo tempo, então os números podem esta
 - **A página** (`settings.html`, `src/settings/`): barra lateral com Geral, Aparência do dock, Apps do dock, Itens do dock e Sobre, e ao lado a mesma tela que o painel tinha, sem o "Voltar". Esc fecha a janela.
 - **Capacidade** `settings`: só o que as telas de ajustes usam (configurações, widgets, apps, pacotes de ícones, fechar a própria janela), pinada no guarda.
 - **O painel** continua com as telas de ajustes por enquanto, mas ninguém mais as abre; elas saem dele no H2.
+- **Uma janela só, e resposta na hora (2026-10-30):** enquanto a janela está sendo criada ela ainda não existe pelo rótulo, então um segundo clique criava outra. Agora um sinal de "abrindo" (`Opening`) segura os pedidos: o segundo clique não cria nada, e quando a janela fica pronta ela vem para a frente com o foco, na última seção pedida (enviada à página quando ela termina de carregar). O sinal é limpo também quando a criação falha. A janela nasce com o fundo da superfície do tema (`--surface-rgb`), para aparecer na hora nas cores do app enquanto o WebView2 arranca, e pega o foco ao ficar pronta, mesmo que o arranque tenha demorado. O ponteiro parado em "Configurações" no menu do dock ou da bandeja **aquece** o WebView2 com a janela escondida do painel (a mesma do H2, destruída 45 s depois sem uso), como os itens que abrem painel. Medido com `spikes/webview-startup` (release, máquina do autor, 2026-10-30): frio 404–688 ms até a página pintada; morno 104–134 ms. O log diz quanto cada criação levou (`settings: window made in … ms`).
 
 ## 4. Verificado (H1)
 
@@ -47,7 +48,7 @@ No app real (debug): o item Configurações abre a janela "Configurações do Do
 
 - **A janela do painel** (`windows/panel_window.rs`) saiu do `tauri.conf.json`: é criada (fora da thread principal, como a de Configurações) quando um painel vai abrir, ou quando o ponteiro **para 150 ms** sobre um item que abre painel (aquecer), e é **destruída 45 s** depois do último uso, sem painel aberto nem esperando. Com ela, o processo do WebView2 encerra.
 - **O primeiro show espera a página:** um painel pedido com a janela ainda nascendo fica guardado e sai quando a página avisa que escuta o `panel-show` (`panel_mounted`).
-- **O que não aquece:** os programas (o clique abre o programa) e Configurações (um app à parte).
+- **O que não aquece:** os programas (o clique abre o programa) e o item Configurações do dock (um app à parte). Desde 2026-10-30, a linha "Configurações" dos menus do dock e da bandeja aquece (§3).
 
 ## 6. H3 em detalhe
 
