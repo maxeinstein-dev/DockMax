@@ -29,8 +29,27 @@ pub(super) const CLIP_TIMER: usize = 6;
 fn read(done: impl FnOnce(Answer) + Send + 'static) -> bool {
     std::thread::Builder::new()
         .name("launcher-clipboard".into())
-        .spawn(move || done(read_history()))
+        .spawn(move || done(single_threaded(read_history)))
         .is_ok()
+}
+
+/// Runs `work` with the thread in a single-threaded apartment (STA).
+/// `Clipboard` is a single-threaded WinRT class: from a thread without COM
+/// (the multithreaded apartment, implicit) each call fails with
+/// `RO_E_UNSUPPORTED_FROM_MTA` (0x8000001D), and the history read as
+/// "could not be read" in 2 ms, in front or not.
+fn single_threaded<T>(work: impl FnOnce() -> T) -> T {
+    use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize};
+    let entered = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }.is_ok();
+    if !entered {
+        log::warn!("launcher: the clipboard thread did not enter a single-threaded apartment");
+    }
+    // What `work` returns holds no WinRT object: it outlives the apartment.
+    let done = work();
+    if entered {
+        unsafe { CoUninitialize() };
+    }
+    done
 }
 
 /// The text items of the history, in Windows' order (the last copied
@@ -325,7 +344,7 @@ impl Launcher {
         let spawned = std::thread::Builder::new()
             .name("launcher-clipboard".into())
             .spawn(move || {
-                let copied = restore(&id);
+                let copied = single_threaded(|| restore(&id));
                 post(move |launcher| {
                     if copied {
                         super::access::announce(
@@ -355,7 +374,7 @@ mod tests {
     fn clipboard_history_answers() {
         let before = private_bytes();
         let started = Instant::now();
-        let answer = read_history();
+        let answer = single_threaded(read_history);
         let took = started.elapsed();
         let after = private_bytes();
         match &answer {
@@ -376,7 +395,7 @@ mod tests {
         }
         println!("read in {took:?}");
         let started = Instant::now();
-        let again = read_history();
+        let again = single_threaded(read_history);
         println!(
             "read again in {:?} ({})",
             started.elapsed(),
@@ -392,6 +411,128 @@ mod tests {
             after as f64 / 1e6,
             (after as f64 - before as f64) / 1e6
         );
+    }
+
+    /// The history's status and how many items it has, never what they
+    /// are: "Success 12", "AccessDenied 0".
+    fn status_and_count() -> String {
+        let enabled = Clipboard::IsHistoryEnabled();
+        let result = Clipboard::GetHistoryItemsAsync().and_then(|operation| operation.join());
+        describe(enabled, result)
+    }
+
+    fn describe(
+        enabled: windows::core::Result<bool>,
+        result: windows::core::Result<
+            windows::ApplicationModel::DataTransfer::ClipboardHistoryItemsResult,
+        >,
+    ) -> String {
+        let result = match result {
+            Ok(result) => result,
+            Err(error) => return format!("enabled {enabled:?}, error {:?}", error.code()),
+        };
+        let status = match result.Status() {
+            Ok(ClipboardHistoryItemsResultStatus::Success) => "Success".to_owned(),
+            Ok(ClipboardHistoryItemsResultStatus::AccessDenied) => "AccessDenied".to_owned(),
+            Ok(ClipboardHistoryItemsResultStatus::ClipboardHistoryDisabled) => {
+                "ClipboardHistoryDisabled".to_owned()
+            }
+            Ok(other) => format!("status {}", other.0),
+            Err(error) => format!("no status {:?}", error.code()),
+        };
+        let count = result
+            .Items()
+            .and_then(|items| items.Size())
+            .map_or(-1, i64::from);
+        format!("enabled {enabled:?}, {status}, {count} items")
+    }
+
+    /// Runs the window's messages for `long`.
+    fn pump(long: std::time::Duration) {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            DispatchMessageW, MSG, PM_REMOVE, PeekMessageW, TranslateMessage,
+        };
+        let started = Instant::now();
+        while started.elapsed() < long {
+            let mut message = MSG::default();
+            while unsafe { PeekMessageW(&mut message, None, 0, 0, PM_REMOVE) }.as_bool() {
+                unsafe {
+                    let _ = TranslateMessage(&message);
+                    DispatchMessageW(&message);
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
+    /// Reads the history the ways the launcher could, with a small window
+    /// of this process in front (as the launcher is), and prints only the
+    /// status and how many items, never what they are. The window closes
+    /// itself in a few seconds. Not run by `cargo test`:
+    /// `cargo test clipboard_history_in_front -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "reads the clipboard history of this machine, with a window in front"]
+    fn clipboard_history_in_front() {
+        use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+        use windows::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, GetForegroundWindow, GetWindowThreadProcessId,
+            SW_SHOWNORMAL, SetForegroundWindow, ShowWindow, WS_CAPTION, WS_EX_TOOLWINDOW,
+            WS_EX_TOPMOST,
+        };
+        use windows::core::w;
+
+        let time = |label: &str, run: &dyn Fn() -> String| {
+            let started = Instant::now();
+            let said = run();
+            println!("{label}: {said} ({:?})", started.elapsed());
+        };
+        // Without COM (the multithreaded apartment, implicit), as before the
+        // fix, and in a single-threaded one, as the launcher reads now.
+        let without_com = || std::thread::spawn(status_and_count).join().unwrap();
+        let single = || {
+            std::thread::spawn(|| single_threaded(status_and_count))
+                .join()
+                .unwrap()
+        };
+        time("not in front, worker thread (MTA)", &without_com);
+        time("not in front, worker thread (STA)", &single);
+
+        let hwnd = unsafe {
+            CreateWindowExW(
+                WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+                w!("STATIC"),
+                w!("tipocb"),
+                WS_CAPTION,
+                40,
+                40,
+                160,
+                60,
+                None,
+                None,
+                None,
+                None,
+            )
+        }
+        .expect("window");
+        unsafe {
+            let _ = ShowWindow(hwnd, SW_SHOWNORMAL);
+            // The input of the window in front, for a moment: Windows then
+            // lets this thread take the foreground.
+            let front = GetWindowThreadProcessId(GetForegroundWindow(), None);
+            let mine = GetCurrentThreadId();
+            let _ = AttachThreadInput(mine, front, true);
+            let _ = SetForegroundWindow(hwnd);
+            let _ = AttachThreadInput(mine, front, false);
+        }
+        pump(std::time::Duration::from_millis(300));
+        println!("in front: {}", unsafe { GetForegroundWindow() } == hwnd);
+
+        time("in front, worker thread (MTA)", &without_com);
+        time("in front, worker thread (STA)", &single);
+        println!("in front: {}", unsafe { GetForegroundWindow() } == hwnd);
+        unsafe {
+            let _ = DestroyWindow(hwnd);
+        }
     }
 
     #[repr(C)]
