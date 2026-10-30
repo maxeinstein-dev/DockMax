@@ -121,6 +121,53 @@ pub async fn e2e_launcher_key(key: String) -> Result<(), String> {
     }
 }
 
+/// The private memory of the app's own process, in bytes: the native dock,
+/// the launcher and everything else in Rust, without the WebView2 processes
+/// (M1 of study 0002). What the suite's memory guard reads.
+#[tauri::command]
+pub async fn e2e_memory() -> Result<u64, String> {
+    private_bytes().ok_or_else(|| "the process memory could not be read".into())
+}
+
+#[cfg(windows)]
+fn private_bytes() -> Option<u64> {
+    #[repr(C)]
+    #[derive(Default)]
+    struct Counters {
+        cb: u32,
+        page_fault_count: u32,
+        peak_working_set: usize,
+        working_set: usize,
+        quota_peak_paged_pool: usize,
+        quota_paged_pool: usize,
+        quota_peak_non_paged_pool: usize,
+        quota_non_paged_pool: usize,
+        pagefile_usage: usize,
+        peak_pagefile_usage: usize,
+        private_usage: usize,
+    }
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetCurrentProcess() -> isize;
+        fn K32GetProcessMemoryInfo(process: isize, counters: *mut Counters, size: u32) -> i32;
+    }
+
+    let mut counters = Counters {
+        cb: size_of::<Counters>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: `counters` is a `PROCESS_MEMORY_COUNTERS_EX` of the size `cb`
+    // says, and the pseudo handle of the current process needs no closing.
+    let read = unsafe { K32GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, counters.cb) };
+    (read != 0).then_some(counters.private_usage as u64)
+}
+
+#[cfg(not(windows))]
+fn private_bytes() -> Option<u64> {
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,6 +211,16 @@ mod tests {
             let error = data_root(TEST_IDENTIFIER, Some(value.into())).unwrap_err();
             assert!(error.contains("absolute"), "{value}: {error}");
         }
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn reads_the_private_memory_of_the_process() {
+        let before = private_bytes().expect("the memory must be readable");
+        let block = vec![1u8; 32 << 20];
+        let after = private_bytes().expect("the memory must be readable");
+        assert!(after >= before + (16 << 20), "{before} -> {after}");
+        drop(block);
     }
 
     #[test]

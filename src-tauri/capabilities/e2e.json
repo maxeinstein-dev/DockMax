@@ -11,6 +11,7 @@
     "allow-e2e-launcher-view",
     "allow-e2e-launcher-toggle",
     "allow-e2e-launcher-type",
-    "allow-e2e-launcher-key"
+    "allow-e2e-launcher-key",
+    "allow-e2e-memory"
   ]
 }

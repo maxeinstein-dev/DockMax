@@ -87,6 +87,30 @@ export async function pressLauncherKey(key: "up" | "down" | "escape") {
   await invoke("e2e_launcher_key", { key });
 }
 
+/** The private memory of the app's own process, in bytes: the native dock
+ * and the rest of the Rust side, without the WebView2 processes
+ * (`e2e_memory`, test build only). */
+export function processMemory(): Promise<number> {
+  return invoke<number>("e2e_memory");
+}
+
+/** Closes the open panel as its Esc does (`hide_panel`). */
+export async function closePanel() {
+  await browser.switchToWindow("panel");
+  await browser.execute(() =>
+    (
+      window as unknown as {
+        __TAURI_INTERNALS__: { invoke: (c: string) => Promise<unknown> };
+      }
+    ).__TAURI_INTERNALS__.invoke("hide_panel"),
+  );
+}
+
+/** Whether the app has a window labelled `label` now. */
+export async function hasWindow(label: string): Promise<boolean> {
+  return (await browser.getWindowHandles()).includes(label);
+}
+
 /** The test build's identifier (`src-tauri/tauri.e2e.conf.json`). */
 export const E2E_IDENTIFIER = "dev.maxsueleinstein.dockmax.e2e";
 
