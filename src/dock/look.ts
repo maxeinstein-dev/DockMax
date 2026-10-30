@@ -36,6 +36,7 @@ export const STYLE_LOOKS: Readonly<Record<DockStyle, StyleLook>> = {
   phosphor: { border: false, corners: 0, reflections: false },
   tactical: { border: false, corners: 0, reflections: false },
   medieval: { border: false, corners: 0, reflections: false },
+  hunter: { border: false, corners: 0, reflections: false },
 };
 
 /** The look a style has when `tweaks` is applied over its own. */
