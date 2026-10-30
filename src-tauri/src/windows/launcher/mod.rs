@@ -1922,6 +1922,50 @@ impl Launcher {
         self.announce_soon();
     }
 
+    /// The monitor's scale changed, or the window moved to a monitor of
+    /// another scale, while it is open: everything is drawn again at the new
+    /// scale, where Windows suggests (M15).
+    fn dpi_changed(&mut self, wparam: WPARAM, lparam: LPARAM) {
+        if !is_open() || lparam.0 == 0 {
+            return;
+        }
+        let suggested = unsafe { *(lparam.0 as *const RECT) };
+        let dpi = (wparam.0 & 0xFFFF) as u32;
+        let icon = self.icon_size();
+        self.scale = layout::scale_for_dpi(dpi, text_scale());
+        self.restyle();
+        // The icons read at the old size are read again at the new one.
+        if self.icon_size() != icon {
+            self.icons.clear();
+        }
+        let placed = layout::rescale(
+            super::dock::Rect {
+                x: suggested.left,
+                y: suggested.top,
+                width: (suggested.right - suggested.left).max(0) as u32,
+                height: (suggested.bottom - suggested.top).max(0) as u32,
+            },
+            self.scale,
+            BOX + self.list_height(),
+        );
+        unsafe {
+            let _ = SetWindowPos(
+                self.frame,
+                None,
+                placed.x,
+                placed.y,
+                placed.width as i32,
+                placed.height as i32,
+                SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+        self.arrange();
+        self.request_icons();
+        self.publish();
+        self.paint_soon();
+        log::info!("launcher: scale {:.2}", self.scale);
+    }
+
     /// The results changed: the window takes their height (its top stays),
     /// and the list is painted.
     fn after_change(&mut self) {
@@ -2854,8 +2898,9 @@ extern "system" fn frame_procedure(
             clipboard::CLIP_TIMER => with(Launcher::clip_late),
             _ => return unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
         },
-        // The launcher places itself on each opening, at its monitor's scale.
-        WM_DPICHANGED => {}
+        // Closed, the launcher places itself on the next opening; open, it
+        // redraws at the new scale (M15).
+        WM_DPICHANGED => with(|launcher| launcher.dpi_changed(wparam, lparam)),
         WM_SETTINGCHANGE => {
             with(|launcher| {
                 if is_open() {
