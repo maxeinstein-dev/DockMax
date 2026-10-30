@@ -2,8 +2,10 @@
 //! anywhere, or by "Buscar apps…" in the dock's and the tray's menus, that
 //! finds the programs of the Apps folder and opens them (L1); and, mixed in
 //! the same list (L2), the result of a sum, a web search by keyword and the
-//! settings pages of Windows and of the Dockyard. Each result does one action
-//! of a closed list (`search::Action`), checked before it runs.
+//! settings pages of Windows and of the Dockyard; and, under them (L4), the
+//! files and folders of the computer (`files`, in the helper process). Each
+//! result does one action of a closed list (`search::Action`), checked
+//! before it runs.
 //!
 //! A native window, not WebView2 (author's decision, 2026-10-26): it opens in
 //! a few milliseconds and costs a few megabytes only while open. The frame is
@@ -18,6 +20,7 @@
 //! when it opens and dropped 45 s after it closes.
 
 mod access;
+mod files;
 pub mod icons;
 pub(crate) mod layout;
 mod paint;
@@ -68,6 +71,7 @@ use self::layout::{BOX, Colors, ROW, Rgb};
 use crate::domain::hotkey::{self, Hotkey};
 use crate::domain::launcher::{self as search, Action, Candidate, MAX_RESULTS};
 use crate::domain::launcher_calc;
+use crate::domain::launcher_files::{self, FileHit, FileQuery, Generation, Mode};
 use crate::domain::launcher_pages::{self, Target};
 use crate::domain::launcher_web::{self, WebKeyword};
 use crate::persistence::database::Storage;
@@ -102,6 +106,13 @@ const ANNOUNCE_AFTER: u32 = 300;
 /// the middle).
 const CAPTURE_TIMER: usize = 3;
 const CAPTURE_FOR: u32 = 60_000;
+/// Looks for the files a moment after the last key (L4): the apps answer at
+/// once.
+const FILES_TIMER: usize = 4;
+
+/// `WM_MOUSEWHEEL`, and the rows one notch of the wheel moves.
+const WM_MOUSEWHEEL: u32 = 0x020A;
+const WHEEL_ROWS: isize = 3;
 
 /// The search glyph of Windows' icon font.
 const SEARCH_GLYPH: &str = "\u{E721}";
@@ -110,6 +121,9 @@ const SEARCH_GLYPH: &str = "\u{E721}";
 const SETTINGS_GLYPH: char = '\u{E713}';
 const CALCULATOR_GLYPH: char = '\u{E8EF}';
 const WEB_GLYPH: char = '\u{E774}';
+/// A file's and a folder's, while their icon is read.
+const FILE_GLYPH: char = '\u{E7C3}';
+const FOLDER_GLYPH: char = '\u{E8B7}';
 
 /// Event sent to the windows when the hotkey's state changes (Configurações
 /// shows it).
@@ -144,12 +158,17 @@ enum Kind {
     DockyardPage,
     Calculator,
     Web,
+    File,
+    Folder,
 }
 
 impl Kind {
-    /// Opening it is kept in the use (the apps and the pages).
+    /// Opening it is kept in the use (the apps, the pages and the files).
     fn remembered(self) -> bool {
-        matches!(self, Kind::App | Kind::WindowsPage | Kind::DockyardPage)
+        matches!(
+            self,
+            Kind::App | Kind::WindowsPage | Kind::DockyardPage | Kind::File | Kind::Folder
+        )
     }
 
     fn glyph(self) -> Option<char> {
@@ -158,6 +177,8 @@ impl Kind {
             Kind::WindowsPage | Kind::DockyardPage => Some(SETTINGS_GLYPH),
             Kind::Calculator => Some(CALCULATOR_GLYPH),
             Kind::Web => Some(WEB_GLYPH),
+            Kind::File => Some(FILE_GLYPH),
+            Kind::Folder => Some(FOLDER_GLYPH),
         }
     }
 }
@@ -188,6 +209,12 @@ impl Found {
         if let Some(subtitle) = &self.subtitle {
             return subtitle;
         }
+        self.kind_name()
+    }
+
+    /// What it is, for assistive technology: a file's and a folder's say so
+    /// ("Arquivo", "Pasta"), the others are what is under their name.
+    fn kind_name(&self) -> &str {
         let text = &crate::i18n::messages().launcher;
         match self.kind {
             Kind::App => text.app,
@@ -195,7 +222,45 @@ impl Found {
             Kind::DockyardPage => text.dockyard_page,
             Kind::Calculator => text.calculator,
             Kind::Web => text.web,
+            Kind::File => text.file,
+            Kind::Folder => text.folder,
         }
+    }
+
+    /// A file or folder found: its name, and under it the folder it is in,
+    /// the user's profile written `~`.
+    fn file(hit: &FileHit, profile: &str) -> Found {
+        Found {
+            key: launcher_files::file_key(hit),
+            kind: if hit.folder { Kind::Folder } else { Kind::File },
+            name: hit.name().to_owned(),
+            subtitle: Some(launcher_files::abbreviate(hit.parent(), profile)),
+            action: Action::OpenFile(hit.path.clone()),
+        }
+    }
+
+    /// The file or folder it opens, for one.
+    fn file_hit(&self) -> Option<FileHit> {
+        match &self.action {
+            Action::OpenFile(path) if matches!(self.kind, Kind::File | Kind::Folder) => {
+                Some(FileHit {
+                    path: path.clone(),
+                    folder: self.kind == Kind::Folder,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// What its icon is kept under, with the icon pack `pack`: a program's
+    /// id, or a file's `launcher_files::icon_key` behind a control
+    /// character no program's id has.
+    fn icon_key(&self, pack: &Option<String>) -> Option<(Option<String>, String)> {
+        if let Some(id) = self.app_id() {
+            return Some((pack.clone(), id.to_owned()));
+        }
+        let hit = self.file_hit()?;
+        Some((None, format!("\u{1}{}", launcher_files::icon_key(&hit))))
     }
 
     fn page(page: &launcher_pages::Page) -> Found {
@@ -278,9 +343,20 @@ pub struct Launcher {
     failed: Option<String>,
     painter: Option<paint::Painter>,
     icons: HashMap<(Option<String>, String), Loaded>,
-    /// Reads the programs' icons from Windows in a helper process, while
-    /// the launcher is open.
-    icon_reader: Option<icons::Reader>,
+    /// Reads the icons from Windows and searches the files in a helper
+    /// process, while the launcher is open.
+    helper: Option<icons::Reader>,
+    /// What is typed asks for files (L4), and the ones of the last search,
+    /// in the order shown.
+    file_query: Option<FileQuery>,
+    files: Vec<FileHit>,
+    /// Tells the searches of files apart: an answer to an older typing is
+    /// dropped.
+    generation: Generation,
+    /// The user's profile folder, written `~` under a file's name.
+    profile: String,
+    /// The first row shown: the list scrolls past `MAX_RESULTS` rows.
+    first: usize,
     font: Option<HFONT>,
     glyph_font: Option<HFONT>,
     brush: Option<HBRUSH>,
@@ -436,7 +512,12 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
         failed: None,
         painter: None,
         icons: HashMap::new(),
-        icon_reader: None,
+        helper: None,
+        file_query: None,
+        files: Vec::new(),
+        generation: Generation::default(),
+        profile: String::new(),
+        first: 0,
         font: None,
         glyph_font: None,
         brush: None,
@@ -781,7 +862,10 @@ impl Launcher {
         self.usage = self.read_usage();
         self.keywords = crate::commands::settings::current(&self.app).launcher_keywords;
         self.decimal = decimal_mark();
+        self.profile = std::env::var("USERPROFILE").unwrap_or_default();
         self.query.clear();
+        self.file_query = None;
+        self.files.clear();
         self.failed = None;
         self.launching = None;
         self.pointer = None;
@@ -829,13 +913,19 @@ impl Launcher {
             let _ = SetWindowTextW(self.edit, w!(""));
             SetTimer(Some(self.frame), RELEASE_TIMER, RELEASE_AFTER, None);
             let _ = KillTimer(Some(self.frame), ANNOUNCE_TIMER);
+            let _ = KillTimer(Some(self.frame), FILES_TIMER);
         }
         self.query.clear();
         self.results.clear();
+        self.file_query = None;
+        self.files.clear();
+        // A search of files still running answers nothing.
+        self.generation.next();
         access::publish(Vec::new());
-        // The helper leaves, and the memory of reading the icons with it;
-        // the icons it had not answered are asked again next time.
-        self.icon_reader = None;
+        // The helper leaves, and the memory of reading the icons and of
+        // searching the files with it; the icons it had not answered are
+        // asked again next time.
+        self.helper = None;
         self.icons
             .retain(|_, loaded| matches!(loaded, Loaded::Ready(_)));
         log::info!("launcher: closed");
@@ -940,7 +1030,41 @@ impl Launcher {
     }
 
     fn list_height(&self) -> f64 {
-        layout::list_height(self.results.len(), self.recent && !self.results.is_empty())
+        layout::list_height(self.shown(), self.recent && !self.results.is_empty())
+    }
+
+    /// How many rows are on screen: the list scrolls past `MAX_RESULTS`.
+    fn shown(&self) -> usize {
+        self.results.len().min(MAX_RESULTS)
+    }
+
+    /// The results on screen, as indices.
+    fn visible(&self) -> std::ops::Range<usize> {
+        let end = (self.first + MAX_RESULTS).min(self.results.len());
+        self.first.min(end)..end
+    }
+
+    /// Scrolls so that the row `index` is on screen; whether it moved.
+    fn reveal(&mut self, index: usize) -> bool {
+        let before = self.first;
+        if index < self.first {
+            self.first = index;
+        } else if index >= self.first + MAX_RESULTS {
+            self.first = index + 1 - MAX_RESULTS;
+        }
+        self.first != before
+    }
+
+    /// Scrolls by `rows` (the mouse wheel), staying in the list.
+    fn scroll(&mut self, rows: isize) {
+        let last = self.results.len().saturating_sub(MAX_RESULTS) as isize;
+        let first = (self.first as isize + rows).clamp(0, last.max(0)) as usize;
+        if first != self.first {
+            self.first = first;
+            self.request_icons();
+            self.publish();
+            self.paint_soon();
+        }
     }
 
     /// The use kept in the database, as it weighs now.
@@ -1009,16 +1133,7 @@ impl Launcher {
         self.candidates = candidates;
         self.apps_read = true;
         if is_open() {
-            let selected_key = self
-                .results
-                .get(self.selected)
-                .map(|found| found.key.clone());
-            self.refresh();
-            if let Some(index) =
-                selected_key.and_then(|key| self.results.iter().position(|found| found.key == key))
-            {
-                self.selected = index;
-            }
+            self.refresh_keeping_selection();
             self.after_change();
         }
     }
@@ -1029,12 +1144,20 @@ impl Launcher {
     fn refresh(&mut self) {
         let query = self.query.trim().to_owned();
         let mut results = Vec::new();
+        let files: Vec<Found> = self
+            .files
+            .iter()
+            .map(|hit| Found::file(hit, &self.profile))
+            .collect();
         if query.is_empty() {
-            results.extend(
-                search::recents(&self.candidates, &self.usage, MAX_RESULTS)
-                    .into_iter()
-                    .map(|index| self.entries[index].clone()),
-            );
+            results = self.recents();
+        } else if self
+            .file_query
+            .as_ref()
+            .is_some_and(|wanted| wanted.mode == Mode::Only)
+        {
+            // `f term`: the files and folders alone.
+            results = files;
         } else {
             if let Some(value) = launcher_calc::evaluate(&query) {
                 let shown = launcher_calc::format(value, self.decimal);
@@ -1056,10 +1179,13 @@ impl Launcher {
                         .map(|index| self.entries[index].clone()),
                 );
                 if results.is_empty()
+                    && files.is_empty()
                     && let Some(keyword) = self.keywords.first()
                 {
                     results.extend(Found::web(keyword, &query));
                 }
+                // The files in a band of their own, after everything else.
+                results.extend(files);
             }
         }
         self.recent = query.is_empty();
@@ -1071,6 +1197,114 @@ impl Launcher {
             (true, false, true) => Note::NothingFound,
         };
         self.selected = 0;
+        self.first = 0;
+    }
+
+    /// The most used, with nothing typed: the apps, the pages and the files
+    /// together, at most `MAX_RESULTS`.
+    fn recents(&self) -> Vec<Found> {
+        let weight = |key: &str| self.usage.get(key).copied().unwrap_or(0.0);
+        let mut used: Vec<(f64, Found)> =
+            search::recents(&self.candidates, &self.usage, MAX_RESULTS)
+                .into_iter()
+                .map(|index| {
+                    let found = self.entries[index].clone();
+                    (weight(&found.key), found)
+                })
+                .collect();
+        used.extend(self.usage.iter().filter_map(|(key, weight)| {
+            let hit = launcher_files::hit_of_key(key)?;
+            (*weight > 0.0).then(|| (*weight, Found::file(&hit, &self.profile)))
+        }));
+        used.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.1.name.cmp(&b.1.name))
+                .then_with(|| a.1.key.cmp(&b.1.key))
+        });
+        used.into_iter()
+            .take(MAX_RESULTS)
+            .map(|(_, found)| found)
+            .collect()
+    }
+
+    /// What `query` asks of the files, if anything: not with a sum nor a
+    /// keyword's web search, which come alone.
+    fn file_query_for(&self, query: &str) -> Option<FileQuery> {
+        let taken = self.keywords.iter().any(|keyword| {
+            keyword
+                .keyword
+                .eq_ignore_ascii_case(launcher_files::KEYWORD)
+        });
+        let wanted = launcher_files::parse(query, taken)?;
+        let alone = launcher_calc::evaluate(query).is_some()
+            || launcher_web::matching(&self.keywords, query).is_some();
+        (wanted.mode == Mode::Only || !alone).then_some(wanted)
+    }
+
+    /// The results changed under the selection: it stays on the same result
+    /// when that one is still there.
+    fn refresh_keeping_selection(&mut self) {
+        let selected_key = self
+            .results
+            .get(self.selected)
+            .map(|found| found.key.clone());
+        let first = self.first;
+        self.refresh();
+        if let Some(index) =
+            selected_key.and_then(|key| self.results.iter().position(|found| found.key == key))
+        {
+            self.selected = index;
+            self.first = first.min(self.results.len().saturating_sub(MAX_RESULTS));
+            self.reveal(index);
+        }
+    }
+
+    /// Asks the helper for the files of what is typed (the timer's, once
+    /// the typing pauses).
+    fn search_files(&mut self) {
+        let _ = unsafe { KillTimer(Some(self.frame), FILES_TIMER) };
+        let Some(wanted) = self.file_query.clone() else {
+            return;
+        };
+        let generation = self.generation.next();
+        let limit = wanted.limit();
+        self.helper().ask(icons::Request::Files {
+            generation,
+            words: wanted.words,
+            limit,
+        });
+    }
+
+    /// The files of the search `generation` came: shown when it is the
+    /// last one, dropped when the typing went on.
+    fn files_found(&mut self, generation: u64, hits: Vec<FileHit>) {
+        if !self.generation.is_current(generation) || !is_open() {
+            return;
+        }
+        let Some(wanted) = &self.file_query else {
+            return;
+        };
+        self.files = launcher_files::rank(hits, &wanted.words, &self.usage, wanted.limit());
+        self.refresh_keeping_selection();
+        self.after_change();
+        self.announce_soon();
+    }
+
+    /// The helper, started the first time it is needed after the launcher
+    /// opens.
+    fn helper(&mut self) -> &icons::Reader {
+        self.helper.get_or_insert_with(|| {
+            icons::Reader::start(|answer| {
+                post(move |launcher| match answer {
+                    icons::Answer::Icon { key, png } => launcher.icon_read(&key, png),
+                    icons::Answer::Files { generation, hits } => {
+                        launcher.files_found(generation, hits);
+                    }
+                });
+            })
+            .unwrap_or_else(icons::Reader::closed)
+        })
     }
 
     /// Puts `text` in the search box, as typing it would (UI Automation's
@@ -1088,6 +1322,31 @@ impl Launcher {
     fn text_changed(&mut self) {
         self.query = read_text(self.edit);
         self.failed = None;
+        // A search of files of the text before answers nothing.
+        self.generation.next();
+        let wanted = self.file_query_for(self.query.trim());
+        match &wanted {
+            Some(wanted) => {
+                // The rows that still match stay until the new ones come,
+                // so the list does not blink at each key.
+                self.files
+                    .retain(|hit| launcher_files::still_matches(hit, &wanted.words));
+                self.files.truncate(wanted.limit());
+                unsafe {
+                    SetTimer(
+                        Some(self.frame),
+                        FILES_TIMER,
+                        launcher_files::DEBOUNCE_MS,
+                        None,
+                    )
+                };
+            }
+            None => {
+                self.files.clear();
+                let _ = unsafe { KillTimer(Some(self.frame), FILES_TIMER) };
+            }
+        }
+        self.file_query = wanted;
         self.refresh();
         self.after_change();
         self.announce_soon();
@@ -1131,8 +1390,24 @@ impl Launcher {
         if self.icons.len() > paint::MAX_ICONS {
             self.icons.clear();
         }
-        let shown: Vec<(String, String)> = self
-            .results
+        let size = self.icon_size();
+        let visible = self.visible();
+        let files: Vec<((Option<String>, String), String)> = self.results[visible.clone()]
+            .iter()
+            .filter_map(|found| Some((found.icon_key(&pack)?, found.file_hit()?.path)))
+            .collect();
+        for (key, path) in files {
+            if self.icons.contains_key(&key) {
+                continue;
+            }
+            self.icons.insert(key.clone(), Loaded::Loading);
+            self.helper().ask(icons::Request::File {
+                key: key.1,
+                path,
+                size,
+            });
+        }
+        let shown: Vec<(String, String)> = self.results[visible]
             .iter()
             .filter_map(|found| Some((found.app_id()?.to_owned(), found.name.clone())))
             .collect();
@@ -1166,21 +1441,19 @@ impl Launcher {
         }
     }
 
-    /// Asks Windows for the icon of the program `id`, through the helper.
-    fn ask_windows(&mut self, id: String) {
-        if self.icon_reader.is_none() {
-            self.icon_reader = icons::Reader::start(|id, png| {
-                post(move |launcher| launcher.icon_read(&id, png));
-            });
-        }
-        let size = (layout::ICON * self.scale).round().clamp(16.0, 256.0) as u32;
-        match &self.icon_reader {
-            Some(reader) => reader.ask(id, size),
-            None => self.icon_read(&id, None),
-        }
+    /// The side of an icon, in pixels.
+    fn icon_size(&self) -> u32 {
+        (layout::ICON * self.scale).round().clamp(16.0, 256.0) as u32
     }
 
-    /// The icon of the program `id` came (`None`: it has none).
+    /// Asks Windows for the icon of the program `id`, through the helper.
+    fn ask_windows(&mut self, id: String) {
+        let size = self.icon_size();
+        self.helper().ask(icons::Request::App { id, size });
+    }
+
+    /// The icon of the program or file kept under `id` came (`None`: it has
+    /// none).
     fn icon_read(&mut self, id: &str, png: Option<Vec<u8>>) {
         let bitmap = png.and_then(|png| self.painter().and_then(|painter| painter.bitmap(&png)));
         for ((_, key_id), loaded) in &mut self.icons {
@@ -1199,6 +1472,7 @@ impl Launcher {
         }
         let s = self.scale;
         let top = layout::LIST_PAD + if self.recent { layout::TITLE } else { 0.0 };
+        let visible = self.visible();
         let entries = self
             .results
             .iter()
@@ -1206,13 +1480,18 @@ impl Launcher {
             .map(|(index, found)| access::Entry {
                 key: found.key.clone(),
                 name: found.name.clone(),
-                kind: found.subtitle().to_owned(),
-                rect: (
-                    f64::from(origin.x) + layout::SIDE * s,
-                    f64::from(origin.y) + (top + index as f64 * ROW) * s,
-                    (layout::WIDTH - 2.0 * layout::SIDE) * s,
-                    ROW * s,
-                ),
+                kind: found.kind_name().to_owned(),
+                // A row scrolled out of the list has no box on the screen.
+                rect: if visible.contains(&index) {
+                    (
+                        f64::from(origin.x) + layout::SIDE * s,
+                        f64::from(origin.y) + (top + (index - self.first) as f64 * ROW) * s,
+                        (layout::WIDTH - 2.0 * layout::SIDE) * s,
+                        ROW * s,
+                    )
+                } else {
+                    (0.0, 0.0, 0.0, 0.0)
+                },
                 selected: index == self.selected,
             })
             .collect();
@@ -1245,6 +1524,9 @@ impl Launcher {
             return;
         }
         self.selected = index;
+        if self.reveal(index) {
+            self.request_icons();
+        }
         self.publish();
         self.paint_soon();
         let found = &self.results[index];
@@ -1252,7 +1534,7 @@ impl Launcher {
             .launcher
             .selected
             .replace("{name}", &found.name)
-            .replace("{kind}", found.subtitle())
+            .replace("{kind}", found.kind_name())
             .replace("{n}", &(index + 1).to_string())
             .replace("{count}", &self.results.len().to_string());
         access::selected(self.list.0 as isize, &found.key, &said);
@@ -1302,6 +1584,9 @@ impl Launcher {
             }
             Action::OpenUri(uri) => {
                 self.open_off_thread(key, remembered, move || super::apps::open_uri(&uri))
+            }
+            Action::OpenFile(path) => {
+                self.open_off_thread(key, remembered, move || super::apps::open_path(&path))
             }
             Action::OpenSection(section) => {
                 let opened = super::settings_window::open_section(&self.app, section)
@@ -1441,13 +1726,15 @@ impl Launcher {
             .results
             .iter()
             .enumerate()
+            .skip(self.first)
+            .take(MAX_RESULTS)
             .map(|(index, found)| {
-                let icon = found.app_id().and_then(|id| {
-                    match self.icons.get(&(pack.clone(), id.to_owned())) {
+                let icon = found
+                    .icon_key(&pack)
+                    .and_then(|key| match self.icons.get(&key) {
                         Some(Loaded::Ready(Some(bitmap))) => Some(bitmap),
                         _ => None,
-                    }
-                });
+                    });
                 let subtitle = if self.failed.as_deref() == Some(found.key.as_str()) {
                     text.failed
                 } else {
@@ -1460,7 +1747,7 @@ impl Launcher {
                     glyph: found.kind.glyph(),
                     letter: found.name.chars().next().unwrap_or(' '),
                     selected: index == self.selected,
-                    shortcut: layout::shortcut(index),
+                    shortcut: layout::shortcut(index - self.first),
                 }
             })
             .collect();
@@ -1495,16 +1782,16 @@ impl Launcher {
             return;
         }
         let at = f64::from(y) / self.scale;
-        if let Some(index) = layout::row_at(at, self.results.len(), self.recent) {
-            self.select(index);
+        if let Some(index) = layout::row_at(at, self.shown(), self.recent) {
+            self.select(self.first + index);
         }
     }
 
     fn clicked(&mut self, y: i32) {
         let at = f64::from(y) / self.scale;
-        if let Some(index) = layout::row_at(at, self.results.len(), self.recent) {
-            self.selected = index;
-            self.open(index);
+        if let Some(index) = layout::row_at(at, self.shown(), self.recent) {
+            self.selected = self.first + index;
+            self.open(self.first + index);
         }
     }
 }
@@ -1515,6 +1802,12 @@ fn read_text(edit: HWND) -> String {
     let mut buffer = vec![0u16; length + 1];
     let read = unsafe { GetWindowTextW(edit, &mut buffer) }.max(0) as usize;
     String::from_utf16_lossy(&buffer[..read])
+}
+
+/// The rows a turn of the wheel scrolls (down is positive).
+fn wheel_rows(wparam: WPARAM) -> isize {
+    let delta = isize::from(((wparam.0 >> 16) & 0xFFFF) as u16 as i16);
+    -delta.signum() * WHEEL_ROWS
 }
 
 fn point(lparam: LPARAM) -> (i32, i32) {
@@ -1573,6 +1866,7 @@ extern "system" fn frame_procedure(
                 register(launcher.enabled());
             }),
             ANNOUNCE_TIMER => with(|launcher| launcher.announce()),
+            FILES_TIMER => with(Launcher::search_files),
             _ => return unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
         },
         // The launcher places itself on each opening, at its monitor's scale.
@@ -1619,6 +1913,7 @@ extern "system" fn list_procedure(
             let (_, y) = point(lparam);
             with(|launcher| launcher.clicked(y));
         }
+        WM_MOUSEWHEEL => with(|launcher| launcher.scroll(wheel_rows(wparam))),
         WM_GETOBJECT => match access::get_object(hwnd, wparam, lparam) {
             Some(result) => return result,
             None => return unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
@@ -1661,7 +1956,7 @@ unsafe extern "system" fn edit_procedure(
         WM_CHAR if matches!(wparam.0, 0x0D | 0x1B | 0x09) => return LRESULT(0),
         WM_SYSKEYDOWN if (u16::from(b'1')..=u16::from(b'9')).contains(&key) => {
             let index = usize::from(key - u16::from(b'1'));
-            with(|launcher| launcher.open(index));
+            with(|launcher| launcher.open(launcher.first + index));
             return LRESULT(0);
         }
         // Alt and a number would beep: there is no menu to look in.
@@ -1672,6 +1967,11 @@ unsafe extern "system" fn edit_procedure(
             if let Some(result) = access::get_field_object(hwnd, wparam, lparam) {
                 return result;
             }
+        }
+        // The wheel over the search box scrolls the list.
+        WM_MOUSEWHEEL => {
+            with(|launcher| launcher.scroll(wheel_rows(wparam)));
+            return LRESULT(0);
         }
         _ => {}
     }
