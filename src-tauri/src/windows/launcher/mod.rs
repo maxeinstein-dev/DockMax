@@ -1153,7 +1153,8 @@ impl Launcher {
             let spawned = std::thread::Builder::new()
                 .name("launcher-icon".into())
                 .spawn(move || {
-                    let png = crate::commands::icons::pack_icon(&app, &pack, &names);
+                    let dark = super::native_dock::system_dark();
+                    let png = crate::commands::icons::pack_icon(&app, &pack, &names, dark);
                     post(move |launcher| match png {
                         Some(png) => launcher.icon_read(&id, Some(png)),
                         None => launcher.ask_windows(id),

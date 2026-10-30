@@ -124,6 +124,10 @@ pub struct Manifest {
     pub icons: BTreeMap<String, String>,
     /// The image of a program no name covers.
     pub fallback: Option<String>,
+    /// An image → the one drawn instead while the dock is dark, both
+    /// relative to the pack's folder. An image without one is drawn in both
+    /// themes.
+    pub dark: BTreeMap<String, String>,
 }
 
 /// Why a pack is refused. The text is shown to the user and carries no path.
@@ -174,7 +178,7 @@ impl Manifest {
         {
             return Err(PackError::BadAccent);
         }
-        if self.icons.len() > MAX_ENTRIES {
+        if self.icons.len() > MAX_ENTRIES || self.dark.len() > MAX_ENTRIES {
             return Err(PackError::TooManyEntries);
         }
         if self
@@ -188,6 +192,8 @@ impl Manifest {
             .icons
             .values()
             .chain(self.fallback.iter())
+            .chain(self.dark.keys())
+            .chain(self.dark.values())
             .any(|path| !is_valid_image_path(path))
         {
             return Err(PackError::BadPath);
@@ -218,6 +224,17 @@ impl Manifest {
             .filter(|key| !key.is_empty())
             .find_map(|key| keyed.get(&key).copied())
             .or(self.fallback.as_deref())
+    }
+
+    /// Like [`Manifest::image_for`], in the dock's theme: while it is `dark`,
+    /// the image's dark one when the pack has it.
+    pub fn image_in_theme<'a>(&'a self, names: &[&str], dark: bool) -> Option<&'a str> {
+        let image = self.image_for(names)?;
+        Some(
+            dark.then(|| self.dark.get(image))
+                .flatten()
+                .map_or(image, String::as_str),
+        )
     }
 
     /// Whether some name of the program has its own image in the pack (the
@@ -419,5 +436,45 @@ mod tests {
         assert!(pack.covers(&["?", "bloco de notas"]));
         assert!(!pack.covers(&["Desconhecido"]));
         assert!(!pack.covers(&["..."]));
+    }
+
+    #[test]
+    fn the_dark_theme_takes_the_dark_image_of_an_image_when_there_is_one() {
+        let pack = manifest(
+            r#"{"name":"A","icons":{"Calculadora":"calc.png","Bloco de notas":"notes.png"},"fallback":"other.png","dark":{"calc.png":"escuro/calc.png","other.png":"escuro/other.png"}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            pack.image_in_theme(&["Calculadora"], false),
+            Some("calc.png")
+        );
+        assert_eq!(
+            pack.image_in_theme(&["Calculadora"], true),
+            Some("escuro/calc.png")
+        );
+        // Without a dark one, the same image in both themes.
+        assert_eq!(
+            pack.image_in_theme(&["Bloco de notas"], true),
+            Some("notes.png")
+        );
+        // The fallback has its dark one too.
+        assert_eq!(
+            pack.image_in_theme(&["Desconhecido"], true),
+            Some("escuro/other.png")
+        );
+        let plain = manifest(r#"{"name":"A","icons":{"x":"x.png"}}"#).unwrap();
+        assert_eq!(plain.image_in_theme(&["y"], true), None);
+    }
+
+    #[test]
+    fn a_dark_image_is_a_path_like_any_other() {
+        for json in [
+            r#"{"name":"A","dark":{"a.png":"../b.png"}}"#,
+            r#"{"name":"A","dark":{"C:/a.png":"b.png"}}"#,
+            r#"{"name":"A","dark":{"a.png":"b.txt"}}"#,
+        ] {
+            assert_eq!(manifest(json), Err(PackError::BadPath), "{json}");
+        }
+        assert!(manifest(r#"{"name":"A","dark":{"a.png":"escuro/a.png"}}"#).is_ok());
     }
 }

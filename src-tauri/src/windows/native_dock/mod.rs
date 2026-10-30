@@ -302,7 +302,7 @@ pub struct Dock {
     open: Option<PanelId>,
     /// The programs whose icon is animating after a click, by item key.
     opening: HashMap<String, Instant>,
-    icons: HashMap<(Option<String>, String), Loaded>,
+    icons: HashMap<(Option<String>, String, bool), Loaded>,
     badges: HashMap<String, Loaded>,
     /// The notification badge of each item (spec 0016), as the taskbar
     /// last had it.
@@ -1139,6 +1139,9 @@ impl Dock {
     /// Asks for the icons and badges not read yet, off the main thread.
     fn request_pictures(&mut self) {
         let pack = self.data.settings.dock.icon_pack.clone();
+        // A pack's dark images while the dock is dark; Windows' icons are
+        // the same in both themes.
+        let dark = pack.is_some() && self.dark_now();
         let hwnd = self.hwnd.0 as isize;
         for item in &self.items {
             let app_id = match item {
@@ -1146,12 +1149,12 @@ impl Dock {
                 Item::Other(other) => other.app_id.clone(),
                 _ => continue,
             };
-            let key = (pack.clone(), app_id.clone());
+            let key = (pack.clone(), app_id.clone(), dark);
             if !self.icons.contains_key(&key) {
                 self.icons.insert(key.clone(), Loaded::Loading);
                 let app = self.app.clone();
                 std::thread::spawn(move || {
-                    let png = crate::commands::apps::dock_icon_png(&app, &app_id);
+                    let png = crate::commands::apps::dock_icon_png(&app, &app_id, dark);
                     post_to(hwnd, move |dock| {
                         let bitmap = png.and_then(|png| dock.painter.bitmap(&png));
                         dock.icons.insert(key, Loaded::Ready(bitmap));
@@ -1916,8 +1919,9 @@ impl Dock {
         clock: &windows::Win32::Foundation::SYSTEMTIME,
     ) -> Face {
         let pack = settings.icon_pack.clone();
+        let dark = pack.is_some() && self.dark_now();
         let program = |app_id: &str, badge: Option<&str>| {
-            let icon = match self.icons.get(&(pack.clone(), app_id.to_string())) {
+            let icon = match self.icons.get(&(pack.clone(), app_id.to_string(), dark)) {
                 Some(Loaded::Ready(Some(icon))) => Some(icon.clone()),
                 _ => None,
             };
@@ -3432,6 +3436,8 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
             with_dock(hwnd, |dock| {
                 dock.dark = theme::system_dark();
                 dock.motion = system_motion();
+                // A pack's icons for the theme Windows switched to.
+                dock.request_pictures();
                 dock.place();
                 dock.paint();
             });
