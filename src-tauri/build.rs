@@ -98,6 +98,7 @@ fn main() {
             "e2e_launcher_toggle",
             "e2e_launcher_type",
             "e2e_launcher_key",
+            "e2e_memory",
         ]),
     ))
     .expect("failed to run tauri-build");

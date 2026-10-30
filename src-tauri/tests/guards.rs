@@ -199,6 +199,7 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-e2e-launcher-toggle",
             "allow-e2e-launcher-type",
             "allow-e2e-launcher-key",
+            "allow-e2e-memory",
         ],
     ),
     (
@@ -762,6 +763,7 @@ fn every_declared_command_is_registered_and_vice_versa() {
             "e2e_launcher_toggle",
             "e2e_launcher_type",
             "e2e_launcher_view",
+            "e2e_memory",
             "e2e_press_dock",
         ]
         .map(String::from),

@@ -275,7 +275,8 @@ macro_rules! handler {
             e2e::e2e_launcher_view,
             e2e::e2e_launcher_toggle,
             e2e::e2e_launcher_type,
-            e2e::e2e_launcher_key
+            e2e::e2e_launcher_key,
+            e2e::e2e_memory
         ]
     };
 }
