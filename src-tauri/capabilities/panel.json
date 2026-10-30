@@ -59,6 +59,7 @@
     "allow-move-app-windows",
     "allow-move-open-windows",
     "allow-list-icon-packs",
+    "allow-icon-pack-preview",
     "allow-reload-icon-packs",
     "allow-open-icon-packs-folder",
     "log:allow-log"

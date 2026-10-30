@@ -21,6 +21,7 @@
     "allow-unpin-app",
     "allow-move-app",
     "allow-list-icon-packs",
+    "allow-icon-pack-preview",
     "allow-reload-icon-packs",
     "allow-open-icon-packs-folder",
     "allow-list-tray",

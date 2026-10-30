@@ -355,6 +355,8 @@ function LookPanel({
         )}
         <IconPacksField
           selected={dock?.iconPack ?? null}
+          dock={dock}
+          appIds={appIds}
           disabled={disabled}
           onSelect={(iconPack) => update({ iconPack })}
         />
