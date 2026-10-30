@@ -111,6 +111,7 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-move-app-windows",
             "allow-move-open-windows",
             "allow-list-icon-packs",
+            "allow-icon-pack-preview",
             "allow-reload-icon-packs",
             "allow-open-icon-packs-folder",
             "log:allow-log",
@@ -141,6 +142,7 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-unpin-app",
             "allow-move-app",
             "allow-list-icon-packs",
+            "allow-icon-pack-preview",
             "allow-reload-icon-packs",
             "allow-open-icon-packs-folder",
             // Which tray icons the dock shows itself: the list to choose from.
