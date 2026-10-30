@@ -36,6 +36,10 @@ pub struct LauncherMessages {
     /// L4); under their names, the folder they are in.
     pub file: &'static str,
     pub folder: &'static str,
+    /// What an open window is (L7), and what is under its title; `{app}` is
+    /// replaced by its program's name.
+    pub window: &'static str,
+    pub window_of: &'static str,
     /// A web search's name and what is under it; `{term}` and `{name}` are
     /// replaced.
     pub search_for: &'static str,
@@ -52,6 +56,9 @@ pub struct LauncherMessages {
     pub action_reveal: &'static str,
     pub action_copy_path: &'static str,
     pub action_copy_result: &'static str,
+    /// The lines of a window's menu of actions (L7).
+    pub action_switch: &'static str,
+    pub action_close_window: &'static str,
     /// The title above the most used, with nothing typed.
     pub recent: &'static str,
     pub reading: &'static str,
@@ -312,6 +319,8 @@ const PT_BR: Messages = Messages {
         web: "Busca na web",
         file: "Arquivo",
         folder: "Pasta",
+        window: "Janela",
+        window_of: "Janela · {app}",
         search_for: "Buscar “{term}”",
         search_with: "{name} · busca na web",
         copied: "Resultado copiado",
@@ -323,9 +332,11 @@ const PT_BR: Messages = Messages {
         action_reveal: "Mostrar no Explorador",
         action_copy_path: "Copiar caminho",
         action_copy_result: "Copiar resultado",
+        action_switch: "Alternar para a janela",
+        action_close_window: "Fechar janela",
         recent: "Recentes",
         reading: "Lendo os apps…",
-        hint: "Digite para buscar apps, arquivos e configurações ou fazer uma conta",
+        hint: "Digite para buscar apps, janelas, arquivos e configurações ou fazer uma conta",
         nothing_found: "Nenhum resultado",
         folder_not_found: "Pasta não encontrada",
         folder_denied: "Sem acesso",
@@ -438,6 +449,8 @@ const EN: Messages = Messages {
         web: "Web search",
         file: "File",
         folder: "Folder",
+        window: "Window",
+        window_of: "Window · {app}",
         search_for: "Search “{term}”",
         search_with: "{name} · web search",
         copied: "Result copied",
@@ -449,9 +462,11 @@ const EN: Messages = Messages {
         action_reveal: "Show in File Explorer",
         action_copy_path: "Copy path",
         action_copy_result: "Copy result",
+        action_switch: "Switch to window",
+        action_close_window: "Close window",
         recent: "Recent",
         reading: "Reading apps…",
-        hint: "Type to search apps, files and settings or do a calculation",
+        hint: "Type to search apps, windows, files and settings or do a calculation",
         nothing_found: "No results",
         folder_not_found: "Folder not found",
         folder_denied: "No access",
@@ -524,6 +539,8 @@ mod tests {
     #[test]
     fn english_keeps_the_placeholders() {
         assert!(EN.launcher.search_for.contains("{term}"));
+        assert!(EN.launcher.window_of.contains("{app}"));
+        assert!(PT_BR.launcher.window_of.contains("{app}"));
         assert!(EN.dock.update_notice_title.contains("{version}"));
         assert!(PT_BR.dock.update_notice_title.contains("{version}"));
         assert_eq!(EN.tray.open_settings, "Settings");

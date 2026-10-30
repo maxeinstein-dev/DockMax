@@ -336,6 +336,12 @@ pub enum Action {
     /// Pins a program of the Apps folder to the dock, or takes it out.
     PinApp(String),
     UnpinApp(String),
+    /// Brings an open window to the front, restoring it if it is minimized
+    /// (L7), by its handle.
+    FocusWindow(isize),
+    /// Asks an open window to close, as its close button does (`WM_CLOSE`;
+    /// the program may ask to save first, and is never killed).
+    CloseWindow(isize),
 }
 
 /// Whether `action` may run: every result's action is checked here first.
@@ -356,6 +362,9 @@ pub fn is_allowed(action: &Action) -> bool {
             is_valid_app_id(id)
         }
         Action::OpenFileAsAdmin(path) => super::launcher_actions::is_elevatable(path),
+        // A handle, never 0; that it is still a window with a taskbar
+        // button, of another program, is checked again when it runs.
+        Action::FocusWindow(hwnd) | Action::CloseWindow(hwnd) => *hwnd != 0,
     }
 }
 
@@ -678,5 +687,10 @@ mod tests {
         assert!(!is_allowed(&Action::OpenFileAsAdmin(
             r"C:\Users\ana\a.pdf".into()
         )));
+        // L7: the windows' actions.
+        assert!(is_allowed(&Action::FocusWindow(0x1234)));
+        assert!(is_allowed(&Action::CloseWindow(0x1234)));
+        assert!(!is_allowed(&Action::FocusWindow(0)));
+        assert!(!is_allowed(&Action::CloseWindow(0)));
     }
 }

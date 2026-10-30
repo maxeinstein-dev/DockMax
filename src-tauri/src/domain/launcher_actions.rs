@@ -23,6 +23,10 @@ pub enum Verb {
     CopyPath,
     /// Copies a sum's result.
     CopyResult,
+    /// Brings an open window to the front (L7: what Enter does to one).
+    Switch,
+    /// Asks an open window to close (`WM_CLOSE`).
+    CloseWindow,
 }
 
 /// What a result is, as the menu sees it.
@@ -47,6 +51,11 @@ pub enum Subject<'a> {
     Web,
     /// A sum's result: it is copied.
     Calculator,
+    /// An open window (L7), and whether its program's file can be shown in
+    /// File Explorer (`launcher_windows::is_revealable`).
+    Window {
+        revealable: bool,
+    },
 }
 
 /// The kinds of file Windows runs as administrator: programs, scripts,
@@ -105,6 +114,13 @@ pub fn verbs(subject: Subject<'_>) -> Vec<Verb> {
         Subject::Folder => vec![Verb::Open, Verb::Reveal, Verb::CopyPath],
         Subject::Page | Subject::Web => vec![Verb::Open],
         Subject::Calculator => vec![Verb::CopyResult],
+        Subject::Window { revealable } => {
+            let mut verbs = vec![Verb::Switch, Verb::CloseWindow];
+            if revealable {
+                verbs.push(Verb::Reveal);
+            }
+            verbs
+        }
     }
 }
 
@@ -131,7 +147,7 @@ pub fn ctrl_c_copies_result(start: u32, end: u32, verbs: &[Verb]) -> bool {
 
 /// The action of the closed list that `verb` does on a result whose own
 /// action (Enter's) is `open`; `file` is the program's file, for a program
-/// shown in File Explorer. `None` when `verb` does not apply to it.
+/// (or a window's program, L7) shown in File Explorer. `None` when `verb` does not apply to it.
 pub fn action(verb: Verb, open: &Action, file: Option<&str>) -> Option<Action> {
     let action = match (verb, open) {
         (Verb::Open, _) => open.clone(),
@@ -143,6 +159,9 @@ pub fn action(verb: Verb, open: &Action, file: Option<&str>) -> Option<Action> {
         (Verb::Reveal, Action::OpenFile(path)) => Action::Reveal(path.clone()),
         (Verb::CopyPath, Action::OpenFile(path)) => Action::CopyPath(path.clone()),
         (Verb::CopyResult, Action::Copy(text)) => Action::Copy(text.clone()),
+        (Verb::Switch, Action::FocusWindow(_)) => open.clone(),
+        (Verb::CloseWindow, Action::FocusWindow(hwnd)) => Action::CloseWindow(*hwnd),
+        (Verb::Reveal, Action::FocusWindow(_)) => Action::Reveal(file?.to_owned()),
         _ => return None,
     };
     super::launcher::is_allowed(&action).then_some(action)
@@ -306,6 +325,52 @@ mod tests {
     }
 
     #[test]
+    fn a_window_switches_closes_and_shows_its_program() {
+        let shown = verbs(Subject::Window { revealable: true });
+        assert_eq!(shown, [Verb::Switch, Verb::CloseWindow, Verb::Reveal]);
+        assert!(opens_menu(&shown));
+        // A Store app's window: its file is not shown.
+        assert_eq!(
+            verbs(Subject::Window { revealable: false }),
+            [Verb::Switch, Verb::CloseWindow]
+        );
+        // A window has no path to copy: Ctrl+C copies the text.
+        assert_eq!(copy_verb(&shown), None);
+        assert!(!ctrl_c_copies_result(0, 0, &shown));
+        let open = Action::FocusWindow(0x42);
+        assert_eq!(action(Verb::Switch, &open, None), Some(open.clone()));
+        assert_eq!(
+            action(Verb::CloseWindow, &open, None),
+            Some(Action::CloseWindow(0x42))
+        );
+        let exe = r"C:\Windows\System32\notepad.exe";
+        assert_eq!(
+            action(Verb::Reveal, &open, Some(exe)),
+            Some(Action::Reveal(exe.into()))
+        );
+        assert_eq!(action(Verb::Reveal, &open, None), None);
+        // The others' verbs do nothing new to a window.
+        for verb in [
+            Verb::OpenAsAdmin,
+            Verb::Pin,
+            Verb::Unpin,
+            Verb::CopyPath,
+            Verb::CopyResult,
+        ] {
+            assert_eq!(action(verb, &open, Some(exe)), None, "{verb:?}");
+        }
+        // Nor the window's verbs to the others.
+        let app = Action::OpenApp(STORE.into());
+        assert_eq!(action(Verb::CloseWindow, &app, None), None);
+        assert_eq!(action(Verb::Switch, &app, None), None);
+        // A handle 0 is no window.
+        assert_eq!(
+            action(Verb::CloseWindow, &Action::FocusWindow(0), None),
+            None
+        );
+    }
+
+    #[test]
     fn a_verb_that_does_not_apply_gives_no_action() {
         let page = Action::OpenUri("ms-settings:network-wifi".into());
         for verb in [
@@ -315,6 +380,8 @@ mod tests {
             Verb::Reveal,
             Verb::CopyPath,
             Verb::CopyResult,
+            Verb::Switch,
+            Verb::CloseWindow,
         ] {
             assert_eq!(action(verb, &page, None), None, "{verb:?}");
         }

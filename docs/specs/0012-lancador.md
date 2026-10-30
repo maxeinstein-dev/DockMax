@@ -1,6 +1,6 @@
 # Spec 0012 — Lançador: buscar e abrir pelo teclado
 
-**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado; L6 (menu de ações por resultado) implementado.
+**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado; L6 (menu de ações por resultado) implementado; L7 (janelas abertas) implementado.
 **Origem:** pedido do autor (2026-10-26) de um lançador no estilo do [Ulauncher](https://ulauncher.io/): uma caixa de busca aberta por um atalho de teclado global, que acha e abre apps e, no futuro, arquivos e extensões. O PrimoDock tem algo parecido ("O botão Iniciar abre: Apps do PrimoDock", [interface](../reference/primodock/interface.md)), mas só pelo mouse e sem busca por teclado.
 
 ## 1. Decisões do autor (2026-10-26)
@@ -22,7 +22,7 @@
 | **L4** | **Arquivos e pastas:** o Everything (quando roda) e o índice do Windows Search, misturados abaixo dos apps a partir de 3 caracteres, e a palavra-chave `f ` só com eles (seções 5a e 8d) |
 | **L5** | **Caminhos,** como no Ulauncher: digitar `C:\`, `~\`, `%APPDATA%\` ou `\\servidor\compartilhamento\` lista a pasta, Tab completa e entra na pasta selecionada, Backspace sobe uma pasta (seção 8e) |
 | **L6** | **Menu de ações por resultado:** Ctrl+Shift+Enter abre como administrador (como no Executar do Windows), mostrar no Explorador, copiar o caminho, fixar no dock |
-| **L7** (depois) | Buscar e alternar entre as **janelas abertas** |
+| **L7** | Buscar e alternar entre as **janelas abertas**, misturadas entre os apps e os arquivos, e a palavra-chave `j ` só com elas (seção 8g) |
 
 L1 e L2 formam o primeiro recorte do produto. Cada um é um PR; o L2 só começa depois da medição de memória do L1. Do L4 em diante, os recortes seguem em sequência, um PR cada.
 
@@ -134,19 +134,20 @@ O desenho e o que foi medido estão em "Como o L4 ficou" (seção 8d).
 
 | Tecla | Ação |
 |---|---|
-| Digitar | Busca a cada tecla (o catálogo cabe em memória; sem atraso); os arquivos, 120 ms depois da última tecla (L4) |
+| Digitar | Busca a cada tecla (o catálogo cabe em memória; sem atraso), relendo as janelas abertas (L7); os arquivos, 120 ms depois da última tecla (L4) |
+| `j ` | Só as janelas abertas (L7); sem nada depois, todas, a usada por último primeiro |
 | Cima, Baixo | Muda o resultado selecionado, sem sair da caixa de texto |
-| Enter | Abre o selecionado (o primeiro, se nenhum foi escolhido) |
-| Shift+Enter | O menu de ações do selecionado (L6); numa página de Configurações, numa busca na web ou numa conta, que só têm uma ação, faz essa ação direto, sem menu |
+| Enter | Abre o selecionado (o primeiro, se nenhum foi escolhido); numa janela (L7), traz para a frente, restaurando se estiver minimizada |
+| Shift+Enter | O menu de ações do selecionado (L6); numa janela: Alternar para a janela, Fechar janela, Mostrar no Explorador (L7); numa página de Configurações, numa busca na web ou numa conta, que só têm uma ação, faz essa ação direto, sem menu |
 | Tecla Menu, Shift+F10 | O menu de ações do selecionado (L6); sem menu (página, busca na web, conta, nenhum resultado), o menu do próprio campo de texto, como antes |
-| Ctrl+Shift+Enter | Abre o selecionado como administrador, como no Executar do Windows (L6): app, programa, script, instalador ou atalho; nos outros, nada |
-| Ctrl+C | Sem texto selecionado no campo, copia o caminho do arquivo ou da pasta selecionada (ou o resultado da conta), fecha e diz "Caminho copiado" (L6); com texto selecionado, copia o texto, como sempre |
+| Ctrl+Shift+Enter | Abre o selecionado como administrador, como no Executar do Windows (L6): app, programa, script, instalador ou atalho; nos outros (inclusive uma janela), nada |
+| Ctrl+C | Sem texto selecionado no campo, copia o caminho do arquivo ou da pasta selecionada (ou o resultado da conta), fecha e diz "Caminho copiado" (L6); com texto selecionado, copia o texto, como sempre. Numa janela, o Ctrl+C da caixa de texto |
 | Alt+1…9 | Abre o n-ésimo resultado, como no Ulauncher; o atalho aparece sempre à direita de cada linha (no L1, sempre, e não só com Alt apertado) |
 | Tab | Num arquivo ou numa pasta, completa o caminho no campo; numa pasta, acrescenta `\` e entra nela (L5). Nos outros resultados, nada. Shift+Tab, nada |
 | Backspace | Com o cursor no fim de um caminho terminado em `\`, volta para a pasta de cima (L5); fora disso, apaga um caractere |
 | Esc | Fecha |
 | Page Up, Page Down, Home, End na lista | Ficam com a caixa de texto (o cursor) |
-| Roda do mouse | Rola a lista quando há mais de 8 resultados (L4: até 16 na mistura, 30 com `f `); Cima e Baixo também rolam, levando a seleção |
+| Roda do mouse | Rola a lista quando há mais de 8 resultados (L4: até 16 na mistura, 30 com `f `; L7: até 24 na mistura, com 8 janelas, e 30 com `j `); Cima e Baixo também rolam, levando a seleção |
 
 O mouse também funciona: passar o ponteiro seleciona, o clique abre e o botão direito seleciona a linha e abre o menu de ações no ponteiro (L6).
 
@@ -172,6 +173,7 @@ O mouse também funciona: passar o ponteiro seleciona, o clique abre e o botão 
 - a lista fechada de ações: um teste que falha se aparecer uma ação nova sem passar pela validação;
 - L4: a mistura e a ordem dos arquivos, o `f `, o limite, a junção sem repetir caminho, a abreviação com `~`, o descarte de uma geração antiga, os buffers da IPC do Everything e o escape do termo para cada fonte;
 - L6: as ações por tipo de resultado, o Fixar e Desafixar e o Ctrl+C com e sem seleção (seção 8f);
+- L7: a regra de que janela conta, a mistura e a ordem com apps e arquivos, o `j `, a exclusão do Dockyard e as ações de janela (seção 8g);
 - L5: o reconhecimento de um caminho, a expansão de `~` e `%VAR%`, a pasta e o filtro, a ordem e os ocultos, o Tab, o Backspace e o descarte de uma leitura antiga (seção 8e);
 - a migração de `launcher_usage` e "Limpar o histórico".
 
@@ -352,6 +354,34 @@ Duas falhas apareceram e foram corrigidas antes do PR: o campo lia a **posição
 **Testes de unidade:** as ações por tipo (app da Loja sem "Mostrar no Explorador", clássico com; arquivo comum sem "Abrir como administrador", executável e atalho com; pasta; página, busca e conta sem menu), "Fixar" virando "Desafixar" e a ação de cada um, o Ctrl+C com e sem seleção, a ação que não se aplica, as novas ações da lista fechada (`every_action_is_checked`) e `pinned_here` antes e depois de fixar e desafixar.
 
 **Não verificado (só ao vivo):** o menu na tela, embaixo da linha e no ponteiro, em claro, escuro e alto contraste; o lançador continuar aberto com o menu e fechar com um clique em outro programa; o UAC de verdade (aceitar abre elevado; cancelar deixa o lançador aberto, com o foco); `runas` num app da Loja que não aceita elevação e num app clássico pela pasta Aplicativos; o Explorador abrindo com o item selecionado; fixar e desafixar aparecendo no dock; o Ctrl+C, a tecla Menu e Shift+F10 com o teclado de verdade; o Narrador lendo o menu e "Caminho copiado".
+
+## 8g. Como o L7 ficou
+
+**As janelas abertas** (`domain/launcher_windows.rs`, puro e testado; `windows/launcher/open_windows.rs`, a leitura):
+
+- **Que janela conta:** a mesma regra do dock, a da barra de tarefas: visível, sem dona, sem `WS_EX_TOOLWINDOW` nem `WS_EX_NOACTIVATE` (a não ser com `WS_EX_APPWINDOW`, que pede o botão) e não "cloaked" (outra área de trabalho virtual, app da Loja suspenso), com título. A regra saiu de `windows/openwin.rs` para `domain::open_apps::has_button`, pura e testada com dados sintéticos, e o dock e o lançador leem pela mesma `openwin::enumerate`, que já devolvia a ordem Z (a do topo primeiro).
+- **Fora da lista:** o próprio lançador e todas as janelas do Dockyard (o processo dele: o dock, Configurações) e de outro processo do mesmo programa (o auxiliar de ícones, uma segunda cópia), comparando o `.exe` sem diferenciar maiúsculas (`launcher_windows::is_ours`).
+- **A linha:** o título da janela como título; "Janela · <nome do app>" como subtítulo ("Janela", só, quando o app não tem nome). O nome e o ícone vêm do que o dock já sabe (`open_apps::programs_of_windows`, sem perguntar ao shell): o app fixado (o nome e o id do dock) ou o aberto não fixado (o nome e o id que o dock descreveu, inclusive o perfil do Chrome). Se o dock não mostra o programa (a opção "apps abertos" desligada), o app da pasta Aplicativos cujo id é o AppID da janela; por fim, o `.exe` e o nome dele sem a extensão. O ícone é lido pelo mesmo caminho do app (`Request::App` do auxiliar, ou o pacote de ícones); enquanto não chega, o glifo de janela.
+- **A mistura:** com qualquer consulta, as janelas casam pelo **título** e pelo **nome do app**, pelas mesmas faixas dos apps (seção 5), a melhor das duas; dentro da faixa, na ordem Z. Entram numa faixa própria **depois dos apps, das páginas e da conta e antes dos arquivos** (`launcher_windows::mix`), até **8**. A busca na web padrão ("quando nada casa") só aparece se não houver app, janela nem arquivo. Uma conta ou uma busca na web por palavra-chave vêm sozinhas, como no L4, e `f termo` mostra só arquivos.
+- **A palavra-chave `j `** ("janelas"): mostra **só** as janelas, até 30; `j ` sem nada depois lista **todas, na ordem Z** (a usada por último primeiro). `j` sem espaço é digitação comum. **Por que não `w`:** `w` é a Wikipédia nas palavras-chave padrão da web. **`j` não colide** com as padrão (`g`, `yt`, `w`, `gh`) nem com o `f` dos arquivos (um teste garante); se o usuário criar uma palavra-chave da web `j`, **a dele vence**, como com o `f`.
+- **Ler:** as janelas são lidas na thread da UI, ao abrir o lançador e a cada tecla (uma janela aberta ou fechada no meio aparece ou some). **Medido** nesta máquina (`reading_the_windows_is_cheap`, ignorado no `cargo test`): 0,25 ms de mediana com 2 janelas; a primeira leitura do processo, 4,6 ms (as DLLs do shell carregando). O custo é um `EnumWindows` e, por janela com botão, o título, o `.exe` (`OpenProcess`) e o AppID (`SHGetPropertyStoreForWindow`), da ordem de 0,1 ms por janela. Uma leitura acima de 5 ms vai para o log, para medir ao vivo.
+
+**As ações** (`launcher_actions`, no menu do L6):
+
+| Resultado | Ações |
+|---|---|
+| Janela | **Alternar para a janela** (Enter) · **Fechar janela** · Mostrar no Explorador (o `.exe` do app; fora para app da Loja, cuja pasta `WindowsApps` é fechada ao usuário, e para o `ApplicationFrameHost.exe` que emoldura um) |
+
+- **A lista fechada cresceu:** `Action::FocusWindow(hwnd)` e `Action::CloseWindow(hwnd)`, com o handle diferente de zero em `is_allowed`. Antes de agir, o lançador confere de novo que o handle ainda é uma janela com botão de outro processo (`open_windows::still_listed`): o Windows reaproveita handles, e uma janela que fechou no meio mostra "Não foi possível abrir" na linha.
+- **Alternar** usa a mesma função do dock (`openwin::focus`): restaura se estiver minimizada, chama `SetForegroundWindow` e, se o Windows recusar, o truque de `AttachThreadInput` da seção 3. Como o lançador está em primeiro plano, o Windows deixa ele passar a frente. Depois avisa o dock (`open_apps::wake`), como o clique do dock.
+- **Fechar janela** manda `WM_CLOSE` pela função do dock (`openwin::close`), como o botão de fechar: o programa pode perguntar se salva ou recusar. **Nunca** mata o processo. O lançador fecha, como em toda ação, e a pergunta do programa fica visível.
+- **Espaços de trabalho do Dockyard:** o dock não tem um "clicar numa janela de outro espaço": uma janela de outro espaço no mesmo monitor está **estacionada** (`window_spaces`, escondida com `SW_HIDE`), fora da barra e do Alt+Tab, e o dock só mostra as do espaço em uso (`counts`). O lançador segue isso: lista só as janelas visíveis, então as estacionadas ficam de fora, e uma janela de outro espaço **em outro monitor** (visível, porque aquele monitor mostra o espaço dela) é alternada normalmente, sem trocar de espaço.
+- **Uso:** alternar para uma janela **não conta** no uso e janela **não aparece nos recentes**. Uma janela é efêmera: o handle muda a cada abertura do programa (e o Windows o reaproveita para outra janela), então a chave (`window:<handle>`) não teria sentido na abertura seguinte do lançador; e o que se usa muito é o **app**, que já conta quando é aberto. Fechar e mostrar no Explorador também não contam.
+- **Acessibilidade:** o item da UI Automation tem o tipo "Janela"; o Narrador lê "Relatório.docx - Word, Janela, 3 de 9".
+
+**Testes de unidade:** a regra de que janela conta (visível, cloaked, tool window, `WS_EX_NOACTIVATE`, com dona, `WS_EX_APPWINDOW`), a busca pelo título e pelo app, a faixa vencendo a ordem Z, a mistura entre apps e arquivos e a busca na web só quando nada casa, o `j ` (todas na ordem Z, com termo, o limite, `j` sem espaço, a palavra-chave do usuário vencendo, sem colidir com as padrão), a exclusão do Dockyard (o processo e o `.exe`, sem diferenciar maiúsculas), a descrição do programa (dock, catálogo, `.exe`), o Mostrar no Explorador fora dos apps da Loja e as ações de janela na lista fechada.
+
+**Não verificado (só ao vivo):** Enter trazendo para a frente uma janela comum, uma minimizada e uma de programa elevado (o Windows pode barrar o foco de uma janela de administrador vinda de um processo comum); Fechar janela num programa com documento não salvo (a pergunta aparecendo); o tempo de leitura com 20–30 janelas abertas (a meta de 5 ms); o ícone e o nome de cada app (Chrome com perfis, Explorador, apps da Loja via `ApplicationFrameHost`); uma janela de outro espaço em outro monitor; o Narrador lendo "Janela".
 
 ## 9. Extensões (depois)
 

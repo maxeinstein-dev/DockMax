@@ -41,6 +41,39 @@ pub struct WindowFacts {
     pub exe: Option<String>,
 }
 
+/// The extended styles of a window the taskbar looks at (`WS_EX_*`).
+pub const WS_EX_TOOLWINDOW: u32 = 0x0000_0080;
+pub const WS_EX_APPWINDOW: u32 = 0x0004_0000;
+pub const WS_EX_NOACTIVATE: u32 = 0x0800_0000;
+
+/// What the taskbar looks at in a top-level window to give it a button.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ButtonFacts {
+    pub visible: bool,
+    /// Its extended styles (`GWL_EXSTYLE`).
+    pub ex_style: u32,
+    /// Another window owns it (a dialog's owner).
+    pub owned: bool,
+    /// The shell hides it (`DWMWA_CLOAKED`: on another virtual desktop, a
+    /// suspended Store app).
+    pub cloaked: bool,
+}
+
+/// Whether the taskbar would give the window a button: visible, not a tool
+/// window, not owned by another (a dialog), not one that never takes the
+/// focus (unless it asks for a button with `WS_EX_APPWINDOW`), and not
+/// hidden by the shell. The rule the dock (spec 0009) and the launcher's
+/// windows (spec 0012 L7) count a window by.
+pub fn has_button(window: ButtonFacts) -> bool {
+    let app_window = window.ex_style & WS_EX_APPWINDOW != 0;
+    window.visible
+        && (app_window
+            || (window.ex_style & WS_EX_TOOLWINDOW == 0
+                && window.ex_style & WS_EX_NOACTIVATE == 0
+                && !window.owned))
+        && !window.cloaked
+}
+
 /// The AppID the shell gives File Explorer: the id of its item in the Apps
 /// folder, the one the dock pins.
 pub const EXPLORER_APP_ID: &str = "Microsoft.Windows.Explorer";
@@ -282,6 +315,56 @@ mod tests {
     }
 
     const CHROME_EXE: &str = r"C:\Program Files\Google\Chrome\Application\chrome.exe";
+
+    #[test]
+    fn only_a_taskbar_window_has_a_button() {
+        let plain = ButtonFacts {
+            visible: true,
+            ex_style: 0,
+            owned: false,
+            cloaked: false,
+        };
+        assert!(has_button(plain));
+        // Hidden, cloaked (another virtual desktop), a tool window, one that
+        // never takes the focus, a dialog: no button.
+        assert!(!has_button(ButtonFacts {
+            visible: false,
+            ..plain
+        }));
+        assert!(!has_button(ButtonFacts {
+            cloaked: true,
+            ..plain
+        }));
+        assert!(!has_button(ButtonFacts {
+            ex_style: WS_EX_TOOLWINDOW,
+            ..plain
+        }));
+        assert!(!has_button(ButtonFacts {
+            ex_style: WS_EX_NOACTIVATE,
+            ..plain
+        }));
+        assert!(!has_button(ButtonFacts {
+            owned: true,
+            ..plain
+        }));
+        // `WS_EX_APPWINDOW` asks for a button anyway, but not when hidden.
+        for ex_style in [WS_EX_TOOLWINDOW, WS_EX_NOACTIVATE, 0] {
+            let asked = ButtonFacts {
+                ex_style: ex_style | WS_EX_APPWINDOW,
+                owned: true,
+                ..plain
+            };
+            assert!(has_button(asked), "{ex_style:#x}");
+            assert!(!has_button(ButtonFacts {
+                cloaked: true,
+                ..asked
+            }));
+            assert!(!has_button(ButtonFacts {
+                visible: false,
+                ..asked
+            }));
+        }
+    }
 
     #[test]
     fn a_window_that_declares_an_appid_of_the_program_belongs_to_it() {
