@@ -18,6 +18,7 @@ pub mod icon_pack;
 pub mod launcher;
 pub mod launcher_actions;
 pub mod launcher_calc;
+pub mod launcher_clipboard;
 pub mod launcher_files;
 pub mod launcher_pages;
 pub mod launcher_paths;

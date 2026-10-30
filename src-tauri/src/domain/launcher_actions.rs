@@ -27,6 +27,11 @@ pub enum Verb {
     Switch,
     /// Asks an open window to close (`WM_CLOSE`).
     CloseWindow,
+    /// Puts an item of the clipboard's history back as what is copied
+    /// (what Enter does to one).
+    CopyClip,
+    /// Opens an item of the history that is one `https://` link.
+    OpenLink,
 }
 
 /// What a result is, as the menu sees it.
@@ -55,6 +60,11 @@ pub enum Subject<'a> {
     /// File Explorer (`launcher_windows::is_revealable`).
     Window {
         revealable: bool,
+    },
+    /// An item of the clipboard's history, and whether its text is one
+    /// `https://` link (`launcher_clipboard::link`).
+    Clip {
+        link: bool,
     },
 }
 
@@ -121,6 +131,13 @@ pub fn verbs(subject: Subject<'_>) -> Vec<Verb> {
             }
             verbs
         }
+        Subject::Clip { link } => {
+            let mut verbs = vec![Verb::CopyClip];
+            if link {
+                verbs.push(Verb::OpenLink);
+            }
+            verbs
+        }
     }
 }
 
@@ -136,7 +153,7 @@ pub fn copy_verb(verbs: &[Verb]) -> Option<Verb> {
     verbs
         .iter()
         .copied()
-        .find(|verb| matches!(verb, Verb::CopyPath | Verb::CopyResult))
+        .find(|verb| matches!(verb, Verb::CopyPath | Verb::CopyResult | Verb::CopyClip))
 }
 
 /// Whether Ctrl+C, with the text field's selection from `start` to `end`,
@@ -147,7 +164,8 @@ pub fn ctrl_c_copies_result(start: u32, end: u32, verbs: &[Verb]) -> bool {
 
 /// The action of the closed list that `verb` does on a result whose own
 /// action (Enter's) is `open`; `file` is the program's file, for a program
-/// (or a window's program, L7) shown in File Explorer. `None` when `verb` does not apply to it.
+/// (or a window's program, L7) shown in File Explorer, or the link an item
+/// of the clipboard's history is. `None` when `verb` does not apply to it.
 pub fn action(verb: Verb, open: &Action, file: Option<&str>) -> Option<Action> {
     let action = match (verb, open) {
         (Verb::Open, _) => open.clone(),
@@ -162,6 +180,8 @@ pub fn action(verb: Verb, open: &Action, file: Option<&str>) -> Option<Action> {
         (Verb::Switch, Action::FocusWindow(_)) => open.clone(),
         (Verb::CloseWindow, Action::FocusWindow(hwnd)) => Action::CloseWindow(*hwnd),
         (Verb::Reveal, Action::FocusWindow(_)) => Action::Reveal(file?.to_owned()),
+        (Verb::CopyClip, Action::CopyClip(_)) => open.clone(),
+        (Verb::OpenLink, Action::CopyClip(_)) => Action::OpenUri(file?.to_owned()),
         _ => return None,
     };
     super::launcher::is_allowed(&action).then_some(action)
@@ -371,6 +391,48 @@ mod tests {
     }
 
     #[test]
+    fn a_clip_copies_and_a_link_also_opens() {
+        let plain = verbs(Subject::Clip { link: false });
+        assert_eq!(plain, [Verb::CopyClip]);
+        // One action only: Shift+Enter copies, no menu.
+        assert!(!opens_menu(&plain));
+        let link = verbs(Subject::Clip { link: true });
+        assert_eq!(link, [Verb::CopyClip, Verb::OpenLink]);
+        assert!(opens_menu(&link));
+        // Ctrl+C with nothing selected copies the item, as Enter does.
+        assert_eq!(copy_verb(&link), Some(Verb::CopyClip));
+        assert!(ctrl_c_copies_result(0, 0, &plain));
+        let open = Action::CopyClip("{id}".into());
+        assert_eq!(action(Verb::CopyClip, &open, None), Some(open.clone()));
+        assert_eq!(
+            action(Verb::OpenLink, &open, Some("https://example.com/a")),
+            Some(Action::OpenUri("https://example.com/a".into()))
+        );
+        // No link, or one the launcher does not open: nothing.
+        assert_eq!(action(Verb::OpenLink, &open, None), None);
+        assert_eq!(
+            action(Verb::OpenLink, &open, Some("http://example.com")),
+            None
+        );
+        // The others' verbs do nothing to an item.
+        for verb in [
+            Verb::OpenAsAdmin,
+            Verb::Pin,
+            Verb::Reveal,
+            Verb::CopyPath,
+            Verb::CopyResult,
+            Verb::Switch,
+            Verb::CloseWindow,
+        ] {
+            assert_eq!(
+                action(verb, &open, Some("https://example.com")),
+                None,
+                "{verb:?}"
+            );
+        }
+    }
+
+    #[test]
     fn a_verb_that_does_not_apply_gives_no_action() {
         let page = Action::OpenUri("ms-settings:network-wifi".into());
         for verb in [
@@ -382,6 +444,8 @@ mod tests {
             Verb::CopyResult,
             Verb::Switch,
             Verb::CloseWindow,
+            Verb::CopyClip,
+            Verb::OpenLink,
         ] {
             assert_eq!(action(verb, &page, None), None, "{verb:?}");
         }

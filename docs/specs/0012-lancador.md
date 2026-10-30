@@ -1,6 +1,6 @@
 # Spec 0012 — Lançador: buscar e abrir pelo teclado
 
-**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado; L6 (menu de ações por resultado) implementado; L7 (janelas abertas) implementado.
+**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado; L6 (menu de ações por resultado) implementado; L7 (janelas abertas) implementado; a área de transferência (seção 8h) implementada.
 **Origem:** pedido do autor (2026-10-26) de um lançador no estilo do [Ulauncher](https://ulauncher.io/): uma caixa de busca aberta por um atalho de teclado global, que acha e abre apps e, no futuro, arquivos e extensões. O PrimoDock tem algo parecido ("O botão Iniciar abre: Apps do PrimoDock", [interface](../reference/primodock/interface.md)), mas só pelo mouse e sem busca por teclado.
 
 ## 1. Decisões do autor (2026-10-26)
@@ -30,7 +30,7 @@ L1 e L2 formam o primeiro recorte do produto. Cada um é um PR; o L2 só começa
 
 - **Extensões** (seção 9): só a forma interna dos provedores nasce no L1, preparada para elas.
 - A **tecla Win sozinha** ou a tecla Copilot como atalho (exigem um hook de teclado de baixo nível).
-- A área de transferência, a conversão de unidades e o histórico de contas.
+- A conversão de unidades e o histórico de contas. (A área de transferência saiu desta lista: seção 8h.)
 - Um item no dock que abre o lançador (o "botão Iniciar" do PrimoDock).
 
 ## 3. O atalho
@@ -136,6 +136,7 @@ O desenho e o que foi medido estão em "Como o L4 ficou" (seção 8d).
 |---|---|
 | Digitar | Busca a cada tecla (o catálogo cabe em memória; sem atraso), relendo as janelas abertas (L7); os arquivos, 120 ms depois da última tecla (L4) |
 | `j ` | Só as janelas abertas (L7); sem nada depois, todas, a usada por último primeiro |
+| `cb ` | Só o histórico da área de transferência do Windows (seção 8h); sem nada depois, os últimos copiados. Enter põe o item de volta como o copiado agora, sem colar |
 | Cima, Baixo | Muda o resultado selecionado, sem sair da caixa de texto |
 | Enter | Abre o selecionado (o primeiro, se nenhum foi escolhido); numa janela (L7), traz para a frente, restaurando se estiver minimizada |
 | Shift+Enter | O menu de ações do selecionado (L6); numa janela: Alternar para a janela, Fechar janela, Mostrar no Explorador (L7); numa página de Configurações, numa busca na web ou numa conta, que só têm uma ação, faz essa ação direto, sem menu |
@@ -161,6 +162,7 @@ O mouse também funciona: passar o ponteiro seleciona, o clique abre e o botão 
 - **Tamanho do texto:** a fonte segue o "Tamanho do texto" da Acessibilidade do Windows, além do DPI; as linhas crescem com ela.
 - **Só teclado:** tudo o que o mouse faz no lançador também se faz pelo teclado (seção 6).
 - **O menu de ações (L6)** é o menu próprio do app (`windows/menu`, o do dock), com o mesmo provedor de UI Automation: o Narrador ouve o menu abrir ("Dockyard") e lê cada item com o foco ("Abrir como administrador", "Mostrar no Explorador"); o Invoke escolhe. Aberto pelo teclado, o primeiro item já vem com o foco. "Caminho copiado" é um anúncio, como "Resultado copiado".
+- **A área de transferência (seção 8h):** o item da UI Automation tem o tipo "Área de transferência" e a primeira linha como nome; o Narrador lê "Relatório de vendas, Área de transferência, 1 de 12". Pôr um item de volta diz "Copiado"; a falha de leitura é dita como as outras notas da lista.
 
 ## 8. Como verificar
 
@@ -382,6 +384,41 @@ Duas falhas apareceram e foram corrigidas antes do PR: o campo lia a **posição
 **Testes de unidade:** a regra de que janela conta (visível, cloaked, tool window, `WS_EX_NOACTIVATE`, com dona, `WS_EX_APPWINDOW`), a busca pelo título e pelo app, a faixa vencendo a ordem Z, a mistura entre apps e arquivos e a busca na web só quando nada casa, o `j ` (todas na ordem Z, com termo, o limite, `j` sem espaço, a palavra-chave do usuário vencendo, sem colidir com as padrão), a exclusão do Dockyard (o processo e o `.exe`, sem diferenciar maiúsculas), a descrição do programa (dock, catálogo, `.exe`), o Mostrar no Explorador fora dos apps da Loja e as ações de janela na lista fechada.
 
 **Não verificado (só ao vivo):** Enter trazendo para a frente uma janela comum, uma minimizada e uma de programa elevado (o Windows pode barrar o foco de uma janela de administrador vinda de um processo comum); Fechar janela num programa com documento não salvo (a pergunta aparecendo); o tempo de leitura com 20–30 janelas abertas (a meta de 5 ms); o ícone e o nome de cada app (Chrome com perfis, Explorador, apps da Loja via `ApplicationFrameHost`); uma janela de outro espaço em outro monitor; o Narrador lendo "Janela".
+
+## 8h. Área de transferência
+
+**Decisões do autor (2026-10-30):**
+
+- **A fonte é o histórico do próprio Windows** (Win+V), pelo WinRT `Windows.ApplicationModel.DataTransfer.Clipboard`: `IsHistoryEnabled`, `GetHistoryItemsAsync` e `SetHistoryItemAsContent`.
+- **O Dockyard não guarda nada:** nem em disco, nem em cache entre aberturas.
+- **Com o histórico do Windows desligado,** aparece uma linha só, "Histórico da área de transferência desligado", que ao Enter abre `ms-settings:clipboard`.
+
+**Como ficou** (`domain/launcher_clipboard.rs`, puro e testado; `windows/launcher/clipboard.rs`, a leitura e as linhas):
+
+- **A palavra-chave `cb `** ("clipboard"), e só ela: o histórico pode ter senhas e outras coisas sensíveis, e nunca aparece misturado numa busca comum. `cb` sem espaço é digitação comum. **Por que `cb` e não `ac`:** as duas são curtas e nenhuma colide com as padrão (`g`, `yt`, `w`, `gh`, `f`, `j`; um teste garante), mas `cb` segue o costume das outras, abreviações em inglês como `yt` e `gh`; `ac` ("área de cópia") não é o nome que o Windows usa ("área de transferência" daria `at`). Se o usuário criar uma palavra-chave da web `cb`, **a dele vence**, como com o `f` e o `j`.
+- **Nesse modo, só o histórico responde:** nem apps, nem Configurações, nem conta, nem busca na web, nem janelas, nem arquivos.
+- **Sem termo,** os itens mais recentes, até **25** (o que o Windows guarda). **Com termo,** os itens cujo texto tem cada palavra do termo em qualquer lugar, sem diferenciar maiúsculas nem acentos, na ordem do mais recente. O filtro olha os primeiros 4 096 caracteres de cada texto.
+- **Só itens de texto** (os que têm o formato `Text`). Imagens, arquivos e outros formatos ficam **de fora nesta versão**; a leitura só conta quantos foram pulados.
+- **A linha:** a primeira linha com algum texto, com espaços e tabulações juntados, cortada em **80 caracteres** (o último vira `…`); um texto só de espaços aparece como "Texto em branco". O subtítulo: "Área de transferência · há 5 min" ("agora", "há N min", "há N h", "há 1 dia", "há N dias"). O glifo de colar no lugar do ícone.
+- **Enter** põe o item como o conteúdo atual da área de transferência (`SetHistoryItemAsContent`, pelo id do item, lido de novo do histórico numa thread `launcher-clipboard`), fecha o lançador e anuncia "Copiado" ao leitor de tela. **Não cola** no programa: colar exigiria mandar Ctrl+V com `SendInput`, que o projeto evita. Um item apagado do histórico no meio mostra "Não foi possível abrir".
+- **As ações (L6):** **Copiar** (Enter, o padrão) · **Abrir como link**, só quando o texto inteiro (sem os espaços das pontas) é um endereço `https://` que o lançador abre (`launcher_clipboard::link`, a mesma checagem das buscas na web). Sem link, a linha tem uma ação só: Shift+Enter copia, sem menu. Ctrl+C sem seleção no campo copia o item, como o Enter.
+- **A lista fechada cresceu:** `Action::CopyClip(id)`, com o id do item do Windows (não vazio, até 128 caracteres, sem controle). **O texto copiado nunca entra na ação.** "Abrir como link" vira `Action::OpenUri`, checado como sempre.
+- **Uso e recentes:** um item **não conta** no uso e não aparece nos recentes. A linha do histórico desligado conta como a página "Área de transferência" das Configurações do Windows, que ela abre.
+
+**Onde roda e o descarte:**
+
+- A leitura é do WinRT, assíncrona, e roda numa thread `launcher-clipboard` do processo principal, esperando a operação (`join`). Ela começa quando a consulta entra em `cb ` e é feita **uma vez** enquanto a consulta fica em `cb `: o termo só filtra o que foi lido, na thread da UI, a cada tecla.
+- **A geração e o tempo limite,** como no L4 e no L5: cada leitura leva um número; uma resposta depois de **1,5 s**, depois de a consulta sair de `cb ` ou de o lançador fechar é descartada. Sem resposta a tempo, "Não foi possível ler a área de transferência" (o mesmo texto de quando o Windows recusa).
+- **Nada fica:** sair de `cb ` ou fechar o lançador esquece o que foi lido. Nada vai para o disco.
+- **Por que não no auxiliar:** a API do WinRT da área de transferência pesa pouco no processo (medido abaixo), e o Windows pode recusar o histórico a um processo que não tem o primeiro plano: o lançador aberto tem, o auxiliar nunca tem janela à frente.
+
+**Privacidade:** nada do conteúdo vai para o log, nem com o trace ligado. O log diz só quantos itens de texto e de outros tipos o histórico tinha, o tempo, e o código de status quando o Windows recusa. Duas guardas: o texto de um item é um `ClipText`, que não tem `Display` (um `log::info!("{}", texto)` não compila) e cujo `Debug` escreve só o tamanho (`ClipText(23 chars)`), com um teste; e um teste que lê as linhas de `log::` de `windows/launcher/clipboard.rs` e falha se alguma levar o texto, a linha, o nome ou o id de um item.
+
+**Testes de unidade:** a palavra-chave (só `cb ` com espaço, `cb` sozinho e as outras consultas sem histórico, a palavra-chave do usuário vencendo) e as colisões com as padrão, o `f` e o `j`; o filtro (sem acento, sem maiúsculas, todas as palavras, a ordem do mais recente, o limite de 25); o corte da primeira linha (linhas em branco, tabulações, 80 caracteres por caractere e não por byte); o "há N min" (agora, minutos, horas, dias, relógio atrasado); a conversão do `DateTime` do WinRT; o histórico desligado, a resposta atrasada e a de antes de um descarte; a URL (só um `https://` sozinho; `http://`, texto em volta, duas linhas, `javascript:` e endereço longo demais ficam de fora); as ações (Copiar e Abrir como link, o Ctrl+C, a ação na lista fechada); e as duas guardas de privacidade.
+
+**A medir:** o teste `clipboard_history_answers`, ignorado no `cargo test` e rodado à mão com `cargo test clipboard_history_answers -- --ignored --nocapture`, imprime só a contagem e o tamanho dos itens (nunca o conteúdo), o tempo das duas leituras e a memória privada que o WinRT somou ao processo. Ele ainda não rodou: no dia do PR o disco da máquina estava cheio e o build de teste não coube. Se a memória passar de 1–2 MB, a leitura vai para o auxiliar, como no L4, com o cuidado do primeiro plano acima.
+
+**Não verificado (só ao vivo):** a leitura com o lançador em primeiro plano (o teste roda de um terminal, que é quem tem o primeiro plano); o Enter pondo o item de volta e o Ctrl+V em outro programa colando-o; "Abrir como link" no navegador; a linha do histórico desligado abrindo a página; o tempo e a memória com o lançador aberto; o Narrador lendo "Área de transferência" e "Copiado".
 
 ## 9. Extensões (depois)
 

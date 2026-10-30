@@ -77,6 +77,28 @@ pub struct LauncherMessages {
     /// The selected result, read aloud; `{name}`, `{kind}`, `{n}` and
     /// `{count}` are replaced.
     pub selected: &'static str,
+    /// The clipboard's history (`cb `): what an item is, and under its
+    /// first line "<what> · <how long ago>" (`{ago}` replaced by one of the
+    /// `ago_*`, where `{n}` is replaced).
+    pub clipboard: &'static str,
+    pub clip_of: &'static str,
+    pub ago_now: &'static str,
+    pub ago_minutes: &'static str,
+    pub ago_hours: &'static str,
+    pub ago_one_day: &'static str,
+    pub ago_days: &'static str,
+    /// An item that is only blanks.
+    pub clip_blank: &'static str,
+    /// The one row with Windows' history off, and what is under it.
+    pub clipboard_off: &'static str,
+    pub clipboard_off_hint: &'static str,
+    /// The history could not be read (refused, failed or late).
+    pub clipboard_failed: &'static str,
+    /// Said once an item is what is copied again.
+    pub clip_copied: &'static str,
+    /// The lines of an item's menu of actions.
+    pub action_copy: &'static str,
+    pub action_open_link: &'static str,
 }
 
 /// The dock's own texts (spec 0011 H3): the names of its items, in their
@@ -345,6 +367,20 @@ const PT_BR: Messages = Messages {
         results: "{n} resultados",
         one_result: "1 resultado",
         selected: "{name}, {kind}, {n} de {count}",
+        clipboard: "Área de transferência",
+        clip_of: "Área de transferência · {ago}",
+        ago_now: "agora",
+        ago_minutes: "há {n} min",
+        ago_hours: "há {n} h",
+        ago_one_day: "há 1 dia",
+        ago_days: "há {n} dias",
+        clip_blank: "Texto em branco",
+        clipboard_off: "Histórico da área de transferência desligado",
+        clipboard_off_hint: "Enter abre as Configurações do Windows para ligar",
+        clipboard_failed: "Não foi possível ler a área de transferência",
+        clip_copied: "Copiado",
+        action_copy: "Copiar",
+        action_open_link: "Abrir como link",
     },
 };
 
@@ -475,6 +511,20 @@ const EN: Messages = Messages {
         results: "{n} results",
         one_result: "1 result",
         selected: "{name}, {kind}, {n} of {count}",
+        clipboard: "Clipboard",
+        clip_of: "Clipboard · {ago}",
+        ago_now: "just now",
+        ago_minutes: "{n} min ago",
+        ago_hours: "{n} h ago",
+        ago_one_day: "1 day ago",
+        ago_days: "{n} days ago",
+        clip_blank: "Blank text",
+        clipboard_off: "Clipboard history is off",
+        clipboard_off_hint: "Enter opens Windows Settings to turn it on",
+        clipboard_failed: "Couldn't read the clipboard",
+        clip_copied: "Copied",
+        action_copy: "Copy",
+        action_open_link: "Open as link",
     },
 };
 
@@ -541,6 +591,12 @@ mod tests {
         assert!(EN.launcher.search_for.contains("{term}"));
         assert!(EN.launcher.window_of.contains("{app}"));
         assert!(PT_BR.launcher.window_of.contains("{app}"));
+        for launcher in [&EN.launcher, &PT_BR.launcher] {
+            assert!(launcher.clip_of.contains("{ago}"));
+            for ago in [launcher.ago_minutes, launcher.ago_hours, launcher.ago_days] {
+                assert!(ago.contains("{n}"), "{ago}");
+            }
+        }
         assert!(EN.dock.update_notice_title.contains("{version}"));
         assert!(PT_BR.dock.update_notice_title.contains("{version}"));
         assert_eq!(EN.tray.open_settings, "Settings");
