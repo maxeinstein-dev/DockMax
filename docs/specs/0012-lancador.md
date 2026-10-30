@@ -1,6 +1,6 @@
 # Spec 0012 — Lançador: buscar e abrir pelo teclado
 
-**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado.
+**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado.
 **Origem:** pedido do autor (2026-10-26) de um lançador no estilo do [Ulauncher](https://ulauncher.io/): uma caixa de busca aberta por um atalho de teclado global, que acha e abre apps e, no futuro, arquivos e extensões. O PrimoDock tem algo parecido ("O botão Iniciar abre: Apps do PrimoDock", [interface](../reference/primodock/interface.md)), mas só pelo mouse e sem busca por teclado.
 
 ## 1. Decisões do autor (2026-10-26)
@@ -9,7 +9,7 @@
 |---|---|
 | Atalho | **Alt+Espaço** por padrão; personalizar fica para depois (recorte L3) |
 | Janela | **Nativa** (Direct2D, como o dock), não WebView2 |
-| Arquivos | **Só apps** no primeiro recorte; arquivos depois |
+| Arquivos | **Só apps** no primeiro recorte; arquivos no L4 (decisões de 2026-10-30, seção 5a) |
 | Extras do primeiro recorte | **Todos:** apps recentes com a busca vazia, calculadora, busca na web por palavra-chave, Configurações do DockMax e do Windows |
 
 ## 2. Recortes
@@ -18,17 +18,19 @@
 |---|---|
 | **L1** | A janela nativa, o atalho Alt+Espaço (e o item "Buscar apps…" nos menus do dock e da bandeja), a busca nos apps da pasta Aplicativos, a ordenação com o histórico de uso, os recentes com a busca vazia, o teclado, a UI Automation e a chave **Lançador** (ligar e desligar) em Configurações › Geral |
 | **L2** | Os outros provedores: **calculadora**, **busca na web por palavra-chave** (com as palavras-chave em Configurações) e **Configurações do DockMax e do Windows** |
-| **L3** (depois) | Personalizar o atalho em Configurações |
+| **L3** | Personalizar o atalho em Configurações |
+| **L4** | **Arquivos e pastas:** o Everything (quando roda) e o índice do Windows Search, misturados abaixo dos apps a partir de 3 caracteres, e a palavra-chave `f ` só com eles (seções 5a e 8d) |
+| **L5** (depois) | **Caminhos,** como no Ulauncher: digitar `C:\` ou `~\` lista a pasta, e Tab entra na pasta selecionada |
+| **L6** (depois) | **Menu de ações por resultado:** Ctrl+Shift+Enter abre como administrador (como no Executar do Windows), mostrar no Explorador, copiar o caminho, fixar no dock |
+| **L7** (depois) | Buscar e alternar entre as **janelas abertas** |
 
-L1 e L2 formam o primeiro recorte do produto. Cada um é um PR; o L2 só começa depois da medição de memória do L1.
+L1 e L2 formam o primeiro recorte do produto. Cada um é um PR; o L2 só começa depois da medição de memória do L1. Do L4 em diante, os recortes seguem em sequência, um PR cada.
 
 **Fica para depois, fora desta spec:**
 
-- **Arquivos:** navegar por caminho como o Ulauncher (`~\`, `C:\`, Tab entra na pasta) e, depois, o índice do Windows Search.
 - **Extensões** (seção 9): só a forma interna dos provedores nasce no L1, preparada para elas.
 - A **tecla Win sozinha** ou a tecla Copilot como atalho (exigem um hook de teclado de baixo nível).
-- Um menu de ações por resultado: executar como administrador (Ctrl+Shift+Enter, como no Executar do Windows), mostrar no Explorador e fixar no dock.
-- Buscar e alternar entre as **janelas abertas**, a área de transferência, a conversão de unidades e o histórico de contas.
+- A área de transferência, a conversão de unidades e o histórico de contas.
 - Um item no dock que abre o lançador (o "botão Iniciar" do PrimoDock).
 
 ## 3. O atalho
@@ -116,16 +118,29 @@ O Windows dá ao processo que recebe um atalho registrado o direito de trazer um
 
 **Abrir** um app usa o mesmo caminho do dock (`apps::launch`, fora da thread principal); se falhar, o lançador fica aberto e o resultado mostra "Não foi possível abrir" no subtítulo.
 
+## 5a. Arquivos e pastas (L4)
+
+**Decisões do autor (2026-10-30):**
+
+- **Fontes:** o **Everything** (voidtools), quando está rodando, e o **índice do Windows Search**. Com os dois respondendo, os resultados se juntam sem repetir o caminho (comparado sem diferenciar maiúsculas); sem o Everything, só o Windows Search. O Dockyard não instala nem baixa o Everything.
+- **Mistura:** a partir de **3 caracteres**, os arquivos e pastas aparecem **abaixo** dos apps, das Configurações e da calculadora, numa faixa própria depois dessas. A palavra-chave **`f `** (f e espaço) mostra **só** arquivos e pastas.
+- **Limite:** até **8** arquivos na mistura e até **30** com `f `.
+- **Abrir:** Enter abre o arquivo pelo programa padrão e a pasta no Explorador. A linha tem o nome como título e a pasta onde está como subtítulo, com o perfil abreviado em `~`. O ícone vem do tipo do arquivo, pelo processo auxiliar (seção 4), sem carregar o shell no processo principal.
+- **Recentes e uso:** abrir um arquivo conta no uso (`file:<caminho>`) e ele aparece nos recentes, como as páginas.
+
+O desenho e o que foi medido estão em "Como o L4 ficou" (seção 8d).
+
 ## 6. Teclado
 
 | Tecla | Ação |
 |---|---|
-| Digitar | Busca a cada tecla (o catálogo cabe em memória; sem atraso) |
+| Digitar | Busca a cada tecla (o catálogo cabe em memória; sem atraso); os arquivos, 120 ms depois da última tecla (L4) |
 | Cima, Baixo | Muda o resultado selecionado, sem sair da caixa de texto |
 | Enter | Abre o selecionado (o primeiro, se nenhum foi escolhido) |
 | Alt+1…9 | Abre o n-ésimo resultado, como no Ulauncher; o atalho aparece sempre à direita de cada linha (no L1, sempre, e não só com Alt apertado) |
 | Esc | Fecha |
-| Page Up, Page Down, Home, End na lista | Ficam com a caixa de texto (o cursor); a lista tem só 8 linhas |
+| Page Up, Page Down, Home, End na lista | Ficam com a caixa de texto (o cursor) |
+| Roda do mouse | Rola a lista quando há mais de 8 resultados (L4: até 16 na mistura, 30 com `f `); Cima e Baixo também rolam, levando a seleção |
 
 O mouse também funciona: passar o ponteiro seleciona e o clique abre.
 
@@ -148,6 +163,7 @@ O mouse também funciona: passar o ponteiro seleciona e o clique abre.
 - os recentes com a busca vazia (no máximo 8, sem histórico vira a dica);
 - L2: a calculadora (precedência, parênteses, `^`, `%`, a vírgula decimal, divisão por zero, conta incompleta, uma consulta que não é conta), as palavras-chave (só `https://`, o termo codificado, uma palavra-chave sem termo, o buscador padrão quando nada casa), as Configurações (sinônimos, a ordem depois dos apps na mesma faixa);
 - a lista fechada de ações: um teste que falha se aparecer uma ação nova sem passar pela validação;
+- L4: a mistura e a ordem dos arquivos, o `f `, o limite, a junção sem repetir caminho, a abreviação com `~`, o descarte de uma geração antiga, os buffers da IPC do Everything e o escape do termo para cada fonte;
 - a migração de `launcher_usage` e "Limpar o histórico".
 
 **Ponta a ponta:** comandos só do build de teste, como os do dock: abrir o lançador, digitar uma consulta e ler os resultados (título, subtítulo, selecionado), e apertar um resultado. Cobrem a busca, a seleção com Cima e Baixo e o fechar com Esc.
@@ -231,13 +247,50 @@ Duas falhas apareceram e foram corrigidas antes do PR: o campo lia a **posição
 
 **Não verificado:** a captura com o teclado físico, combinações com Win dentro do WebView2 (o Windows segura muitas antes da página), e o leitor de tela no campo.
 
+## 8d. Como o L4 ficou
+
+**Os arquivos** (`domain/launcher_files.rs`, puro e testado; `windows/launcher/files.rs`; o protocolo do auxiliar em `windows/launcher/icons.rs`):
+
+- **Quando:** `launcher_files::parse`. Uma consulta de **3 caracteres ou mais** (normalizada) busca arquivos para misturar, a não ser que seja uma conta ou uma busca na web por palavra-chave, que vêm sozinhas. `f termo` busca só arquivos, e um caractere de termo já basta; `f` e `f ` sem termo são digitação comum (seguem para os apps). **A palavra-chave `f` não colide com as padrão da web** (`g`, `yt`, `w`, `gh`; um teste garante). Se o usuário criar uma palavra-chave da web `f` em Configurações, **a dele vence**: `f termo` vira a busca na web dele e os arquivos só entram pela mistura.
+- **A mistura:** os apps e as páginas continuam respondendo na hora, até 8, e a conta continua primeiro. Os arquivos entram **depois de tudo**, até 8; com `f `, sozinhos, até 30. A busca na web padrão ("quando nada casa") só aparece se não houver nem app nem arquivo. A lista mostra 8 linhas e **rola** além disso: Cima e Baixo levam a seleção e a lista junto, a roda do mouse rola, e Alt+1…9 abre a n-ésima linha **visível**.
+- **A ordem dos arquivos:** pelas mesmas faixas de casamento dos apps (seção 5), comparando o nome e, para um arquivo, o nome sem a extensão (`relatorio` é o nome exato de "relatorio.txt"); dentro da faixa, pelo uso (`file:<caminho>`); depois, na ordem em que as fontes responderam (o Everything primeiro).
+- **O termo vira palavras** (`launcher_files::words`): separado nos espaços e em `" * ? < > | : \ /`, sem caracteres de controle, até 8 palavras de até 64 caracteres. Nenhum desses caracteres existe num nome de arquivo, e sem eles nada do termo vira sintaxe das fontes:
+  - **Everything:** cada palavra entre aspas duplas (`"relatorio" "2024"`), que o Everything trata como literal (operadores, curingas e modificadores como `regex:` não valem ali dentro); espaço entre elas é E. Sem as opções de maiúsculas, palavra inteira, caminho ou regex.
+  - **Windows Search:** `CONTAINS(System.FileName, '"relatorio*" AND "2024*"')`, com o apóstrofo dobrado (`joe''s`), como pede o SQL. **Por que `CONTAINS` e não `LIKE '%termo%'`:** o `CONTAINS` usa o índice de texto (medido nesta máquina: 64–190 ms, contra 336–510 ms do `LIKE`, que lê todos os nomes por causa do `%` no início), dá a relevância (`System.Search.Rank`) para ordenar e trata acentos como o índice. O que ele perde é uma palavra no meio de outra (`orio`), raro para arquivos.
+- **A consulta ao índice:** `SELECT TOP n System.ItemUrl, System.FileAttributes FROM SystemIndex WHERE SCOPE='file:' AND CONTAINS(...) ORDER BY System.Search.Rank DESC, System.DateAccessed DESC`. O caminho sai do `System.ItemUrl` (`file:C:/Users/...`), **não** do `System.ItemPathDisplay`, que traz os nomes traduzidos do Explorador (`C:\Usuários\...`) e não abre nada (achado no teste ao vivo). A pasta vem do bit de diretório dos atributos.
+- **O Everything** pela IPC do SDK oficial (`domain/everything_ipc.rs`, com a fonte citada: `ipc/everything_ipc.h` do Everything-SDK.zip): `WM_COPYDATA` com `EVERYTHING_IPC_COPYDATA_QUERY2W` (18) e um `EVERYTHING_IPC_QUERY2` para a janela de classe `EVERYTHING_TASKBAR_NOTIFICATION`, pedindo só o caminho completo (`REQUEST_FULL_PATH_AND_NAME`), ordenado por data de modificação. A resposta vem num `WM_COPYDATA` para uma janela só de mensagens do auxiliar, num `EVERYTHING_IPC_LIST2`, lido com os limites conferidos (um buffer curto ou um deslocamento fora dele não lê nada fora). Sem a janela do Everything, a fonte fica de fora sem erro. Nada da `Everything64.dll`.
+- **A junção:** `launcher_files::merge`, Everything primeiro, cada caminho uma vez (sem diferenciar maiúsculas, sem a `\` do fim); um caminho que não é de unidade (`C:\...`) fica de fora.
+- **Abrir:** a ação nova `Action::OpenFile(caminho)` da lista fechada, checada por `is_allowed` (um caminho completo numa unidade, sem `.` nem `..` como pasta, sem os caracteres que um caminho não tem, até 1024) e de novo em `apps::open_path`, que chama `ShellExecuteW` "open" numa thread de trabalho, como `apps::launch`: o arquivo abre no programa padrão e a pasta no Explorador. Se falhar (um arquivo apagado depois da busca), a linha mostra "Não foi possível abrir".
+- **Uso e recentes:** abrir conta como `file:<caminho>`, com `\` no fim para uma pasta (assim os recentes sabem que é pasta sem perguntar ao disco); `launcher_repo::is_valid_key` aceita a chave. Com a busca vazia, os recentes juntam apps, páginas e arquivos pelo peso.
+- **A linha:** o nome do arquivo como título; a pasta onde está como subtítulo, com o perfil (`USERPROFILE`) escrito `~` (`~\Documents\Contratos`), sem diferenciar maiúsculas e só numa fronteira de pasta (`C:\Users\anabela` não vira `~bela`). O ícone é o do tipo (`type:.pdf`, lido uma vez para todos os PDFs) ou o próprio, para pasta, programa, atalho e arquivo sem extensão; enquanto não chega, um glifo de documento ou de pasta.
+- **Acessibilidade:** o item da UI Automation tem o tipo "Arquivo" ou "Pasta" (o subtítulo continua na tela); o Narrador lê "relatorio.pdf, Arquivo, 9 de 12". O anúncio "N resultados" sai de novo quando os arquivos chegam. Uma linha fora da área rolada tem a caixa vazia na UI Automation.
+
+**Onde roda:**
+
+| O quê | Processo | Thread |
+|---|---|---|
+| A busca de apps, a mistura, a ordem final dos arquivos, o debounce e a geração | principal | a da UI (a do lançador) |
+| Falar com o auxiliar | principal | `launcher-helper` (o leitor de ícones, que passou a levar também as buscas) |
+| O Everything (IPC) | auxiliar (`--launcher-icons`) | a principal do auxiliar, com uma janela só de mensagens |
+| O Windows Search (COM e OLE DB) | auxiliar | `launcher-windows-search`, que guarda a sessão entre consultas |
+| Os ícones de arquivo e de pasta (shell) | auxiliar | a principal do auxiliar |
+| Abrir o arquivo (`ShellExecuteW`) | principal | `launcher-open`, uma por abertura |
+
+- **O debounce e a geração:** cada tecla aumenta a geração e rearma um temporizador de **120 ms**; quando ele dispara, a busca sai com a geração da vez. Uma resposta com geração antiga (a digitação continuou, o lançador fechou) é descartada (`launcher_files::Generation`). Enquanto a busca nova não chega, as linhas de arquivo da busca anterior que ainda casam com o termo ficam, para a lista não piscar.
+- **O tempo limite:** cada fonte tem **300 ms**. O Everything responde em poucos ms; o Windows Search, se atrasar, fica de fora daquela resposta, e o resultado atrasado é descartado pelo número da consulta quando chega. O leitor do auxiliar manda primeiro os pedidos de ícone e, das buscas que se acumularam, só a última.
+- **Por que no auxiliar:** o mesmo motivo do L1 (o shell prende memória dos ícones no processo) e para o COM e o OLE DB do Windows Search ficarem fora do processo principal. O auxiliar já existia, nasce quando o lançador precisa e sai quando ele fecha, levando essa memória junto.
+
+**Medido** (2026-10-30, na máquina do autor, pelo teste `windows_search_answers`, ignorado no `cargo test` e rodado à mão com `cargo test windows_search_answers -- --ignored --nocapture`): a sessão do Windows Search abre em 2–8 ms; a primeira consulta de `relatorio` (TOP 30) levou 120–190 ms e as seguintes 64–75 ms, com 26 resultados; o `LIKE` levou 336–510 ms. O processo do teste ganhou **+1,1 MB** de memória privada com o COM e o OLE DB carregados, que agora ficam no auxiliar. O Everything não estava instalado: a fonte ficou de fora sem erro.
+
+**Não verificado (só ao vivo):** a memória do processo principal e do auxiliar com o lançador aberto buscando arquivos (a meta da seção 8 continua: +10 MB aberto, +3 MB 60 s depois de fechar); o Everything de verdade (só os buffers foram testados, no formato do SDK); o Everything rodando como administrador (o Windows pode barrar o `WM_COPYDATA` de um processo comum); os ícones de arquivo e de pasta na tela; o Enter abrindo um arquivo e uma pasta; a roda do mouse; o Narrador lendo "Arquivo" e "Pasta"; se o `CONTAINS` acha `relatorio` em "Relatório.docx" (o índice ignora acentos por padrão, mas não havia arquivo assim para conferir).
+
 ## 9. Extensões (depois)
 
 Fica aqui só o desenho que o L1 não pode fechar:
 
 - **Ativadas por palavra-chave**, como no Ulauncher: uma extensão declara a palavra (`gh`, `todo`) e só recebe as consultas que começam com ela; a busca de apps nunca espera uma extensão.
 - **Um processo à parte** por extensão, falando JSON por linha na entrada e na saída padrão, com tempo limite por consulta (um resultado atrasado é descartado). Uma extensão travada ou que cai não derruba o DockMax.
-- **Só as ações da lista fechada** da seção 5: uma extensão devolve resultados, nunca executa nada pelo DockMax. Uma ação nova (abrir um arquivo, rodar um comando) é decisão de uma spec própria, com permissões declaradas num manifesto e aceitas por quem instala.
+- **Só as ações da lista fechada** da seção 5: uma extensão devolve resultados, nunca executa nada pelo DockMax. Uma ação nova (rodar um comando; abrir um arquivo entrou no L4, mas só para o que a busca de arquivos acha) é decisão de uma spec própria, com permissões declaradas num manifesto e aceitas por quem instala.
 - **Instalação explícita**, de uma pasta local; sem loja nem download automático.
 - **Memória:** o processo de uma extensão nasce na primeira consulta com a palavra-chave dela e sai junto com a janela do lançador, 45 s depois de fechada.
 
