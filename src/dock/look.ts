@@ -30,6 +30,10 @@ export const STYLE_LOOKS: Readonly<Record<DockStyle, StyleLook>> = {
   neon: { border: true, corners: 70, reflections: false },
   paper: { border: false, corners: 40, reflections: false },
   floating: { border: false, corners: 40, reflections: true },
+  // The skins: the image is the bar, with no border or corners to change.
+  retro: { border: false, corners: 0, reflections: false },
+  classic98: { border: false, corners: 0, reflections: false },
+  phosphor: { border: false, corners: 0, reflections: false },
 };
 
 /** The look a style has when `tweaks` is applied over its own. */

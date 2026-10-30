@@ -1,4 +1,10 @@
 import type { DockStyle } from "../core/settings";
+import classic98Json from "../../src-tauri/skins/classic98/skin.json";
+import classic98Png from "../../src-tauri/skins/classic98/skin.png";
+import phosphorJson from "../../src-tauri/skins/phosphor/skin.json";
+import phosphorPng from "../../src-tauri/skins/phosphor/skin.png";
+import retroJson from "../../src-tauri/skins/retro/skin.json";
+import retroPng from "../../src-tauri/skins/retro/skin.png";
 
 /* The colors each style paints the bar with, for the miniatures of
  * Configurações › Aparência (spec 0014 R1). A mirror of
@@ -32,6 +38,41 @@ export interface StylePaint {
   /** The style's own color of the mark under an open program; null for the
    * accent. */
   indicator: Rgba | null;
+  /** The bar is an image (spec 0020 §3): its skin, else null. */
+  skin: SkinPaint | null;
+}
+
+/** A skin of the bar, from its `skin.json` and `skin.png` in
+ * `src-tauri/skins/<id>/`: the image goes to the bar's height, its ends as
+ * they are and the middle repeated (or stretched) across. */
+export interface SkinPaint {
+  url: string;
+  width: number;
+  height: number;
+  left: number;
+  right: number;
+  repeat: boolean;
+  pixelated: boolean;
+}
+
+interface SkinJson {
+  width: number;
+  height: number;
+  slice: { top: number; right: number; bottom: number; left: number };
+  middle: string;
+  pixelated: boolean;
+}
+
+function skinPaint(url: string, json: SkinJson): SkinPaint {
+  return {
+    url,
+    width: json.width,
+    height: json.height,
+    left: json.slice.left,
+    right: json.slice.right,
+    repeat: json.middle === "repeat",
+    pixelated: json.pixelated,
+  };
 }
 
 const WHITE = (alpha: number): Rgba => [255, 255, 255, alpha];
@@ -44,6 +85,7 @@ const PLAIN: StylePaint = {
   flat: false,
   shelf: false,
   indicator: null,
+  skin: null,
 };
 
 export const STYLE_PAINTS: Readonly<Record<DockStyle, StylePaint>> = {
@@ -105,6 +147,21 @@ export const STYLE_PAINTS: Readonly<Record<DockStyle, StylePaint>> = {
     flat: true,
     shelf: true,
     indicator: [0x2c, 0x3a, 0x5a, 1],
+  },
+  retro: {
+    ...PLAIN,
+    indicator: [0xff, 0x00, 0x4d, 1],
+    skin: skinPaint(retroPng, retroJson),
+  },
+  classic98: {
+    ...PLAIN,
+    indicator: [0x00, 0x00, 0x80, 1],
+    skin: skinPaint(classic98Png, classic98Json),
+  },
+  phosphor: {
+    ...PLAIN,
+    indicator: [0x3c, 0xff, 0x6e, 1],
+    skin: skinPaint(phosphorPng, phosphorJson),
   },
 };
 

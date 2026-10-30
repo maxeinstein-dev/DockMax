@@ -14,6 +14,7 @@ import {
   type StyleTweaks,
 } from "../core/settings";
 import { dockLookOf } from "../dock/look";
+import { STYLE_PAINTS } from "../dock/paints";
 import { useT } from "../i18n";
 import IconPacksField from "./IconPacksField";
 import OptionGroup, { type Option } from "./OptionGroup";
@@ -30,6 +31,7 @@ import {
 } from "./ChoiceThumbs";
 import ToggleField from "./parts/ToggleField";
 import StyleGallery from "./StyleGallery";
+import ThemeGallery from "./ThemeGallery";
 import { useSettingsEditor } from "./useSettingsEditor";
 import "./Look.css";
 
@@ -201,7 +203,7 @@ function LookPanel({
 
   // The changes to the chosen style: a list, so the panel and the app
   // put the same rows in their own frame.
-  const tweaks = [
+  const allTweaks = [
     <ToggleField
       key="border"
       label={text.border}
@@ -244,6 +246,11 @@ function LookPanel({
       </button>
     </div>,
   ];
+  // A skin's image is its border and its corners (spec 0020, Q21).
+  const skinned = dock !== null && STYLE_PAINTS[dock.style].skin !== null;
+  const tweaks = skinned
+    ? allTweaks.filter((row) => row.key !== "border" && row.key !== "corners")
+    : allTweaks;
 
   return (
     <>
@@ -252,6 +259,14 @@ function LookPanel({
       ) : (
         <PanelHeader title={text.title} />
       )}
+      <SettingsGroup title={groups.themes} grouped={grouped}>
+        <ThemeGallery
+          dock={dock}
+          appIds={appIds}
+          disabled={disabled}
+          onApply={(choices) => update(choices)}
+        />
+      </SettingsGroup>
       <SettingsGroup title={groups.style} grouped={grouped}>
         <StyleGallery
           label={text.style}

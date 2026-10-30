@@ -25,6 +25,9 @@ const RUST_NAMES: Readonly<Record<DockStyle, string>> = {
   neon: "Neon",
   paper: "Paper",
   floating: "Floating",
+  retro: "Retro",
+  classic98: "Classic98",
+  phosphor: "Phosphor",
 };
 
 /** `r g b` of every color written in `rust`, as a set. */
@@ -110,6 +113,7 @@ describe("STYLE_PAINTS", () => {
       expect(paint.hi === "none", style).toBe(
         /hi: Some\(Color::CLEAR\)/.test(block),
       );
+      expect(paint.skin !== null, style).toBe(/skin: true/.test(block));
     }
   });
 });

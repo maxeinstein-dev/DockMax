@@ -23,6 +23,7 @@ use crate::domain::apps::{
 };
 use crate::domain::icon_pack::is_valid_pack_id;
 use crate::domain::open_apps::OpenSnapshot;
+use crate::domain::settings::DockStyle;
 use crate::domain::widgets::{MoveDirection, WidgetId};
 use crate::persistence::apps_repo;
 use crate::persistence::database::Storage;
@@ -327,7 +328,7 @@ pub async fn app_icon(
     } else {
         None
     };
-    let dark = pack.is_some() && super::settings::dark_now(&app);
+    let dark = pack.is_some() && super::settings::icons_dark(&app, None);
     let key = (pack, app_id, size, dark);
     if let Some(icon) = cached_icon(&key) {
         return Ok(icon);
@@ -353,14 +354,16 @@ pub const PREVIEW_APPS: usize = 6;
 
 /// The icons `pack` gives the programs `app_ids`, in that order, as PNG
 /// `data:` URLs (`null` for a program with no icon): the miniature of the
-/// pack's card in Configurações (spec 0007 §3.5). In the dock's theme and at
-/// its size; without a pack, the programs' own icons. At most
+/// pack's card in Configurações (spec 0007 §3.5). On the bar of `style` (the
+/// dock's own when `None`) in the dock's color mode, and at its size; without
+/// a pack, the programs' own icons. At most
 /// [`PREVIEW_APPS`] programs.
 #[tauri::command]
 pub async fn icon_pack_preview(
     app: AppHandle,
     pack: Option<String>,
     app_ids: Vec<String>,
+    style: Option<DockStyle>,
 ) -> Result<Vec<Option<String>>, AppCommandError> {
     if app_ids.len() > PREVIEW_APPS || !app_ids.iter().all(|id| is_valid_app_id(id)) {
         return Err(AppError::InvalidApp.into());
@@ -368,7 +371,7 @@ pub async fn icon_pack_preview(
     if pack.as_deref().is_some_and(|id| !is_valid_pack_id(id)) {
         return Err(AppError::InvalidApp.into());
     }
-    let dark = pack.is_some() && super::settings::dark_now(&app);
+    let dark = pack.is_some() && super::settings::icons_dark(&app, style);
     let mut icons = Vec::with_capacity(app_ids.len());
     for app_id in app_ids {
         let key = (pack.clone(), app_id, ICON_SIZES[1], dark);

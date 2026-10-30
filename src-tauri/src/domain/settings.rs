@@ -360,7 +360,8 @@ impl TaskbarMode {
     }
 }
 
-/// The look of the dock bar: eight ready-made styles (spec 0005 §3.2).
+/// The look of the dock bar: eight ready-made styles (spec 0005 §3.2) and
+/// three skins (spec 0020 §3).
 ///
 /// The Canarinho style (`"canary"`) was removed on 2026-10-30; a file that
 /// still names it opens with the default style, see [`REMOVED_STYLES`].
@@ -377,6 +378,30 @@ pub enum DockStyle {
     Neon,
     Paper,
     Floating,
+    /// The skins (spec 0020 §3): the bar is an image.
+    Retro,
+    Classic98,
+    Phosphor,
+}
+
+impl DockStyle {
+    /// Whether the bar is dark, so an icon pack's dark images go on it (spec
+    /// 0020, Q8): the bars dark in both color modes (Meia-noite, Rocket,
+    /// Neon), never the light one (Papel), and the others with the mode.
+    pub fn bar_dark(self, mode_dark: bool) -> bool {
+        match self {
+            DockStyle::Midnight
+            | DockStyle::Rocket
+            | DockStyle::Neon
+            | DockStyle::Retro
+            | DockStyle::Phosphor => true,
+            DockStyle::Paper | DockStyle::Classic98 => false,
+            DockStyle::Native
+            | DockStyle::LiquidGlass
+            | DockStyle::AquaShelf
+            | DockStyle::Floating => mode_dark,
+        }
+    }
 }
 
 /// Styles that no longer exist. As `style`, serde reads them as the default
@@ -841,6 +866,9 @@ mod tests {
             (DockStyle::Neon, "neon"),
             (DockStyle::Paper, "paper"),
             (DockStyle::Floating, "floating"),
+            (DockStyle::Retro, "retro"),
+            (DockStyle::Classic98, "classic98"),
+            (DockStyle::Phosphor, "phosphor"),
         ];
         for (style, name) in styles {
             assert_eq!(serde_json::to_value(style).unwrap(), name);
@@ -1125,6 +1153,25 @@ mod tests {
         ];
         for (code, name) in cases {
             assert_eq!(serde_json::to_value(code).unwrap(), name);
+        }
+    }
+
+    #[test]
+    fn a_pack_s_dark_images_follow_the_bar_not_only_the_mode() {
+        for style in [DockStyle::Midnight, DockStyle::Rocket, DockStyle::Neon] {
+            assert!(style.bar_dark(false), "{style:?}");
+            assert!(style.bar_dark(true), "{style:?}");
+        }
+        assert!(!DockStyle::Paper.bar_dark(true));
+        assert!(!DockStyle::Paper.bar_dark(false));
+        for style in [
+            DockStyle::Native,
+            DockStyle::LiquidGlass,
+            DockStyle::AquaShelf,
+            DockStyle::Floating,
+        ] {
+            assert!(style.bar_dark(true), "{style:?}");
+            assert!(!style.bar_dark(false), "{style:?}");
         }
     }
 }

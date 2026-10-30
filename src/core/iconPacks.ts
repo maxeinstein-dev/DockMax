@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { errorKind, log } from "./log";
+import type { DockStyle } from "./settings";
 
 /* The icon packs in the packs folder (spec 0007). Rust reads the folder and
  * checks every pack; the page only lists them, opens the folder and takes
@@ -84,15 +85,17 @@ export function reloadIconPacks(): Promise<IconPackInfo[]> {
 export const PREVIEW_APPS = 6;
 
 /** The icons `pack` (null: the programs' own) gives the programs `appIds`,
- * in that order, as `data:` URLs, in the dock's theme: the miniature of the
- * pack's card. */
+ * in that order, as `data:` URLs, on the bar of `style` (the dock's own when
+ * null): a dark bar takes the pack's dark images. The miniature of a card. */
 export function iconPackPreview(
   pack: string | null,
   appIds: readonly string[],
+  style: DockStyle | null = null,
 ): Promise<(string | null)[]> {
   return invoke<(string | null)[]>(ICON_PACK_COMMANDS.preview, {
     pack,
     appIds: appIds.slice(0, PREVIEW_APPS),
+    style,
   }).catch((error: unknown) => {
     log.warn(`icons: preview failed: ${errorKind(error)}`);
     throw error;
