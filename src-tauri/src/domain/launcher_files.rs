@@ -28,6 +28,16 @@ pub const ONLY_LIMIT: usize = 30;
 pub const DEBOUNCE_MS: u32 = 120;
 /// How long a source has to answer, in milliseconds.
 pub const TIMEOUT_MS: u64 = 300;
+/// How long an answer that missed `TIMEOUT_MS` is still waited for, in
+/// milliseconds: the Windows Search cold, on the first search after the
+/// launcher opens (the helper starting, COM and OLE DB loading).
+pub const LATE_LIMIT_MS: u64 = 5_000;
+/// How long the helper waits for that late answer at each ask, in
+/// milliseconds: the requests of icons wait at most this much behind it.
+pub const LATE_POLL_MS: u64 = 100;
+/// The first line of an answer not yet whole: a source missed the time,
+/// and what it finds may still come (`decode_answer`).
+const LATE_MARK: &str = "+";
 /// The longest path kept (a result, a key of the use).
 pub const MAX_PATH_CHARS: usize = 1024;
 /// Most words of a term, and the longest one.
@@ -409,9 +419,111 @@ pub fn decode_hits(text: &str) -> Vec<FileHit> {
         .collect()
 }
 
+/// The answer of a search as the helper sends it: the hits
+/// (`encode_hits`), after the line `LATE_MARK` when it is not whole (a
+/// source missed `TIMEOUT_MS` and is still waited for).
+pub fn encode_answer(hits: &[FileHit], whole: bool) -> String {
+    let hits = encode_hits(hits);
+    if whole {
+        hits
+    } else {
+        format!("{LATE_MARK}\n{hits}")
+    }
+}
+
+/// The hits of `encode_answer` and whether the answer is whole.
+pub fn decode_answer(text: &str) -> (Vec<FileHit>, bool) {
+    let whole = text.lines().next() != Some(LATE_MARK);
+    (decode_hits(text), whole)
+}
+
+/// What the helper says when asked for the late answer of its last search.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LateAnswer {
+    /// Nothing is waited for any more (none was late, it came empty, it
+    /// was too late or the source is gone): the launcher stops asking.
+    Gone,
+    /// Not yet: the launcher asks again.
+    Waiting,
+    /// It came: the hits of the search, the early ones and the late ones
+    /// joined, for the launcher to show in place of the first answer.
+    Came(Vec<FileHit>),
+}
+
+/// A `LateAnswer` as the helper sends it: nothing for `Gone` (and for an
+/// empty `Came`, which changes nothing), `LATE_MARK` for `Waiting`, the
+/// hits for `Came`.
+pub fn encode_late(answer: &LateAnswer) -> String {
+    match answer {
+        LateAnswer::Gone => String::new(),
+        LateAnswer::Waiting => format!("{LATE_MARK}\n"),
+        LateAnswer::Came(hits) => encode_hits(hits),
+    }
+}
+
+pub fn decode_late(text: &str) -> LateAnswer {
+    if text.lines().next() == Some(LATE_MARK) {
+        return LateAnswer::Waiting;
+    }
+    match decode_hits(text) {
+        hits if hits.is_empty() => LateAnswer::Gone,
+        hits => LateAnswer::Came(hits),
+    }
+}
+
+/// A search of the helper waiting for the Windows Search index: its number
+/// and what Everything gave, to be joined with the index's answer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexWait {
+    number: u64,
+    early: Vec<FileHit>,
+}
+
+/// What an answer of the index is to the search waited for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Arrival {
+    /// Of this search, in time: the joined hits go in its first answer.
+    InTime(Vec<FileHit>),
+    /// Of this search, after `TIMEOUT_MS` but within `LATE_LIMIT_MS`: the
+    /// joined hits go after, and the launcher's list is redone with them.
+    Late(Vec<FileHit>),
+    /// Of an older search (the typing went on), or too late: dropped.
+    Dropped,
+}
+
+impl IndexWait {
+    pub fn new(number: u64, early: Vec<FileHit>) -> IndexWait {
+        IndexWait { number, early }
+    }
+
+    /// What Everything gave (the first answer, when the index is late).
+    pub fn early(&self) -> Vec<FileHit> {
+        merge([self.early.clone()])
+    }
+
+    /// The answer `hits` of the index to the search `number`, `waited_ms`
+    /// after this search was asked.
+    pub fn arrival(&self, number: u64, hits: Vec<FileHit>, waited_ms: u64) -> Arrival {
+        if number != self.number || self.expired(waited_ms) {
+            return Arrival::Dropped;
+        }
+        let joined = merge([self.early.clone(), hits]);
+        if waited_ms <= TIMEOUT_MS {
+            Arrival::InTime(joined)
+        } else {
+            Arrival::Late(joined)
+        }
+    }
+
+    /// Whether the index's answer is no longer waited for.
+    pub fn expired(&self, waited_ms: u64) -> bool {
+        waited_ms > LATE_LIMIT_MS
+    }
+}
+
 /// Tells the searches of files apart: each one takes the next number, and
 /// only the answer of the last one is shown. An answer of an older typing,
-/// late, is dropped.
+/// late, is dropped; a late answer of the typing still there is shown.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Generation(u64);
 
@@ -795,5 +907,102 @@ mod tests {
         let second = generation.next();
         assert!(!generation.is_current(first), "the late answer is dropped");
         assert!(generation.is_current(second));
+    }
+
+    #[test]
+    fn an_answer_of_the_index_in_time_goes_in_the_first_answer() {
+        let wait = IndexWait::new(4, vec![file(r"C:\a.txt")]);
+        assert_eq!(
+            wait.arrival(4, vec![file(r"C:\b.txt"), file(r"C:\A.TXT")], 120),
+            Arrival::InTime(vec![file(r"C:\a.txt"), file(r"C:\b.txt")]),
+            "joined, Everything's first, each path once"
+        );
+        assert_eq!(
+            wait.arrival(4, Vec::new(), TIMEOUT_MS),
+            Arrival::InTime(vec![file(r"C:\a.txt")])
+        );
+    }
+
+    #[test]
+    fn a_late_answer_of_the_same_search_comes_after() {
+        // The first search after opening: the index cold, 900 ms.
+        let wait = IndexWait::new(1, Vec::new());
+        assert_eq!(wait.early(), []);
+        assert_eq!(
+            wait.arrival(1, vec![file(r"C:\relatorio.pdf")], 900),
+            Arrival::Late(vec![file(r"C:\relatorio.pdf")])
+        );
+        assert_eq!(
+            wait.arrival(1, vec![file(r"C:\relatorio.pdf")], LATE_LIMIT_MS),
+            Arrival::Late(vec![file(r"C:\relatorio.pdf")])
+        );
+        // Too late: no longer waited for.
+        assert!(wait.expired(LATE_LIMIT_MS + 1));
+        assert_eq!(
+            wait.arrival(1, vec![file(r"C:\relatorio.pdf")], LATE_LIMIT_MS + 1),
+            Arrival::Dropped
+        );
+    }
+
+    #[test]
+    fn a_late_answer_of_an_older_search_is_dropped() {
+        let wait = IndexWait::new(3, vec![file(r"C:\a.txt")]);
+        assert_eq!(
+            wait.arrival(2, vec![file(r"C:\b.txt")], 900),
+            Arrival::Dropped
+        );
+        assert_eq!(
+            wait.arrival(2, vec![file(r"C:\b.txt")], 50),
+            Arrival::Dropped
+        );
+    }
+
+    #[test]
+    fn the_launcher_shows_a_late_answer_of_the_typing_still_there() {
+        let mut generation = Generation::default();
+        let asked = generation.next();
+        // The first answer (not whole) and the late one carry the same
+        // generation: both are shown while nothing more was typed.
+        assert!(generation.is_current(asked), "in time");
+        assert!(generation.is_current(asked), "late, same typing: shown");
+        generation.next();
+        assert!(!generation.is_current(asked), "late, older typing: dropped");
+    }
+
+    #[test]
+    fn an_answer_says_whether_more_may_come() {
+        let hits = vec![file(r"C:\a.txt")];
+        assert_eq!(
+            decode_answer(&encode_answer(&hits, true)),
+            (hits.clone(), true)
+        );
+        assert_eq!(
+            decode_answer(&encode_answer(&hits, false)),
+            (hits.clone(), false)
+        );
+        assert_eq!(
+            decode_answer(&encode_answer(&[], false)),
+            (Vec::new(), false)
+        );
+        assert_eq!(decode_answer(""), (Vec::new(), true));
+        // The mark is not a hit for an older reader of the hits.
+        assert_eq!(decode_hits(&encode_answer(&hits, false)), hits);
+    }
+
+    #[test]
+    fn a_late_answer_goes_through_the_helper() {
+        let hits = vec![folder(r"C:\Docs")];
+        for answer in [
+            LateAnswer::Gone,
+            LateAnswer::Waiting,
+            LateAnswer::Came(hits.clone()),
+        ] {
+            assert_eq!(decode_late(&encode_late(&answer)), answer);
+        }
+        // Empty, it changes nothing: as gone.
+        assert_eq!(
+            decode_late(&encode_late(&LateAnswer::Came(Vec::new()))),
+            LateAnswer::Gone
+        );
     }
 }
