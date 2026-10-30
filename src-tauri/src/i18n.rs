@@ -71,6 +71,8 @@ pub struct LauncherMessages {
     pub folder_slow: &'static str,
     /// Under a program that could not be opened.
     pub failed: &'static str,
+    /// Under a result whose copy did not reach the clipboard.
+    pub copy_failed: &'static str,
     /// How many results there are; `{n}` is replaced.
     pub results: &'static str,
     pub one_result: &'static str,
@@ -395,6 +397,7 @@ const PT_BR: Messages = Messages {
         folder_denied: "Sem acesso",
         folder_slow: "A pasta não respondeu",
         failed: "Não foi possível abrir",
+        copy_failed: "Não foi possível copiar",
         results: "{n} resultados",
         one_result: "1 resultado",
         selected: "{name}, {kind}, {n} de {count}",
@@ -600,6 +603,7 @@ const EN: Messages = Messages {
         folder_denied: "No access",
         folder_slow: "The folder didn't answer",
         failed: "Couldn't open",
+        copy_failed: "Couldn't copy",
         results: "{n} results",
         one_result: "1 result",
         selected: "{name}, {kind}, {n} of {count}",

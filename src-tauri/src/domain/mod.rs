@@ -7,6 +7,7 @@ pub mod badges;
 pub mod browser_profile;
 pub mod calendar;
 pub mod claude_usage;
+pub mod clipboard_write;
 pub mod cycle;
 pub mod dock_items;
 pub mod dock_layout;
