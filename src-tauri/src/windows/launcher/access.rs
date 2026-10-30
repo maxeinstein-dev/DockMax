@@ -505,6 +505,7 @@ mod tests {
             kind: kind.into(),
             rect: (0.0, 0.0, 10.0, 10.0),
             selected: false,
+            help: None,
         }
     }
 
