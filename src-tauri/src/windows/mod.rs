@@ -54,6 +54,8 @@ pub mod previews;
 #[cfg(windows)]
 pub mod profiles;
 #[cfg(windows)]
+pub mod program_name;
+#[cfg(windows)]
 pub mod recovery;
 pub mod settings_window;
 #[cfg(windows)]

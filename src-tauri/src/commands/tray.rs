@@ -25,6 +25,7 @@ pub struct TrayIcon {
     /// settings keep the icons shown in the dock); null when the program's
     /// file can't be read.
     pub id: Option<String>,
+    /// The tooltip, or the name of the program when the icon has none.
     pub tip: String,
     /// A PNG as a `data:` URL, or null when the image could not be read.
     pub image: Option<String>,
@@ -41,13 +42,21 @@ const MAX_KEY: usize = 64;
 fn snapshot() -> Vec<TrayIcon> {
     tray_host::icons()
         .into_iter()
-        .map(|icon| TrayIcon {
-            clickable: icon.callback != 0,
-            id: stable_key(icon.hwnd, icon.uid),
-            key: icon.key,
-            tip: icon.tip,
-            image: icon.png,
-            hidden: icon.hidden,
+        .map(|icon| {
+            let program = crate::windows::openwin::exe_of_window(icon.hwnd);
+            TrayIcon {
+                clickable: icon.callback != 0,
+                id: program
+                    .as_ref()
+                    .map(|path| key_of(&path.to_string_lossy(), icon.uid)),
+                key: icon.key,
+                // An icon without a tooltip goes by its program's name.
+                tip: crate::domain::program_name::tip_or(icon.tip, || {
+                    crate::windows::program_name::of_file(program.as_deref()?)
+                }),
+                image: icon.png,
+                hidden: icon.hidden,
+            }
         })
         .collect()
 }
@@ -66,12 +75,6 @@ pub fn icons() -> Vec<TrayIcon> {
 /// what names a tray icon across restarts (the PrimoDock's key).
 pub fn key_of(path: &str, uid: u32) -> String {
     format!("path:{}#{uid}", path.to_lowercase())
-}
-
-#[cfg(windows)]
-fn stable_key(hwnd: isize, uid: u32) -> Option<String> {
-    let path = crate::windows::openwin::exe_of_window(hwnd)?;
-    Some(key_of(&path.to_string_lossy(), uid))
 }
 
 /// Starts the host and has every change sent to the pages. Does nothing
