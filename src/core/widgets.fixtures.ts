@@ -353,6 +353,13 @@ export const WIDGET_FIXTURES = {
     },
   } satisfies WidgetInstance<"weather">,
 
+  "launcher-default": {
+    id: "019a1b2c-3d4e-7f60-8a1b-2c3d4e5f60a2",
+    label: null,
+    kind: "launcher",
+    config: {},
+  } satisfies WidgetInstance<"launcher">,
+
   "snapshot-sample": {
     storage: { state: "ok" },
     widgets: [CLOCK_DEFAULT, { ...NOTE_DEFAULT, label: "Mercado" }],

@@ -31,7 +31,7 @@ L1 e L2 formam o primeiro recorte do produto. Cada um é um PR; o L2 só começa
 - **Extensões** (seção 9): só a forma interna dos provedores nasce no L1, preparada para elas.
 - A **tecla Win sozinha** ou a tecla Copilot como atalho (exigem um hook de teclado de baixo nível).
 - A área de transferência, a conversão de unidades e o histórico de contas.
-- Um item no dock que abre o lançador (o "botão Iniciar" do PrimoDock).
+- ~~Um item no dock que abre o lançador (o "botão Iniciar" do PrimoDock).~~ **Feito** (seção 8h).
 
 ## 3. O atalho
 
@@ -382,6 +382,21 @@ Duas falhas apareceram e foram corrigidas antes do PR: o campo lia a **posição
 **Testes de unidade:** a regra de que janela conta (visível, cloaked, tool window, `WS_EX_NOACTIVATE`, com dona, `WS_EX_APPWINDOW`), a busca pelo título e pelo app, a faixa vencendo a ordem Z, a mistura entre apps e arquivos e a busca na web só quando nada casa, o `j ` (todas na ordem Z, com termo, o limite, `j` sem espaço, a palavra-chave do usuário vencendo, sem colidir com as padrão), a exclusão do Dockyard (o processo e o `.exe`, sem diferenciar maiúsculas), a descrição do programa (dock, catálogo, `.exe`), o Mostrar no Explorador fora dos apps da Loja e as ações de janela na lista fechada.
 
 **Não verificado (só ao vivo):** Enter trazendo para a frente uma janela comum, uma minimizada e uma de programa elevado (o Windows pode barrar o foco de uma janela de administrador vinda de um processo comum); Fechar janela num programa com documento não salvo (a pergunta aparecendo); o tempo de leitura com 20–30 janelas abertas (a meta de 5 ms); o ícone e o nome de cada app (Chrome com perfis, Explorador, apps da Loja via `ApplicationFrameHost`); uma janela de outro espaço em outro monitor; o Narrador lendo "Janela".
+
+## 8h. O item Lançador no dock
+
+O "botão Iniciar" do PrimoDock, com o lançador no lugar do Iniciar.
+
+- **O mecanismo:** um widget novo, `launcher` (`domain/widgets/launcher.rs`), e não um item de sistema: os itens de sistema (Configurações) o usuário não põe nem tira, e os widgets já têm tudo isso, o catálogo de Configurações › Widgets (prateleira Sistema), os espaços de trabalho, arrastar para reordenar e o "Remover do dock" do menu (PR #89). A config é vazia (`{}`): o atalho é o do lançador, em `launcherHotkey`.
+- **O desenho:** o glifo de busca do Windows (`Segoe Fluent Icons`, `E721`, o `SEARCH_GLYPH` do menu) em branco sobre um esmalte próprio, Turquesa (`Glaze::LAUNCHER`, `.t-launcher`), por uma face nova do dock (`Face::Symbol`), que desenha um glifo da fonte de ícones como a faixa de ícones pequenos já fazia.
+- **A dica e o nome:** "Lançador (Alt+Espaço)", com o atalho em uso e a tecla Espaço no idioma da interface (`launcher::tip`); com o atalho desligado em Configurações, só "Lançador". Um rótulo dado pelo usuário entra no lugar do nome. É o mesmo texto que o Narrador lê, como os outros itens; o papel é o dos outros itens do dock.
+- **O clique** abre ou fecha o lançador (`launcher::toggle`, o mesmo de "Buscar apps…"), onde ele abre hoje: centrado no monitor do ponteiro. **Com o atalho desligado** o clique abre o lançador do mesmo jeito: a chave de Configurações só solta o atalho do teclado ("os menus o abrem de qualquer jeito", seção 3), e o item é um desses caminhos pelo mouse. Ligar o atalho por um clique ou mandar o usuário para Configurações seria mudar uma escolha dele sem pedir. Passar o mouse não pré-aquece o painel, que o item não abre.
+- **O clique direito:** o menu do widget com **Configurar atalho…** (abre Configurações › Geral, onde fica o atalho) e **Remover do dock**, antes do menu do dock.
+- **O painel** do widget existe só porque todo widget tem um (o contrato do `registry.ts`): uma frase dizendo como o item funciona e, em Ajustes, o rótulo e "Remover do dock". O clique do dock nunca o abre.
+
+**Testes de unidade:** o kind (nome, `{}`, criável, uma largura), a config lendo de JSON antigo e sempre válida, a dica com o atalho (Espaço traduzido, outro atalho, sem atalho), o menu (Configurar atalho… e Remover do dock, as escolhas certas), quem é o Lançador entre os itens, o esmalte batendo com `tokens.css` e as fixtures dos dois lados.
+
+**Não verificado (só ao vivo):** o glifo centrado e do tamanho dos outros no esmalte, nos três tamanhos do dock e nos temas; o clique com o lançador aberto fechando-o (e não reabrindo, se o clique no dock tirar o foco do lançador antes); a dica e o Narrador lendo "Lançador (Alt+Espaço)"; Configurar atalho… abrindo Configurações já em Geral.
 
 ## 9. Extensões (depois)
 
