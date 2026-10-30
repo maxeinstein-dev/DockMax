@@ -5,6 +5,8 @@ import phosphorJson from "../../src-tauri/skins/phosphor/skin.json";
 import phosphorPng from "../../src-tauri/skins/phosphor/skin.png";
 import retroJson from "../../src-tauri/skins/retro/skin.json";
 import retroPng from "../../src-tauri/skins/retro/skin.png";
+import tacticalJson from "../../src-tauri/skins/tactical/skin.json";
+import tacticalPng from "../../src-tauri/skins/tactical/skin.png";
 
 /* The colors each style paints the bar with, for the miniatures of
  * Configurações › Aparência (spec 0014 R1). A mirror of
@@ -162,6 +164,11 @@ export const STYLE_PAINTS: Readonly<Record<DockStyle, StylePaint>> = {
     ...PLAIN,
     indicator: [0x3c, 0xff, 0x6e, 1],
     skin: skinPaint(phosphorPng, phosphorJson),
+  },
+  tactical: {
+    ...PLAIN,
+    indicator: [0xff, 0x8a, 0x1f, 1],
+    skin: skinPaint(tacticalPng, tacticalJson),
   },
 };
 

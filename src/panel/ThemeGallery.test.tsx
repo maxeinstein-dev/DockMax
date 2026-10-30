@@ -58,6 +58,7 @@ describe("ThemeGallery", () => {
       "Retrô",
       "Clássico 98",
       "Fósforo",
+      "Tático",
     ]);
     expect(card("Padrão")).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByText(text.themeCustom)).toBeNull();

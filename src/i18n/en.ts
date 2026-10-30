@@ -207,6 +207,7 @@ export const en: Messages = {
         retro: "Retro",
         classic98: "Classic 98",
         phosphor: "Phosphor",
+        tactical: "Tactical",
       },
       themeCustom:
         "Custom: the style, the icons or the indicator color aren't a theme's",
@@ -223,6 +224,7 @@ export const en: Messages = {
         retro: "Retro",
         classic98: "Classic 98",
         phosphor: "Phosphor",
+        tactical: "Tactical",
       },
       tweaks: "Customize this style",
       border: "Border",

@@ -17,13 +17,26 @@ from vetor import SUPERELIPSE, Mascara, achatar, hex_de, hsl, mover, n, sobre, g
 class Forma:
     """Uma forma numa imagem de `lado`: `placa`, `disco` ou `glifo`."""
 
-    def __init__(self, tipo, lado, glifo=None, caixa=0.54, largura=1.75, nucleo=1.0):
+    def __init__(self, tipo, lado, glifo=None, caixa=0.54, largura=1.75, nucleo=1.0, recuo=0.0):
         self.tipo, self.lado = tipo, lado
         self.glifo, self.caixa, self.largura, self.nucleo = glifo, caixa, largura, nucleo
+        # `octogono`: quanto a forma entra, em pixels, de cada lado.
+        self.recuo = recuo
         self.t, self.x0, self.y0 = geometria_esmalte(lado)
 
     def chave(self):
-        return (self.tipo, self.caixa, self.largura, self.nucleo)
+        return (self.tipo, self.caixa, self.largura, self.nucleo, self.recuo)
+
+    def octogono(self, dx=0.0, dy=0.0):
+        """O caminho do octógono: o quadrado da placa com os cantos
+        chanfrados a 45°, em 29% do lado."""
+        s = self.t - 2 * self.recuo
+        x, y = self.x0 + self.recuo + dx, self.y0 + self.recuo + dy
+        c = s * 0.29
+        return (
+            f"M{n(x + c)} {n(y)}H{n(x + s - c)}L{n(x + s)} {n(y + c)}V{n(y + s - c)}"
+            f"L{n(x + s - c)} {n(y + s)}H{n(x + c)}L{n(x)} {n(y + s - c)}V{n(y + c)}Z"
+        )
 
     def caixa_glifo(self):
         """O lado da caixa de 24 do glifo e onde ela começa."""
@@ -34,6 +47,8 @@ class Forma:
         m = Mascara(self.lado)
         if self.tipo == "placa":
             m.preencher(mover(achatar(SUPERELIPSE), self.t / 100, self.x0 + dx, self.y0 + dy))
+        elif self.tipo == "octogono":
+            m.preencher(achatar(self.octogono(dx, dy)))
         elif self.tipo == "disco":
             r = self.t / 2
             cx, cy = self.x0 + r + dx, self.y0 + r + dy
@@ -49,6 +64,8 @@ class Forma:
         """A forma em SVG; `tinta` são os atributos de cor."""
         if self.tipo == "placa":
             return f'<path d="{SUPERELIPSE}" transform="translate({n(self.x0 + dx)} {n(self.y0 + dy)}) scale({n(self.t / 100)})" {tinta}/>'
+        if self.tipo == "octogono":
+            return f'<path d="{self.octogono(dx, dy)}" {tinta}/>'
         if self.tipo == "disco":
             r = self.t / 2
             return f'<circle cx="{n(self.x0 + r + dx)}" cy="{n(self.y0 + r + dy)}" r="{n(r)}" {tinta}/>'
@@ -295,4 +312,24 @@ def argila(glifo, lado, estilo):
     ]
 
 
-ESTILOS = {"circulo": circulo, "tom": tom, "vidro": vidro, "neon": neon, "argila": argila}
+def cor_hex(texto):
+    return tuple(int(texto[i : i + 2], 16) / 255 for i in (1, 3, 5))
+
+
+def tatico(glifo, lado, estilo):
+    """Placa octogonal verde-oliva escura, com fio claro na borda, e o glifo
+    de contorno em areia, como um ícone de HUD (spec 0020 §4)."""
+    placa = Forma("octogono", lado)
+    dentro = Forma("octogono", lado, recuo=lado / 64)
+    traco = Forma("glifo", lado, glifo, caixa=numero(estilo, "caixa"))
+    k = placa.t / 48
+    areia = cor_hex(estilo["cor"])
+    return [
+        Camada(placa, ("cor", PRETO), 0.28, dy=1.5 * k, borrao=2),
+        Camada(placa, ("vertical", cor_hex(estilo["placa"]), cor_hex(estilo["placa-base"]))),
+        Camada(placa, ("cor", areia), 0.4, menos=(dentro, 0.0, 0.0)),
+        Camada(traco, ("cor", areia)),
+    ]
+
+
+ESTILOS = {"tatico": tatico, "circulo": circulo, "tom": tom, "vidro": vidro, "neon": neon, "argila": argila}

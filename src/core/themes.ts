@@ -14,7 +14,8 @@ export type ThemeId =
   | "midnight"
   | "retro"
   | "classic98"
-  | "phosphor";
+  | "phosphor"
+  | "tactical";
 
 export interface Theme {
   id: ThemeId;
@@ -55,6 +56,13 @@ export const THEMES: readonly Theme[] = [
     id: "phosphor",
     style: "phosphor",
     iconPack: "fosforo",
+    indicatorColor: null,
+  },
+  // The gamer themes (spec 0020 §4).
+  {
+    id: "tactical",
+    style: "tactical",
+    iconPack: "tatico",
     indicatorColor: null,
   },
 ];
