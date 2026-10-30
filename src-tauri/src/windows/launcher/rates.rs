@@ -160,12 +160,7 @@ mod tests {
             rates.rates.get("USD"),
         );
         let conversion = launcher_units::convert("100 usd em brl", Some(&rates));
-        let shown = launcher_units::show(
-            &conversion[0],
-            ',',
-            |_, _| None,
-            "Cotação BCE de {d}/{m}/{y}",
-        );
+        let shown = launcher_units::show(&conversion[0], ',', |_, _| None, "BCE {d}/{m}/{y}");
         println!("100 usd em brl → {} ({})", shown.title, shown.subtitle);
         assert!(rates.rates.contains_key("BRL"));
     }

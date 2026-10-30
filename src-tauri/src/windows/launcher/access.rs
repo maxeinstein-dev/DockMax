@@ -27,7 +27,7 @@ use windows::Win32::UI::Accessibility::{
     NavigateDirection_NextSibling, NavigateDirection_Parent, NavigateDirection_PreviousSibling,
     NotificationKind_ActionCompleted, NotificationProcessing_MostRecent, ProviderOptions,
     ProviderOptions_ServerSideProvider, UIA_AutomationIdPropertyId, UIA_ControlTypePropertyId,
-    UIA_EditControlTypeId, UIA_InvokePatternId, UIA_IsEnabledPropertyId,
+    UIA_EditControlTypeId, UIA_HelpTextPropertyId, UIA_InvokePatternId, UIA_IsEnabledPropertyId,
     UIA_IsKeyboardFocusablePropertyId, UIA_IsPasswordPropertyId, UIA_ItemTypePropertyId,
     UIA_ListControlTypeId, UIA_ListItemControlTypeId, UIA_NamePropertyId, UIA_PATTERN_ID,
     UIA_PROPERTY_ID, UIA_PositionInSetPropertyId, UIA_SelectionItem_ElementSelectedEventId,
@@ -46,6 +46,9 @@ pub struct Entry {
     pub name: String,
     /// What it is ("App").
     pub kind: String,
+    /// What is said after it, when there is more than its name: a
+    /// conversion's sum, in words (spec 0012 §5b).
+    pub help: Option<String>,
     /// Its box on the screen, in physical pixels.
     pub rect: (f64, f64, f64, f64),
     pub selected: bool,
@@ -371,6 +374,10 @@ impl IRawElementProviderSimple_Impl for Item_Impl {
             UIA_ControlTypePropertyId => VARIANT::from(UIA_ListItemControlTypeId.0),
             UIA_NamePropertyId => VARIANT::from(BSTR::from(entry.name.as_str())),
             UIA_ItemTypePropertyId => VARIANT::from(BSTR::from(entry.kind.as_str())),
+            UIA_HelpTextPropertyId => match &entry.help {
+                Some(help) => VARIANT::from(BSTR::from(help.as_str())),
+                None => VARIANT::default(),
+            },
             UIA_AutomationIdPropertyId => VARIANT::from(BSTR::from(entry.key.as_str())),
             UIA_PositionInSetPropertyId => VARIANT::from(index as i32 + 1),
             UIA_SizeOfSetPropertyId => VARIANT::from(count as i32),
