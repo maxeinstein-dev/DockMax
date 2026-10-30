@@ -14,15 +14,23 @@
 //! |---|---|
 //! | `<size>\t<app id>` | the program's icon, a PNG |
 //! | `file\t<size>\t<path>` | the icon of a file or folder, a PNG |
-//! | `files\t<limit>\t<words>` | the files and folders found (`launcher_files::encode_hits`) |
+//! | `files\t<limit>\t<words>` | the files and folders found (`launcher_files::encode_answer`): not whole when Windows Search missed its time |
+//! | `late` | the late answer of the last search (`launcher_files::encode_late`), waited for at most `LATE_POLL_MS` |
+//! | `warm` | nothing: the Windows Search session opens, before the first search |
+//!
+//! After an answer that is not whole, the reader asks `late` while nothing
+//! else is waiting, until it comes, is gone or `LATE_LIMIT_MS` passes; what
+//! comes goes to the launcher with the generation of the search, as a
+//! second answer of it.
 
 use std::io::{BufRead, Read, Write};
 use std::os::windows::process::CommandExt;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
+use std::time::{Duration, Instant};
 
 use crate::domain::apps::is_valid_app_id;
-use crate::domain::launcher_files::{self, FileHit, ONLY_LIMIT};
+use crate::domain::launcher_files::{self, FileHit, LATE_LIMIT_MS, LateAnswer, ONLY_LIMIT};
 
 /// The first argument that makes this executable the launcher's helper.
 pub const FLAG: &str = "--launcher-icons";
@@ -51,6 +59,9 @@ pub enum Request {
         words: Vec<String>,
         limit: usize,
     },
+    /// Opens the Windows Search session ahead of the first search (the
+    /// launcher's first key): nothing is answered to the launcher.
+    Warm,
 }
 
 /// What the helper answered.
@@ -75,39 +86,55 @@ impl Request {
             Request::App { id, size } => format!("{size}\t{id}"),
             Request::File { path, size, .. } => format!("file\t{size}\t{path}"),
             Request::Files { words, limit, .. } => format!("files\t{limit}\t{}", words.join(" ")),
+            Request::Warm => WARM.to_owned(),
         }
     }
 
     /// What the launcher gets when there is no answer.
-    fn unanswered(self) -> Answer {
+    fn unanswered(self) -> Option<Answer> {
         match self {
-            Request::App { id, .. } => Answer::Icon { key: id, png: None },
-            Request::File { key, .. } => Answer::Icon { key, png: None },
-            Request::Files { generation, .. } => Answer::Files {
+            Request::App { id, .. } => Some(Answer::Icon { key: id, png: None }),
+            Request::File { key, .. } => Some(Answer::Icon { key, png: None }),
+            Request::Files { generation, .. } => Some(Answer::Files {
                 generation,
                 hits: Vec::new(),
-            },
+            }),
+            Request::Warm => None,
         }
     }
 
-    /// The answer `bytes` of the helper to this request.
-    fn answered(self, bytes: Option<Vec<u8>>) -> Answer {
+    /// The answer `bytes` of the helper to this request, and the
+    /// generation of a search whose answer is not whole (its late answer
+    /// is then asked for).
+    fn answered(self, bytes: Option<Vec<u8>>) -> (Option<Answer>, Option<u64>) {
         match self {
-            Request::App { id, .. } => Answer::Icon {
-                key: id,
-                png: bytes,
-            },
-            Request::File { key, .. } => Answer::Icon { key, png: bytes },
-            Request::Files { generation, .. } => Answer::Files {
-                generation,
-                hits: bytes
+            Request::App { id, .. } => (
+                Some(Answer::Icon {
+                    key: id,
+                    png: bytes,
+                }),
+                None,
+            ),
+            Request::File { key, .. } => (Some(Answer::Icon { key, png: bytes }), None),
+            Request::Files { generation, .. } => {
+                let (hits, whole) = bytes
                     .and_then(|bytes| String::from_utf8(bytes).ok())
-                    .map(|text| launcher_files::decode_hits(&text))
-                    .unwrap_or_default(),
-            },
+                    .map_or((Vec::new(), true), |text| {
+                        launcher_files::decode_answer(&text)
+                    });
+                (
+                    Some(Answer::Files { generation, hits }),
+                    (!whole).then_some(generation),
+                )
+            }
+            Request::Warm => (None, None),
         }
     }
 }
+
+/// The request lines without arguments.
+const WARM: &str = "warm";
+const LATE: &str = "late";
 
 /// A request line as the helper reads it.
 #[derive(Debug, PartialEq, Eq)]
@@ -115,6 +142,8 @@ enum Line<'a> {
     App(u32, &'a str),
     File(u32, &'a str),
     Files(usize, Vec<String>),
+    Late,
+    Warm,
 }
 
 fn size_of_icon(size: &str) -> Option<u32> {
@@ -124,6 +153,11 @@ fn size_of_icon(size: &str) -> Option<u32> {
 
 /// A request line; `None` when it is not one.
 fn parse(line: &str) -> Option<Line<'_>> {
+    match line {
+        LATE => return Some(Line::Late),
+        WARM => return Some(Line::Warm),
+        _ => {}
+    }
     let (head, rest) = line.split_once('\t')?;
     match head {
         "file" => {
@@ -160,10 +194,22 @@ pub fn serve() {
             Some(Line::App(size, id)) => super::super::apps::icon_png(id, size),
             Some(Line::File(size, path)) => super::super::apps::path_icon_png(path, size),
             Some(Line::Files(limit, words)) => {
-                let hits = searcher
+                let (hits, whole) = searcher
                     .get_or_insert_with(super::files::Searcher::new)
                     .search(&words, limit);
-                Some(launcher_files::encode_hits(&hits).into_bytes())
+                Some(launcher_files::encode_answer(&hits, whole).into_bytes())
+            }
+            Some(Line::Late) => {
+                let late = searcher
+                    .as_mut()
+                    .map_or(LateAnswer::Gone, super::files::Searcher::late);
+                Some(launcher_files::encode_late(&late).into_bytes())
+            }
+            Some(Line::Warm) => {
+                searcher
+                    .get_or_insert_with(super::files::Searcher::new)
+                    .warm();
+                None
             }
             None => None,
         };
@@ -252,14 +298,30 @@ fn order(waiting: Vec<Request>) -> (Vec<Request>, Vec<Request>) {
     (icons, searches)
 }
 
+/// What the reader does after asking `late`, `waited` after the search:
+/// the late answer goes to the launcher (`Some` hits) and the asking stops,
+/// or it goes on (`true`) while `LATE_LIMIT_MS` lasts.
+fn after_late(answer: LateAnswer, waited: Duration) -> (Option<Vec<FileHit>>, bool) {
+    match answer {
+        LateAnswer::Came(hits) => (Some(hits), false),
+        LateAnswer::Gone => (None, false),
+        LateAnswer::Waiting => (None, waited <= Duration::from_millis(LATE_LIMIT_MS)),
+    }
+}
+
 fn run(received: &mpsc::Receiver<Request>, answered: &dyn Fn(Answer)) {
     let Ok(first) = received.recv() else {
         return;
     };
+    let tell = |answer: Option<Answer>| {
+        if let Some(answer) = answer {
+            answered(answer);
+        }
+    };
     let Some(mut child) = spawn() else {
-        answered(first.unanswered());
+        tell(first.unanswered());
         for request in received.iter() {
-            answered(request.unanswered());
+            tell(request.unanswered());
         }
         return;
     };
@@ -268,26 +330,77 @@ fn run(received: &mpsc::Receiver<Request>, answered: &dyn Fn(Answer)) {
         return;
     };
     let mut gone = false;
+    // The search whose answer was not whole: its generation and when.
+    let mut late: Option<(u64, Instant)> = None;
     let mut next = Some(first);
-    while let Some(request) = next.take().or_else(|| received.recv().ok()) {
+    loop {
+        let request = match next.take() {
+            Some(request) => request,
+            // Nothing else waiting: ask for the late answer.
+            None if late.is_some() && !gone => match received.try_recv() {
+                Ok(request) => request,
+                Err(mpsc::TryRecvError::Empty) => {
+                    let Some((generation, asked)) = late else {
+                        continue;
+                    };
+                    let sent = writeln!(input, "{LATE}").and_then(|()| input.flush());
+                    match sent.and_then(|()| answer(&mut output)) {
+                        Ok(bytes) => {
+                            let text = bytes
+                                .and_then(|bytes| String::from_utf8(bytes).ok())
+                                .unwrap_or_default();
+                            let (hits, again) =
+                                after_late(launcher_files::decode_late(&text), asked.elapsed());
+                            if let Some(hits) = hits {
+                                answered(Answer::Files { generation, hits });
+                            }
+                            if !again {
+                                late = None;
+                            }
+                        }
+                        Err(error) => {
+                            log::warn!("launcher: the helper stopped: {error}");
+                            gone = true;
+                            late = None;
+                        }
+                    }
+                    continue;
+                }
+                Err(mpsc::TryRecvError::Disconnected) => break,
+            },
+            None => match received.recv() {
+                Ok(request) => request,
+                Err(_) => break,
+            },
+        };
         let mut waiting = vec![request];
         waiting.extend(received.try_iter());
         let (send, dropped) = order(waiting);
         for request in dropped {
-            answered(request.unanswered());
+            tell(request.unanswered());
         }
         for request in send {
             if gone {
-                answered(request.unanswered());
+                tell(request.unanswered());
                 continue;
+            }
+            if matches!(request, Request::Files { .. }) {
+                // A new search: the helper no longer waits for the last.
+                late = None;
             }
             let sent = writeln!(input, "{}", request.line()).and_then(|()| input.flush());
             match sent.and_then(|()| answer(&mut output)) {
-                Ok(bytes) => answered(request.answered(bytes)),
+                Ok(bytes) => {
+                    let (answer, more) = request.answered(bytes);
+                    tell(answer);
+                    if let Some(generation) = more {
+                        late = Some((generation, Instant::now()));
+                    }
+                }
                 Err(error) => {
                     log::warn!("launcher: the helper stopped: {error}");
                     gone = true;
-                    answered(request.unanswered());
+                    tell(request.unanswered());
                 }
             }
         }
@@ -378,13 +491,50 @@ mod tests {
             path: r"C:\a.txt".into(),
             folder: false,
         }]);
-        match request.answered(Some(text.into_bytes())) {
-            Answer::Files { generation, hits } => {
+        match request.clone().answered(Some(text.into_bytes())) {
+            (Some(Answer::Files { generation, hits }), None) => {
                 assert_eq!(generation, 7);
                 assert_eq!(hits.len(), 1);
             }
             other => panic!("{other:?}"),
         }
+        // Not whole: the hits so far, and the late answer is asked for.
+        let partial = launcher_files::encode_answer(&[], false);
+        match request.answered(Some(partial.into_bytes())) {
+            (Some(Answer::Files { generation, hits }), Some(late)) => {
+                assert_eq!((generation, late), (7, 7));
+                assert!(hits.is_empty());
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn warming_and_the_late_answer_are_lines_of_their_own() {
+        assert_eq!(parse("warm"), Some(Line::Warm));
+        assert_eq!(parse("late"), Some(Line::Late));
+        assert_eq!(parse(&Request::Warm.line()), Some(Line::Warm));
+        assert_eq!(parse("late\tx"), None);
+        // Warming answers nothing to the launcher.
+        assert_eq!(Request::Warm.answered(None), (None, None));
+        assert_eq!(Request::Warm.unanswered(), None);
+    }
+
+    #[test]
+    fn the_late_answer_is_asked_for_until_it_comes_or_the_limit() {
+        let hits = vec![FileHit {
+            path: r"C:\relatorio.pdf".into(),
+            folder: false,
+        }];
+        let soon = Duration::from_millis(900);
+        assert_eq!(
+            after_late(LateAnswer::Came(hits.clone()), soon),
+            (Some(hits), false)
+        );
+        assert_eq!(after_late(LateAnswer::Waiting, soon), (None, true));
+        assert_eq!(after_late(LateAnswer::Gone, soon), (None, false));
+        let past = Duration::from_millis(LATE_LIMIT_MS + 1);
+        assert_eq!(after_late(LateAnswer::Waiting, past), (None, false));
     }
 
     #[test]

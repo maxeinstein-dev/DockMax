@@ -77,6 +77,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{HSTRING, PCWSTR, w};
 
 use self::layout::{BOX, Colors, ROW, Rgb};
+use crate::domain::clipboard_write;
 use crate::domain::hotkey::{self, Hotkey};
 use crate::domain::launcher::{self as search, Action, Candidate, MAX_RESULTS};
 use crate::domain::launcher_actions::{self, Subject, Verb};
@@ -475,14 +476,18 @@ pub struct Launcher {
     recent: bool,
     note: Note,
     selected: usize,
-    /// The result being opened, and the one that could not be.
+    /// The result being opened, and the one that could not be, with what
+    /// its row says ("Não foi possível abrir", "… copiar").
     launching: Option<String>,
-    failed: Option<String>,
+    failed: Option<(String, &'static str)>,
     painter: Option<paint::Painter>,
     icons: HashMap<(Option<String>, String), Loaded>,
     /// Reads the icons from Windows and searches the files in a helper
     /// process, while the launcher is open.
     helper: Option<icons::Reader>,
+    /// Whether the helper was asked to open the Windows Search session in
+    /// this opening (at the first key).
+    warmed: bool,
     /// What is typed asks for files (L4), and the ones of the last search,
     /// in the order shown.
     file_query: Option<FileQuery>,
@@ -752,6 +757,7 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
         painter: None,
         icons: HashMap::new(),
         helper: None,
+        warmed: false,
         file_query: None,
         files: Vec::new(),
         generation: Generation::default(),
@@ -1043,39 +1049,117 @@ fn decimal_mark() -> char {
     }
 }
 
-/// Puts `text` in the clipboard, owned by `owner`.
-fn copy_text(owner: HWND, text: &str) -> bool {
-    use windows::Win32::Foundation::{GlobalFree, HANDLE};
-    use windows::Win32::System::DataExchange::{
-        CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
-    };
-    use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
-    use windows::Win32::System::Ole::CF_UNICODETEXT;
+/// The clipboard as `clipboard_write::write` drives it: owned by `owner`,
+/// with the text's memory made before it is opened.
+struct WindowsClipboard {
+    owner: HWND,
+    /// The text, until the clipboard takes it (then it owns the memory).
+    memory: Option<windows::Win32::Foundation::HGLOBAL>,
+    /// The last error of Windows, for the log (never the text).
+    error: Option<windows::core::Error>,
+}
 
-    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
-    if unsafe { OpenClipboard(Some(owner)) }.is_err() {
-        return false;
+impl clipboard_write::Clipboard for WindowsClipboard {
+    fn open(&mut self) -> bool {
+        use windows::Win32::System::DataExchange::OpenClipboard;
+        unsafe { OpenClipboard(Some(self.owner)) }
+            .inspect_err(|error| self.error = Some(error.clone()))
+            .is_ok()
     }
-    let copied = unsafe {
-        EmptyClipboard().and_then(|()| {
-            let memory = GlobalAlloc(GMEM_MOVEABLE, wide.len() * size_of::<u16>())?;
-            let pointer = GlobalLock(memory).cast::<u16>();
-            if pointer.is_null() {
-                let _ = GlobalFree(Some(memory));
-                return Err(windows::core::Error::from_thread());
+
+    fn empty(&mut self) -> bool {
+        use windows::Win32::System::DataExchange::EmptyClipboard;
+        unsafe { EmptyClipboard() }
+            .inspect_err(|error| self.error = Some(error.clone()))
+            .is_ok()
+    }
+
+    fn set(&mut self) -> bool {
+        use windows::Win32::Foundation::HANDLE;
+        use windows::Win32::System::DataExchange::SetClipboardData;
+        use windows::Win32::System::Ole::CF_UNICODETEXT;
+        let Some(memory) = self.memory else {
+            return false;
+        };
+        match unsafe { SetClipboardData(u32::from(CF_UNICODETEXT.0), Some(HANDLE(memory.0))) } {
+            Ok(_) => {
+                // The clipboard owns the memory now.
+                self.memory = None;
+                true
             }
-            std::ptr::copy_nonoverlapping(wide.as_ptr(), pointer, wide.len());
-            let _ = GlobalUnlock(memory);
-            // The clipboard owns the memory once it takes it.
-            SetClipboardData(u32::from(CF_UNICODETEXT.0), Some(HANDLE(memory.0)))
-                .inspect_err(|_| {
-                    let _ = GlobalFree(Some(memory));
-                })
-                .map(|_| ())
-        })
+            Err(error) => {
+                self.error = Some(error);
+                false
+            }
+        }
+    }
+
+    fn close(&mut self) {
+        let _ = unsafe { windows::Win32::System::DataExchange::CloseClipboard() };
+    }
+
+    fn pause(&mut self, ms: u64) {
+        std::thread::sleep(std::time::Duration::from_millis(ms));
+    }
+}
+
+/// `text` in memory the clipboard can take (`GMEM_MOVEABLE`, UTF-16 with
+/// its end).
+fn clipboard_memory(text: &str) -> windows::core::Result<windows::Win32::Foundation::HGLOBAL> {
+    use windows::Win32::Foundation::GlobalFree;
+    use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
+    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        let memory = GlobalAlloc(GMEM_MOVEABLE, wide.len() * size_of::<u16>())?;
+        let pointer = GlobalLock(memory).cast::<u16>();
+        if pointer.is_null() {
+            let error = windows::core::Error::from_thread();
+            let _ = GlobalFree(Some(memory));
+            return Err(error);
+        }
+        std::ptr::copy_nonoverlapping(wide.as_ptr(), pointer, wide.len());
+        let _ = GlobalUnlock(memory);
+        Ok(memory)
+    }
+}
+
+/// Puts `text` in the clipboard, owned by `owner`
+/// (`clipboard_write::write`); what went wrong goes to the log, never the
+/// text.
+fn copy_text(owner: HWND, text: &str) -> clipboard_write::Written {
+    use clipboard_write::Written;
+    let memory = match clipboard_memory(text) {
+        Ok(memory) => memory,
+        Err(error) => {
+            log::warn!("launcher: the copy's memory was not had: {error}");
+            return Written::NoMemory;
+        }
     };
-    let _ = unsafe { CloseClipboard() };
-    copied.is_ok()
+    let mut clipboard = WindowsClipboard {
+        owner,
+        memory: Some(memory),
+        error: None,
+    };
+    let written = clipboard_write::write(&mut clipboard);
+    if let Some(memory) = clipboard.memory.take() {
+        let _ = unsafe { windows::Win32::Foundation::GlobalFree(Some(memory)) };
+    }
+    let error = clipboard
+        .error
+        .map(|error| format!("{:?}", error.code()))
+        .unwrap_or_default();
+    match written {
+        Written::Done | Written::NoMemory => {}
+        Written::Busy => log::warn!(
+            "launcher: the clipboard stayed held by another program through {} tries ({error})",
+            clipboard_write::OPEN_TRIES
+        ),
+        Written::NotEmptied => log::warn!("launcher: the clipboard did not empty ({error})"),
+        Written::NotSet => {
+            log::warn!("launcher: the clipboard was emptied but did not take the copy ({error})");
+        }
+    }
+    written
 }
 
 fn delete_font(font: Option<HFONT>) {
@@ -1219,6 +1303,7 @@ impl Launcher {
         // searching the files with it; the icons it had not answered are
         // asked again next time.
         self.helper = None;
+        self.warmed = false;
         self.icons
             .retain(|_, loaded| matches!(loaded, Loaded::Ready(_)));
         log::info!("launcher: closed");
@@ -1818,7 +1903,11 @@ impl Launcher {
     }
 
     /// The files of the search `generation` came: shown when it is the
-    /// last one, dropped when the typing went on.
+    /// last one, dropped when the typing went on. A search can answer
+    /// twice: first without Windows Search, when it missed its time, then
+    /// with it (its late answer, the same generation): the list is redone
+    /// keeping the selection, and the web search that stood in for nothing
+    /// found leaves (`launcher_windows::mix`).
     fn files_found(&mut self, generation: u64, hits: Vec<FileHit>) {
         if !self.generation.is_current(generation) || !is_open() {
             return;
@@ -1865,6 +1954,16 @@ impl Launcher {
         self.failed = None;
         // A search of files of the text before answers nothing.
         self.generation.next();
+        // The first key: the Windows Search session opens in the helper
+        // while the rest is typed and the debounce runs, so the first
+        // search does not find it cold. Not at the opening: an opening
+        // closed without typing starts no helper for it (the session costs
+        // about 1 MB there, and goes with the helper when the launcher
+        // closes).
+        if !self.warmed && !self.query.trim().is_empty() {
+            self.warmed = true;
+            self.helper().ask(icons::Request::Warm);
+        }
         // The clipboard's history (`cb `): it answers alone.
         if self.clip_changed() {
             return;
@@ -2272,12 +2371,14 @@ impl Launcher {
     }
 
     /// Copies `text` and says `said` (the launcher closes, as opening).
+    /// When it did not copy, the launcher stays, the row saying so.
     fn copy(&mut self, key: &str, text: &str, said: &str) {
-        let copied = copy_text(self.frame, text);
-        if copied {
+        if copy_text(self.frame, text).closes_launcher() {
             access::announce(self.list.0 as isize, said);
+            self.launched(key, false, true);
+        } else {
+            self.not_done(key, crate::i18n::messages().launcher.copy_failed);
         }
-        self.launched(key, false, copied);
     }
 
     /// Runs `run` as administrator on a thread of its own (Windows asks the
@@ -2603,13 +2704,17 @@ impl Launcher {
             self.hide();
         } else {
             log::warn!("launcher: a result could not be opened");
-            self.failed = Some(key.to_owned());
-            self.paint_soon();
-            access::announce(
-                self.list.0 as isize,
-                crate::i18n::messages().launcher.failed,
-            );
+            self.not_done(key, crate::i18n::messages().launcher.failed);
         }
+    }
+
+    /// The result `key` could not be done: the launcher stays, its row
+    /// saying `note`, also to the screen reader.
+    fn not_done(&mut self, key: &str, note: &'static str) {
+        self.launching = None;
+        self.failed = Some((key.to_owned(), note));
+        self.paint_soon();
+        access::announce(self.list.0 as isize, note);
     }
 
     /// One more opening of `key`, in the database.
@@ -2692,10 +2797,9 @@ impl Launcher {
                         Some(Loaded::Ready(Some(bitmap))) => Some(bitmap),
                         _ => None,
                     });
-                let subtitle = if self.failed.as_deref() == Some(found.key.as_str()) {
-                    text.failed
-                } else {
-                    found.subtitle()
+                let subtitle = match &self.failed {
+                    Some((key, note)) if *key == found.key => *note,
+                    _ => found.subtitle(),
                 };
                 paint::Row {
                     name: &found.name,
