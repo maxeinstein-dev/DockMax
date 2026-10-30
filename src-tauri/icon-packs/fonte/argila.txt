@@ -1,0 +1,12 @@
+# Pacote Argila (spec 0019): placa fofa na cor do app, com luz e sombra por
+# dentro, sombra macia no chão e glifo branco grosso em relevo.
+# Para gerar de novo: python vetor.py argila
+
+pack.name: Argila
+pack.author: Dockyard
+pack.version: 1.0.0
+pack.description: Placas fofas de argila na cor de cada app, com glifo branco em relevo.
+pack.accent: #CF7F5F
+
+estilo: argila
+lado: 128

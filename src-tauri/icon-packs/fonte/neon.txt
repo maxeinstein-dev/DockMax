@@ -1,0 +1,17 @@
+# Pacote Neon (spec 0019): o glifo de glifos.txt como um tubo de neon na
+# cor do app, com o brilho em volta. No tema escuro, solto; no claro, sobre
+# uma placa escura, para o neon acender.
+# Para gerar de novo: python vetor.py neon
+
+pack.name: Neon
+pack.author: Dockyard
+pack.version: 1.0.0
+pack.description: Glifos em tubo de neon na cor de cada app, com o brilho em volta.
+pack.accent: #FF3FA0
+
+estilo: neon
+lado: 128
+caixa: 0.62
+placa: sim
+placa-escuro: nao
+caixa-escuro: 0.78

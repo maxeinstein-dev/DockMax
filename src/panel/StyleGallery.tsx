@@ -19,7 +19,7 @@ import ChoiceCards from "./parts/ChoiceCards";
 import "./StyleGallery.css";
 
 /** How many items a miniature shows. */
-const MINI_ITEMS = 5;
+export const MINI_ITEMS = 5;
 
 /** The bar of a miniature is this much of the real dock's (a 48 px tile
  * becomes 18 px): the glows shrink with it. */
@@ -29,7 +29,7 @@ const MINI_SCALE = 18 / 48;
  * corners at 100 % are a pill. */
 const MINI_HALF_HEIGHT = 14;
 
-type GalleryDock = Pick<
+export type GalleryDock = Pick<
   DockSettings,
   "style" | "tweaks" | "indicator" | "indicatorColor" | "iconPack"
 >;
@@ -56,15 +56,19 @@ function MiniApp({ appId, variant }: { appId: string; variant: string }) {
 }
 
 /** The dock in `style`, with the user's changes to that style, as a
- * picture: decorative, the card's name says which style it is. */
-function MiniDock({
+ * picture: decorative, the card's name says which style it is. `icons`,
+ * when given, are the pictures of the programs (an icon pack's), in place of
+ * the ones the dock shows now. */
+export function MiniDock({
   of: style,
   dock,
   appIds,
+  icons,
 }: {
   of: DockStyle;
   dock: GalleryDock | null;
   appIds: readonly string[];
+  icons?: readonly (string | null)[];
 }) {
   const paint = STYLE_PAINTS[style];
   const look = styleLookOf(style, dock?.tweaks[style]);
@@ -102,13 +106,25 @@ function MiniDock({
         }}
       >
         {shown.length > 0
-          ? shown.map((appId) => (
-              <MiniApp
-                key={appId}
-                appId={appId}
-                variant={dock?.iconPack ?? ""}
-              />
-            ))
+          ? shown.map((appId, index) =>
+              icons === undefined ? (
+                <MiniApp
+                  key={appId}
+                  appId={appId}
+                  variant={dock?.iconPack ?? ""}
+                />
+              ) : icons[index] ? (
+                <img
+                  key={appId}
+                  className="mini-app"
+                  src={icons[index]}
+                  alt=""
+                  draggable={false}
+                />
+              ) : (
+                <span key={appId} className="mini-app" />
+              ),
+            )
           : (["clock", "note", "time-progress"] as const).map((kind) => (
               <MiniTile key={kind} kind={kind} small />
             ))}
