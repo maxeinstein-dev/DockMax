@@ -353,6 +353,30 @@ fn number_of(key: &str) -> i32 {
     hash as i32
 }
 
+/// What the row `entry`, at `index` of `count`, says of `property` (its
+/// name, its kind...). Apart from `Item` so a test reads it without making
+/// one: an `Item` brings its `Invoke`, and with it the whole launcher and
+/// Tauri's runtime, into the test executable, which then needs Common
+/// Controls v6 (`TaskDialogIndirect`) to start.
+fn item_property(entry: &Entry, index: usize, count: usize, property: UIA_PROPERTY_ID) -> VARIANT {
+    match property {
+        UIA_ControlTypePropertyId => VARIANT::from(UIA_ListItemControlTypeId.0),
+        UIA_NamePropertyId => VARIANT::from(BSTR::from(entry.name.as_str())),
+        UIA_ItemTypePropertyId => VARIANT::from(BSTR::from(entry.kind.as_str())),
+        UIA_HelpTextPropertyId => match &entry.help {
+            Some(help) => VARIANT::from(BSTR::from(help.as_str())),
+            None => VARIANT::default(),
+        },
+        UIA_AutomationIdPropertyId => VARIANT::from(BSTR::from(entry.key.as_str())),
+        UIA_PositionInSetPropertyId => VARIANT::from(index as i32 + 1),
+        UIA_SizeOfSetPropertyId => VARIANT::from(count as i32),
+        UIA_IsEnabledPropertyId => VARIANT::from(true),
+        // The keyboard stays in the search box.
+        UIA_IsKeyboardFocusablePropertyId => VARIANT::from(false),
+        _ => VARIANT::default(),
+    }
+}
+
 impl IRawElementProviderSimple_Impl for Item_Impl {
     fn ProviderOptions(&self) -> Result<ProviderOptions> {
         Ok(ProviderOptions_ServerSideProvider)
@@ -370,22 +394,7 @@ impl IRawElementProviderSimple_Impl for Item_Impl {
         let Some((index, count, entry)) = self.entry() else {
             return Ok(VARIANT::default());
         };
-        Ok(match property {
-            UIA_ControlTypePropertyId => VARIANT::from(UIA_ListItemControlTypeId.0),
-            UIA_NamePropertyId => VARIANT::from(BSTR::from(entry.name.as_str())),
-            UIA_ItemTypePropertyId => VARIANT::from(BSTR::from(entry.kind.as_str())),
-            UIA_HelpTextPropertyId => match &entry.help {
-                Some(help) => VARIANT::from(BSTR::from(help.as_str())),
-                None => VARIANT::default(),
-            },
-            UIA_AutomationIdPropertyId => VARIANT::from(BSTR::from(entry.key.as_str())),
-            UIA_PositionInSetPropertyId => VARIANT::from(index as i32 + 1),
-            UIA_SizeOfSetPropertyId => VARIANT::from(count as i32),
-            UIA_IsEnabledPropertyId => VARIANT::from(true),
-            // The keyboard stays in the search box.
-            UIA_IsKeyboardFocusablePropertyId => VARIANT::from(false),
-            _ => VARIANT::default(),
-        })
+        Ok(item_property(&entry, index, count, property))
     }
 
     fn HostRawElementProvider(&self) -> Result<IRawElementProviderSimple> {
@@ -497,6 +506,35 @@ impl ISelectionItemProvider_Impl for Item_Impl {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn entry(key: &str, kind: &str) -> Entry {
+        Entry {
+            key: key.into(),
+            name: key.into(),
+            kind: kind.into(),
+            rect: (0.0, 0.0, 10.0, 10.0),
+            selected: false,
+            help: None,
+        }
+    }
+
+    /// A row's `ItemType` and `Name` go whole into the `VARIANT`, in a
+    /// list of one row too. The live test read "P" and "C" from one-row
+    /// lists: PowerShell's `$types[0]` on what a `foreach` gives for one
+    /// row, a string and not an array; the provider said it whole.
+    #[test]
+    fn a_rows_kind_goes_whole_into_the_variant() {
+        let kind = "Calculadora · Enter copia o resultado";
+        let row = entry("calc", kind);
+        let text = |property| {
+            let value = item_property(&row, 0, 1, property);
+            BSTR::try_from(&value).expect("a BSTR").to_string()
+        };
+        let said = text(UIA_ItemTypePropertyId);
+        assert_eq!(said, kind);
+        assert_eq!(said.encode_utf16().count(), kind.encode_utf16().count());
+        assert_eq!(text(UIA_NamePropertyId), "calc");
+    }
 
     #[test]
     fn a_results_number_is_stable_and_tells_keys_apart() {
