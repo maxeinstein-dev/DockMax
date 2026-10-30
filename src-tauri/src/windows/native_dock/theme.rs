@@ -243,6 +243,12 @@ impl Glaze {
         s: 56.0,
         l: 52.0,
     };
+    /// Turquesa: o Lançador (spec 0012).
+    pub const LAUNCHER: Glaze = Glaze {
+        h: 172.0,
+        s: 44.0,
+        l: 36.0,
+    };
     /// Tinta.
     pub const SETTINGS: Glaze = Glaze {
         h: 222.0,
@@ -364,6 +370,7 @@ mod tests {
             ("t-music", Glaze::MUSIC),
             ("t-claude", Glaze::CLAUDE),
             ("t-weather", Glaze::WEATHER),
+            ("t-launcher", Glaze::LAUNCHER),
         ];
         for (class, glaze) in glazes {
             let css_glaze = Glaze {

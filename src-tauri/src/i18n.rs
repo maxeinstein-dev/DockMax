@@ -138,6 +138,10 @@ pub struct DockMessages {
     pub claude_week: &'static str,
     pub claude_week_short: &'static str,
     pub weather: &'static str,
+    /// The Lançador (spec 0012), and the Space key in its tip's hotkey
+    /// ("Lançador (Alt+Espaço)").
+    pub launcher: &'static str,
+    pub space_key: &'static str,
     /// The media buttons of a window preview (F4).
     pub media_previous: &'static str,
     pub media_play: &'static str,
@@ -234,6 +238,9 @@ pub struct TrayMessages {
     pub icons: &'static str,
     /// Takes the widget clicked out of the dock (its menu).
     pub remove_widget: &'static str,
+    /// The Lançador's menu: opens Configurações › Geral, where the
+    /// launcher's hotkey is (spec 0012).
+    pub set_hotkey: &'static str,
 }
 
 const PT_BR: Messages = Messages {
@@ -249,6 +256,7 @@ const PT_BR: Messages = Messages {
         one_icon: "1 ícone",
         icons: "{n} ícones",
         remove_widget: "Remover do dock",
+        set_hotkey: "Configurar atalho…",
     },
     settings: SettingsMessages {
         window_title: "Configurações do Dockyard",
@@ -285,6 +293,8 @@ const PT_BR: Messages = Messages {
         claude_week: "Semana",
         claude_week_short: "Sem",
         weather: "Clima",
+        launcher: "Lançador",
+        space_key: "Espaço",
         media_previous: "Anterior",
         media_play: "Tocar",
         media_pause: "Pausar",
@@ -430,6 +440,7 @@ const EN: Messages = Messages {
         one_icon: "1 icon",
         icons: "{n} icons",
         remove_widget: "Remove from dock",
+        set_hotkey: "Set shortcut…",
     },
     settings: SettingsMessages {
         window_title: "Dockyard Settings",
@@ -466,6 +477,8 @@ const EN: Messages = Messages {
         claude_week: "Week",
         claude_week_short: "Wk",
         weather: "Weather",
+        launcher: "Launcher",
+        space_key: "Space",
         media_previous: "Previous",
         media_play: "Play",
         media_pause: "Pause",
