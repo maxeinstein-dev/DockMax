@@ -8,7 +8,7 @@ Aplicativo desktop para Windows inspirado em docks personalizáveis, com foco em
 
 ## Instalar
 
-Gere o instalador (`pnpm tauri build`, ver abaixo) e execute `src-tauri/target/release/bundle/nsis/Dockyard_0.3.0_x64-setup.exe`. Ele instala **só para o seu usuário** (sem pedir administrador) e é **em português**. O instalador **não é assinado**: o SmartScreen do Windows avisa, e é preciso escolher "Mais informações › Executar assim mesmo". Em Configurações, "Iniciar com o Windows" abre o Dockyard ao entrar. Para desinstalar, use "Aplicativos instalados" do Windows; os seus dados ficam, a menos que você peça para apagá-los.
+Baixe o `Dockyard_<versão>_x64-setup.exe` do [último Release](https://github.com/maxeinstein-dev/Dockyard/releases/latest), ou gere o instalador (`pnpm tauri build`, ver abaixo) e execute `src-tauri/target/release/bundle/nsis/Dockyard_0.4.0_x64-setup.exe`. Ele instala **só para o seu usuário** (sem pedir administrador) e fala **português ou inglês**, conforme o idioma do Windows. A partir da 0.4.0 o Dockyard procura versões novas sozinho e avisa; ele só atualiza quando você clica em **Atualizar**, em Sobre. O instalador **não é assinado**: o SmartScreen do Windows avisa, e é preciso escolher "Mais informações › Executar assim mesmo". Em Configurações, "Iniciar com o Windows" abre o Dockyard ao entrar. Para desinstalar, use "Aplicativos instalados" do Windows; os seus dados ficam, a menos que você peça para apagá-los.
 
 ## Objetivos
 
@@ -97,6 +97,10 @@ Testes end-to-end (a CI roda o job `e2e` com estes mesmos comandos). O build de 
 pnpm test:e2e:build       # gera o build de teste (feature e2e)
 pnpm test:e2e             # roda os specs do WebdriverIO
 ```
+
+### Sair uma versão
+
+Uma versão sai por tag (spec 0019 G3). Suba a `version` nos três arquivos (`package.json`, `src-tauri/tauri.conf.json` e `src-tauri/Cargo.toml`, com o `Cargo.lock` que o `cargo` atualiza), abra o PR e faça o merge. Depois, na `main` atualizada, crie e envie a tag: `git tag v0.4.0 && git push origin v0.4.0`. O workflow `release.yml` confere que a tag bate com as três versões, compila o instalador, assina com a chave do updater (os secrets `TAURI_SIGNING_PRIVATE_KEY` e `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) e publica o Release com o `latest.json`, que é onde os Dockyards instalados procuram a versão nova. Sem essa chave, quem já instalou não recebe mais atualizações.
 
 ## Princípios
 

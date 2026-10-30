@@ -324,6 +324,20 @@ export const en: Messages = {
     repository: "github.com/maxeinstein-dev/Dockyard",
     footer: "Independent project",
     tour: "See the tour",
+    update: {
+      available: "New version: {version}",
+      install: "Update",
+      check: "Check for updates",
+      checking: "Checking…",
+      upToDate: "You're on the latest version",
+      checkFailed: "Couldn't check for updates: {error}",
+      downloading: "Downloading version {version}… {percent}%",
+      downloadingNoSize: "Downloading version {version}…",
+      progress: "Update download",
+      installing:
+        "Installing version {version}. Dockyard closes and opens again by itself.",
+      installFailed: "Couldn't update: {error}",
+    },
   },
   tour: {
     count: "{n} of {total}",

@@ -256,3 +256,40 @@ kbd {
   cursor: text;
   user-select: all;
 }
+
+/* Updates (spec 0019 G3): the new version and Atualizar, its download, or
+   Procurar atualizações with its answer. */
+.about-update {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 12.5px;
+}
+
+.about-update-line {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.about-update-note {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--ink-2);
+}
+
+/* The one action that matters here: in the accent, as the tour's main. */
+.about-update .about-update-install {
+  color: #fff;
+  background: var(--accent);
+}
+
+.about-update .about-update-install:hover {
+  background: color-mix(in srgb, var(--accent) 86%, #000);
+}
+
+.about-update-progress {
+  flex: 1 1 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
