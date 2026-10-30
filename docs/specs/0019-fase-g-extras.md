@@ -2,7 +2,7 @@
 
 Fase G da [spec 0004](0004-paridade-primodock.md) (§6), depois da fase F ([spec 0017](0017-fase-f-widgets.md), concluída em 2026-10-29).
 
-**Status:** em andamento: G1 (idioma inglês, #75), G2 (tour, #79), G4 (ícones retrô, #80), G5 (estudo do Linux, #76) e G6 (nome e logo, #77) entregues; o renome para **Dockyard** (R1) entrou em 2026-10-30, com o repositório renomeado para `maxeinstein-dev/Dockyard`. Falta a G3 (atualização automática). Ordem decidida pelo autor em 2026-10-29: tour, pacote de ícones, nome e logo, estudo do Linux e, por último, atualização automática.
+**Status:** em andamento: G1 (idioma inglês, #75), G2 (tour, #79), G4 (ícones retrô, #80), G5 (estudo do Linux, #76) e G6 (nome e logo, #77) entregues; o renome para **Dockyard** (R1) entrou em 2026-10-30, com o repositório renomeado para `maxeinstein-dev/Dockyard`. A G3 (atualização automática) foi implementada em 2026-10-30 e estreia na 0.4.0. Ordem decidida pelo autor em 2026-10-29: tour, pacote de ícones, nome e logo, estudo do Linux e, por último, atualização automática.
 
 ## 1. Decisões do autor (2026-10-29)
 
@@ -65,3 +65,13 @@ Decisões do autor (2026-10-30):
 - **Como publica:** uma tag `vX.Y.Z` dispara a CI, que compila o instalador NSIS, assina e publica o Release com o `latest.json`.
 - **Chave de assinatura:** nos secrets do repositório (`TAURI_SIGNING_PRIVATE_KEY` e `..._PASSWORD`), com cópia em `%USERPROFILE%\.tauri\dockyard.key` e a senha no Gerenciador de Credenciais (`Dockyard/updater-key-password`). Sem a chave, quem já instalou não recebe mais atualizações.
 - **Instalador:** português e inglês, seguindo o idioma do Windows.
+
+### Implementação (2026-10-30)
+
+- **Configuração:** `tauri-plugin-updater` com `plugins.updater` no `tauri.conf.json` (o `latest.json` do último Release, a chave pública da `dockyard.key` e `windows.installMode: "passive"`) e `bundle.createUpdaterArtifacts`. O instalador NSIS tem `PortugueseBR` e `English` sem seletor: segue o idioma do Windows. A versão sobe para **0.4.0**, a primeira com atualização.
+- **Rust:** `domain::update` tem as regras sem rede (o estado — nenhuma, disponível, baixando, instalando —, o aviso uma vez por versão e o intervalo); `windows::update` procura 15 s depois de abrir e a cada 6 h numa thread, como o Clima. Só no build de release: o de debug não procura sozinho, e o de teste (`e2e`) nem registra o plugin. Sem rede, só um `warn` no log. Uma versão nova mostra uma vez a notificação do Windows "Dockyard X.Y.Z disponível" (texto em `i18n.rs`; sem clique, o toast só avisa).
+- **Sobre** (o do painel e o de Configurações, o mesmo `AboutPanel`): "Versão nova: X.Y.Z" com **Atualizar**; sem versão nova, **Procurar atualizações**, que responde "Você está na versão mais recente" ou o erro. O evento `update-changed` leva o estado e o progresso do download a todas as janelas.
+- **Commands:** `update_status`, `check_for_update` e `install_update`, nas capabilities do painel e de Configurações; os commands do próprio plugin não estão em nenhuma.
+- **Instalar:** baixa (assinatura conferida pelo plugin), depois roda o `install` na thread principal. No Windows o `install` termina o processo sem passar pelo `RunEvent::Exit`; o `on_before_exit` dele chama `release_on_exit`, a mesma limpeza do Sair (bandeja, faixa do dock, **barra do Windows de volta**, janelas escondidas pelos espaços, dock e lançador soltos, checkpoint do banco), uma vez só. Se o instalador não abrir depois disso, o app se reinicia. O instalador passivo recebe `/P /UPDATE /R` e abre o Dockyard no fim.
+- **Publicar:** `.github/workflows/release.yml`, numa tag `v*`: um job confere que a tag bate com `tauri.conf.json`, `Cargo.toml` e `package.json`, e o `tauri-action` compila, assina e publica o Release com o `latest.json`.
+- **Testes:** `domain::update` (estado, aviso único, intervalo), o progresso de `windows::update`, as guardas (`release_on_exit` no `RunEvent::Exit` com o checkpoint; o updater só instala depois dele, na thread principal) e o `AboutPanel` com e sem versão nova.

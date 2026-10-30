@@ -269,6 +269,19 @@ export const otherText: Messages = {
     repository: "github.com/maxeinstein-dev/Dockyard",
     footer: "Independent project",
     tour: "See the tour",
+    update: {
+      available: "New: {version}",
+      install: "Update",
+      check: "Check",
+      checking: "Checking",
+      upToDate: "Up to date",
+      checkFailed: "Failed: {error}",
+      downloading: "{version} {percent}%",
+      downloadingNoSize: "{version}",
+      progress: "Download",
+      installing: "Installing {version}",
+      installFailed: "Failed: {error}",
+    },
   },
   tour: {
     count: "{n} of {total}",
@@ -405,6 +418,16 @@ export const otherText: Messages = {
   },
   accounts: ptBR.accounts,
   widgets: ptBR.widgets,
+};
+
+/** A locale without the update texts (spec 0019 G3) does not compile. */
+export const missingUpdate: Messages = {
+  ...ptBR,
+  about: {
+    ...ptBR.about,
+    // @ts-expect-error -- `install` is missing.
+    update: { ...ptBR.about.update, install: undefined },
+  },
 };
 
 /** A locale missing a key does not compile. */

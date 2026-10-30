@@ -68,6 +68,13 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-claude-usage",
             // "Ver o tour" in Sobre (spec 0019 G2).
             "allow-open-tour",
+            // Sobre's updates (spec 0019 G3): what there is, looking now,
+            // and Atualizar, which downloads, closes the app as Sair does
+            // and runs the signed installer. Never the updater plugin's own
+            // commands.
+            "allow-update-status",
+            "allow-check-for-update",
+            "allow-install-update",
             // Opens the Claude Code's own sign-in in a terminal.
             "allow-claude-sign-in",
             // The Clima (F5): the last forecast of a city, and the search
@@ -167,6 +174,13 @@ const EXPECTED_CAPABILITIES: &[(&str, &str, &[&str], &[&str])] = &[
             "allow-disconnect-google-account",
             // "Ver o tour" in Sobre (spec 0019 G2).
             "allow-open-tour",
+            // Sobre's updates (spec 0019 G3): what there is, looking now,
+            // and Atualizar, which downloads, closes the app as Sair does
+            // and runs the signed installer. Never the updater plugin's own
+            // commands.
+            "allow-update-status",
+            "allow-check-for-update",
+            "allow-install-update",
             "log:allow-log",
         ],
     ),
@@ -622,17 +636,58 @@ fn block_after<'a>(code: &'a str, marker: &str, file: &str) -> &'a str {
 #[test]
 fn exit_checkpoints_the_widget_database() {
     // The process ends without closing the widget database: without the
-    // checkpoint on `RunEvent::Exit`, the last changes stay only in the
-    // `-wal` (spec 0003 §2.4). Without comments: a commented-out call must
-    // not count.
+    // checkpoint on the way out, the last changes stay only in the `-wal`
+    // (spec 0003 §2.4). The way out is `release_on_exit`, which
+    // `RunEvent::Exit` and the updater's installer (spec 0019 G3) both run.
+    // Without comments: a commented-out call must not count.
     let source = rust_code("src/lib.rs");
     let exit = block_after(&source, "RunEvent::Exit", "src/lib.rs");
-    let checkpoint = exit.find(".checkpoint()").unwrap_or_else(|| {
-        panic!("src/lib.rs: `RunEvent::Exit` must call `.checkpoint()` on the widget storage")
+    assert!(
+        exit.contains("release_on_exit(app)"),
+        "src/lib.rs: `RunEvent::Exit` must call `release_on_exit(app)`"
+    );
+    let release = block_after(&source, "fn release_on_exit", "src/lib.rs");
+    let checkpoint = release.find(".checkpoint()").unwrap_or_else(|| {
+        panic!("src/lib.rs: `release_on_exit` must call `.checkpoint()` on the widget storage")
     });
     assert!(
-        exit[..checkpoint].contains("persistence::database::Storage"),
-        "src/lib.rs: the `.checkpoint()` on `RunEvent::Exit` must be the widget storage's (`persistence::database::Storage`)"
+        release[..checkpoint].contains("persistence::database::Storage"),
+        "src/lib.rs: the `.checkpoint()` of `release_on_exit` must be the widget storage's (`persistence::database::Storage`)"
+    );
+    for call in ["taskbar::release()", "native_dock::shutdown()"] {
+        assert!(
+            release.contains(call),
+            "src/lib.rs: `release_on_exit` must call `{call}`"
+        );
+    }
+}
+
+#[test]
+fn the_updater_installs_only_after_the_app_lets_go() {
+    // On Windows the updater's `install` ends the process without
+    // `RunEvent::Exit`: its `on_before_exit` must give the taskbar back and
+    // stop the dock first (spec 0019 G3), and the install must run on the
+    // main thread, where the docks live.
+    let source = rust_code("src/windows/update.rs");
+    let hook = block_after(&source, ".on_before_exit(move ||", "src/windows/update.rs");
+    assert!(
+        hook.contains("crate::release_on_exit(&handle)"),
+        "src/windows/update.rs: the updater must run `release_on_exit` before the installer"
+    );
+    assert_eq!(
+        source.matches("updater_builder()").count(),
+        1,
+        "src/windows/update.rs: every updater must be built in `find`, with the `on_before_exit`"
+    );
+    let main_thread = source
+        .split("run_on_main_thread(")
+        .nth(1)
+        .unwrap_or_else(|| {
+            panic!("src/windows/update.rs: the install must run on the main thread")
+        });
+    assert!(
+        main_thread.contains(".install(bytes)"),
+        "src/windows/update.rs: `install` must be called inside `run_on_main_thread`"
     );
 }
 

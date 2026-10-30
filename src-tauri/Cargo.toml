@@ -1,6 +1,6 @@
 [package]
 name = "dockyard"
-version = "0.3.0"
+version = "0.4.0"
 description = "Windows desktop dock built with Tauri"
 authors = ["Maxsuel Einstein"]
 license-file = "../LICENSE"
@@ -52,6 +52,9 @@ png = "0.17"
 base64 = "0.22"
 # Syntax check of shortcut URLs (spec 0003 §2.5); never opens them.
 url = "2"
+# Automatic update (spec 0019 G3): GitHub Releases, signed; it checks and
+# installs only through `windows::update`, never from a page.
+tauri-plugin-updater = "2"
 
 [dev-dependencies]
 tempfile = "3"

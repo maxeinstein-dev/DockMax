@@ -407,6 +407,23 @@ const messages = {
     footer: "Projeto independente",
     /** Opens the welcome tour again (spec 0019 G2). */
     tour: "Ver o tour",
+    /** The automatic update (spec 0019 G3). `{version}` is the new one,
+     * `{percent}` the download so far, `{error}` what Rust answered. */
+    update: {
+      available: "Versão nova: {version}",
+      install: "Atualizar",
+      check: "Procurar atualizações",
+      checking: "Procurando…",
+      upToDate: "Você está na versão mais recente",
+      checkFailed: "Não deu para procurar atualizações: {error}",
+      downloading: "Baixando a versão {version}… {percent}%",
+      downloadingNoSize: "Baixando a versão {version}…",
+      /** The progress bar's name. */
+      progress: "Download da atualização",
+      installing:
+        "Instalando a versão {version}. O Dockyard fecha e abre de novo sozinho.",
+      installFailed: "Não deu para atualizar: {error}",
+    },
   },
   /** The welcome tour (spec 0019 G2). `{hotkey}` is the launcher's. */
   tour: {

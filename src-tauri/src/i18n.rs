@@ -121,6 +121,10 @@ pub struct DockMessages {
     /// The Ciclo's Windows notice (F2b-2): neutral, the same for all.
     pub cycle_notice_title: &'static str,
     pub cycle_notice_line: &'static str,
+    /// The notice of a new version (spec 0019 G3), once per version;
+    /// `{version}` is replaced.
+    pub update_notice_title: &'static str,
+    pub update_notice_line: &'static str,
     /// A meeting with no title: from a free/busy calendar, or untitled.
     pub calendar_busy: &'static str,
     pub calendar_untitled: &'static str,
@@ -254,6 +258,8 @@ const PT_BR: Messages = Messages {
         calendar_nothing: "Nada marcado",
         cycle_notice_title: "Lembrete do Ciclo",
         cycle_notice_line: "Abra o Ciclo no Dockyard para ver.",
+        update_notice_title: "Dockyard {version} disponível",
+        update_notice_line: "Para atualizar, abra Sobre no dock.",
         calendar_busy: "Ocupado",
         calendar_untitled: "(sem título)",
         calendar_then: "Depois",
@@ -364,6 +370,8 @@ const EN: Messages = Messages {
         calendar_nothing: "Nothing scheduled",
         cycle_notice_title: "Cycle reminder",
         cycle_notice_line: "Open Cycle in Dockyard to see it.",
+        update_notice_title: "Dockyard {version} available",
+        update_notice_line: "To update, open About in the dock.",
         calendar_busy: "Busy",
         calendar_untitled: "(no title)",
         calendar_then: "Then",
@@ -467,6 +475,8 @@ mod tests {
     #[test]
     fn english_keeps_the_placeholders() {
         assert!(EN.launcher.search_for.contains("{term}"));
+        assert!(EN.dock.update_notice_title.contains("{version}"));
+        assert!(PT_BR.dock.update_notice_title.contains("{version}"));
         assert_eq!(EN.tray.open_settings, "Settings");
     }
 
