@@ -2892,7 +2892,7 @@ impl Dock {
         // Up, under its menu, until it closes.
         self.menu_open = true;
         self.effects.push(Box::new(move |app| {
-            let chosen = show_dock_menu(edge, items);
+            let chosen = show_dock_menu(app, edge, items);
             post_to(hwnd, |dock: &mut Dock| dock.menu_open = false);
             if let Some(choice) = chosen {
                 act(
@@ -3295,13 +3295,23 @@ fn widget_items(config: &WidgetConfig) -> Vec<MenuEntry> {
 }
 
 /// Shows the menu `items` at the pointer, opening away from the screen edge,
-/// and returns what was chosen.
-fn show_dock_menu(edge: DockEdge, items: Vec<MenuEntry>) -> Option<MenuChoice> {
+/// and returns what was chosen. The pointer resting on Configurações warms
+/// WebView2 for it (`settings_window::warm`), as an item that opens a panel
+/// does (H2).
+fn show_dock_menu(app: &AppHandle, edge: DockEdge, items: Vec<MenuEntry>) -> Option<MenuChoice> {
     let (choices, lines): (Vec<_>, Vec<_>) = items
         .into_iter()
         .map(|entry| (entry.choice, entry.line))
         .unzip();
-    let chosen = menu::show(None, edge == DockEdge::Bottom, lines)?;
+    let settings = choices
+        .iter()
+        .position(|choice| *choice == Some(MenuChoice::Settings));
+    let app = app.clone();
+    let chosen = menu::show_hovering(None, edge == DockEdge::Bottom, lines, move |index| {
+        if Some(index) == settings {
+            super::settings_window::warm(&app);
+        }
+    })?;
     choices.get(chosen).copied().flatten()
 }
 
@@ -3319,7 +3329,11 @@ fn check_tray_icon() {
 pub fn tray_menu(app: &AppHandle) {
     let auto_hide = crate::commands::settings::current(app).dock.auto_hide;
     // The taskbar is at the bottom of the screen, as a dock most often is.
-    let chosen = show_dock_menu(DockEdge::Bottom, dock_menu_items(auto_hide, &[], false));
+    let chosen = show_dock_menu(
+        app,
+        DockEdge::Bottom,
+        dock_menu_items(auto_hide, &[], false),
+    );
     if chosen == Some(MenuChoice::Settings) {
         // From the tray, the dock comes up too if it is hiding.
         show();
