@@ -1,6 +1,6 @@
 # Spec 0005 — Fase A: visual do dock
 
-- **Status:** rascunho em implementação (recorte A1)
+- **Status:** A1 entregue (#9). Do A2, o tamanho de ícone contínuo (32–96) entrou e as bordas esquerda e direita (dock vertical) não: o dock vai só embaixo ou em cima (`DockEdge`). O A3 virou o app de Configurações ([spec 0011](0011-arquitetura-hibrida.md) H1, [spec 0014](0014-rebranding-configuracoes-e-menus.md)). O Canarinho saiu em 2026-10-30 (#82).
 - **Data:** 2026-10-22
 - **Origem:** [spec 0004](0004-paridade-primodock.md) (fases A–G) e [ADR 0009](../adr/0009-dock-substitui-a-barra-de-tarefas.md)
 

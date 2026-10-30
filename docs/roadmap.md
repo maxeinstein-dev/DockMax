@@ -1,18 +1,20 @@
-# Roadmap — DockMax
+# Roadmap — Dockyard
 
-**Produto:** DockMax  
+**Produto:** Dockyard (antes DockMax; renomeado em 2026-10-30, [spec 0019](specs/0019-fase-g-extras.md) G6). O identificador e as pastas de dados continuam `dockmax`, de propósito.  
 **Plataforma inicial:** Windows 11  
 **Objetivo:** ferramenta de uso pessoal que também demonstre competências de desenvolvimento desktop e arquitetura.  
-**Status:** proposta inicial; estimativas são indicativas. **Atualização de 2026-10-26:** o produto passou a ser um dock que substitui a barra de tarefas (ADR 0009) e o plano das fases 3 e 4 abaixo foi superado pelas fases A a G da [spec 0004](specs/0004-paridade-primodock.md). O que define o MVP está em "Escopo do MVP"; o andamento das fases A a G, em "Andamento das fases da spec 0004".
+**Status:** proposta inicial; estimativas são indicativas. **Atualização de 2026-10-26:** o produto passou a ser um dock que substitui a barra de tarefas (ADR 0009) e o plano das fases 3 e 4 abaixo foi superado pelas fases A a G da [spec 0004](specs/0004-paridade-primodock.md). O que define o MVP está em "Escopo do MVP"; o andamento das fases A a G, em "Andamento das fases da spec 0004". **Atualização de 2026-10-30:** as fases A a G estão concluídas (versão 0.7.0); o que vem depois está no [estudo 0002](estudos/0002-melhorias-e-funcionalidades.md), com as melhorias primeiro e as funcionalidades depois.
 
 ## Escopo do MVP (decisão do autor, 2026-10-26)
 
 O MVP é o que já existe, com os **ícones que os programas já têm**:
 
 - o dock no lugar da barra de tarefas do Windows, com restauração garantida (ADR 0009);
-- a fase A (visual): nove estilos, efeito ao passar o mouse, indicador, posições;
+- a fase A (visual): nove estilos, efeito ao passar o mouse, indicador, posições (hoje são 14 estilos da barra: ver a fase A abaixo);
 - a fase B (apps): programas fixados com o ícone real, fixar e desafixar, reordenar arrastando, soltar um programa ou atalho no dock, e o menu do programa (a Jump List do Windows);
 - relógio com data, bandeja do sistema hospedada pelo DockMax e os widgets Relógio, Progresso do tempo e Nota.
+
+O que ficou para o futuro no parágrafo abaixo entrou depois, quase tudo, nas fases C a G (tabela seguinte); continuam de fora o ícone por app e a imagem própria (B4b, B4c).
 
 Ficam **para o futuro**, fora do MVP: a personalização de ícones (ícone por app, imagem própria, chaves semânticas e um pacote embutido, recortes B4b e B4c da [spec 0007](specs/0007-fase-b4-icones.md); a leitura de pacotes de ícones, B4a, já está pronta e fica como recurso avançado), os apps abertos e as prévias de janela (fase D e E), os espaços de trabalho (fase C), os demais widgets (fase F) e os extras (fase G). A fase 5 abaixo é o que falta para fechar o MVP.
 
@@ -22,21 +24,23 @@ Ordem decidida pelo autor em 2026-10-26, depois da fase D: **C → E → F → G
 
 | Fase | Situação |
 |---|---|
-| **A. Visual** | Concluída: nove estilos, efeito ao passar o mouse, indicador, posições ([spec 0005](specs/0005-fase-a-visual.md)). |
-| **B. Itens e ícones** | Concluída no escopo do MVP ([spec 0006](specs/0006-fase-b-apps.md), [spec 0007](specs/0007-fase-b4-icones.md)); a personalização de ícones (B4b, B4c) fica para o futuro. |
+| **A. Visual** | Concluída: nove estilos, efeito ao passar o mouse, indicador, posições ([spec 0005](specs/0005-fase-a-visual.md)). O Canarinho saiu em 2026-10-30 (#82) e a [spec 0020](specs/0020-temas.md) somou seis skins de barra (Retrô, Clássico 98, Fósforo, Tático, Medieval e Caçador): hoje são 14 estilos (`DockStyle`). |
+| **B. Itens e ícones** | Concluída no escopo do MVP ([spec 0006](specs/0006-fase-b-apps.md), [spec 0007](specs/0007-fase-b4-icones.md)). Os pacotes embutidos vieram na fase G (G4) e na spec 0020: hoje são 15. O ícone por app e a imagem própria (B4b, B4c) ficam para o futuro. |
 | **D. Windows** | **Concluída em 2026-10-26**: barra de aplicativos e barra do Windows oculta (ADR 0009), apps abertos, ativar e minimizar, menus ([spec 0009](specs/0009-fase-d-janelas.md)), tela cheia e um dock por monitor ([spec 0010](specs/0010-fase-d4-monitores-e-tela-cheia.md)), dock nativo ([spec 0011](specs/0011-arquitetura-hibrida.md)) e ocultar automaticamente. Falta a [rodada de verificações](roteiro-de-verificacao.md). |
 | **C. Espaços de trabalho** | **Concluída** ([spec 0013](specs/0013-fase-c-espacos-de-trabalho.md)): C1 (espaços, troca no dock e edição em Configurações), C2 (janelas por espaço, guardadas entre execuções) e C3 (mover janelas para outro espaço, troca em todos os monitores, indicador na cor do espaço, widgets em vários espaços, bolinhas no leitor de tela, troca animada). |
 | **E. Prévias e bandeja** | **Concluída** ([spec 0015](specs/0015-fase-e-previas.md)): a bandeja (painel da seta, ícones no dock, menus no lugar), E1 (o cartão com as miniaturas ao vivo, ativar e fechar) e E2 (o cartão no leitor de tela e a entrada animada). |
-| **F. Widgets** | **Em andamento** ([spec 0017](specs/0017-fase-f-widgets.md)): F1 (tiles largos, Atividade, Atividade de rede e a aba Widgets com o catálogo); F2 a F5 a fazer. |
-| **G. Extras** | Depois da F. |
+| **F. Widgets** | **Concluída em 2026-10-29** ([spec 0017](specs/0017-fase-f-widgets.md)): F1 (tiles largos, Atividade, Atividade de rede e a aba Widgets com o catálogo), F2 (contas Google, Calendário, Tasks, Ciclo, Contagem regressiva, Pomodoro), F3 (Lista de tarefas, Beber água), F4 (Tocando agora) e F5 (Uso do Claude, Clima); os PRs de cada recorte estão no status da spec. Ficam para depois o iCal, criar reunião pelo Calendário e o Notion. |
+| **G. Extras** | **Concluída em 2026-10-30** ([spec 0019](specs/0019-fase-g-extras.md)): G1 (idioma inglês, #75), G2 (tour, #79), G3 (atualização automática, #83, desde a 0.4.0), G4 (pacotes de ícones, #80, #85 a #88, #92 e #93), G5 (estudo do Linux, #76) e G6 (nome e logo, #77; o renome para Dockyard no #81). A primeira leva de temas ([spec 0020](specs/0020-temas.md), #109, #111 e #113 a #117) estende a fase. O mascote ficou de fora. |
 
-Fora das fases: o **lançador** no estilo do Ulauncher ([spec 0012](specs/0012-lancador.md)). O L1 entrou em 2026-10-27 (Alt+Espaço, busca nos apps, recentes), no [PR #33](https://github.com/maxeinstein-dev/DockMax/pull/33). O L2 (calculadora, busca na web por palavra-chave, Configurações do DockMax e do Windows) entrou no [PR #37](https://github.com/maxeinstein-dev/DockMax/pull/37). O L3 (personalizar o atalho) vem no PR seguinte. O L4 busca arquivos e pastas (o Everything, quando roda, e o índice do Windows Search); o L5 navega por caminho, como no Ulauncher (`C:\`, `~\`, `%APPDATA%\`, `\\servidor\compartilhamento\`, com Tab e Backspace); depois vêm o L6 (menu de ações por resultado) e o L7 (janelas abertas).
+Fora das fases: o **lançador** no estilo do Ulauncher ([spec 0012](specs/0012-lancador.md)), com os sete recortes entregues: L1 (Alt+Espaço, busca nos apps, recentes; [PR #33](https://github.com/maxeinstein-dev/Dockyard/pull/33)), L2 (calculadora, busca na web por palavra-chave, Configurações do Dockyard e do Windows; [PR #37](https://github.com/maxeinstein-dev/Dockyard/pull/37)), L3 (personalizar o atalho, #41), L4 (arquivos e pastas, pelo Everything quando roda e pelo índice do Windows Search, #95), L5 (navegar por caminho, #96), L6 (menu de ações por resultado, #98) e L7 (janelas abertas, #99). Depois deles entraram a conversão de unidades e moedas (#102), o histórico da área de transferência (#101) e o item Lançador no dock (#103). As extensões ficam para depois (spec 0012 §9).
 
-Também fora das fases: os **selos de notificação** ([spec 0016](specs/0016-selos-de-notificacao.md)), o número de não lidas que o app põe no botão da barra do Windows, lido pela UI Automation e desenhado no ícone do dock. Para isso a barra passa a ficar transparente e sem receber cliques, em vez de escondida.
+Também fora das fases: os **selos de notificação** ([spec 0016](specs/0016-selos-de-notificacao.md)), o número de não lidas que o app põe no botão da barra do Windows, lido pela UI Automation e desenhado no ícone do dock. Para isso a barra passa a ficar transparente e sem receber cliques, em vez de escondida. Entregue no #43.
+
+Também fora das fases: **arrastar entre o dock e as pastas** ([spec 0018](specs/0018-arrastar-entre-dock-e-pastas.md)), um app do dock solto numa pasta abre nela e arquivos soltos num app abrem com ele. Entregue no #63, com a correção do #64.
 
 ## Visão do produto
 
-DockMax será um dock personalizável para Windows, inspirado em aplicações de dock e widgets, mas com identidade própria. A interface principal reunirá atalhos e painéis de widgets. A integração com a barra de tarefas será evolutiva: o DockMax começará convivendo com a barra nativa e poderá incorporar capacidades de gerenciamento de janelas ao longo do tempo.
+O Dockyard será um dock personalizável para Windows, inspirado em aplicações de dock e widgets, mas com identidade própria. A interface principal reunirá atalhos e painéis de widgets. A integração com a barra de tarefas seria evolutiva, começando por conviver com a barra nativa; desde o [ADR 0009](adr/0009-dock-substitui-a-barra-de-tarefas.md) o dock substitui a barra.
 
 ## Princípios de escopo
 
@@ -177,18 +181,19 @@ A fase D acabou: a rodada única está no **[roteiro de verificação](roteiro-d
 - [ ] Instalar e desinstalar numa máquina limpa ou virtual; Windows 10; atualizar por cima de uma versão anterior com o programa aberto.
 - [ ] Os cliques com o **mouse físico** no dock: esquerdo (ativar, minimizar, próxima janela), meio (nova instância) e direito (menus), nos programas fixados e nos abertos; os menus do dock e da bandeja.
 - [ ] Soltar um arquivo no dock vindo do Explorador de Arquivos (o teste usou um arraste simulado).
-- [ ] A seção "Ícones dos apps" e as chaves novas de Configurações vistas no app de Configurações de verdade.
+- [ ] A seção "Ícones dos apps" e as chaves novas de Configurações vistas no app de Configurações de verdade. (Ícones dos apps: vista ao vivo em 2026-10-30, com os 12 pacotes de então, [spec 0019](specs/0019-fase-g-extras.md) §7; as outras chaves, não.)
 - [ ] Um programa que pergunta se quer salvar ao fechar pelo menu.
 - [ ] Áreas de trabalho virtuais do Windows.
 - [ ] Uso longo (horas): memória e CPU em repouso.
 - [ ] Leitor de tela.
 - [ ] O dock nativo (spec 0011 H3) com o **mouse de verdade**: os três efeitos ao passar o mouse; os oito estilos e os reflexos na tela; a borda de cima; escala de 150 %. (Arrastar para reordenar: confirmado pelo autor em 2026-10-26.)
-- [ ] Um dock por monitor (spec 0010 D4b): o mouse no segundo dock, ligar e desligar um monitor com o DockMax aberto, mudar "Dock em todos os monitores" com ele aberto, tela cheia de verdade no segundo monitor. (Um dock em cada monitor: confirmado pelo autor em 2026-10-26.)
+- [ ] Um dock por monitor (spec 0010 D4b): o mouse no segundo dock, ligar e desligar um monitor com o Dockyard aberto, mudar "Dock em todos os monitores" com ele aberto, tela cheia de verdade no segundo monitor. (Um dock em cada monitor: confirmado pelo autor em 2026-10-26.)
 - [ ] O lançador (spec 0012 L4): ao vivo, buscar arquivos (misturados e com `f `), abrir um arquivo e uma pasta, os ícones de tipo, a roda do mouse, o Narrador lendo "Arquivo" e "Pasta", o Everything de verdade (também rodando como administrador) e a memória com o lançador aberto buscando arquivos.
 - [ ] O lançador (spec 0012 L5): ao vivo, navegar por `C:\`, `~\`, `%APPDATA%\` e um compartilhamento de rede (e um fora do ar, que deve dizer "A pasta não respondeu" sem travar), o Tab e o Backspace no teclado de verdade, "Sem acesso" numa pasta protegida, `C:\Windows\System32` filtrando sem atraso, os ícones e o Narrador.
 - [ ] O lançador (spec 0012 L3): capturar um atalho novo em Configurações com o teclado físico (Alt+Espaço e combinações com Win dentro do WebView2) e com o leitor de tela.
 - [ ] O lançador (spec 0012 L1): o Alt+Espaço com o teclado físico, o Narrador lendo a lista e a seleção, o IME de outro idioma na caixa de busca, o alto contraste, escala de 150 % e dois monitores.
 - [ ] O lançador (spec 0012 L2): o Narrador lendo "Resultado copiado"; o editor de palavras-chave em Configurações com o teclado e o leitor de tela. (O Enter na conta, em `g dockmax` e em `wifi` o autor verificou em 2026-10-27.)
+- [ ] O resto das listas de verificação de cada spec desde a 0012 e a atualização de uma versão para a seguinte pelo updater (G3): ver a M11 do [estudo 0002](estudos/0002-melhorias-e-funcionalidades.md).
 
 ### Medição de recursos (build de release 0.3.0, 2026-10-26)
 
@@ -218,20 +223,20 @@ Não verificado: máquina limpa ou virtual, Windows 10, atualização por cima d
 ## Backlog pós-MVP
 
 ### Produtividade
-- [ ] Calendário
-- [ ] Lembretes e notificações
-- [ ] Área de transferência
+- [x] Calendário: widget Calendário com contas Google (spec 0017 F2a).
+- [ ] Lembretes e notificações (há os avisos do Ciclo, spec 0017 F2b-2, mas não lembretes gerais)
+- [x] Área de transferência: no lançador, pelo histórico do Windows (spec 0012 §8i), não como widget.
 - [ ] Melhorias na Prateleira e nos grupos de atalhos
 
 ### Sistema e mídia
-- [ ] Atividade: CPU e memória; outros indicadores conforme viabilidade. Definir o escopo antes de qualquer PR.
-- [ ] Música: sessão de mídia do Windows
+- [x] Atividade: CPU e memória (widget Atividade, spec 0017 F1), e Atividade de rede.
+- [x] Música: sessão de mídia do Windows (widget Tocando agora, spec 0017 F4).
 
 ### Só se sobrar (valor baixo para o custo; cada widget custou cerca de 2 mil linhas com testes na Fase 2)
 - [ ] Ventoinhas e temperaturas: exige driver de sensores, com risco de segurança
 - [ ] Conta-gotas de cores
-- [ ] Beber água
-- [ ] Uso do Claude: depende de dados que a conta pode não expor
+- [x] Beber água (spec 0017 F3-2)
+- [x] Uso do Claude: limites de 5 horas e semanal, lidos como o `/usage` do Claude Code (spec 0017 F5)
 
 ### Rebranding de Configurações e menus
 
@@ -239,11 +244,11 @@ Não verificado: máquina limpa ou virtual, Windows 10, atualização por cima d
 
 ### Personalização do dock
 - [ ] Cor de destaque escolhida pelo usuário (o token `--accent` já existe)
-- [ ] Ponto indicador personalizável: cor, forma e visibilidade
+- [ ] Ponto indicador personalizável: cor, forma e visibilidade. Cor (Aparência › Cor do indicador) e forma (ponto ou traço) feitas; esconder o indicador, não.
 
 ### Integrações
 - [ ] GitHub
-- [ ] Clima
+- [x] Clima (Open-Meteo, spec 0017 F5)
 
 ## Widgets planejados
 
@@ -267,7 +272,7 @@ Não verificado: máquina limpa ou virtual, Windows 10, atualização por cima d
 18. GitHub
 19. Clima
 
-**Nota:** a lista consolidada contém 19 itens. O widget “Atividade” deverá ter seu escopo definido antes da implementação (por exemplo, CPU/RAM ou atividade de aplicativos).
+**Nota:** a lista consolidada contém 19 itens. Em 2026-10-30 existem Relógio, Progresso do tempo, Calendário, Nota, Música (Tocando agora), Atividade, Rede (Atividade de rede), Beber água, Uso do Claude e Clima, além de widgets fora da lista (Ciclo, Contagem regressiva, Pomodoro, Lista de tarefas e Lançador); Atalho e Arquivos existem só no domínio. A Bateria ficou de fora por decisão do autor (estudo 0002). O widget “Atividade” deverá ter seu escopo definido antes da implementação (por exemplo, CPU/RAM ou atividade de aplicativos).
 
 ## Riscos e mitigação
 
@@ -295,7 +300,7 @@ Para cada tarefa:
 8. Antes do teste manual do usuário, capturar o build real via CDP nos dois temas (pega contraste e controle faltando antes do teste).
 9. Medir memória e CPU em repouso em todo PR que mude a interface.
 10. Versionar por fase (v0.2.0 no fim da Fase 2), para o painel Sobre e o instalador nascerem alinhados.
-11. A `main` é protegida (2026-10-27): o PR só entra com a CI (`checks`) verde e a branch atualizada com a `main`, também para o dono; a branch é apagada no merge. Um PR empilhado sobre outro fica vermelho no job `base` até apontar para a `main`: mergeie primeiro o de baixo (o #45 caiu na branch do R1 por isso).
+11. A `main` é protegida (2026-10-27): o PR só entra com os checks `checks`, `e2e` e `base` verdes e a branch atualizada com a `main`, também para o dono; a branch é apagada no merge. Um PR empilhado sobre outro fica vermelho no job `base` até apontar para a `main`: mergeie primeiro o de baixo (o #45 caiu na branch do R1 por isso).
 
 ## Estimativa geral
 

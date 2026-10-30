@@ -1,6 +1,6 @@
 # Spec 0006 — Fase B: apps no dock
 
-- **Status:** B1 e B3 implementados e verificados no app real; falta o autor abrir um programa e escolher uma entrada de menu
+- **Status:** B1 (#10), B2 (#13) e B3 (#11 e #12) implementados; B4a na [spec 0007](0007-fase-b4-icones.md) (#14); B4b e B4c (ícone por app e imagem própria) ficam para depois. B1 e B3 verificados no app real; falta o autor abrir um programa e escolher uma entrada de menu
 - **Data:** 2026-10-23
 - **Origem:** [spec 0004](0004-paridade-primodock.md) §3.4, §3.7c e §6 (fase B) e [ADR 0009](../adr/0009-dock-substitui-a-barra-de-tarefas.md)
 

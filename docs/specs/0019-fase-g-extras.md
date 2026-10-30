@@ -2,7 +2,7 @@
 
 Fase G da [spec 0004](0004-paridade-primodock.md) (§6), depois da fase F ([spec 0017](0017-fase-f-widgets.md), concluída em 2026-10-29).
 
-**Status:** em andamento: G1 (idioma inglês, #75), G2 (tour, #79), G4 (ícones retrô, #80), G5 (estudo do Linux, #76) e G6 (nome e logo, #77) entregues; o renome para **Dockyard** (R1) entrou em 2026-10-30, com o repositório renomeado para `maxeinstein-dev/Dockyard`. A G3 (atualização automática) foi implementada em 2026-10-30 e estreia na 0.4.0. Ordem decidida pelo autor em 2026-10-29: tour, pacote de ícones, nome e logo, estudo do Linux e, por último, atualização automática.
+**Status:** concluída em 2026-10-30: G1 (idioma inglês, #75), G2 (tour, #79), G3 (atualização automática, #83, estreou na 0.4.0), G4 (ícones retrô, #80; os outros pacotes, #85 a #88, #92 e #93), G5 (estudo do Linux, #76) e G6 (nome e logo, #77) entregues; o renome para **Dockyard** (R1, #81) entrou em 2026-10-30, com o repositório renomeado para `maxeinstein-dev/Dockyard`. Os temas seguem na [spec 0020](0020-temas.md). Falta a verificação ao vivo da atualização de uma versão para a seguinte pelo updater. Ordem decidida pelo autor em 2026-10-29: tour, pacote de ícones, nome e logo, estudo do Linux e, por último, atualização automática.
 
 ## 1. Decisões do autor (2026-10-29)
 

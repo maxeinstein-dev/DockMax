@@ -1,6 +1,6 @@
 # Spec 0004 — Paridade com o PrimoDock
 
-**Status:** rascunho para aprovação. Atualizada em 2026-10-22 com as capturas de tela do autor. Nenhum código de funcionalidade foi escrito.
+**Status:** aprovada; as fases A a G foram feitas e estão concluídas em 2026-10-30 (andamento no [roadmap](../roadmap.md)). Atualizada em 2026-10-22 com as capturas de tela do autor.
 **Origem:** pedido do autor de transformar o DockMax no PrimoDock, mantendo o nome, aceitando mudança de arquitetura.
 
 ## 1. Como o levantamento foi feito
@@ -153,6 +153,6 @@ Ordem sugerida: A → B → D → C → E → F → G. A fase D vem cedo porque 
 ## 7. Pendências para o autor
 
 - Capturas: feitas em 2026-10-25 e descritas em [`docs/reference/primodock/interface.md`](../reference/primodock/interface.md) (menus, bandeja, todas as abas de configuração, os temas e as quatro bordas no dock). Faltam só a animação de abertura num app de verdade, o mascote comendo e o tour.
-- **Prioridade (autor, 2026-10-25):** os temas sazonais e o tema Canarinho ficam de fora por enquanto. O Canarinho já existe no DockMax desde a fase A1 e continua lá, sem mais trabalho; os sazonais saem da fase G até segunda ordem. *Nota: Canarinho removido em 2026-10-30, a pedido do autor.*
+- **Prioridade (autor, 2026-10-25):** os temas sazonais e o tema Canarinho ficam de fora por enquanto. O Canarinho existiu no DockMax desde a fase A1 e foi removido em 2026-10-30, a pedido do autor (#82); os sazonais saem da fase G até segunda ordem (estão no [estudo 0002](../estudos/0002-melhorias-e-funcionalidades.md), F15).
 - ~~Confirmar a ordem das fases e se o spike da barra de aplicativos vem primeiro.~~ Feito: A, B e D concluídas nessa ordem; depois **C → E → F → G** (autor, 2026-10-26; andamento no [roadmap](../roadmap.md)).
 - Feito em 2026-10-22: `PRODUCT.md`, ADR 0009 (substitui a convivência do ADR 0004) e licença de uso pessoal. Falta atualizar o roadmap quando a ordem das fases for aprovada.

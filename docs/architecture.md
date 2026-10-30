@@ -1,8 +1,8 @@
-# Arquitetura — DockMax
+# Arquitetura — Dockyard
 
 ## 1. Contexto e objetivos
 
-DockMax é uma aplicação desktop local para Windows, com interface em React/TypeScript e integração nativa via Tauri 2/Rust. Desde a [spec 0011](specs/0011-arquitetura-hibrida.md) a arquitetura é **híbrida**: o dock é desenhado em Rust nativo (Direct2D), sem WebView2, e os painéis e o app de Configurações são páginas React em janelas WebView2 criadas quando abrem.
+O Dockyard (antes DockMax) é uma aplicação desktop local para Windows, com interface em React/TypeScript e integração nativa via Tauri 2/Rust. Desde a [spec 0011](specs/0011-arquitetura-hibrida.md) a arquitetura é **híbrida**: o dock é desenhado em Rust nativo (Direct2D), sem WebView2, e os painéis e o app de Configurações são páginas React em janelas WebView2 criadas quando abrem.
 
 Objetivos arquiteturais:
 
