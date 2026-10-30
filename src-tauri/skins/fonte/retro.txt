@@ -1,0 +1,30 @@
+# Skin Retrô (spec 0020 §3): placa azul-noite na paleta do PICO-8, com
+# contorno preto, luz em cima e à esquerda e cantos de pixel.
+# Para gerar de novo: python gerar.py retro
+
+skin.name: Retrô
+skin.left: 2
+skin.right: 2
+skin.middle: stretch
+
+cor.0: #000000
+cor.1: #1D2B53
+cor.5: #5F574F
+cor.6: #C2C3C7
+
+.000.
+06650
+06150
+06150
+06150
+06150
+06150
+06150
+06150
+06150
+06150
+06150
+06150
+06150
+05550
+.000.

@@ -253,6 +253,14 @@ pub fn dark_now(app: &AppHandle) -> bool {
     }
 }
 
+/// Whether an icon pack's dark images go on the bar of `style` (the dock's
+/// own when `None`): see [`DockStyle::bar_dark`].
+pub fn icons_dark(app: &AppHandle, style: Option<DockStyle>) -> bool {
+    style
+        .unwrap_or_else(|| current(app).dock.style)
+        .bar_dark(dark_now(app))
+}
+
 /// Called by both windows at startup.
 #[tauri::command]
 pub fn get_settings(state: State<'_, Mutex<SettingsState>>) -> Settings {

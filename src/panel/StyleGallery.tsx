@@ -86,6 +86,7 @@ export function MiniDock({
         data-outline={outline === null ? undefined : ""}
         data-flat={paint.flat ? "" : undefined}
         data-reflections={look.reflections ? "" : undefined}
+        data-skin={paint.skin ? "" : undefined}
         // The style's paint, through the CSSOM (no inline style).
         ref={(bar) => {
           if (!bar) return;
@@ -103,6 +104,22 @@ export function MiniDock({
           );
           set("--mini-indicator", indicator);
           set("--mini-shelf", paint.shelf ? shelfCss() : null);
+          // A skin: its image at the bar's height, the ends as they are.
+          const skin = paint.skin;
+          const k = skin ? (2 * MINI_HALF_HEIGHT) / skin.height : 0;
+          set("--mini-skin", skin && `url("${skin.url}")`);
+          set(
+            "--mini-skin-slice",
+            skin && `0 ${skin.right} 0 ${skin.left} fill`,
+          );
+          set(
+            "--mini-skin-width",
+            skin && `0 ${skin.right * k}px 0 ${skin.left * k}px`,
+          );
+          set(
+            "--mini-skin-repeat",
+            skin && (skin.repeat ? "repeat" : "stretch"),
+          );
         }}
       >
         {shown.length > 0

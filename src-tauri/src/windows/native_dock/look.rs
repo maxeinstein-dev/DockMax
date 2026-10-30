@@ -56,6 +56,9 @@ pub struct Look {
     pub outline: Option<(Color, Color)>,
     /// The silver shelf under the tiles (Prateleira Aqua).
     pub shelf: bool,
+    /// The bar is the style's skin (spec 0020 §3): its image, not a fill,
+    /// an edge or a border.
+    pub skin: bool,
 }
 
 /// The parts of a style the user can change, as each style has them.
@@ -69,6 +72,8 @@ fn own(style: DockStyle) -> (bool, u8, bool) {
         DockStyle::Neon => (true, 70, false),
         DockStyle::Paper => (false, 40, false),
         DockStyle::Floating => (false, 40, true),
+        // The image is the bar: no border and no corners to change.
+        DockStyle::Retro | DockStyle::Classic98 | DockStyle::Phosphor => (false, 0, false),
     }
 }
 
@@ -93,6 +98,7 @@ impl Look {
             flat: false,
             outline: None,
             shelf: false,
+            skin: false,
         };
         match style {
             DockStyle::Native => base,
@@ -174,6 +180,30 @@ impl Look {
                 flat: true,
                 shelf: true,
                 indicator: Some(Color::rgb(0x2c, 0x3a, 0x5a)),
+                ..base
+            },
+            DockStyle::Retro => Look {
+                skin: true,
+                border: false,
+                separator: Some(Color::rgb(0x5f, 0x57, 0x4f)),
+                ink: Some(Color::rgb(0xff, 0xf1, 0xe8)),
+                indicator: Some(Color::rgb(0xff, 0x00, 0x4d)),
+                ..base
+            },
+            DockStyle::Classic98 => Look {
+                skin: true,
+                border: false,
+                separator: Some(Color::rgb(0x80, 0x80, 0x80)),
+                ink: Some(Color::rgb(0x00, 0x00, 0x00)),
+                indicator: Some(Color::rgb(0x00, 0x00, 0x80)),
+                ..base
+            },
+            DockStyle::Phosphor => Look {
+                skin: true,
+                border: false,
+                separator: Some(Color::rgb(0x1f, 0x7a, 0x3a)),
+                ink: Some(Color::rgb(0x3c, 0xff, 0x6e)),
+                indicator: Some(Color::rgb(0x3c, 0xff, 0x6e)),
                 ..base
             },
         }

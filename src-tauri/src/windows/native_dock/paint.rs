@@ -15,8 +15,9 @@ use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_FIGURE_END_OPEN, D2D1_GRADIENT_STOP, D2D1_PIXEL_FORMAT,
 };
 use windows::Win32::Graphics::Direct2D::{
-    D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_ARC_SEGMENT, D2D1_ARC_SIZE_LARGE, D2D1_ARC_SIZE_SMALL,
-    D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, D2D1_CAP_STYLE_ROUND, D2D1_DASH_STYLE_SOLID,
+    D2D1_ANTIALIAS_MODE_ALIASED, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_ARC_SEGMENT,
+    D2D1_ARC_SIZE_LARGE, D2D1_ARC_SIZE_SMALL, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+    D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR, D2D1_CAP_STYLE_ROUND, D2D1_DASH_STYLE_SOLID,
     D2D1_DRAW_TEXT_OPTIONS_NONE, D2D1_ELLIPSE, D2D1_EXTEND_MODE_CLAMP,
     D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_FEATURE_LEVEL_DEFAULT, D2D1_GAMMA_2_2,
     D2D1_LAYER_OPTIONS_NONE, D2D1_LAYER_PARAMETERS, D2D1_LINE_JOIN_ROUND,
@@ -455,6 +456,8 @@ pub struct Painter {
     round: ID2D1StrokeStyle,
     squircle: ID2D1PathGeometry,
     geometries: HashMap<&'static str, ID2D1PathGeometry>,
+    /// The bitmap of each skin drawn (spec 0020 §3), made once.
+    skins: HashMap<&'static str, ID2D1Bitmap>,
     formats: HashMap<TextKey, IDWriteTextFormat>,
     /// Windows' icon font, by size (hundredths of a pixel).
     icon_formats: HashMap<u32, IDWriteTextFormat>,
@@ -585,6 +588,7 @@ impl Painter {
             formats: HashMap::new(),
             icon_formats: HashMap::new(),
             glazes: HashMap::new(),
+            skins: HashMap::new(),
             sheen,
             rim,
             dpi: 96.0,
@@ -955,6 +959,10 @@ impl Painter {
             return;
         }
         let look = &scene.look;
+        if look.skin {
+            self.skin_bar(scene);
+            return;
+        }
         let radius = (look.corners * bar.height / 2.0) as f32;
         let rounded = |grow: f64| D2D1_ROUNDED_RECT {
             rect: rect(Area {
@@ -1034,6 +1042,61 @@ impl Painter {
                     .DrawRoundedRectangle(&shape, &line, 1.0, None::<&ID2D1StrokeStyle>)
             };
         }
+    }
+
+    /// The bar as its style's skin (spec 0020 §3): the ends of the image as
+    /// they are and the middle in tiles, at the bar's height, without
+    /// smoothing for pixel art.
+    fn skin_bar(&mut self, scene: &Scene) {
+        let Some(skin) = crate::domain::skin::skin_of(scene.look.style) else {
+            return;
+        };
+        if !self.skins.contains_key(skin.id) {
+            let Some(bitmap) = self.bitmap(skin.png) else {
+                return;
+            };
+            self.skins.insert(skin.id, bitmap);
+        }
+        let Some(bitmap) = self.skins.get(skin.id) else {
+            return;
+        };
+        let meta = skin.meta();
+        let bar = scene.bar;
+        let mode = if meta.pixelated {
+            D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR
+        } else {
+            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR
+        };
+        let to_rect = |r: crate::domain::skin::Rect| D2D_RECT_F {
+            left: r.x as f32,
+            top: r.y as f32,
+            right: (r.x + r.width) as f32,
+            bottom: (r.y + r.height) as f32,
+        };
+        let area = crate::domain::skin::Rect {
+            x: bar.x,
+            y: bar.y,
+            width: bar.width,
+            height: bar.height,
+        };
+        // Hard edges: tiles side by side must not show a seam where one
+        // ends on a fraction of a pixel.
+        unsafe { self.target.SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED) };
+        for piece in crate::domain::skin::pieces(meta, area) {
+            unsafe {
+                self.target.DrawBitmap(
+                    bitmap,
+                    Some(&to_rect(piece.to)),
+                    1.0,
+                    mode,
+                    Some(&to_rect(piece.from)),
+                )
+            };
+        }
+        unsafe {
+            self.target
+                .SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE)
+        };
     }
 
     /// The silver shelf under the tiles (Prateleira Aqua): narrower on the

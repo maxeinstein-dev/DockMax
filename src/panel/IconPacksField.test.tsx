@@ -114,10 +114,12 @@ describe("IconPacksField", () => {
     expect(invoke).toHaveBeenCalledWith("icon_pack_preview", {
       pack: "cores",
       appIds: ["a", "b", "c", "d", "e"],
+      style: null,
     });
     expect(invoke).toHaveBeenCalledWith("icon_pack_preview", {
       pack: null,
       appIds: ["a", "b", "c", "d", "e"],
+      style: null,
     });
     const pictures = card("Cores lisas").querySelectorAll("img");
     expect([...pictures].map((img) => img.getAttribute("src"))).toEqual(
@@ -206,6 +208,7 @@ describe("IconPacksField", () => {
     expect(invoke).toHaveBeenCalledWith("icon_pack_preview", {
       pack: "cores",
       appIds: ["a"],
+      style: null,
     });
   });
 

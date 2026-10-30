@@ -1,6 +1,7 @@
 import type { AppErrorCode } from "../core/apps";
 import type { HotkeyErrorCode } from "../core/launcher";
 import type { PackErrorCode } from "../core/iconPacks";
+import type { ThemeId } from "../core/themes";
 import type {
   DockEdge,
   DockOpacity,
@@ -67,7 +68,7 @@ const messages = {
   settings: {
     /** Label of each option group, by setting. */
     groups: {
-      theme: "Tema",
+      theme: "Modo de cor",
       language: "Idioma",
       edge: "Posição",
       size: "Tamanho",
@@ -112,8 +113,9 @@ const messages = {
         behavior: "Comportamento",
         launcher: "Lançador",
         startup: "Inicialização",
-        style: "Tema",
-        tweaks: "Personalizar este tema",
+        themes: "Temas",
+        style: "Estilo da barra",
+        tweaks: "Personalizar este estilo",
         hover: "Ao passar o mouse",
         indicator: "Indicador",
         icons: "Ícones",
@@ -255,6 +257,20 @@ const messages = {
     look: {
       /** The row that opens it, and its title. */
       title: "Aparência do dock",
+      /** The themes (spec 0020): a style, an icon pack and a mark at once. */
+      themes: "Tema",
+      themeNames: {
+        standard: "Padrão",
+        neon: "Neon",
+        glaze: "Esmalte",
+        glass: "Vidro",
+        midnight: "Meia-noite",
+        retro: "Retrô",
+        classic98: "Clássico 98",
+        phosphor: "Fósforo",
+      } satisfies Record<ThemeId, string>,
+      themeCustom:
+        "Personalizado: o estilo, os ícones ou a cor do indicador não são os de um tema",
       style: "Estilo",
       styles: {
         native: "Nativo",
@@ -265,6 +281,9 @@ const messages = {
         neon: "Neon",
         paper: "Papel",
         floating: "Flutuante",
+        retro: "Retrô",
+        classic98: "Clássico 98",
+        phosphor: "Fósforo",
       } satisfies Record<DockStyle, string>,
       /** Group of the changes that belong to the chosen style. */
       tweaks: "Personalizar este estilo",

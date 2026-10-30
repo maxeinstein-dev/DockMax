@@ -1,0 +1,14 @@
+{
+  "name": "Fósforo",
+  "image": "skin.png",
+  "width": 7,
+  "height": 16,
+  "slice": {
+    "top": 0,
+    "right": 3,
+    "bottom": 0,
+    "left": 3
+  },
+  "middle": "repeat",
+  "pixelated": true
+}

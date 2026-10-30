@@ -119,3 +119,21 @@ span.mini-app {
   height: 2px;
   border-radius: 1px;
 }
+
+/* A skin (spec 0020 §3): the image is the bar, scaled without smoothing;
+   no fill, edge or shadow of its own. */
+.mini-bar[data-skin] {
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  border-style: solid;
+  border-image-source: var(--mini-skin);
+  border-image-slice: var(--mini-skin-slice);
+  border-image-width: var(--mini-skin-width);
+  border-image-repeat: var(--mini-skin-repeat);
+  image-rendering: pixelated;
+}
+
+.mini-bar[data-skin]::before {
+  display: none;
+}

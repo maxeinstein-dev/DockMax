@@ -120,7 +120,7 @@ describe("LookPanel", () => {
     expect(sentSettings().dock.iconPack).toBe("cores");
   });
 
-  it("lists the eight styles in order, with the one in use chosen", () => {
+  it("lists the styles in order, with the one in use chosen", () => {
     render(
       <LookPanel settings={withDock({ style: "neon" })} onBack={vi.fn()} />,
     );
@@ -135,8 +135,26 @@ describe("LookPanel", () => {
       "Neon",
       "Papel",
       "Flutuante",
+      "Retrô",
+      "Clássico 98",
+      "Fósforo",
     ]);
     expect(chosen(text.style)).toEqual(["Neon"]);
+  });
+
+  it("leaves the border and the corners out for a skin, its image has them", () => {
+    render(
+      <LookPanel
+        settings={withDock({ style: "classic98" })}
+        onBack={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("switch", { name: text.border })).toBeNull();
+    expect(screen.queryByRole("slider", { name: text.corners })).toBeNull();
+    expect(
+      screen.getByRole("switch", { name: text.reflections }),
+    ).toBeInTheDocument();
   });
 
   it("saves the full settings on choosing a style", () => {

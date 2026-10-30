@@ -1,0 +1,30 @@
+# Skin Clássico 98 (spec 0020 §3): o painel elevado do Windows 95/98.
+# Para gerar de novo: python gerar.py classic98
+
+skin.name: Clássico 98
+skin.left: 2
+skin.right: 2
+skin.middle: stretch
+
+cor.f: #FFFFFF
+cor.g: #DFDFDF
+cor.7: #C0C0C0
+cor.8: #808080
+cor.0: #000000
+
+ffff0
+fgg80
+fg780
+fg780
+fg780
+fg780
+fg780
+fg780
+fg780
+fg780
+fg780
+fg780
+fg780
+fg780
+f8880
+00000
