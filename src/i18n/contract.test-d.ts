@@ -171,6 +171,10 @@ export const otherText: Messages = {
         tactical: "Tactical",
         medieval: "Medieval 8-bit",
       },
+      themeKeep: "Keep?",
+      themeRevertIn: "In {seconds} s",
+      themeKeepButton: "Keep",
+      themeRevertButton: "Revert",
       themeCustom: "Custom",
       style: "Style",
       styles: {

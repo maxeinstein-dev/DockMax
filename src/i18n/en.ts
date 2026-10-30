@@ -210,6 +210,10 @@ export const en: Messages = {
         tactical: "Tactical",
         medieval: "Medieval 8-bit",
       },
+      themeKeep: "Keep this theme?",
+      themeRevertIn: "Reverting in {seconds} s",
+      themeKeepButton: "Keep",
+      themeRevertButton: "Revert",
       themeCustom:
         "Custom: the style, the icons or the indicator color aren't a theme's",
       style: "Style",

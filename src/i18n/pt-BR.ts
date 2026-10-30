@@ -271,6 +271,12 @@ const messages = {
         tactical: "Tático",
         medieval: "Medieval 8-bit",
       } satisfies Record<ThemeId, string>,
+      /** Trying a theme (spec 0020): keep it, or back to the choices before;
+       * `{seconds}` left before it goes back by itself. */
+      themeKeep: "Manter este tema?",
+      themeRevertIn: "Volta ao anterior em {seconds} s",
+      themeKeepButton: "Manter",
+      themeRevertButton: "Voltar ao anterior",
       themeCustom:
         "Personalizado: o estilo, os ícones ou a cor do indicador não são os de um tema",
       style: "Estilo",

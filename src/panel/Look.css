@@ -83,3 +83,32 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* Trying a theme (spec 0020): keep it or go back, before the time runs out,
+   like a new screen resolution in Windows. */
+.theme-trial {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+
+.theme-trial-text {
+  margin: 0;
+  font-size: 13px;
+}
+
+.theme-trial-left {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.theme-trial-actions {
+  display: flex;
+  gap: 8px;
+}
