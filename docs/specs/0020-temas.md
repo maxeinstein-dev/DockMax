@@ -2,7 +2,15 @@
 
 Extensão da fase G ([spec 0019](0019-fase-g-extras.md)): **temas** que vestem o dock de uma vez, como os temas sazonais do PrimoDock, começando por temas gamer.
 
-**Status:** em andamento: passo 1 (galeria de Temas), passo 2 (launchers) e passo 3 (skins de barra, com Retrô, Clássico 98 e Fósforo) passo 4 (Tático) passo 5 (Medieval 8-bit) e passo 6 (Caçador).
+**Status:** primeira leva concluída em 2026-10-30, com os seis passos entregues e testados ao vivo:
+1. galeria de Temas e novos nomes (#109);
+2. glifos dos launchers (#111);
+3. skins de barra, com Retrô, Clássico 98 e Fósforo (#113);
+4. Tático (#114);
+5. Medieval 8-bit (#116);
+6. Caçador (#117).
+
+Também entrou o "experimentar e voltar" (#115). Ficam para depois: os temas Cyberpunk, Arcade e Sci-fi; os widgets do dock no tom do tema (Q9); e uma pasta `Skins` para barras de terceiros (Q14).
 
 ## 1. Decisões do autor (2026-10-30)
 
