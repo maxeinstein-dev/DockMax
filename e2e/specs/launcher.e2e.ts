@@ -45,7 +45,9 @@ describe("Launcher", () => {
     );
     const found = await launcherView();
     expect(found.selected).toBe(0);
-    expect(found.results.length).toBeLessThanOrEqual(8);
+    // Up to 8 programs and pages, then up to 8 open windows (L7); files
+    // only from 3 letters on (L4).
+    expect(found.results.length).toBeLessThanOrEqual(16);
 
     await pressLauncherKey("down");
     await until((view) => view.selected === 1, "Down did not move on");
