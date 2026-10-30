@@ -4,7 +4,7 @@
 
 Aplicativo desktop para Windows inspirado em docks personalizáveis, com foco em produtividade, widgets integrados e integração progressiva com o sistema operacional.
 
-> **Status:** versão 0.3.0, o **MVP**: um dock que ocupa o lugar da barra de tarefas do Windows (com restauração garantida), oito estilos de barra, apps fixados com o ícone real e o menu do programa, relógio, bandeja do sistema, os widgets Relógio, Progresso do tempo e Nota, início com o Windows e dados locais em SQLite. O que ainda não existe (apps abertos, prévias, espaços de trabalho, mais widgets, ícones personalizados) está em [limitações](docs/limitacoes.md) e no [escopo do MVP](docs/roadmap.md). O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O Dockyard é um projeto independente e não é afiliado ao PrimoDock.
+> **Status:** versão 0.7.0, com as fases A a G da [spec 0004](docs/specs/0004-paridade-primodock.md) concluídas: um dock que ocupa o lugar da barra de tarefas do Windows (com restauração garantida), apps fixados e abertos com prévias, espaços de trabalho, 15 widgets, o lançador, temas, pacotes de ícones, português e inglês e atualização automática. O que ainda não existe está em [limitações](docs/limitacoes.md); o andamento, no [roadmap](docs/roadmap.md). O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O Dockyard é um projeto independente e não é afiliado ao PrimoDock.
 
 ## Instalar
 
@@ -119,18 +119,19 @@ O Dockyard abre um dock que **ocupa o lugar da barra de tarefas do Windows**: re
 - ícones com ampliação, rótulo e ponto indicador; o clique atravessa a área transparente em volta do dock;
 - **apps fixados** ([spec 0006](docs/specs/0006-fase-b-apps.md)): escolha na lista de programas instalados (a mesma do menu Iniciar) ou **solte um programa ou atalho no dock** para fixá-lo, com o ícone real; o clique abre o programa e o botão direito mostra o mesmo menu da barra do Windows (tarefas, recentes, Abrir, Remover); **arraste um app no dock** para mudar a ordem (ou use Configurações › Apps do dock);
 - **programas abertos** ([spec 0009](docs/specs/0009-fase-d-janelas.md)): os apps fixados que estão abertos ganham o indicador, e o clique traz a janela para a frente, minimiza ou passa para a próxima janela do programa; os abertos que não estão fixados aparecem depois dos widgets (dá para esconder em Configurações); o botão do meio do mouse abre uma nova instância e o botão direito abre um menu (fechar janela, fixar no dock);
-- oito **estilos de barra** (Nativo, Liquid Glass, Meia-noite, Rocket, Prateleira Aqua, Neon, Papel e Flutuante), efeito ao passar o mouse e indicador, em Configurações › Aparência do dock;
+- **prévias** ([spec 0015](docs/specs/0015-fase-e-previas.md)): passar o mouse sobre um programa aberto mostra o cartão com as miniaturas ao vivo das janelas, para ativar ou fechar cada uma;
+- **espaços de trabalho** ([spec 0013](docs/specs/0013-fase-c-espacos-de-trabalho.md)): cada espaço tem os seus itens e as suas janelas, por monitor; troca pelas bolinhas, pela roda do mouse sobre o dock, por `Ctrl+Alt+1…9` ou pelo menu;
+- **selos de notificação** ([spec 0016](docs/specs/0016-selos-de-notificacao.md)) nos ícones e **arrastar entre o dock e as pastas** ([spec 0018](docs/specs/0018-arrastar-entre-dock-e-pastas.md)): um app solto numa pasta abre nela, e arquivos soltos num app abrem com ele;
+- 14 **estilos de barra** (Nativo, Liquid Glass, Meia-noite, Rocket, Prateleira Aqua, Neon, Papel, Flutuante e as skins Retrô, Clássico 98, Fósforo, Tático, Medieval 8-bit e Caçador), **temas** que aplicam de uma vez o estilo, o pacote de ícones e a cor do indicador ([spec 0020](docs/specs/0020-temas.md)), efeito ao passar o mouse e indicador, em Configurações › Aparência do dock;
 - **relógio com data** no fim do dock e **bandeja do sistema** hospedada pelo Dockyard: o botão direito num ícone abre o menu do próprio programa;
-- **widgets**, cada um um item do dock que abre o próprio painel:
-  - **Relógio**: hora viva no ícone (digital ou analógica), fuso, 12/24 h e segundos no painel;
-  - **Progresso do tempo**: anel no ícone e painel com dia, semana, mês, ano e expediente;
-  - **Nota**: texto com salvamento automático;
-- painel de **Configurações** (tema, posição, tamanho, opacidade e **Itens do dock**, onde se adiciona, reordena e remove widgets) e painel **Sobre**;
+- **widgets** ([spec 0017](docs/specs/0017-fase-f-widgets.md)), cada um um item do dock que abre o próprio painel: Relógio, Progresso do tempo, Nota, Atividade (CPU e memória), Atividade de rede, Calendário e Ciclo (com uma conta Google), Contagem regressiva, Pomodoro, Lista de tarefas, Beber água, Tocando agora, Uso do Claude, Clima e Lançador;
+- o **lançador** (Alt+Espaço, [spec 0012](docs/specs/0012-lancador.md)), no estilo do Ulauncher: apps, contas, conversões de unidades e moedas, busca na web por palavra-chave, páginas de configurações, arquivos e pastas, caminhos, janelas abertas e o histórico da área de transferência;
+- o app de **Configurações** (Geral, Espaços de trabalho, Aparência do dock, Apps do dock, Widgets, Contas e Sobre) e o painel **Sobre**, com o **tour** de boas-vindas ([spec 0019](docs/specs/0019-fase-g-extras.md) G2);
 - ícone na bandeja para mostrar ou ocultar o dock, abrir as Configurações e sair;
 - **Iniciar com o Windows** ([spec 0008](docs/specs/0008-fechamento-do-mvp.md)), desligado por padrão;
-- leitura de **pacotes de ícones** próprios da pasta `IconPacks` ([spec 0007](docs/specs/0007-fase-b4-icones.md)), como recurso avançado: há um pacote de exemplo em [`docs/examples/icon-packs`](docs/examples/icon-packs/).
+- **pacotes de ícones** ([spec 0007](docs/specs/0007-fase-b4-icones.md)): 15 embutidos, escolhidos em Aparência › Ícones dos apps, e pacotes próprios lidos da pasta `IconPacks`, como recurso avançado (há um exemplo em [`docs/examples/icon-packs`](docs/examples/icon-packs/)).
 
-Onde ficam os seus dados (nada sai da máquina):
+Onde ficam os seus dados (o que fala com a internet está em [limitações › O que usa a rede](docs/limitacoes.md#o-que-usa-a-rede)). A pasta e o banco continuam com o nome `dockmax`, de antes do renome, de propósito:
 
 | O quê | Onde |
 |---|---|
@@ -139,8 +140,9 @@ Onde ficam os seus dados (nada sai da máquina):
 | Cópias de segurança e recuperação | `dockmax.db.bak-v*` e `dockmax.db.corrompido-*`, na mesma pasta: o Dockyard nunca apaga seu banco nem esses arquivos, só renomeia um banco danificado |
 | Pacotes de ícones (opcional) | `%APPDATA%\dev.maxsueleinstein.dockmax\IconPacks\<id>\` |
 | Logs, sem dados pessoais | `%LOCALAPPDATA%\dev.maxsueleinstein.dockmax\logs` |
+| Acesso à conta Google (se conectada) | cofre de credenciais do Windows, cifrado para o seu usuário ([privacidade](docs/privacidade.md)) |
 
-Depois do MVP, as próximas etapas seguem as fases da [spec 0004](docs/specs/0004-paridade-primodock.md): apps abertos e prévias de janela, espaços de trabalho e mais widgets. A personalização de ícones (por app, imagem própria, pacote embutido) ficou para o futuro por decisão do autor.
+As próximas etapas estão no [estudo 0002](docs/estudos/0002-melhorias-e-funcionalidades.md): primeiro melhorias no que existe (memória, robustez, acessibilidade), depois funcionalidades novas. O ícone por app e a imagem própria seguem para o futuro.
 
 ## Licença
 

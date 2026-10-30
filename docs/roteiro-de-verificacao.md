@@ -2,18 +2,18 @@
 
 A rodada única de verificações que o autor decidiu fazer depois da fase D (roadmap, "Verificações pendentes", 2026-10-26). Reúne tudo o que as specs e os PRs marcaram como **não verificado**. Cada passo diz o que fazer e o que deve acontecer.
 
-Use o build de release mais novo, com o mouse e o teclado de verdade. Ao fechar o DockMax, confira se a barra do Windows voltou como estava. Quando algo falhar, anote o passo, o que aconteceu e, se der, uma captura.
+Use o build de release mais novo, com o mouse e o teclado de verdade. Ao fechar o Dockyard, confira se a barra do Windows voltou como estava. Quando algo falhar, anote o passo, o que aconteceu e, se der, uma captura.
 
 **Legenda:** `[x]` confirmado (com a data e quem confirmou) · `[ ]` a fazer.
 
 ## Já confirmado pelo autor (2026-10-26)
 
-- [x] Arrastar para reordenar no dock nativo, com o mouse de verdade: o ícone sobe, os outros abrem espaço, e ao soltar ele desliza até o lugar ([PR #28](https://github.com/maxeinstein-dev/DockMax/pull/28)).
-- [x] Arrastar widgets e apps abertos, e misturar apps e widgets pelo arrasto ([PR #26](https://github.com/maxeinstein-dev/DockMax/pull/26)).
-- [x] Arrastar um ícone do painel da bandeja para o dock ([PR #26](https://github.com/maxeinstein-dev/DockMax/pull/26)).
-- [x] O botão direito num ícone da bandeja no dock abre o menu do programa em cima do ícone ([PR #26](https://github.com/maxeinstein-dev/DockMax/pull/26)).
-- [x] Um dock em cada monitor, nos dois monitores do autor ([PR #27](https://github.com/maxeinstein-dev/DockMax/pull/27)).
-- [x] Ocultar automaticamente: desce, sobe na borda e fica à mostra com o ponteiro em cima ([PR #29](https://github.com/maxeinstein-dev/DockMax/pull/29)).
+- [x] Arrastar para reordenar no dock nativo, com o mouse de verdade: o ícone sobe, os outros abrem espaço, e ao soltar ele desliza até o lugar ([PR #28](https://github.com/maxeinstein-dev/Dockyard/pull/28)).
+- [x] Arrastar widgets e apps abertos, e misturar apps e widgets pelo arrasto ([PR #26](https://github.com/maxeinstein-dev/Dockyard/pull/26)).
+- [x] Arrastar um ícone do painel da bandeja para o dock ([PR #26](https://github.com/maxeinstein-dev/Dockyard/pull/26)).
+- [x] O botão direito num ícone da bandeja no dock abre o menu do programa em cima do ícone ([PR #26](https://github.com/maxeinstein-dev/Dockyard/pull/26)).
+- [x] Um dock em cada monitor, nos dois monitores do autor ([PR #27](https://github.com/maxeinstein-dev/Dockyard/pull/27)).
+- [x] Ocultar automaticamente: desce, sobe na borda e fica à mostra com o ponteiro em cima ([PR #29](https://github.com/maxeinstein-dev/Dockyard/pull/29)).
 - [x] Abrir o DockMax pelo menu Iniciar traz o dock de volta.
 
 ## Resultado da rodada de 2026-10-27
@@ -29,7 +29,7 @@ O autor rodou os blocos 1 a 4 com o build do main depois do #29.
   - Os painéis do Windows (Wi-Fi, volume e bateria) abrem sempre no monitor principal. O Windows só os abre pelo atalho Win+A, sem escolha de monitor.
   - Com tela cheia no monitor principal e o segundo monitor em uso, o dock do principal volta por cima do vídeo.
 - **Não feito:** o instalador (não há outra máquina) e o uso longo.
-- **Retirado:** "Ícones dos apps". É um seletor de pacotes lidos de uma pasta, e o DockMax não traz pacote embutido, então só há "Original" (ver limitações).
+- **Retirado:** "Ícones dos apps". É um seletor de pacotes lidos de uma pasta, e o DockMax não trazia pacote embutido, então só havia "Original". *Atualizado em 2026-10-30:* hoje vêm 15 pacotes embutidos (spec 0019 G4 e spec 0020), e a seção foi vista ao vivo com os 12 de então ([spec 0019](specs/0019-fase-g-extras.md) §7).
 
 ## 1. Cliques no dock (uns 10 minutos)
 
@@ -42,7 +42,7 @@ O autor rodou os blocos 1 a 4 com o build do main depois do #29.
 - [ ] **Direito num programa aberto não fixado:** abre o menu com nova instância, fechar janela e "Fixar no dock".
 - [ ] **Fechar janela pelo menu**, num programa com algo não salvo (o Bloco de Notas com texto novo, por exemplo): o programa pergunta se quer salvar, e nada se perde.
 - [ ] **Direito no espaço vazio do dock:** o menu tem Gerenciador de Tarefas, Configurações, Ocultar automaticamente (com a marca) e Sair, e cada um faz o que diz.
-- [ ] **Menu do ícone do DockMax na área de notificação:** os mesmos itens, e a marca de "Ocultar automaticamente" acompanha a configuração.
+- [ ] **Menu do ícone do Dockyard na área de notificação:** os mesmos itens, e a marca de "Ocultar automaticamente" acompanha a configuração.
 
 ## 2. Aparência do dock nativo (uns 15 minutos)
 
@@ -60,8 +60,8 @@ O autor rodou os blocos 1 a 4 com o build do main depois do #29.
 ## 4. Dois monitores (uns 10 minutos)
 
 - [ ] O mouse no **segundo dock**: abrir um painel (abre no monitor dele), um menu e um arrasto.
-- [ ] **Ligar e desligar um monitor** com o DockMax aberto: o dock dele some e volta, e a faixa é devolvida.
-- [ ] Desligar e religar "Dock em todos os monitores" com o DockMax aberto.
+- [ ] **Ligar e desligar um monitor** com o Dockyard aberto: o dock dele some e volta, e a faixa é devolvida.
+- [ ] Desligar e religar "Dock em todos os monitores" com o Dockyard aberto.
 - [x] **Tela cheia de verdade no segundo monitor** (um vídeo do YouTube em tela cheia): só o dock daquele monitor some, e usar o outro monitor não o traz de volta por cima do vídeo. (Autor, 2026-10-27.)
 - [ ] **Tela cheia no monitor principal**, idem, e um jogo em tela cheia exclusiva, se houver.
 
@@ -69,7 +69,7 @@ O autor rodou os blocos 1 a 4 com o build do main depois do #29.
 
 - [ ] Instalar numa máquina limpa ou numa máquina virtual com Windows 11.
 - [ ] Instalar no **Windows 10**: o que funciona e o que não.
-- [ ] Atualizar por cima de uma versão anterior **com o DockMax aberto**.
+- [ ] Atualizar por cima de uma versão anterior **com o Dockyard aberto**.
 - [ ] Desinstalar: o programa sai, os dados ficam (a pasta em `%APPDATA%`), e a barra do Windows volta.
 
 ## 6. Longo prazo

@@ -1,6 +1,6 @@
 # Spec 0018: arrastar entre o dock e as pastas
 
-**Status:** em andamento.
+**Status:** implementada em 2026-10-28 (#63), com a correção do #64 (arquivos abrem pelo handler do "Abrir com" do app, o que faz o Bloco de notas abrir um `.txt`). Testado ao vivo o Explorer nas duas direções; VS Code e Terminal funcionaram na máquina do autor; os apps da Store não foram testados ao vivo.
 
 Pedido do autor: "ao arrastar o app do dock para a pasta, abrir a pasta dentro do app. Por exemplo, arrastar o VS Code para uma pasta no Explorer faz abrir o VS Code dentro dessa pasta. Assim como no terminal. O contrário também poderia ser válido: arrastar a pasta ou o arquivo para o app faz com que abra aquele arquivo com o app."
 
