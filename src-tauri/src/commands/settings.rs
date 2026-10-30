@@ -243,6 +243,16 @@ pub fn current(app: &AppHandle) -> Settings {
         .unwrap_or_default()
 }
 
+/// Whether the dock is drawn dark now: the setting, or Windows' own. The
+/// icon pack's dark images follow it.
+pub fn dark_now(app: &AppHandle) -> bool {
+    match current(app).theme {
+        Theme::System => crate::windows::native_dock::system_dark(),
+        Theme::Light => false,
+        Theme::Dark => true,
+    }
+}
+
 /// Called by both windows at startup.
 #[tauri::command]
 pub fn get_settings(state: State<'_, Mutex<SettingsState>>) -> Settings {

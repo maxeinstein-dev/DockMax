@@ -134,9 +134,9 @@ pub const ESMALTE: Bundled = Bundled {
     ),
 };
 
-/// Traço: the same glyphs alone, in a thin line of one neutral gray (the
-/// format has no image per theme), drawn by `icon-packs/fonte/vetor.py`. A
-/// test checks this list against the pack.
+/// Traço: the same glyphs alone, in a thin line, with an ink for the light
+/// theme (`apps/`) and one for the dark (`escuro/`), drawn by
+/// `icon-packs/fonte/vetor.py`. A test checks this list against the pack.
 pub const TRACO: Bundled = Bundled {
     id: "traco",
     files: pack_files!("traco":
@@ -184,6 +184,49 @@ pub const TRACO: Bundled = Bundled {
         "apps/word.png",
         "apps/xbox.png",
         "apps/zoom.png",
+        "escuro/bloco-de-notas.png",
+        "escuro/brave.png",
+        "escuro/calculadora.png",
+        "escuro/captura.png",
+        "escuro/chatgpt.png",
+        "escuro/chrome.png",
+        "escuro/claude.png",
+        "escuro/configuracoes.png",
+        "escuro/discord.png",
+        "escuro/docker.png",
+        "escuro/edge.png",
+        "escuro/excel.png",
+        "escuro/explorador.png",
+        "escuro/figma.png",
+        "escuro/filezilla.png",
+        "escuro/firefox.png",
+        "escuro/fotos.png",
+        "escuro/gerenciador.png",
+        "escuro/github.png",
+        "escuro/grade.png",
+        "escuro/lixeira.png",
+        "escuro/notion.png",
+        "escuro/obs.png",
+        "escuro/onenote.png",
+        "escuro/opera.png",
+        "escuro/outlook.png",
+        "escuro/paint.png",
+        "escuro/powerpoint.png",
+        "escuro/powershell.png",
+        "escuro/prompt.png",
+        "escuro/slack.png",
+        "escuro/spotify.png",
+        "escuro/steam.png",
+        "escuro/store.png",
+        "escuro/teams.png",
+        "escuro/telegram.png",
+        "escuro/terminal.png",
+        "escuro/vlc.png",
+        "escuro/vscode.png",
+        "escuro/whatsapp.png",
+        "escuro/word.png",
+        "escuro/xbox.png",
+        "escuro/zoom.png",
     ),
 };
 
@@ -335,8 +378,16 @@ mod tests {
                 .icons
                 .values()
                 .chain(manifest.fallback.iter())
+                .chain(manifest.dark.values())
                 .map(String::as_str)
                 .collect();
+            // A dark image stands for one of the pack.
+            assert!(
+                manifest
+                    .dark
+                    .keys()
+                    .all(|image| named.contains(image.as_str()))
+            );
             let listed: BTreeSet<&str> = pack
                 .files
                 .iter()
@@ -344,8 +395,12 @@ mod tests {
                 .filter(|path| *path != "pack.json")
                 .collect();
             assert_eq!(named, listed, "{name}");
+            let mut on_disk = names_in(&format!("{}/apps", pack.id), "apps/");
+            if folder(&format!("{}/escuro", pack.id)).is_dir() {
+                on_disk.extend(names_in(&format!("{}/escuro", pack.id), "escuro/"));
+            }
             assert_eq!(
-                names_in(&format!("{}/apps", pack.id), "apps/"),
+                on_disk,
                 listed.iter().map(|path| path.to_string()).collect(),
                 "{name}"
             );
@@ -366,6 +421,7 @@ mod tests {
                 .icons
                 .values()
                 .chain(pack.manifest.fallback.iter())
+                .chain(pack.manifest.dark.values())
             {
                 assert!(icon_packs::read_image(&pack, path).is_some(), "{path}");
             }
@@ -692,51 +748,69 @@ mod tests {
     }
 
     #[test]
-    fn the_line_glyphs_are_one_ink_seen_on_both_themes() {
-        let hex = LINE
-            .lines()
-            .find_map(|line| line.strip_prefix("cor:"))
-            .unwrap()
-            .trim();
-        let byte = |at: usize| u8::from_str_radix(&hex[at..at + 2], 16).unwrap();
-        let ink = [byte(1), byte(3), byte(5)];
-        // The dock's porcelain (light) and graphite (dark): the pack has one
-        // image for both, so the ink must read on each (3:1, WCAG for
-        // graphics).
-        for surface in [[247, 247, 249], [38, 39, 44]] {
-            assert!(contrast(ink, surface) >= 3.0, "{surface:?}");
-        }
+    fn the_line_glyphs_have_an_ink_for_each_theme() {
+        let ink = |key: &str| {
+            let hex = LINE
+                .lines()
+                .find_map(|line| line.strip_prefix(key))
+                .unwrap()
+                .trim();
+            let byte = |at: usize| u8::from_str_radix(&hex[at..at + 2], 16).unwrap();
+            [byte(1), byte(3), byte(5)]
+        };
+        let manifest = TRACO.manifest();
         let images: BTreeMap<&str, &[u8]> = TRACO
             .files
             .iter()
             .filter(|(path, _)| *path != "pack.json")
             .copied()
             .collect();
-        assert_eq!(
-            glyphs().keys().map(String::as_str).collect::<Vec<_>>(),
-            images.keys().copied().collect::<Vec<_>>()
-        );
-        assert_eq!(
-            names_in("fonte/traco-svg", "apps/")
-                .iter()
-                .map(|name| name.replace(".svg", ".png"))
-                .collect::<Vec<_>>(),
-            images
+        // The light ink on the dock's porcelain, the dark one on its
+        // graphite: both read well past the 3:1 WCAG asks of graphics.
+        for (folder_of, ink, surface) in [
+            ("apps/", ink("cor:"), [247, 247, 249]),
+            ("escuro/", ink("cor-escuro:"), [38, 39, 44]),
+        ] {
+            assert!(contrast(ink, surface) >= 4.5, "{folder_of}");
+            let in_folder: Vec<&str> = images
                 .keys()
-                .map(|path| path.to_string())
-                .collect::<Vec<_>>()
-        );
-        for (path, bytes) in images {
-            let (side, pixels) = decode(bytes);
-            assert_eq!(side, 128, "{path}");
-            let pixels = pixels.as_chunks::<4>().0;
-            assert_eq!(pixels[0], [0, 0, 0, 0], "{path}");
-            // Every pixel drawn is the ink; only its opacity varies.
-            for pixel in pixels.iter().filter(|p| p[3] > 0) {
-                assert_eq!(pixel[..3], ink, "{path}");
+                .copied()
+                .filter(|path| path.starts_with(folder_of))
+                .collect();
+            assert_eq!(
+                glyphs()
+                    .keys()
+                    .map(|path| path.replace("apps/", folder_of))
+                    .collect::<Vec<_>>(),
+                in_folder
+            );
+            for path in in_folder {
+                let (side, pixels) = decode(images[path]);
+                assert_eq!(side, 128, "{path}");
+                let pixels = pixels.as_chunks::<4>().0;
+                assert_eq!(pixels[0], [0, 0, 0, 0], "{path}");
+                // Every pixel drawn is the ink; only its opacity varies.
+                for pixel in pixels.iter().filter(|p| p[3] > 0) {
+                    assert_eq!(pixel[..3], ink, "{path}");
+                }
+                let solid = pixels.iter().filter(|p| p[3] == 255).count();
+                assert!(solid > 100, "{path}: {solid} solid pixels");
             }
-            let solid = pixels.iter().filter(|p| p[3] == 255).count();
-            assert!(solid > 100, "{path}: {solid} solid pixels");
+        }
+        // Every image has its dark one, and the SVGs of both are there.
+        for (image, dark) in &manifest.dark {
+            assert_eq!(dark, &image.replace("apps/", "escuro/"));
+        }
+        assert_eq!(manifest.dark.len(), glyphs().len());
+        for svgs in ["fonte/traco-svg", "fonte/traco-escuro-svg"] {
+            assert_eq!(
+                names_in(svgs, "apps/")
+                    .iter()
+                    .map(|name| name.replace(".svg", ".png"))
+                    .collect::<Vec<_>>(),
+                glyphs().keys().cloned().collect::<Vec<_>>(),
+                "{svgs}"
+            );
         }
     }
 

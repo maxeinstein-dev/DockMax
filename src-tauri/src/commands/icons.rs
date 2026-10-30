@@ -81,12 +81,13 @@ pub fn pack_named(app: &AppHandle, id: &str) -> Option<Pack> {
 }
 
 /// The image `pack_id` has for a program known by `names`, as the bytes of a
-/// PNG; `None` if the pack is gone, does not cover it and has no fallback, or
-/// the image is not good. Reads a file: off the event loop.
-pub fn pack_icon(app: &AppHandle, pack_id: &str, names: &[String]) -> Option<Vec<u8>> {
+/// PNG, the dark one while `dark` if the pack has it; `None` if the pack is
+/// gone, does not cover it and has no fallback, or the image is not good.
+/// Reads a file: off the event loop.
+pub fn pack_icon(app: &AppHandle, pack_id: &str, names: &[String], dark: bool) -> Option<Vec<u8>> {
     let pack = pack_named(app, pack_id)?;
     let names: Vec<&str> = names.iter().map(String::as_str).collect();
-    let image = pack.manifest.image_for(&names)?;
+    let image = pack.manifest.image_in_theme(&names, dark)?;
     icon_packs::read_image(&pack, image)
 }
 
