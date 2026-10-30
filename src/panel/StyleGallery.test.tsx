@@ -18,8 +18,8 @@ const DOCK: DockSettings = {
   ...DEFAULT_LOOK,
 };
 
-const gallery = () => screen.getByRole("group", { name: "Tema" });
-const card = (name: string) => within(gallery()).getByRole("button", { name });
+const gallery = () => screen.getByRole("radiogroup", { name: "Tema" });
+const card = (name: string) => within(gallery()).getByRole("radio", { name });
 const bar = (name: string) =>
   card(name).querySelector<HTMLElement>(".mini-bar") as HTMLElement;
 
@@ -43,9 +43,9 @@ describe("StyleGallery", () => {
     );
     await act(async () => {});
 
-    expect(within(gallery()).getAllByRole("button")).toHaveLength(14);
-    expect(card("Neon")).toHaveAttribute("aria-pressed", "true");
-    expect(card("Papel")).toHaveAttribute("aria-pressed", "false");
+    expect(within(gallery()).getAllByRole("radio")).toHaveLength(14);
+    expect(card("Neon")).toHaveAttribute("aria-checked", "true");
+    expect(card("Papel")).toHaveAttribute("aria-checked", "false");
     const images = [...card("Papel").querySelectorAll("img")];
     // Decorative: the card's name says which style it is.
     expect(images.map((img) => img.getAttribute("alt"))).toEqual([
@@ -174,9 +174,9 @@ describe("StyleGallery", () => {
       />,
     );
 
-    for (const each of within(gallery()).getAllByRole("button")) {
+    for (const each of within(gallery()).getAllByRole("radio")) {
       expect(each).toBeDisabled();
-      expect(each).toHaveAttribute("aria-pressed", "false");
+      expect(each).toHaveAttribute("aria-checked", "false");
     }
   });
 });

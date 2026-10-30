@@ -9,6 +9,7 @@ import {
 import { useEffect, useState } from "react";
 import { format, useT } from "../i18n";
 import ChoiceCards from "./parts/ChoiceCards";
+import "./parts/parts.css";
 import { MINI_ITEMS, MiniDock, type GalleryDock } from "./StyleGallery";
 import { usePackPreview } from "./usePackPreview";
 
@@ -40,6 +41,10 @@ type Choices = Pick<DockSettings, "style" | "iconPack" | "indicatorColor">;
 /** How long a theme tried waits to be kept before the dock goes back. */
 export const KEEP_SECONDS = 15;
 
+/** The seconds left when a screen reader hears again that the theme goes
+ * back: the countdown on screen is not read, second by second. */
+export const WARN_SECONDS = 5;
+
 /** The dock's three choices a theme makes. */
 function choicesNow(dock: GalleryDock): Choices {
   return {
@@ -59,6 +64,12 @@ function choicesNow(dock: GalleryDock): Choices {
  * "Manter" keeps it, "Voltar ao anterior" (or [`KEEP_SECONDS`] with no
  * answer) puts back the choices the dock had before the first theme tried.
  * Leaving the view keeps what is applied.
+ *
+ * A screen reader hears the question as it appears, again
+ * [`WARN_SECONDS`] before the theme goes back, and that it went back, from
+ * a live region always there whose text changes (one mounted with its text
+ * is not read). The focus stays on the card: the arrows and Enter keep
+ * trying themes, and Manter is the next Tab stop.
  */
 function ThemeGallery({
   dock,
@@ -80,18 +91,29 @@ function ThemeGallery({
     before: Choices;
     left: number;
   } | null>(null);
+  // The theme went back by itself, said until another one is tried.
+  const [reverted, setReverted] = useState(false);
   useEffect(() => {
     if (trial === null) return;
     const tick = window.setTimeout(() => {
       if (trial.left <= 1) {
         onApply(trial.before);
         setTrial(null);
+        setReverted(true);
       } else {
         setTrial({ ...trial, left: trial.left - 1 });
       }
     }, 1000);
     return () => window.clearTimeout(tick);
   }, [trial, onApply]);
+  const said =
+    trial === null
+      ? reverted
+        ? text.themeReverted
+        : ""
+      : trial.left <= WARN_SECONDS
+        ? format(text.themeRevertSoon, { seconds: WARN_SECONDS })
+        : format(text.themeKeepSaid, { seconds: KEEP_SECONDS });
 
   return (
     <div className="theme-field">
@@ -110,6 +132,7 @@ function ThemeGallery({
           const before = trial?.before ?? choicesNow(dock);
           onApply(choicesOf(theme));
           setTrial({ before, left: KEEP_SECONDS });
+          setReverted(false);
         }}
         thumb={(id) => {
           const theme = THEMES.find((each) => each.id === id);
@@ -119,6 +142,9 @@ function ThemeGallery({
         }}
         wide
       />
+      <p className="visually-hidden" role="status">
+        {said}
+      </p>
       {trial !== null ? (
         <div className="theme-trial" role="group" aria-label={text.themeKeep}>
           <p className="theme-trial-text">

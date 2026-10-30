@@ -52,12 +52,26 @@ function sentSettings(): Settings {
 const saves = () =>
   invoke.mock.calls.filter(([command]) => command === "update_settings");
 
-const group = (name: string) => screen.getByRole("group", { name });
+/** A choice by its label: the cards (styles, icon packs) are a radio
+ * group; the panel's segmented choices and the swatches, a group of toggle
+ * buttons. */
+const group = (name: string) =>
+  screen.queryByRole("radiogroup", { name }) ??
+  screen.getByRole("group", { name });
+
+/** The options of `group`: radios in the cards, buttons in the rest. */
+const optionsOf = (element: HTMLElement) =>
+  within(element).queryAllByRole("radio").length > 0
+    ? within(element).getAllByRole("radio")
+    : within(element).getAllByRole("button");
 
 function chosen(name: string): string[] {
-  return within(group(name))
-    .getAllByRole("button")
-    .filter((button) => button.getAttribute("aria-pressed") === "true")
+  return optionsOf(group(name))
+    .filter(
+      (option) =>
+        option.getAttribute("aria-checked") === "true" ||
+        option.getAttribute("aria-pressed") === "true",
+    )
     .map((button) => button.getAttribute("aria-label") ?? button.textContent)
     .filter((label): label is string => label !== null);
 }
@@ -114,7 +128,7 @@ describe("LookPanel", () => {
     await flush();
 
     fireEvent.click(
-      within(group(text.iconPack)).getByRole("button", { name: "Cores lisas" }),
+      within(group(text.iconPack)).getByRole("radio", { name: "Cores lisas" }),
     );
 
     expect(sentSettings().dock.iconPack).toBe("cores");
@@ -125,7 +139,7 @@ describe("LookPanel", () => {
       <LookPanel settings={withDock({ style: "neon" })} onBack={vi.fn()} />,
     );
 
-    const cards = within(group(text.style)).getAllByRole("button");
+    const cards = within(group(text.style)).getAllByRole("radio");
     expect(cards.map((card) => card.textContent)).toEqual([
       "Nativo",
       "Liquid Glass",
@@ -164,7 +178,7 @@ describe("LookPanel", () => {
     render(<LookPanel settings={SETTINGS} onBack={vi.fn()} />);
 
     fireEvent.click(
-      within(group(text.style)).getByRole("button", {
+      within(group(text.style)).getByRole("radio", {
         name: "Prateleira Aqua",
       }),
     );
@@ -483,7 +497,7 @@ describe("LookPanel", () => {
   it("cannot change anything while the settings can't be read", () => {
     render(<LookPanel settings={null} onBack={vi.fn()} />);
 
-    for (const card of within(group(text.style)).getAllByRole("button")) {
+    for (const card of within(group(text.style)).getAllByRole("radio")) {
       expect(card).toBeDisabled();
     }
     expect(screen.getByRole("switch", { name: text.border })).toBeDisabled();

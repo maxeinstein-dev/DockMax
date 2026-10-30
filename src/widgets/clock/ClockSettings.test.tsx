@@ -9,6 +9,7 @@ import { ptBR } from "../../i18n/pt-BR";
 import type { WidgetUpdate } from "../contract";
 import ClockSettings from "./ClockSettings";
 import { ianaTimeZones } from "./zones";
+import { getAlert, queryAlert } from "../../test/alerts";
 
 // `src` doesn't load the Node types; only `TZ` is needed here.
 declare const process: { env: Record<string, string | undefined> };
@@ -220,9 +221,7 @@ describe("the label", () => {
     fireEvent.blur(labelField());
 
     expect(onUpdate).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      text.errors.invalidLabel,
-    );
+    expect(getAlert()).toHaveTextContent(text.errors.invalidLabel);
     expect(labelField()).toHaveAttribute("aria-invalid", "true");
     expect(labelField()).toHaveValue("Lisboa");
   });
@@ -263,9 +262,7 @@ describe("the label", () => {
     });
 
     expect(onUpdate).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      text.errors.invalidLabel,
-    );
+    expect(getAlert()).toHaveTextContent(text.errors.invalidLabel);
     expect(labelField()).toHaveValue("Lisboa");
   });
 
@@ -363,9 +360,7 @@ describe("the time zone", () => {
       fireEvent.change(zoneField(), { target: { value: "Asia/Tokyo" } });
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      text.errors.invalidTimeZone,
-    );
+    expect(getAlert()).toHaveTextContent(text.errors.invalidTimeZone);
     expect(zoneField()).toHaveValue("America/Sao_Paulo");
   });
 });
@@ -498,9 +493,7 @@ describe("the segmented settings", () => {
     });
 
     expect(option("24 horas")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      text.errors.writeFailed,
-    );
+    expect(getAlert()).toHaveTextContent(text.errors.writeFailed);
   });
 
   it("clears the message on the next change", async () => {
@@ -515,10 +508,10 @@ describe("the segmented settings", () => {
     await act(async () => {
       fireEvent.click(option("12 horas"));
     });
-    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(getAlert()).toBeInTheDocument();
     fireEvent.click(option("Mostrar"));
 
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(queryAlert()).not.toBeInTheDocument();
     expect(screen.getByText(text.common.footer)).toBeInTheDocument();
   });
 
@@ -536,7 +529,7 @@ describe("the segmented settings", () => {
       first.reject({ code: "writeFailed" });
     });
 
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(queryAlert()).not.toBeInTheDocument();
     expect(option("12 horas")).toHaveAttribute("aria-pressed", "true");
     expect(option("Mostrar")).toHaveAttribute("aria-pressed", "true");
   });
@@ -550,9 +543,7 @@ describe("the segmented settings", () => {
       fireEvent.click(option("Mostrar"));
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      text.errors.writeFailed,
-    );
+    expect(getAlert()).toHaveTextContent(text.errors.writeFailed);
   });
 });
 
@@ -563,7 +554,7 @@ describe("Remover do dock", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remover do dock" }));
 
     expect(onRemove).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(queryAlert()).not.toBeInTheDocument();
   });
 
   it("is off while the removal runs", () => {
@@ -587,7 +578,7 @@ describe("Remover do dock", () => {
       fireEvent.click(remove);
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(text.errors.notFound);
+    expect(getAlert()).toHaveTextContent(text.errors.notFound);
     expect(remove).toBeEnabled();
   });
 });

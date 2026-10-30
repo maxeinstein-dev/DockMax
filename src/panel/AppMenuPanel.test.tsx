@@ -4,6 +4,7 @@ import type { AppMenu, PinnedApp } from "../core/apps";
 import type { WorkspacesSnapshot } from "../core/workspaces";
 import { ptBR } from "../i18n/pt-BR";
 import AppMenuPanel from "./AppMenuPanel";
+import { getAlert } from "../test/alerts";
 
 const text = ptBR.apps.menu;
 
@@ -162,7 +163,7 @@ describe("AppMenuPanel", () => {
     answer(new Error("x"));
     await renderMenu();
 
-    expect(screen.getByRole("alert")).toHaveTextContent(text.failed);
+    expect(getAlert()).toHaveTextContent(text.failed);
     expect(item(text.open)).toBeInTheDocument();
   });
 
@@ -176,9 +177,7 @@ describe("AppMenuPanel", () => {
     fireEvent.click(item("nota.txt"));
     await flush();
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      ptBR.apps.errors.launchFailed,
-    );
+    expect(getAlert()).toHaveTextContent(ptBR.apps.errors.launchFailed);
     expect(onDone).not.toHaveBeenCalled();
   });
 

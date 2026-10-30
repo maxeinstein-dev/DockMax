@@ -72,24 +72,31 @@ function UpdateRow() {
     line = format(text.installFailed, { error: outcome.error });
   }
 
+  // One status line in every state, kept by its key: a screen reader reads
+  // a change in a live region it knows, not one mounted with its text.
+  const status = (className: string, said: string | null) => (
+    <p key="status" className={`${className} live`} role="status">
+      {said}
+    </p>
+  );
+
   if (update.state === "available") {
     return (
       <div className="about-update">
-        <p className="about-update-line">
-          {format(text.available, { version: update.version })}
-        </p>
-        <button
-          type="button"
-          className="secondary-button about-update-install"
-          onClick={install}
-        >
-          {text.install}
-        </button>
-        {line ? (
-          <p className="about-update-note" role="status">
-            {line}
-          </p>
-        ) : null}
+        {[
+          <p key="version" className="about-update-line">
+            {format(text.available, { version: update.version })}
+          </p>,
+          <button
+            key="install"
+            type="button"
+            className="secondary-button about-update-install"
+            onClick={install}
+          >
+            {text.install}
+          </button>,
+          status("about-update-note", line),
+        ]}
       </div>
     );
   }
@@ -98,22 +105,26 @@ function UpdateRow() {
     const done = percent(update.downloaded, update.total);
     return (
       <div className="about-update">
-        <p className="about-update-line" role="status">
-          {done === null
-            ? format(text.downloadingNoSize, { version: update.version })
-            : format(text.downloading, {
-                version: update.version,
-                percent: done,
-              })}
-        </p>
-        {done === null ? null : (
-          <progress
-            className="about-update-progress"
-            max={100}
-            value={done}
-            aria-label={text.progress}
-          />
-        )}
+        {[
+          status(
+            "about-update-line",
+            done === null
+              ? format(text.downloadingNoSize, { version: update.version })
+              : format(text.downloading, {
+                  version: update.version,
+                  percent: done,
+                }),
+          ),
+          done === null ? null : (
+            <progress
+              key="progress"
+              className="about-update-progress"
+              max={100}
+              value={done}
+              aria-label={text.progress}
+            />
+          ),
+        ]}
       </div>
     );
   }
@@ -121,9 +132,12 @@ function UpdateRow() {
   if (update.state === "installing") {
     return (
       <div className="about-update">
-        <p className="about-update-line" role="status">
-          {format(text.installing, { version: update.version })}
-        </p>
+        {[
+          status(
+            "about-update-line",
+            format(text.installing, { version: update.version }),
+          ),
+        ]}
       </div>
     );
   }
@@ -131,19 +145,18 @@ function UpdateRow() {
   const checking = outcome.kind === "checking";
   return (
     <div className="about-update">
-      <button
-        type="button"
-        className="secondary-button"
-        onClick={check}
-        disabled={checking}
-      >
-        {checking ? text.checking : text.check}
-      </button>
-      {line ? (
-        <p className="about-update-note" role="status">
-          {line}
-        </p>
-      ) : null}
+      {[
+        <button
+          key="check"
+          type="button"
+          className="secondary-button"
+          onClick={check}
+          disabled={checking}
+        >
+          {checking ? text.checking : text.check}
+        </button>,
+        status("about-update-note", line),
+      ]}
     </div>
   );
 }

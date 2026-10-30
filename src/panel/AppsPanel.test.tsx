@@ -9,6 +9,12 @@ import {
 } from "../core/apps";
 import { ptBR } from "../i18n/pt-BR";
 import AppsPanel from "./AppsPanel";
+import {
+  expectSaidIn,
+  getAlert,
+  liveRegions,
+  queryAlert,
+} from "../test/alerts";
 
 const text = ptBR.apps;
 
@@ -164,11 +170,13 @@ describe("AppsPanel", () => {
     it("shows the reason in the footer when a change is refused", async () => {
       answer({ move_app: () => Promise.reject({ code: "notFound" }) });
       await renderPanel(snapshot([CALCULATOR, NOTEPAD]));
+      const before = liveRegions();
 
       fireEvent.click(button("Descer Calculadora"));
       await flush();
 
-      expect(screen.getByRole("alert")).toHaveTextContent(text.errors.notFound);
+      expect(getAlert()).toHaveTextContent(text.errors.notFound);
+      expectSaidIn(before, getAlert());
     });
 
     it("says notReady for a failure that has no code", async () => {
@@ -178,7 +186,7 @@ describe("AppsPanel", () => {
       fireEvent.click(button("Remover Calculadora do dock"));
       await flush();
 
-      expect(screen.getByRole("alert")).toHaveTextContent(text.errors.notReady);
+      expect(getAlert()).toHaveTextContent(text.errors.notReady);
     });
 
     it("clears the reason at the next action", async () => {
@@ -191,7 +199,7 @@ describe("AppsPanel", () => {
       fireEvent.click(button("Descer Calculadora"));
       await flush();
 
-      expect(screen.queryByRole("alert")).toBeNull();
+      expect(queryAlert()).toBeNull();
     });
   });
 
@@ -291,9 +299,7 @@ describe("AppsPanel", () => {
       fireEvent.click(button("Fixar Zoom"));
       await flush();
 
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        text.errors.alreadyPinned,
-      );
+      expect(getAlert()).toHaveTextContent(text.errors.alreadyPinned);
     });
 
     it("turns pinning off at the limit and says so", async () => {
@@ -310,10 +316,27 @@ describe("AppsPanel", () => {
       ).toBeInTheDocument();
     });
 
+    it("says the catalog failed from an alert there before it", async () => {
+      let fail: (reason: unknown) => void = () => {};
+      answer({
+        list_catalog: () =>
+          new Promise((_, reject) => {
+            fail = reject;
+          }),
+      });
+      await renderPanel(snapshot([]));
+      const before = liveRegions();
+
+      await act(async () => fail({ code: "unavailable" }));
+
+      expect(getAlert()).toHaveTextContent(text.catalogFailed);
+      expectSaidIn(before, getAlert());
+    });
+
     it("says it could not read the programs, and tries again", async () => {
       answer({ list_catalog: () => Promise.reject({ code: "unavailable" }) });
       await renderPanel(snapshot([]));
-      expect(screen.getByRole("alert")).toHaveTextContent(text.catalogFailed);
+      expect(getAlert()).toHaveTextContent(text.catalogFailed);
 
       answer();
       fireEvent.click(button(text.retry));

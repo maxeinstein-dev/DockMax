@@ -24,8 +24,8 @@ function gallery(props: Partial<ComponentProps<typeof ThemeGallery>> = {}) {
   return <ThemeGallery dock={DOCK} appIds={[]} onApply={vi.fn()} {...props} />;
 }
 
-const group = () => screen.getByRole("group", { name: text.themes });
-const card = (name: string) => within(group()).getByRole("button", { name });
+const group = () => screen.getByRole("radiogroup", { name: text.themes });
+const card = (name: string) => within(group()).getByRole("radio", { name });
 
 describe("ThemeGallery", () => {
   beforeEach(() => {
@@ -47,7 +47,7 @@ describe("ThemeGallery", () => {
 
     expect(
       within(group())
-        .getAllByRole("button")
+        .getAllByRole("radio")
         .map((button) => button.textContent),
     ).toEqual([
       "Padrão",
@@ -62,7 +62,7 @@ describe("ThemeGallery", () => {
       "Medieval 8-bit",
       "Caçador",
     ]);
-    expect(card("Padrão")).toHaveAttribute("aria-pressed", "true");
+    expect(card("Padrão")).toHaveAttribute("aria-checked", "true");
     expect(screen.queryByText(text.themeCustom)).toBeNull();
   });
 
@@ -82,15 +82,15 @@ describe("ThemeGallery", () => {
   it("shows the theme the dock is in", () => {
     render(gallery({ dock: { ...DOCK, style: "neon", iconPack: "neon" } }));
 
-    expect(card("Neon")).toHaveAttribute("aria-pressed", "true");
-    expect(card("Padrão")).toHaveAttribute("aria-pressed", "false");
+    expect(card("Neon")).toHaveAttribute("aria-checked", "true");
+    expect(card("Padrão")).toHaveAttribute("aria-checked", "false");
   });
 
   it("chooses none, and says so, when a choice is the user's own", () => {
     render(gallery({ dock: { ...DOCK, style: "neon", iconPack: "argila" } }));
 
-    for (const button of within(group()).getAllByRole("button")) {
-      expect(button).toHaveAttribute("aria-pressed", "false");
+    for (const button of within(group()).getAllByRole("radio")) {
+      expect(button).toHaveAttribute("aria-checked", "false");
     }
     expect(screen.getByText(text.themeCustom)).toBeInTheDocument();
   });
@@ -118,7 +118,7 @@ describe("ThemeGallery", () => {
   it("can be turned off", () => {
     render(gallery({ disabled: true }));
 
-    for (const button of within(group()).getAllByRole("button")) {
+    for (const button of within(group()).getAllByRole("radio")) {
       expect(button).toBeDisabled();
     }
   });
@@ -190,6 +190,72 @@ describe("ThemeGallery", () => {
       expect(onApply).toHaveBeenLastCalledWith(BEFORE);
       expect(onApply).toHaveBeenCalledTimes(2);
       expect(keep()).toBeNull();
+    });
+
+    it("tells a screen reader the question as it appears, 5 s before going back, and that it went back", () => {
+      vi.useFakeTimers();
+      render(gallery({ dock: MINE }));
+      // Mounted with nothing to say: a region mounted with its text is
+      // not read, so the same one says each of them.
+      const live = screen.getByRole("status");
+      expect(live).toBeEmptyDOMElement();
+
+      fireEvent.click(card("Neon"));
+      expect(screen.getByRole("status")).toBe(live);
+      expect(live).toHaveTextContent(
+        "Manter este tema? Se você não escolher Manter, ele volta ao anterior em 15 segundos.",
+      );
+      // The countdown on screen is not read second by second.
+      expect(screen.getByText("Volta ao anterior em 15 s")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
+
+      seconds(9);
+      expect(live).toHaveTextContent(/^Manter este tema\?/);
+      seconds(1);
+      expect(live).toHaveTextContent("O tema volta ao anterior em 5 segundos.");
+      seconds(4);
+      expect(keep()).toBeInTheDocument();
+      seconds(1);
+      expect(keep()).toBeNull();
+      expect(screen.getByRole("status")).toBe(live);
+      expect(live).toHaveTextContent("O tema voltou ao anterior.");
+
+      // Another theme tried asks again.
+      fireEvent.click(card("Vidro"));
+      expect(live).toHaveTextContent(/^Manter este tema\?/);
+    });
+
+    it("has nothing more to say once the theme is kept", () => {
+      render(gallery({ dock: MINE }));
+
+      fireEvent.click(card("Neon"));
+      fireEvent.click(
+        screen.getByRole("button", { name: text.themeKeepButton }),
+      );
+
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    });
+
+    it("leaves the focus on the card, Manter the next Tab stop", () => {
+      render(gallery({ dock: MINE }));
+
+      card("Neon").focus();
+      fireEvent.click(card("Neon"));
+
+      expect(card("Neon")).toHaveFocus();
+      const radios = within(group()).getAllByRole("radio");
+      const keepButton = screen.getByRole("button", {
+        name: text.themeKeepButton,
+      });
+      // Nothing that takes Tab between the cards and Manter.
+      const stops = [
+        ...document.querySelectorAll<HTMLElement>("button, [tabindex]"),
+      ].filter((element) => element.tabIndex >= 0);
+      expect(stops.indexOf(keepButton)).toBe(
+        stops.indexOf(radios.find((radio) => radio.tabIndex === 0)!) + 1,
+      );
     });
 
     it("goes back to before the first theme tried, and starts the time again", () => {

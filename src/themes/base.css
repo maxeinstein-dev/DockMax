@@ -16,3 +16,12 @@ body {
 #root {
   height: 100%;
 }
+
+/* A live region (`role="status"` or `"alert"`) stays mounted and only its
+   text changes, since many screen readers don't read one mounted with its
+   text. While it has nothing to say it is out of the flow, so it takes no
+   room and no gap of a flex or grid parent. */
+.live:empty {
+  position: absolute;
+  margin: 0;
+}

@@ -247,15 +247,15 @@ function AppsPanel({ snapshot, workspace, onBack }: AppsPanelProps) {
                 placeholder={t.apps.searchPlaceholder}
               />
             </div>
-            {catalog === null ? (
-              <p className="apps-empty" role="status">
-                {t.apps.loading}
-              </p>
-            ) : catalog === "failed" ? (
+            {/* Mounted before what they say, so a screen reader reads it. */}
+            <p className="apps-empty live" role="status">
+              {catalog === null ? t.apps.loading : null}
+            </p>
+            <p className="apps-empty live" role="alert">
+              {catalog === "failed" ? t.apps.catalogFailed : null}
+            </p>
+            {catalog === null ? null : catalog === "failed" ? (
               <div className="apps-failed">
-                <p className="apps-empty" role="alert">
-                  {t.apps.catalogFailed}
-                </p>
                 <button
                   type="button"
                   className="secondary-button"

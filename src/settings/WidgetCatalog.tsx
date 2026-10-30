@@ -181,11 +181,10 @@ function WidgetCatalog({
       <p className="catalog-status" role="status">
         {said}
       </p>
-      {error ? (
-        <p className="catalog-error" role="alert">
-          {t.widgets.errors[error]}
-        </p>
-      ) : null}
+      {/* Mounted before the failure, so a screen reader reads it. */}
+      <p className="catalog-error live" role="alert">
+        {error ? t.widgets.errors[error] : null}
+      </p>
     </section>
   );
 }

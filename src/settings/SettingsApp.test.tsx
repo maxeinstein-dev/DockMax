@@ -117,25 +117,25 @@ describe("SettingsApp", () => {
   it("shows the position and the taskbar as cards with a picture", async () => {
     await renderApp();
 
-    const edges = screen.getByRole("group", {
+    const edges = screen.getByRole("radiogroup", {
       name: ptBR.settings.groups.edge,
     });
     expect(
-      within(edges).getByRole("button", { name: "Embaixo" }),
-    ).toHaveAttribute("aria-pressed", "true");
+      within(edges).getByRole("radio", { name: "Embaixo" }),
+    ).toHaveAttribute("aria-checked", "true");
     expect(
       within(edges)
-        .getByRole("button", { name: "Em cima" })
+        .getByRole("radio", { name: "Em cima" })
         .querySelector(".thumb-screen"),
     ).toHaveAttribute("data-edge", "top");
 
     const taskbar = within(
-      screen.getByRole("group", { name: ptBR.settings.groups.taskbar }),
-    ).getByRole("button", { name: "Visível" });
+      screen.getByRole("radiogroup", { name: ptBR.settings.groups.taskbar }),
+    ).getByRole("radio", { name: "Visível" });
     expect(taskbar).toHaveAccessibleDescription(
       ptBR.settings.taskbarHints.visible,
     );
-    expect(taskbar).toHaveAttribute("aria-pressed", "false");
+    expect(taskbar).toHaveAttribute("aria-checked", "false");
     fireEvent.click(taskbar);
     await act(async () => {});
     const saved = invoke.mock.calls.find(
@@ -156,20 +156,19 @@ describe("SettingsApp", () => {
       [look.iconShape, look.iconShapeOptions.plate],
       [look.openAnimation, look.openAnimationOptions.bounce],
     ] as const) {
-      const card = within(screen.getByRole("group", { name: group })).getByRole(
-        "button",
-        { name: chosen },
-      );
-      expect(card, group).toHaveAttribute("aria-pressed", "true");
+      const card = within(
+        screen.getByRole("radiogroup", { name: group }),
+      ).getByRole("radio", { name: chosen });
+      expect(card, group).toHaveAttribute("aria-checked", "true");
       expect(card.querySelector(".thumb"), group).not.toBeNull();
     }
     const bounce = within(
-      screen.getByRole("group", { name: look.openAnimation }),
-    ).getByRole("button", { name: look.openAnimationOptions.bounce });
+      screen.getByRole("radiogroup", { name: look.openAnimation }),
+    ).getByRole("radio", { name: look.openAnimationOptions.bounce });
     expect(bounce.querySelector(".thumb")).toHaveAttribute("data-chosen");
     const shake = within(
-      screen.getByRole("group", { name: look.openAnimation }),
-    ).getByRole("button", { name: look.openAnimationOptions.shake });
+      screen.getByRole("radiogroup", { name: look.openAnimation }),
+    ).getByRole("radio", { name: look.openAnimationOptions.shake });
     expect(shake.querySelector(".thumb")).not.toHaveAttribute("data-chosen");
   });
 
@@ -227,8 +226,8 @@ describe("SettingsApp", () => {
     await act(async () => {});
 
     const card = within(
-      screen.getByRole("group", { name: ptBR.settings.look.style }),
-    ).getByRole("button", { name: "Neon" });
+      screen.getByRole("radiogroup", { name: ptBR.settings.look.style }),
+    ).getByRole("radio", { name: "Neon" });
     // Only the program of Trabalho, the workspace in use.
     expect(
       [...card.querySelectorAll("img")].map((img) => img.getAttribute("src")),
