@@ -491,6 +491,142 @@ impl ISelectionItemProvider_Impl for Item_Impl {
 mod tests {
     use super::*;
 
+    fn entry(key: &str, kind: &str) -> Entry {
+        Entry {
+            key: key.into(),
+            name: key.into(),
+            kind: kind.into(),
+            rect: (0.0, 0.0, 10.0, 10.0),
+            selected: false,
+        }
+    }
+
+    unsafe extern "system" fn procedure(
+        hwnd: HWND,
+        message: u32,
+        wparam: WPARAM,
+        lparam: LPARAM,
+    ) -> LRESULT {
+        use windows::Win32::UI::WindowsAndMessaging::{DefWindowProcW, WM_GETOBJECT};
+        if message == WM_GETOBJECT
+            && let Some(result) = get_object(hwnd, wparam, lparam)
+        {
+            return result;
+        }
+        unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
+    }
+
+    /// Shows lists of one and of three rows in a small window of its own
+    /// (closed in a few seconds) and reads each row's `ItemType` from
+    /// another process, through .NET's UI Automation, as the live test did.
+    /// Not run by `cargo test`:
+    /// `cargo test item_type_read_by_another_process -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "shows a small window and runs PowerShell"]
+    fn item_type_read_by_another_process() {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, DispatchMessageW, MSG, PM_REMOVE, PeekMessageW,
+            RegisterClassW, SW_SHOWNOACTIVATE, ShowWindow, TranslateMessage, WNDCLASSW,
+            WS_EX_TOOLWINDOW, WS_POPUP,
+        };
+        use windows::core::w;
+
+        let class = WNDCLASSW {
+            lpfnWndProc: Some(procedure),
+            lpszClassName: w!("tipocb-uia"),
+            ..Default::default()
+        };
+        unsafe { RegisterClassW(&class) };
+        let hwnd = unsafe {
+            CreateWindowExW(
+                WS_EX_TOOLWINDOW,
+                w!("tipocb-uia"),
+                w!("tipocb"),
+                WS_POPUP,
+                0,
+                0,
+                40,
+                40,
+                None,
+                None,
+                None,
+                None,
+            )
+        }
+        .expect("window");
+        unsafe {
+            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+        }
+        let script = format!(
+            "Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes;\
+             $root=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]{});\
+             $rows=$root.FindAll([System.Windows.Automation.TreeScope]::Children,\
+             [System.Windows.Automation.Condition]::TrueCondition);\
+             foreach($row in $rows){{ 'each: ' + $row.Current.ItemType + ' (' + $row.Current.ItemType.Length + ')' }};\
+             $types = foreach($row in $rows){{ $row.Current.ItemType }};\
+             'indexed: ' + $types[0]",
+            hwnd.0 as isize
+        );
+        for list in [
+            vec![
+                entry("a", "Pasta"),
+                entry("b", "Pasta"),
+                entry("c", "Arquivo"),
+            ],
+            vec![entry("sources", "Pasta")],
+            vec![entry("calc", "Calculadora · Enter copia o resultado")],
+        ] {
+            println!("list of {}:", list.len());
+            publish(list);
+            let child = std::process::Command::new("powershell")
+                .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .expect("powershell");
+            let reading = std::thread::spawn(move || child.wait_with_output());
+            while !reading.is_finished() {
+                let mut message = MSG::default();
+                while unsafe { PeekMessageW(&mut message, None, 0, 0, PM_REMOVE) }.as_bool() {
+                    unsafe {
+                        let _ = TranslateMessage(&message);
+                        DispatchMessageW(&message);
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            let output = reading.join().unwrap().expect("output");
+            print!("{}", String::from_utf8_lossy(&output.stdout));
+        }
+        publish(Vec::new());
+        unsafe {
+            let _ = DestroyWindow(hwnd);
+        }
+    }
+
+    /// A row's `ItemType` and `Name` go whole into the `VARIANT`, in a
+    /// list of one row too (the live test read "P" and "C" from one-row
+    /// lists: PowerShell's `$types[0]` on a single string, not the
+    /// provider; `item_type_read_by_another_process` shows it).
+    #[test]
+    fn a_rows_kind_goes_whole_into_the_variant() {
+        let kind = "Calculadora · Enter copia o resultado";
+        publish(vec![entry("tipocb:calc", kind)]);
+        let row: IRawElementProviderSimple = Item {
+            hwnd: 0,
+            key: "tipocb:calc".into(),
+        }
+        .into();
+        let text = |property| {
+            let value = unsafe { row.GetPropertyValue(property) }.expect("value");
+            BSTR::try_from(&value).expect("a BSTR").to_string()
+        };
+        let said = text(UIA_ItemTypePropertyId);
+        assert_eq!(said, kind);
+        assert_eq!(said.encode_utf16().count(), kind.encode_utf16().count());
+        assert_eq!(text(UIA_NamePropertyId), "tipocb:calc");
+        publish(Vec::new());
+    }
+
     #[test]
     fn a_results_number_is_stable_and_tells_keys_apart() {
         assert_eq!(number_of("app:Paint"), number_of("app:Paint"));
