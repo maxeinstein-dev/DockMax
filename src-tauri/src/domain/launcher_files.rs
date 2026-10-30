@@ -210,6 +210,33 @@ pub fn is_valid_path(path: &str) -> bool {
             .any(|part| part == "." || part == "..")
 }
 
+/// Whether `path` is a full path on a share (`\\server\share\...`, L5): a
+/// server and a share with a name (not the `\\.\` nor the `\\?\` of the
+/// devices), and below them what `is_valid_path` allows.
+pub fn is_valid_unc(path: &str) -> bool {
+    let Some(rest) = path.strip_prefix(r"\\") else {
+        return false;
+    };
+    let mut parts = rest.split('\\');
+    let named = |part: Option<&str>| {
+        part.is_some_and(|part| !part.is_empty() && part != "." && part != "?")
+    };
+    named(parts.next())
+        && named(parts.next())
+        && path.chars().count() <= MAX_PATH_CHARS
+        && !path.contains(':')
+        && !path
+            .chars()
+            .any(|c| c.is_control() || matches!(c, '"' | '*' | '?' | '<' | '>' | '|' | '/'))
+        && !parts.any(|part| part == "." || part == "..")
+}
+
+/// Whether the launcher opens `path`: a full path on a drive, or on a share
+/// typed by the user (L5).
+pub fn is_openable(path: &str) -> bool {
+    is_valid_path(path) || is_valid_unc(path)
+}
+
 /// The key the use of `hit` is kept under: `file:` and its path, with a
 /// `\` at the end for a folder (so the recents know it without asking the
 /// disk).
@@ -228,7 +255,7 @@ pub fn hit_of_key(key: &str) -> Option<FileHit> {
     let folder = path.ends_with('\\');
     let trimmed = path.trim_end_matches('\\');
     let path = if trimmed.len() == 2 { path } else { trimmed };
-    is_valid_path(path).then(|| FileHit {
+    is_openable(path).then(|| FileHit {
         path: path.to_owned(),
         folder,
     })
@@ -621,11 +648,38 @@ mod tests {
             "app:x",
             "file:",
             "file:a.txt",
-            r"file:\\s\x",
+            r"file:\\s",
+            r"file:\\.\pipe\x",
             "file:C:\\a\nb",
         ] {
             assert_eq!(hit_of_key(bad), None, "{bad:?}");
         }
+        // A share typed in the launcher (L5) is kept too.
+        let shared = file(r"\\srv\share\a.txt");
+        assert_eq!(hit_of_key(&file_key(&shared)), Some(shared));
+    }
+
+    #[test]
+    fn a_share_typed_is_opened_but_not_a_device() {
+        for good in [r"\\srv\share\", r"\\srv\share\a b.txt", r"\\srv\share"] {
+            assert!(is_valid_unc(good) && is_openable(good), "{good}");
+        }
+        for bad in [
+            r"\\",
+            r"\\srv",
+            r"\\srv\",
+            r"\\.\pipe\x",
+            r"\\?\C:\x",
+            r"\\srv\share\..\x",
+            r"\\srv\share\a?.txt",
+            r"\\srv\share\a:b",
+            "\\\\srv\\share\\a\nb",
+            r"C:\x",
+        ] {
+            assert!(!is_valid_unc(bad), "{bad:?}");
+        }
+        // The searches of files still take only the drives.
+        assert!(!is_valid_path(r"\\srv\share\a.txt"));
     }
 
     #[test]

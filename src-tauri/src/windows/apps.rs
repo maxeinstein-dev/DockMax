@@ -435,7 +435,7 @@ pub fn path_icon_png(path: &str, size: u32) -> Option<Vec<u8>> {
 
 /// Opens a launcher's file with the program Windows has for it, or its
 /// folder in File Explorer (L4). Checked again here: nothing but a full path
-/// on a drive is opened.
+/// on a drive, or on a share typed in the launcher (L5), is opened.
 #[cfg(windows)]
 pub fn open_path(path: &str) -> Result<(), String> {
     use crate::domain::launcher::{Action, is_allowed};

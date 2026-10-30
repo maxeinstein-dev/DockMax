@@ -1,6 +1,6 @@
 # Spec 0012 — Lançador: buscar e abrir pelo teclado
 
-**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado.
+**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado.
 **Origem:** pedido do autor (2026-10-26) de um lançador no estilo do [Ulauncher](https://ulauncher.io/): uma caixa de busca aberta por um atalho de teclado global, que acha e abre apps e, no futuro, arquivos e extensões. O PrimoDock tem algo parecido ("O botão Iniciar abre: Apps do PrimoDock", [interface](../reference/primodock/interface.md)), mas só pelo mouse e sem busca por teclado.
 
 ## 1. Decisões do autor (2026-10-26)
@@ -20,7 +20,7 @@
 | **L2** | Os outros provedores: **calculadora**, **busca na web por palavra-chave** (com as palavras-chave em Configurações) e **Configurações do DockMax e do Windows** |
 | **L3** | Personalizar o atalho em Configurações |
 | **L4** | **Arquivos e pastas:** o Everything (quando roda) e o índice do Windows Search, misturados abaixo dos apps a partir de 3 caracteres, e a palavra-chave `f ` só com eles (seções 5a e 8d) |
-| **L5** (depois) | **Caminhos,** como no Ulauncher: digitar `C:\` ou `~\` lista a pasta, e Tab entra na pasta selecionada |
+| **L5** | **Caminhos,** como no Ulauncher: digitar `C:\`, `~\`, `%APPDATA%\` ou `\\servidor\compartilhamento\` lista a pasta, Tab completa e entra na pasta selecionada, Backspace sobe uma pasta (seção 8e) |
 | **L6** (depois) | **Menu de ações por resultado:** Ctrl+Shift+Enter abre como administrador (como no Executar do Windows), mostrar no Explorador, copiar o caminho, fixar no dock |
 | **L7** (depois) | Buscar e alternar entre as **janelas abertas** |
 
@@ -138,6 +138,8 @@ O desenho e o que foi medido estão em "Como o L4 ficou" (seção 8d).
 | Cima, Baixo | Muda o resultado selecionado, sem sair da caixa de texto |
 | Enter | Abre o selecionado (o primeiro, se nenhum foi escolhido) |
 | Alt+1…9 | Abre o n-ésimo resultado, como no Ulauncher; o atalho aparece sempre à direita de cada linha (no L1, sempre, e não só com Alt apertado) |
+| Tab | Num arquivo ou numa pasta, completa o caminho no campo; numa pasta, acrescenta `\` e entra nela (L5). Nos outros resultados, nada. Shift+Tab, nada |
+| Backspace | Com o cursor no fim de um caminho terminado em `\`, volta para a pasta de cima (L5); fora disso, apaga um caractere |
 | Esc | Fecha |
 | Page Up, Page Down, Home, End na lista | Ficam com a caixa de texto (o cursor) |
 | Roda do mouse | Rola a lista quando há mais de 8 resultados (L4: até 16 na mistura, 30 com `f `); Cima e Baixo também rolam, levando a seleção |
@@ -164,6 +166,7 @@ O mouse também funciona: passar o ponteiro seleciona e o clique abre.
 - L2: a calculadora (precedência, parênteses, `^`, `%`, a vírgula decimal, divisão por zero, conta incompleta, uma consulta que não é conta), as palavras-chave (só `https://`, o termo codificado, uma palavra-chave sem termo, o buscador padrão quando nada casa), as Configurações (sinônimos, a ordem depois dos apps na mesma faixa);
 - a lista fechada de ações: um teste que falha se aparecer uma ação nova sem passar pela validação;
 - L4: a mistura e a ordem dos arquivos, o `f `, o limite, a junção sem repetir caminho, a abreviação com `~`, o descarte de uma geração antiga, os buffers da IPC do Everything e o escape do termo para cada fonte;
+- L5: o reconhecimento de um caminho, a expansão de `~` e `%VAR%`, a pasta e o filtro, a ordem e os ocultos, o Tab, o Backspace e o descarte de uma leitura antiga (seção 8e);
 - a migração de `launcher_usage` e "Limpar o histórico".
 
 **Ponta a ponta:** comandos só do build de teste, como os do dock: abrir o lançador, digitar uma consulta e ler os resultados (título, subtítulo, selecionado), e apertar um resultado. Cobrem a busca, a seleção com Cima e Baixo e o fechar com Esc.
@@ -283,6 +286,31 @@ Duas falhas apareceram e foram corrigidas antes do PR: o campo lia a **posição
 **Medido** (2026-10-30, na máquina do autor, pelo teste `windows_search_answers`, ignorado no `cargo test` e rodado à mão com `cargo test windows_search_answers -- --ignored --nocapture`): a sessão do Windows Search abre em 2–8 ms; a primeira consulta de `relatorio` (TOP 30) levou 120–190 ms e as seguintes 64–75 ms, com 26 resultados; o `LIKE` levou 336–510 ms. O processo do teste ganhou **+1,1 MB** de memória privada com o COM e o OLE DB carregados, que agora ficam no auxiliar. O Everything não estava instalado: a fonte ficou de fora sem erro.
 
 **Não verificado (só ao vivo):** a memória do processo principal e do auxiliar com o lançador aberto buscando arquivos (a meta da seção 8 continua: +10 MB aberto, +3 MB 60 s depois de fechar); o Everything de verdade (só os buffers foram testados, no formato do SDK); o Everything rodando como administrador (o Windows pode barrar o `WM_COPYDATA` de um processo comum); os ícones de arquivo e de pasta na tela; o Enter abrindo um arquivo e uma pasta; a roda do mouse; o Narrador lendo "Arquivo" e "Pasta"; se o `CONTAINS` acha `relatorio` em "Relatório.docx" (o índice ignora acentos por padrão, mas não havia arquivo assim para conferir).
+
+## 8e. Como o L5 ficou
+
+**Navegar por caminho, como no Ulauncher** (`domain/launcher_paths.rs`, puro e testado; `windows/launcher/paths.rs`, a leitura da pasta):
+
+- **Quando liga** (`launcher_paths::root_len`): a consulta (sem os espaços do começo) começa com uma letra de unidade e `:\` (`C:\`, `d:\`), com `~\` (o perfil, `USERPROFILE`), com `%NOME%\` (uma variável de ambiente do usuário, pelo ambiente do processo; o nome só com letras, números, `_` e parênteses, como `%ProgramFiles(x86)%`, até 64) ou com `\\servidor\compartilhamento\` (com a `\` do fim; `\\.\` e `\\?\`, dos dispositivos, não valem). `C:`, `~`, `%APPDATA%` e `\\servidor\compartilhamento` sem a `\` ainda são digitação comum.
+- **Nesse modo, só o caminho responde:** nem apps, nem Configurações, nem conta, nem busca na web, nem a busca de arquivos do L4.
+- **A pasta e o filtro:** tudo até a última `\` é a pasta digitada; o resto é o filtro. `~` e `%NOME%` são expandidos; `.`, `..` e `\` repetida são resolvidos sem subir acima da unidade ou do compartilhamento (`C:\Users\.\ana\..\bob\` lê `C:\Users\bob\`). Uma variável que não existe ou que não é um caminho completo dá "Pasta não encontrada", sem ler nada.
+- **O que lista** (`launcher_paths::list`): as pastas primeiro, depois os arquivos, até **50**, com a lista rolando como no L4. Sem filtro, em ordem alfabética, sem diferenciar maiúsculas nem acentos. Com filtro, só os nomes que ele casa pelas faixas dos apps (seção 5; para um arquivo, também o nome sem a extensão) e, dentro de cada grupo, **a melhor faixa primeiro e depois a ordem alfabética**: com o filtro `rel`, "relatorio.txt" (nome exato sem a extensão) vem antes de "meu relatorio.txt" (uma palavra), em vez da ordem alfabética pura, que poria uma letra espalhada (faixa 6) antes de um nome exato. Sem filtro, todos estão na mesma faixa e a ordem é a alfabética.
+- **Ocultos:** os itens com o atributo oculto ou de sistema, e os nomes que começam com `.` (como `.git`), ficam de fora, a não ser que o filtro comece com `.`.
+- **A linha:** o nome como título e "Pasta" ou "Arquivo" como subtítulo (a pasta é a digitada, igual em todas as linhas). O ícone vem do auxiliar, como no L4; num compartilhamento de rede a linha fica com o glifo, para o shell não ir à rede e segurar a fila de ícones do auxiliar.
+- **Tab** completa a linha selecionada no campo: a pasta digitada mais o nome, e `\` numa pasta, que entra nela e a lista (`~\Doc` → `~\Documents\`). Num arquivo ou pasta da busca do L4 ou dos recentes, Tab põe o caminho completo, o que entra no modo de caminho. **Antes do L5, o Tab não fazia nada no lançador** (era engolido para não apitar e o foco nunca saía do campo); continua sem mover o foco, que fica no campo como antes. A lista nunca teve foco: o leitor de tela acompanha a seleção pela UI Automation (seção 7). Shift+Tab não faz nada. Depois do Tab, o cursor vai para o fim e o anúncio "N resultados" sai de novo.
+- **Backspace** com o cursor no fim, sem seleção, e o campo terminando em `\` apaga a pasta inteira (`launcher_paths::up`: `C:\Users\ana\` → `C:\Users\`). Na raiz (`C:\`, `~\`, `%APPDATA%\`, `\\servidor\compartilhamento\`) apaga um caractere, como sempre. É tratado no caractere (`WM_CHAR`), onde a caixa de texto apaga.
+- **Enter** abre o arquivo pelo programa padrão ou a pasta no Explorador, pela ação do L4 (`Action::OpenFile`). A validação passou a aceitar também um caminho num compartilhamento (`launcher_files::is_valid_unc`, usada por `is_openable` na ação, em `apps::open_path` e nas chaves de uso); a busca de arquivos do L4 continua só com unidades. **Uso:** abrir conta como `file:<caminho>`, como no L4, e aparece nos recentes.
+- **Erros:** uma pasta que não existe (ou é um arquivo) mostra "Pasta não encontrada"; uma sem permissão, "Sem acesso"; uma que não responde em **2 s** (um compartilhamento fora do ar), "A pasta não respondeu". Uma pasta vazia ou um filtro sem nada mostram "Nenhum resultado". Nada trava.
+
+**Onde roda e o descarte:**
+
+- A pasta é lida com `std::fs::read_dir` (sem shell, sem COM) numa thread `launcher-folder` do processo principal, uma por pasta; os atributos vêm com a listagem, sem outra ida ao disco. A leitura para em **20 000** itens ou em 2 s, e devolve o que leu.
+- **Uma vez por pasta** (`launcher_paths::Browse`): enquanto só o filtro muda, o que foi lido é filtrado a cada tecla, na thread da UI, sem ler de novo. A pasta é lida de novo quando a pasta digitada muda (sem diferenciar maiúsculas), e a cada abertura do lançador.
+- **A geração:** cada leitura leva um número; uma resposta de uma pasta que não é mais a digitada, de depois do tempo limite ou de depois de o lançador fechar é descartada. O temporizador de 2 s na thread da UI cobre a pasta que trava dentro do `read_dir` (a thread fica presa até o Windows desistir, mas a resposta não é usada).
+
+**Testes de unidade:** o reconhecimento do modo (`C:\`, `~\`, `%APPDATA%\`, UNC e o que não é caminho), a expansão de `~` e `%VAR%`, a separação entre pasta e filtro com `.` e `..`, a ordem pastas → arquivos, o filtro pelas faixas, os ocultos, o Tab, o Backspace, o descarte da geração antiga e do tempo limite, a validação do UNC e a leitura de uma pasta de verdade (temporária) com os erros.
+
+**Não verificado (só ao vivo):** o Tab e o Backspace no teclado de verdade (a caixa de texto do Windows, o cursor no fim depois do Tab, o IME); a lista de `C:\Windows\System32` (uns 5 000 itens) filtrando a cada tecla sem atraso; um compartilhamento de rede de verdade, e um fora do ar mostrando "A pasta não respondeu" sem travar; "Sem acesso" numa pasta protegida (`C:\System Volume Information`); os ícones das linhas; o Narrador lendo "Pasta" e "Arquivo" e o anúncio depois do Tab; a memória com o lançador aberto navegando.
 
 ## 9. Extensões (depois)
 
