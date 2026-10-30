@@ -20,6 +20,12 @@
   --accent: #2f5bd3;
   --accent-ink: #1f45b3;
   --accent-soft: rgb(47 91 211 / 0.13);
+  /* The text of a main button, on --accent: white on the deep cobalt, the
+     graphite's ink on the dark theme's light cobalt (#fff on it gave 2.6:1). */
+  --on-accent: #ffffff;
+  /* The hovered main button. Defined here only: it reads --accent where it is
+     used, so it follows the dark blocks without a copy of its own. */
+  --accent-hover: color-mix(in srgb, var(--accent) 86%, #000);
   --surface-rgb: 247 247 249;
   --ink: #1d1e22;
   /* The ink of the <option>s in the open list of a <select>, whose WebView2
@@ -97,6 +103,7 @@
     --accent: #7c9cff;
     --accent-ink: #b0c2ff;
     --accent-soft: rgb(124 156 255 / 0.17);
+    --on-accent: #1d1e22;
     --surface-rgb: 38 39 44;
     --ink: #ececf0;
     --ink-2: #a5a9b3;
@@ -127,6 +134,7 @@
   --accent: #7c9cff;
   --accent-ink: #b0c2ff;
   --accent-soft: rgb(124 156 255 / 0.17);
+  --on-accent: #1d1e22;
   --surface-rgb: 38 39 44;
   --ink: #ececf0;
   --ink-2: #a5a9b3;

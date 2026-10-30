@@ -280,12 +280,12 @@ kbd {
 
 /* The one action that matters here: in the accent, as the tour's main. */
 .about-update .about-update-install {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
 }
 
 .about-update .about-update-install:hover {
-  background: color-mix(in srgb, var(--accent) 86%, #000);
+  background: var(--accent-hover);
 }
 
 .about-update-progress {

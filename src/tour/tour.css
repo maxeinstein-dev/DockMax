@@ -74,11 +74,11 @@
 
 .tour-actions .tour-main {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .tour-actions .tour-main:hover {
-  background: color-mix(in srgb, var(--accent) 86%, #000);
+  background: var(--accent-hover);
 }
 
 @media (forced-colors: active) {

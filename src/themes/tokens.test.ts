@@ -95,6 +95,7 @@ const MODE_COLORS: Record<string, string> = {
   "--accent": "cobalto",
   "--accent-ink": "cobalto-ink",
   "--accent-soft": "cobalto-soft",
+  "--on-accent": "cobalto-on",
   "--ink": "ink",
   "--ink-2": "ink-2",
   "--hair": "hair",

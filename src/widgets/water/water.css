@@ -28,11 +28,11 @@
 
 .water-actions .water-main {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .water-actions .water-main:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 86%, #000);
+  background: var(--accent-hover);
 }
 
 .water-note {

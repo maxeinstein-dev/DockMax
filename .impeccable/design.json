@@ -94,6 +94,36 @@
           "hsl(225 100% 95%)"
         ]
       },
+      "cobalto-on-light": {
+        "role": "primary",
+        "displayName": "Tinta sobre cobalto (claro)",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 26%)",
+          "hsl(0 0% 37%)",
+          "hsl(0 0% 48%)",
+          "hsl(0 0% 59%)",
+          "hsl(0 0% 70%)",
+          "hsl(0 0% 82%)",
+          "hsl(0 0% 95%)"
+        ]
+      },
+      "cobalto-on-dark": {
+        "role": "primary",
+        "displayName": "Tinta sobre cobalto (escuro)",
+        "canonical": "#1d1e22",
+        "tonalRamp": [
+          "hsl(228 8% 15%)",
+          "hsl(228 8% 26%)",
+          "hsl(228 8% 37%)",
+          "hsl(228 8% 48%)",
+          "hsl(228 8% 59%)",
+          "hsl(228 8% 70%)",
+          "hsl(228 8% 82%)",
+          "hsl(228 8% 95%)"
+        ]
+      },
       "perigo-light": {
         "role": "secondary",
         "displayName": "Argila-vermelho, perigo (claro)",

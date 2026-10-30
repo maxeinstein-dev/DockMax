@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import parts from "../panel/parts/parts.css?raw";
+import { readSources } from "../test/sources";
 import css from "./tokens.css?raw";
 
 // WCAG 2.x contrast of the text and glyphs Dockyard draws, computed from the
@@ -94,6 +95,19 @@ function placeholderOpacity(): number {
   return Number(match[1]);
 }
 
+/** `--accent-hover`, `color-mix(in srgb, var(--accent) N%, #000)`: the
+ * accent darkened toward black by the share tokens.css gives it. */
+function accentHover(theme: keyof typeof THEMES): Rgb {
+  const match = /^color-mix\(in srgb, var\(--accent\) ([\d.]+)%, #000\)$/.exec(
+    token(theme, "--accent-hover"),
+  );
+  if (!match) throw new Error("unsupported --accent-hover");
+  const share = Number(match[1]) / 100;
+  return color(theme, "--accent").rgb.map(
+    (channel) => channel * share,
+  ) as unknown as Rgb;
+}
+
 /** `top` painted over the opaque `bottom`. */
 function over(top: Rgba, bottom: Rgb): Rgb {
   return top.rgb.map(
@@ -153,6 +167,7 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
   // its alpha.
   const navHover = over({ ...inkColor, alpha: inkColor.alpha * 0.09 }, surface);
   const dangerSoft = over(color(theme, "--danger-soft"), surface);
+  const onAccent = color(theme, "--on-accent").rgb;
   return [
     { name: "--ink on the panel", ratio: contrast(ink, surface), min: TEXT },
     { name: "--ink-2 on the panel", ratio: contrast(ink2, surface), min: TEXT },
@@ -175,6 +190,18 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
     {
       name: "--ink on the key hint (--kbd)",
       ratio: contrast(ink, over(color(theme, "--kbd"), surface)),
+      min: TEXT,
+    },
+    {
+      // The main button: "Atualizar" in Sobre, and the tour's, the
+      // pomodoro's and the water's main action.
+      name: "--on-accent on --accent",
+      ratio: contrast(onAccent, color(theme, "--accent").rgb),
+      min: TEXT,
+    },
+    {
+      name: "--on-accent on a hovered main button (--accent-hover)",
+      ratio: contrast(onAccent, accentHover(theme)),
       min: TEXT,
     },
     {
@@ -347,5 +374,26 @@ describe("contrast (WCAG AA)", () => {
     expect(hsl(0, 1, 0.5).map(Math.round)).toEqual([255, 0, 0]);
     expect(glazeTops().map((tile) => tile.name)).toContain("t-settings");
     expect(textPairs("dark")[0]?.ratio).not.toBe(textPairs("light")[0]?.ratio);
+  });
+
+  // The text on the cobalt reads --on-accent, which the pairs above check:
+  // a literal white there passed in the light theme and gave 2.6:1 on the
+  // dark theme's light cobalt (estudo 0002, M5).
+  it("never writes white on the cobalt", () => {
+    const white = /(?:^|;)\s*color\s*:\s*(?:#fff|#ffffff|white)\s*(?:;|$)/i;
+    const onCobalt =
+      /(?:^|;)\s*background(?:-color)?\s*:\s*var\(--accent(?:-hover)?\)\s*(?:;|$)/;
+    const found: string[] = [];
+    for (const [path, sheet] of Object.entries(readSources("src", /\.css$/))) {
+      const text = sheet.replace(/\/\*[\s\S]*?\*\//g, "");
+      for (const match of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const body = match[2] ?? "";
+        if (onCobalt.test(body) && white.test(body)) {
+          found.push(`${path}: ${(match[1] ?? "").trim()}`);
+        }
+      }
+    }
+
+    expect(found).toEqual([]);
   });
 });
