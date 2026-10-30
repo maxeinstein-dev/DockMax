@@ -6,7 +6,15 @@ import type { DockSettings, DockStyle } from "./settings";
  * choices are the dock's now, and none when the user changed one of them
  * ("Personalizado"). */
 
-export type ThemeId = "standard" | "neon" | "glaze" | "glass" | "midnight";
+export type ThemeId =
+  | "standard"
+  | "neon"
+  | "glaze"
+  | "glass"
+  | "midnight"
+  | "retro"
+  | "classic98"
+  | "phosphor";
 
 export interface Theme {
   id: ThemeId;
@@ -33,6 +41,20 @@ export const THEMES: readonly Theme[] = [
     id: "midnight",
     style: "midnight",
     iconPack: "traco",
+    indicatorColor: null,
+  },
+  // The skins (spec 0020 §3), each with its pixel art pack.
+  { id: "retro", style: "retro", iconPack: "retro-8bit", indicatorColor: null },
+  {
+    id: "classic98",
+    style: "classic98",
+    iconPack: "classico-98",
+    indicatorColor: null,
+  },
+  {
+    id: "phosphor",
+    style: "phosphor",
+    iconPack: "fosforo",
     indicatorColor: null,
   },
 ];

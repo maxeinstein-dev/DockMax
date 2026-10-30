@@ -33,7 +33,10 @@ export type DockStyle =
   | "aquaShelf"
   | "neon"
   | "paper"
-  | "floating";
+  | "floating"
+  | "retro"
+  | "classic98"
+  | "phosphor";
 
 /** Every style, in the order the Settings panel lists them. */
 export const DOCK_STYLES: readonly DockStyle[] = [
@@ -45,6 +48,9 @@ export const DOCK_STYLES: readonly DockStyle[] = [
   "neon",
   "paper",
   "floating",
+  "retro",
+  "classic98",
+  "phosphor",
 ];
 
 /** What the user changed in one style; a field left out keeps the style's

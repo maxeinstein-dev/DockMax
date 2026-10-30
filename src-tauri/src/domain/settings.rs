@@ -360,7 +360,8 @@ impl TaskbarMode {
     }
 }
 
-/// The look of the dock bar: eight ready-made styles (spec 0005 §3.2).
+/// The look of the dock bar: eight ready-made styles (spec 0005 §3.2) and
+/// three skins (spec 0020 §3).
 ///
 /// The Canarinho style (`"canary"`) was removed on 2026-10-30; a file that
 /// still names it opens with the default style, see [`REMOVED_STYLES`].
@@ -377,6 +378,10 @@ pub enum DockStyle {
     Neon,
     Paper,
     Floating,
+    /// The skins (spec 0020 §3): the bar is an image.
+    Retro,
+    Classic98,
+    Phosphor,
 }
 
 impl DockStyle {
@@ -385,8 +390,12 @@ impl DockStyle {
     /// Neon), never the light one (Papel), and the others with the mode.
     pub fn bar_dark(self, mode_dark: bool) -> bool {
         match self {
-            DockStyle::Midnight | DockStyle::Rocket | DockStyle::Neon => true,
-            DockStyle::Paper => false,
+            DockStyle::Midnight
+            | DockStyle::Rocket
+            | DockStyle::Neon
+            | DockStyle::Retro
+            | DockStyle::Phosphor => true,
+            DockStyle::Paper | DockStyle::Classic98 => false,
             DockStyle::Native
             | DockStyle::LiquidGlass
             | DockStyle::AquaShelf
@@ -857,6 +866,9 @@ mod tests {
             (DockStyle::Neon, "neon"),
             (DockStyle::Paper, "paper"),
             (DockStyle::Floating, "floating"),
+            (DockStyle::Retro, "retro"),
+            (DockStyle::Classic98, "classic98"),
+            (DockStyle::Phosphor, "phosphor"),
         ];
         for (style, name) in styles {
             assert_eq!(serde_json::to_value(style).unwrap(), name);

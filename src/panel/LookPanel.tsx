@@ -14,6 +14,7 @@ import {
   type StyleTweaks,
 } from "../core/settings";
 import { dockLookOf } from "../dock/look";
+import { STYLE_PAINTS } from "../dock/paints";
 import { useT } from "../i18n";
 import IconPacksField from "./IconPacksField";
 import OptionGroup, { type Option } from "./OptionGroup";
@@ -202,7 +203,7 @@ function LookPanel({
 
   // The changes to the chosen style: a list, so the panel and the app
   // put the same rows in their own frame.
-  const tweaks = [
+  const allTweaks = [
     <ToggleField
       key="border"
       label={text.border}
@@ -245,6 +246,11 @@ function LookPanel({
       </button>
     </div>,
   ];
+  // A skin's image is its border and its corners (spec 0020, Q21).
+  const skinned = dock !== null && STYLE_PAINTS[dock.style].skin !== null;
+  const tweaks = skinned
+    ? allTweaks.filter((row) => row.key !== "border" && row.key !== "corners")
+    : allTweaks;
 
   return (
     <>

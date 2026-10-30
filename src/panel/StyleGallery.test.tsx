@@ -43,7 +43,7 @@ describe("StyleGallery", () => {
     );
     await act(async () => {});
 
-    expect(within(gallery()).getAllByRole("button")).toHaveLength(8);
+    expect(within(gallery()).getAllByRole("button")).toHaveLength(11);
     expect(card("Neon")).toHaveAttribute("aria-pressed", "true");
     expect(card("Papel")).toHaveAttribute("aria-pressed", "false");
     const images = [...card("Papel").querySelectorAll("img")];
@@ -126,6 +126,22 @@ describe("StyleGallery", () => {
     );
   });
 
+  it("draws a skin's bar with its image", () => {
+    render(
+      <StyleGallery label="Tema" dock={DOCK} appIds={[]} onSelect={vi.fn()} />,
+    );
+
+    const bar = card("Clássico 98").querySelector<HTMLElement>(".mini-bar");
+    expect(bar).toHaveAttribute("data-skin");
+    expect(bar?.style.getPropertyValue("--mini-skin")).toContain("skin.png");
+    // 2 px ends of a 16 px image, on a 28 px bar.
+    expect(bar?.style.getPropertyValue("--mini-skin-width")).toBe(
+      "0 3.5px 0 3.5px",
+    );
+    const plain = card("Nativo").querySelector<HTMLElement>(".mini-bar");
+    expect(plain).not.toHaveAttribute("data-skin");
+  });
+
   it("chooses with a click, and moves with the arrows without choosing", () => {
     const onSelect = vi.fn();
     render(
@@ -136,8 +152,8 @@ describe("StyleGallery", () => {
     expect(card("Neon")).toHaveAttribute("tabindex", "-1");
     card("Nativo").focus();
     fireEvent.keyDown(card("Nativo"), { key: "ArrowLeft" });
-    expect(card("Flutuante")).toHaveFocus();
-    fireEvent.keyDown(card("Flutuante"), { key: "Home" });
+    expect(card("Fósforo")).toHaveFocus();
+    fireEvent.keyDown(card("Fósforo"), { key: "Home" });
     expect(card("Nativo")).toHaveFocus();
     expect(onSelect).not.toHaveBeenCalled();
 

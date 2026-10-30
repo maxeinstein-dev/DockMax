@@ -49,7 +49,16 @@ describe("ThemeGallery", () => {
       within(group())
         .getAllByRole("button")
         .map((button) => button.textContent),
-    ).toEqual(["Padrão", "Neon", "Esmalte", "Vidro", "Meia-noite"]);
+    ).toEqual([
+      "Padrão",
+      "Neon",
+      "Esmalte",
+      "Vidro",
+      "Meia-noite",
+      "Retrô",
+      "Clássico 98",
+      "Fósforo",
+    ]);
     expect(card("Padrão")).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByText(text.themeCustom)).toBeNull();
   });

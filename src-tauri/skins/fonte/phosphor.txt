@@ -1,0 +1,31 @@
+# Skin Fósforo (spec 0020 §3): moldura de monitor com bisel e a tela
+# escura com linhas de varredura.
+# Para gerar de novo: python gerar.py phosphor
+
+skin.name: Fósforo
+skin.left: 3
+skin.right: 3
+skin.middle: repeat
+
+cor.7: #4C534D
+cor.6: #2B302C
+cor.8: #141815
+cor.0: #0B120C
+cor.1: #060A07
+
+.77777.
+7666668
+7688868
+7680768
+7681768
+7680768
+7681768
+7680768
+7681768
+7680768
+7681768
+7680768
+7681768
+7677768
+7666668
+.88888.

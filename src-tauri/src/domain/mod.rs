@@ -32,6 +32,7 @@ pub mod pomodoro;
 pub mod previews;
 pub mod program_name;
 pub mod settings;
+pub mod skin;
 pub mod system_activity;
 pub mod tasks;
 pub mod thumbnail;
