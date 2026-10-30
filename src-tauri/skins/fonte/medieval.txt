@@ -1,0 +1,36 @@
+# Skin Medieval 8-bit (spec 0020 §4): moldura de madeira escura com
+# cantoneiras de ferro e rebites nas pontas, e o meio de tijolos de pedra,
+# que se repete.
+# Para gerar de novo: python gerar.py medieval
+
+skin.name: Medieval 8-bit
+skin.left: 4
+skin.right: 4
+skin.middle: repeat
+
+cor.0: #120D08
+cor.W: #6B4A2E
+cor.w: #4A3020
+cor.d: #2E1E12
+cor.i: #8C8C94
+cor.I: #D8D8E0
+cor.S: #5E5B55
+cor.s: #4A4844
+cor.k: #2C2A27
+
+.00000000000000.
+0iiWWWWWWWWWWii0
+0iIwwwwwwwwwwIi0
+0iiddddddddddii0
+0WwdSSSkSSSSdwd0
+0Wwdssskssssdwd0
+0Wwdssskssssdwd0
+0Wwdkkkkkkkkdwd0
+0WwdSSSSSSSkdwd0
+0Wwdssssssskdwd0
+0Wwdssssssskdwd0
+0Wwdkkkkkkkkdwd0
+0iiddddddddddii0
+0iIwwwwwwwwwwIi0
+0iiddddddddddii0
+.00000000000000.

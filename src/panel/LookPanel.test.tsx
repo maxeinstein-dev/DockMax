@@ -139,6 +139,7 @@ describe("LookPanel", () => {
       "Clássico 98",
       "Fósforo",
       "Tático",
+      "Medieval 8-bit",
     ]);
     expect(chosen(text.style)).toEqual(["Neon"]);
   });
