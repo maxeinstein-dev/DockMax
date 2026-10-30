@@ -73,7 +73,9 @@ fn own(style: DockStyle) -> (bool, u8, bool) {
         DockStyle::Paper => (false, 40, false),
         DockStyle::Floating => (false, 40, true),
         // The image is the bar: no border and no corners to change.
-        DockStyle::Retro | DockStyle::Classic98 | DockStyle::Phosphor => (false, 0, false),
+        DockStyle::Retro | DockStyle::Classic98 | DockStyle::Phosphor | DockStyle::Tactical => {
+            (false, 0, false)
+        }
     }
 }
 
@@ -204,6 +206,14 @@ impl Look {
                 separator: Some(Color::rgb(0x1f, 0x7a, 0x3a)),
                 ink: Some(Color::rgb(0x3c, 0xff, 0x6e)),
                 indicator: Some(Color::rgb(0x3c, 0xff, 0x6e)),
+                ..base
+            },
+            DockStyle::Tactical => Look {
+                skin: true,
+                border: false,
+                separator: Some(Color::rgba(0xd9, 0xc9, 0xa3, 0.3)),
+                ink: Some(Color::rgb(0xd9, 0xc9, 0xa3)),
+                indicator: Some(Color::rgb(0xff, 0x8a, 0x1f)),
                 ..base
             },
         }

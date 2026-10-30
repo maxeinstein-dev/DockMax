@@ -2,7 +2,7 @@
 
 Extensão da fase G ([spec 0019](0019-fase-g-extras.md)): **temas** que vestem o dock de uma vez, como os temas sazonais do PrimoDock, começando por temas gamer.
 
-**Status:** em andamento: passo 1 (galeria de Temas), passo 2 (launchers) e passo 3 (skins de barra, com Retrô, Clássico 98 e Fósforo).
+**Status:** em andamento: passo 1 (galeria de Temas), passo 2 (launchers) e passo 3 (skins de barra, com Retrô, Clássico 98 e Fósforo) e passo 4 (Tático).
 
 ## 1. Decisões do autor (2026-10-30)
 
@@ -67,6 +67,11 @@ Tomadas numa sessão de perguntas (Q1–Q22), todas na recomendação:
 
 ## 4. Os temas gamer (passos 4–6)
 
-- **Tático:** barra carvão com toque de verde-oliva, cantos chanfrados a 45°, fio cor de areia no topo e colchetes de mira nas pontas; indicador laranja de alerta `#FF8A1F`. Ícones: glifo de contorno areia `#D9C9A3` numa placa octogonal verde-oliva escura com fio claro. Reserva: retícula.
+- **Tático** (passo 4, feito):
+  - **Skin** `tactical` (`skins/fonte/tactical.py`, em vetor): 52×64 px, pontas de 24 px e meio esticado, suavizada (`pixelated: false`). Corpo chanfrado a 45° em gradiente carvão-oliva (`#2D3125` → `#191B13`), borda `#4A5038`, fio de areia (`#D9C9A3`) a 5,5 px do topo e colchetes de mira nas pontas. Separador areia a 30%, relógio areia, indicador laranja de alerta `#FF8A1F`. Barra escura nos dois modos.
+  - **Pacote** `tatico` (`fonte/tatico.txt`, estilo de camadas `tatico`): o glifo de contorno em areia sobre placa octogonal (quadrado chanfrado em 29% do lado) em gradiente oliva (`#353A2A` → `#20241A`), com fio de areia a 40% na borda e sombra curta. A reserva é uma retícula de mira (`apps/mira.png`): o `vetor.py` passa a aceitar `reserva-id` e `reserva` no `.txt` do pacote, para trocar o glifo da reserva.
+  - **Tema** `tactical`: skin Tático, pacote Tático e indicador do estilo.
+  - **Verificado ao vivo** (2026-10-30, build e2e, cópia dos dados do autor): o cartão Tático gravou estilo `tactical` e pacote `tatico`, e o dock desenhou a barra chanfrada com o fio de areia, os ícones nas placas octogonais e as marcas laranja. "Cantos" sumiu. Memória: 294 MB em 7 processos com Configurações aberta. A barra do Windows ficou igual. Fotos em [`docs/fotos/g7-tatico-ao-vivo.png`](../fotos/g7-tatico-ao-vivo.png).
+  - Com os glifos dos launchers (passo 2), o pacote cobre 55 apps, e o teste dos launchers inclui o Tático.
 - **Medieval 8-bit:** barra em pixel art, com moldura de madeira escura, cantoneiras de ferro com rebites e meio de pedra; indicador ouro `#E8B84A`. Ícones: pixel 32×32 em "espaço de inventário" de pedra com bisel, paleta terrosa limitada, fonte em texto e `gerar.py`. Reserva: baú.
 - **Caçador:** barra de couro curtido com costura pespontada e cantos de osso; indicador âmbar `#F2A33A`. Ícones: medalhão de couro com aro de osso e o glifo gravado em âmbar, em relevo. Reserva: pegada de garra.

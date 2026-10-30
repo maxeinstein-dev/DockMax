@@ -1026,6 +1026,70 @@ pub const GAME_BOY: Bundled = Bundled {
     ),
 };
 
+/// Tático: the glyphs in sand on an octagonal olive plate, like a HUD; its
+/// fallback is a reticle. Drawn by `icon-packs/fonte/vetor.py` from layers.
+pub const TATICO: Bundled = Bundled {
+    id: "tatico",
+    files: pack_files!("tatico":
+        "pack.json",
+        "apps/amd.png",
+        "apps/battlenet.png",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/ea.png",
+        "apps/edge.png",
+        "apps/epic.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/faceit.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/gog.png",
+        "apps/lixeira.png",
+        "apps/medal.png",
+        "apps/mira.png",
+        "apps/notion.png",
+        "apps/nvidia.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/overwolf.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/riot.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/twitch.png",
+        "apps/ubisoft.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
 /// Every pack in the binary.
 pub const ALL: &[Bundled] = &[
     RETRO_8BIT,
@@ -1040,6 +1104,7 @@ pub const ALL: &[Bundled] = &[
     ARGILA,
     FOSFORO,
     GAME_BOY,
+    TATICO,
 ];
 
 impl Bundled {
@@ -1131,6 +1196,7 @@ mod tests {
             (ESMALTE, "Esmalte"),
             (TRACO, "Traço"),
             (CLASSICO_98, "Clássico 98"),
+            (TATICO, "Tático"),
             (FOSFORO, "Fósforo"),
             (GAME_BOY, "Game Boy"),
             (CIRCULO, "Círculo"),
@@ -1207,6 +1273,7 @@ mod tests {
             }
             let fallback = match pack.id.as_str() {
                 "retro-8bit" | "game-boy" => "apps/cartucho.png",
+                "tatico" => "apps/mira.png",
                 _ => "apps/grade.png",
             };
             assert_eq!(
@@ -1633,6 +1700,7 @@ mod tests {
             (VIDRO, &["apps/", "escuro/"][..]),
             (NEON, &["apps/", "escuro/"][..]),
             (ARGILA, &["apps/"][..]),
+            (TATICO, &["apps/"][..]),
         ] {
             let manifest = pack.manifest();
             let svg_folder = |theme: &str| match theme {
@@ -1641,10 +1709,16 @@ mod tests {
             };
             for theme in themes {
                 let images = images_in(&pack, theme);
-                let expected: Vec<String> = glyphs()
+                // Tático has its own fallback: a reticle instead of the grid.
+                let mut expected: Vec<String> = glyphs()
                     .keys()
                     .map(|path| path.replace("apps/", theme))
+                    .map(|path| match pack.id {
+                        "tatico" => path.replace("grade.png", "mira.png"),
+                        _ => path,
+                    })
                     .collect();
+                expected.sort();
                 assert_eq!(
                     images
                         .keys()
@@ -1771,6 +1845,7 @@ mod tests {
             VIDRO,
             NEON,
             ARGILA,
+            TATICO,
         ] {
             let manifest = pack.manifest();
             for app in launchers {

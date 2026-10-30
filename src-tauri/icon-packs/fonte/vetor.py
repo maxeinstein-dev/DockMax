@@ -532,6 +532,13 @@ def main():
     pacote = sys.argv[1] if len(sys.argv) > 1 else "esmalte"
     meta, estilo = ler_pacote(AQUI / f"{pacote}.txt")
     glifos = ler_glifos(AQUI / "glifos.txt")
+    # Um pacote pode trocar o glifo da reserva: `reserva-id` e `reserva`
+    # (caminhos separados por |).
+    if "reserva" in estilo:
+        for glifo in glifos:
+            if glifo["nomes"] == ["reserva"]:
+                glifo["id"] = estilo["reserva-id"]
+                glifo["caminhos"] = [d.strip() for d in estilo["reserva"].split("|")]
     lado = int(estilo.get("lado", "128"))
     rasterizar, desenhar = estilo_de(estilo["estilo"])
     destino = AQUI.parent / pacote
