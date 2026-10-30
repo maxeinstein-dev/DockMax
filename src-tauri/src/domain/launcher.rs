@@ -324,6 +324,18 @@ pub enum Action {
     /// File Explorer (L4): a full path on a drive, found by the search of
     /// files, or on a drive or a share, listed from a path typed (L5).
     OpenFile(String),
+    /// From the menu of actions (L6): opens a program of the Apps folder,
+    /// or a program or a shortcut found, as administrator.
+    OpenAppAsAdmin(String),
+    OpenFileAsAdmin(String),
+    /// Shows a file or a folder selected in File Explorer (a program's own
+    /// file, for a classic program).
+    Reveal(String),
+    /// Copies the full path of a file or a folder.
+    CopyPath(String),
+    /// Pins a program of the Apps folder to the dock, or takes it out.
+    PinApp(String),
+    UnpinApp(String),
 }
 
 /// Whether `action` may run: every result's action is checked here first.
@@ -337,7 +349,13 @@ pub fn is_allowed(action: &Action) -> bool {
                 && text.chars().count() <= MAX_COPY
                 && !text.chars().any(char::is_control)
         }
-        Action::OpenFile(path) => super::launcher_files::is_openable(path),
+        Action::OpenFile(path) | Action::Reveal(path) | Action::CopyPath(path) => {
+            super::launcher_files::is_openable(path)
+        }
+        Action::OpenAppAsAdmin(id) | Action::PinApp(id) | Action::UnpinApp(id) => {
+            is_valid_app_id(id)
+        }
+        Action::OpenFileAsAdmin(path) => super::launcher_actions::is_elevatable(path),
     }
 }
 
@@ -636,6 +654,29 @@ mod tests {
             "C:\\a\nb",
         ] {
             assert!(!is_allowed(&Action::OpenFile(path.into())), "{path:?}");
+            assert!(!is_allowed(&Action::Reveal(path.into())), "{path:?}");
+            assert!(!is_allowed(&Action::CopyPath(path.into())), "{path:?}");
+            assert!(
+                !is_allowed(&Action::OpenFileAsAdmin(path.into())),
+                "{path:?}"
+            );
         }
+        // L6: the menu's actions.
+        let id = "Microsoft.Paint_8wekyb3d8bbwe!App";
+        assert!(is_allowed(&Action::OpenAppAsAdmin(id.into())));
+        assert!(is_allowed(&Action::PinApp(id.into())));
+        assert!(is_allowed(&Action::UnpinApp(id.into())));
+        assert!(!is_allowed(&Action::PinApp(String::new())));
+        assert!(!is_allowed(&Action::OpenAppAsAdmin(" a".into())));
+        // A path is copied whatever its length, unlike a sum's result.
+        let long = format!(r"C:\{}\a.pdf", "x".repeat(200));
+        assert!(is_allowed(&Action::CopyPath(long.clone())));
+        assert!(is_allowed(&Action::Reveal(long)));
+        assert!(is_allowed(&Action::OpenFileAsAdmin(
+            r"C:\Tools\setup.exe".into()
+        )));
+        assert!(!is_allowed(&Action::OpenFileAsAdmin(
+            r"C:\Users\ana\a.pdf".into()
+        )));
     }
 }

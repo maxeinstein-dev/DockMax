@@ -146,6 +146,20 @@ fn monitor_at(at: POINT) -> (Area, f64) {
 /// `up` (a dock at the bottom of the screen) and below it otherwise, and
 /// returns the index of the line chosen; `None` when it was let go.
 pub fn show(at: Option<POINT>, up: bool, lines: Vec<Line>) -> Option<usize> {
+    show_from(None, at, up, lines, false)
+}
+
+/// `show`, for a menu of the window `owner` (the launcher's, spec 0012 L6):
+/// it stays above it, and the owner takes the keyboard back when the menu
+/// closes. Opened by the keyboard (`keyboard`), its first item is lit, as
+/// in Windows' menus.
+pub fn show_from(
+    owner: Option<HWND>,
+    at: Option<POINT>,
+    up: bool,
+    lines: Vec<Line>,
+    keyboard: bool,
+) -> Option<usize> {
     if lines.is_empty() || MENU.with(|slot| slot.borrow().is_some()) {
         return None;
     }
@@ -166,7 +180,7 @@ pub fn show(at: Option<POINT>, up: bool, lines: Vec<Line>) -> Option<usize> {
             0,
             1,
             1,
-            None,
+            owner,
             None,
             GetModuleHandleW(None).ok().map(Into::into),
             None,
@@ -213,6 +227,7 @@ pub fn show(at: Option<POINT>, up: bool, lines: Vec<Line>) -> Option<usize> {
     }
     let width = model::width(widest_label, widest_shortcut);
     let height = model::height(&lines);
+    let hot = if keyboard { model::first(&lines) } else { None };
     let px = |logical: f64| (logical * scale).round() as i32;
     let area = model::place(at.x, at.y, px(width), px(height), up, work);
     unsafe {
@@ -250,7 +265,7 @@ pub fn show(at: Option<POINT>, up: bool, lines: Vec<Line>) -> Option<usize> {
         *slot.borrow_mut() = Some(Menu {
             hwnd,
             lines,
-            hot: None,
+            hot,
             chosen: None,
             done: false,
             scale,
@@ -267,6 +282,9 @@ pub fn show(at: Option<POINT>, up: bool, lines: Vec<Line>) -> Option<usize> {
         let _ = SetFocus(Some(hwnd));
     }
     access::opened(hwnd, entries);
+    if hot.is_some() {
+        access::focused(hwnd, hot);
+    }
     run_loop();
     let chosen = MENU
         .with(|slot| slot.borrow_mut().take())

@@ -112,6 +112,50 @@ pub fn unpin(storage: &mut Storage, id: &str, workspace: Option<&str>) -> Result
     Ok(())
 }
 
+/// The dock's id of the program `app_id` of the Apps folder when the
+/// workspace in use has it pinned; `None` when it does not (pinned only in
+/// another workspace, or not at all).
+pub fn pinned_here(storage: &mut Storage, app_id: &str) -> Result<Option<WidgetId>, AppError> {
+    let Some(known) = storage
+        .apps_snapshot()?
+        .apps
+        .into_iter()
+        .find(|app| app.app_id.eq_ignore_ascii_case(app_id))
+    else {
+        return Ok(None);
+    };
+    let workspace = crate::commands::widgets::workspace_of(storage, None)?;
+    let has = storage
+        .workspaces()?
+        .iter()
+        .any(|w| w.id == workspace && w.items.contains(&key_of(&known.id)));
+    Ok(has.then_some(known.id))
+}
+
+/// Pins (`pin`) the program `app_id`, named `name`, to the workspace in use,
+/// or takes it out of it: the launcher's "Fixar no dock" and "Desafixar"
+/// (spec 0012 L6), through what the panel's `pin_app` and `unpin_app` do.
+/// The name is the one the Apps folder gave the launcher's catalog.
+pub fn pin_from_launcher(
+    app: &AppHandle,
+    app_id: &str,
+    name: &str,
+    wanted: bool,
+) -> Result<(), AppCommandError> {
+    if !is_valid_app_id(app_id) || !is_valid_app_name(name) {
+        return Err(AppError::InvalidApp.into());
+    }
+    let state = app.state::<Mutex<Storage>>();
+    change(app, &state, "launcher pin", |storage| {
+        if wanted {
+            pin(storage, app_id, name, None).map(|_| ())
+        } else {
+            let id = pinned_here(storage, app_id)?.ok_or(AppError::NotFound)?;
+            unpin(storage, id.as_str(), None)
+        }
+    })
+}
+
 /// Moves the program `id` one place up or down among the programs of the
 /// workspace `workspace` (or the one in use).
 pub fn shift(
@@ -900,6 +944,24 @@ mod tests {
             target_of(&mut storage, "Some.App!App"),
             Err(AppError::NotFound)
         );
+    }
+
+    #[test]
+    fn the_launcher_knows_whether_the_workspace_in_use_has_a_program_pinned() {
+        let (_dir, mut storage) = open();
+        assert_eq!(pinned_here(&mut storage, "Some.App!App"), Ok(None));
+
+        let pinned = pin(&mut storage, "Some.App!App", "Some App", None).unwrap();
+        // "Desafixar": the same program, whatever the case of its id.
+        assert_eq!(
+            pinned_here(&mut storage, "some.app!app"),
+            Ok(Some(pinned.id.clone()))
+        );
+        assert_eq!(pinned_here(&mut storage, "Other!App"), Ok(None));
+
+        unpin(&mut storage, pinned.id.as_str(), None).unwrap();
+        // "Fixar no dock" again.
+        assert_eq!(pinned_here(&mut storage, "Some.App!App"), Ok(None));
     }
 
     #[test]

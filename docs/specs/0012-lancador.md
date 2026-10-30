@@ -1,6 +1,6 @@
 # Spec 0012 — Lançador: buscar e abrir pelo teclado
 
-**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado.
+**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado; L6 (menu de ações por resultado) implementado.
 **Origem:** pedido do autor (2026-10-26) de um lançador no estilo do [Ulauncher](https://ulauncher.io/): uma caixa de busca aberta por um atalho de teclado global, que acha e abre apps e, no futuro, arquivos e extensões. O PrimoDock tem algo parecido ("O botão Iniciar abre: Apps do PrimoDock", [interface](../reference/primodock/interface.md)), mas só pelo mouse e sem busca por teclado.
 
 ## 1. Decisões do autor (2026-10-26)
@@ -21,7 +21,7 @@
 | **L3** | Personalizar o atalho em Configurações |
 | **L4** | **Arquivos e pastas:** o Everything (quando roda) e o índice do Windows Search, misturados abaixo dos apps a partir de 3 caracteres, e a palavra-chave `f ` só com eles (seções 5a e 8d) |
 | **L5** | **Caminhos,** como no Ulauncher: digitar `C:\`, `~\`, `%APPDATA%\` ou `\\servidor\compartilhamento\` lista a pasta, Tab completa e entra na pasta selecionada, Backspace sobe uma pasta (seção 8e) |
-| **L6** (depois) | **Menu de ações por resultado:** Ctrl+Shift+Enter abre como administrador (como no Executar do Windows), mostrar no Explorador, copiar o caminho, fixar no dock |
+| **L6** | **Menu de ações por resultado:** Ctrl+Shift+Enter abre como administrador (como no Executar do Windows), mostrar no Explorador, copiar o caminho, fixar no dock |
 | **L7** (depois) | Buscar e alternar entre as **janelas abertas** |
 
 L1 e L2 formam o primeiro recorte do produto. Cada um é um PR; o L2 só começa depois da medição de memória do L1. Do L4 em diante, os recortes seguem em sequência, um PR cada.
@@ -137,6 +137,10 @@ O desenho e o que foi medido estão em "Como o L4 ficou" (seção 8d).
 | Digitar | Busca a cada tecla (o catálogo cabe em memória; sem atraso); os arquivos, 120 ms depois da última tecla (L4) |
 | Cima, Baixo | Muda o resultado selecionado, sem sair da caixa de texto |
 | Enter | Abre o selecionado (o primeiro, se nenhum foi escolhido) |
+| Shift+Enter | O menu de ações do selecionado (L6); numa página de Configurações, numa busca na web ou numa conta, que só têm uma ação, faz essa ação direto, sem menu |
+| Tecla Menu, Shift+F10 | O menu de ações do selecionado (L6); sem menu (página, busca na web, conta, nenhum resultado), o menu do próprio campo de texto, como antes |
+| Ctrl+Shift+Enter | Abre o selecionado como administrador, como no Executar do Windows (L6): app, programa, script, instalador ou atalho; nos outros, nada |
+| Ctrl+C | Sem texto selecionado no campo, copia o caminho do arquivo ou da pasta selecionada (ou o resultado da conta), fecha e diz "Caminho copiado" (L6); com texto selecionado, copia o texto, como sempre |
 | Alt+1…9 | Abre o n-ésimo resultado, como no Ulauncher; o atalho aparece sempre à direita de cada linha (no L1, sempre, e não só com Alt apertado) |
 | Tab | Num arquivo ou numa pasta, completa o caminho no campo; numa pasta, acrescenta `\` e entra nela (L5). Nos outros resultados, nada. Shift+Tab, nada |
 | Backspace | Com o cursor no fim de um caminho terminado em `\`, volta para a pasta de cima (L5); fora disso, apaga um caractere |
@@ -144,7 +148,7 @@ O desenho e o que foi medido estão em "Como o L4 ficou" (seção 8d).
 | Page Up, Page Down, Home, End na lista | Ficam com a caixa de texto (o cursor) |
 | Roda do mouse | Rola a lista quando há mais de 8 resultados (L4: até 16 na mistura, 30 com `f `); Cima e Baixo também rolam, levando a seleção |
 
-O mouse também funciona: passar o ponteiro seleciona e o clique abre.
+O mouse também funciona: passar o ponteiro seleciona, o clique abre e o botão direito seleciona a linha e abre o menu de ações no ponteiro (L6).
 
 ## 7. Acessibilidade
 
@@ -155,6 +159,7 @@ O mouse também funciona: passar o ponteiro seleciona e o clique abre.
 - **Movimento:** sem animação de abrir e fechar (no L1 não há esmaecer nenhum).
 - **Tamanho do texto:** a fonte segue o "Tamanho do texto" da Acessibilidade do Windows, além do DPI; as linhas crescem com ela.
 - **Só teclado:** tudo o que o mouse faz no lançador também se faz pelo teclado (seção 6).
+- **O menu de ações (L6)** é o menu próprio do app (`windows/menu`, o do dock), com o mesmo provedor de UI Automation: o Narrador ouve o menu abrir ("Dockyard") e lê cada item com o foco ("Abrir como administrador", "Mostrar no Explorador"); o Invoke escolhe. Aberto pelo teclado, o primeiro item já vem com o foco. "Caminho copiado" é um anúncio, como "Resultado copiado".
 
 ## 8. Como verificar
 
@@ -166,6 +171,7 @@ O mouse também funciona: passar o ponteiro seleciona e o clique abre.
 - L2: a calculadora (precedência, parênteses, `^`, `%`, a vírgula decimal, divisão por zero, conta incompleta, uma consulta que não é conta), as palavras-chave (só `https://`, o termo codificado, uma palavra-chave sem termo, o buscador padrão quando nada casa), as Configurações (sinônimos, a ordem depois dos apps na mesma faixa);
 - a lista fechada de ações: um teste que falha se aparecer uma ação nova sem passar pela validação;
 - L4: a mistura e a ordem dos arquivos, o `f `, o limite, a junção sem repetir caminho, a abreviação com `~`, o descarte de uma geração antiga, os buffers da IPC do Everything e o escape do termo para cada fonte;
+- L6: as ações por tipo de resultado, o Fixar e Desafixar e o Ctrl+C com e sem seleção (seção 8f);
 - L5: o reconhecimento de um caminho, a expansão de `~` e `%VAR%`, a pasta e o filtro, a ordem e os ocultos, o Tab, o Backspace e o descarte de uma leitura antiga (seção 8e);
 - a migração de `launcher_usage` e "Limpar o histórico".
 
@@ -311,6 +317,41 @@ Duas falhas apareceram e foram corrigidas antes do PR: o campo lia a **posição
 **Testes de unidade:** o reconhecimento do modo (`C:\`, `~\`, `%APPDATA%\`, UNC e o que não é caminho), a expansão de `~` e `%VAR%`, a separação entre pasta e filtro com `.` e `..`, a ordem pastas → arquivos, o filtro pelas faixas, os ocultos, o Tab, o Backspace, o descarte da geração antiga e do tempo limite, a validação do UNC e a leitura de uma pasta de verdade (temporária) com os erros.
 
 **Não verificado (só ao vivo):** o Tab e o Backspace no teclado de verdade (a caixa de texto do Windows, o cursor no fim depois do Tab, o IME); a lista de `C:\Windows\System32` (uns 5 000 itens) filtrando a cada tecla sem atraso; um compartilhamento de rede de verdade, e um fora do ar mostrando "A pasta não respondeu" sem travar; "Sem acesso" numa pasta protegida (`C:\System Volume Information`); os ícones das linhas; o Narrador lendo "Pasta" e "Arquivo" e o anúncio depois do Tab; a memória com o lançador aberto navegando.
+
+## 8f. Como o L6 ficou
+
+**As ações por tipo** (`domain/launcher_actions.rs`, puro e testado), na ordem do menu:
+
+| Resultado | Ações |
+|---|---|
+| App | Abrir · Abrir como administrador · **Fixar no dock** ou **Desafixar do dock** · Mostrar no Explorador (só app clássico com arquivo) |
+| Arquivo | Abrir · Abrir como administrador (só `.exe`, `.com`, `.bat`, `.cmd`, `.msi`, `.msc` e `.lnk`) · Mostrar no Explorador · Copiar caminho |
+| Pasta | Abrir · Mostrar no Explorador · Copiar caminho |
+| Página de Configurações, busca na web | Abrir |
+| Conta | Copiar resultado |
+
+- **Uma ação só, sem menu:** página, busca na web e conta têm uma ação, a mesma do Enter. Shift+Enter faz essa ação direto; a tecla Menu, Shift+F10 e o botão direito não abrem nada nessas linhas (a tecla Menu abre o menu do próprio campo de texto, como antes). Um menu de uma linha só seria um passo a mais para o mesmo Enter.
+- **App da Loja ou clássico:** o id de um app empacotado (Loja e afins) é `FamíliaDoPacote!App`; ele nunca tem "Mostrar no Explorador". Para um clássico, o lançador pergunta ao shell o arquivo do app (`apps::target_of`, o mesmo do menu do dock) **antes de abrir o menu**, numa thread `launcher-app-file`, e guarda a resposta até liberar a janela; sem arquivo (um atalho para uma URL, um app do sistema), o item fica de fora. A pergunta só acontece no primeiro menu de cada app.
+- **"Abrir como administrador" aparece em todo app,** inclusive nos da Loja, como o autor decidiu: alguns empacotados aceitam (o Terminal do Windows); um que não aceita mostra "Não foi possível abrir".
+- **A lista fechada cresceu** (`launcher::Action`): `OpenAppAsAdmin` (id válido), `OpenFileAsAdmin` (caminho que o lançador abre, de um tipo que o Windows eleva), `Reveal` e `CopyPath` (caminho que o lançador abre, de unidade ou compartilhamento; o limite de 64 caracteres é só da conta), `PinApp` e `UnpinApp` (id válido). `launcher_actions::action` monta a ação de um item a partir da ação do Enter e passa por `is_allowed`; um item que não se aplica não vira ação. `apps::open_app_as_admin`, `open_path_as_admin` e `reveal_path` conferem de novo.
+
+**Abrir como administrador** (Ctrl+Shift+Enter ou o item do menu): `ShellExecuteExW` com o verbo `runas`, numa thread `launcher-admin`, com a janela do lançador como dona da pergunta do UAC. Um app vai pelo item da pasta Aplicativos (`shell:AppsFolder\<id>`), como o "Executar como administrador" do Iniciar; se o shell recusar e o app clássico tiver arquivo, vai pelo arquivo, com os argumentos do atalho. **Cancelar o UAC não é erro** (`ERROR_CANCELLED`): o lançador continua aberto, com o foco na caixa, sem mensagem. Outra falha mostra "Não foi possível abrir" na linha. Enquanto o Windows pergunta, o lançador não fecha ao perder o foco. Abrir como administrador conta no uso, como abrir. Ctrl+Shift+Enter num resultado sem essa ação (um documento, uma pasta, uma página) não faz nada.
+
+**Fixar e desafixar:** pelo mesmo caminho do painel (`commands::apps::pin` e `unpin`, por `change`, que avisa as janelas, os espaços de trabalho e o dock nativo), no espaço de trabalho em uso. "Desafixar do dock" aparece quando o espaço em uso já tem o app (`commands::apps::pinned_here`, sem diferenciar maiúsculas no id); fixado só em outro espaço, o item é "Fixar no dock" e o põe neste também, como o painel faz. O nome é o do catálogo, que veio do shell.
+
+**Mostrar no Explorador:** `explorer /select,"<caminho>"`, como o menu do dock (`apps::reveal`), numa thread `launcher-open`. Abre a pasta de cima com o item selecionado; numa pasta, seleciona a própria pasta; numa unidade, abre a unidade.
+
+**Copiar:** Ctrl+C, sem seleção no campo (`EM_GETSEL` com o início igual ao fim), copia o caminho do arquivo ou da pasta (a conta copia o resultado, como o Enter). É tratado no caractere (`WM_CHAR` 0x03), onde a caixa de texto copia; com seleção, a caixa copia o texto. Copiar fecha o lançador e diz "Caminho copiado" ao leitor de tela. Num app, numa página ou numa busca, Ctrl+C sem seleção continua sendo o da caixa (não copia nada).
+
+**O menu:** o próprio do app (`windows::menu::show_from`, o do dock), com a janela do lançador como **dona**: fica acima dela e, ao fechar, o Windows devolve a ativação ao lançador. Pelo teclado (Shift+Enter, tecla Menu, Shift+F10), abre embaixo da linha selecionada, na ponta direita, com o primeiro item aceso; pelo botão direito, no ponteiro, depois de selecionar a linha. Cada item mostra o atalho que faz o mesmo sem o menu (Enter, Ctrl+Shift+Enter, Ctrl+C).
+
+- **O laço do menu fora do empréstimo:** o menu roda um laço de mensagens próprio até a escolha. Ele abre por uma mensagem da janela (`WM_ACTION_MENU`), fora do `RefCell` do lançador, para que, enquanto está aberto, o lançador continue pintando e recebendo os arquivos e os ícones (com o lançador emprestado, esse trabalho se perderia).
+- **Não fechar ao perder o foco:** enquanto o menu está aberto, o `WM_ACTIVATE` inativo do lançador é ignorado (`HOLD`), e o atalho global espera. Fechado o menu com Esc, o lançador pega o teclado de volta; fechado com um clique em outro programa (o primeiro plano não é mais do Dockyard), o lançador fecha, como fecharia sem o menu.
+- **Escolher fecha:** cada ação fecha o lançador, como abrir, ou o deixa aberto dizendo "Não foi possível abrir" na linha.
+
+**Testes de unidade:** as ações por tipo (app da Loja sem "Mostrar no Explorador", clássico com; arquivo comum sem "Abrir como administrador", executável e atalho com; pasta; página, busca e conta sem menu), "Fixar" virando "Desafixar" e a ação de cada um, o Ctrl+C com e sem seleção, a ação que não se aplica, as novas ações da lista fechada (`every_action_is_checked`) e `pinned_here` antes e depois de fixar e desafixar.
+
+**Não verificado (só ao vivo):** o menu na tela, embaixo da linha e no ponteiro, em claro, escuro e alto contraste; o lançador continuar aberto com o menu e fechar com um clique em outro programa; o UAC de verdade (aceitar abre elevado; cancelar deixa o lançador aberto, com o foco); `runas` num app da Loja que não aceita elevação e num app clássico pela pasta Aplicativos; o Explorador abrindo com o item selecionado; fixar e desafixar aparecendo no dock; o Ctrl+C, a tecla Menu e Shift+F10 com o teclado de verdade; o Narrador lendo o menu e "Caminho copiado".
 
 ## 9. Extensões (depois)
 
