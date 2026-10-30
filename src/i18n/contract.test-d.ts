@@ -170,6 +170,10 @@ export const otherText: Messages = {
         phosphor: "Phosphor",
         tactical: "Tactical",
       },
+      themeKeep: "Keep?",
+      themeRevertIn: "In {seconds} s",
+      themeKeepButton: "Keep",
+      themeRevertButton: "Revert",
       themeCustom: "Custom",
       style: "Style",
       styles: {

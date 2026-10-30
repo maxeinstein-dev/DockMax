@@ -209,6 +209,10 @@ export const en: Messages = {
         phosphor: "Phosphor",
         tactical: "Tactical",
       },
+      themeKeep: "Keep this theme?",
+      themeRevertIn: "Reverting in {seconds} s",
+      themeKeepButton: "Keep",
+      themeRevertButton: "Revert",
       themeCustom:
         "Custom: the style, the icons or the indicator color aren't a theme's",
       style: "Style",
