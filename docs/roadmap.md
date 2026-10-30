@@ -30,7 +30,7 @@ Ordem decidida pelo autor em 2026-10-26, depois da fase D: **C → E → F → G
 | **F. Widgets** | **Em andamento** ([spec 0017](specs/0017-fase-f-widgets.md)): F1 (tiles largos, Atividade, Atividade de rede e a aba Widgets com o catálogo); F2 a F5 a fazer. |
 | **G. Extras** | Depois da F. |
 
-Fora das fases: o **lançador** no estilo do Ulauncher ([spec 0012](specs/0012-lancador.md)). O L1 entrou em 2026-10-27 (Alt+Espaço, busca nos apps, recentes), no [PR #33](https://github.com/maxeinstein-dev/DockMax/pull/33). O L2 (calculadora, busca na web por palavra-chave, Configurações do DockMax e do Windows) entrou no [PR #37](https://github.com/maxeinstein-dev/DockMax/pull/37). O L3 (personalizar o atalho) vem no PR seguinte.
+Fora das fases: o **lançador** no estilo do Ulauncher ([spec 0012](specs/0012-lancador.md)). O L1 entrou em 2026-10-27 (Alt+Espaço, busca nos apps, recentes), no [PR #33](https://github.com/maxeinstein-dev/DockMax/pull/33). O L2 (calculadora, busca na web por palavra-chave, Configurações do DockMax e do Windows) entrou no [PR #37](https://github.com/maxeinstein-dev/DockMax/pull/37). O L3 (personalizar o atalho) vem no PR seguinte. O L4 busca arquivos e pastas (o Everything, quando roda, e o índice do Windows Search); depois vêm o L5 (caminhos), o L6 (menu de ações por resultado) e o L7 (janelas abertas).
 
 Também fora das fases: os **selos de notificação** ([spec 0016](specs/0016-selos-de-notificacao.md)), o número de não lidas que o app põe no botão da barra do Windows, lido pela UI Automation e desenhado no ícone do dock. Para isso a barra passa a ficar transparente e sem receber cliques, em vez de escondida.
 
@@ -184,6 +184,7 @@ A fase D acabou: a rodada única está no **[roteiro de verificação](roteiro-d
 - [ ] Leitor de tela.
 - [ ] O dock nativo (spec 0011 H3) com o **mouse de verdade**: os três efeitos ao passar o mouse; os oito estilos e os reflexos na tela; a borda de cima; escala de 150 %. (Arrastar para reordenar: confirmado pelo autor em 2026-10-26.)
 - [ ] Um dock por monitor (spec 0010 D4b): o mouse no segundo dock, ligar e desligar um monitor com o DockMax aberto, mudar "Dock em todos os monitores" com ele aberto, tela cheia de verdade no segundo monitor. (Um dock em cada monitor: confirmado pelo autor em 2026-10-26.)
+- [ ] O lançador (spec 0012 L4): ao vivo, buscar arquivos (misturados e com `f `), abrir um arquivo e uma pasta, os ícones de tipo, a roda do mouse, o Narrador lendo "Arquivo" e "Pasta", o Everything de verdade (também rodando como administrador) e a memória com o lançador aberto buscando arquivos.
 - [ ] O lançador (spec 0012 L3): capturar um atalho novo em Configurações com o teclado físico (Alt+Espaço e combinações com Win dentro do WebView2) e com o leitor de tela.
 - [ ] O lançador (spec 0012 L1): o Alt+Espaço com o teclado físico, o Narrador lendo a lista e a seleção, o IME de outro idioma na caixa de busca, o alto contraste, escala de 150 % e dois monitores.
 - [ ] O lançador (spec 0012 L2): o Narrador lendo "Resultado copiado"; o editor de palavras-chave em Configurações com o teclado e o leitor de tela. (O Enter na conta, em `g dockmax` e em `wifi` o autor verificou em 2026-10-27.)

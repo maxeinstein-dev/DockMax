@@ -416,8 +416,58 @@ pub fn drag_cursor(id: &str, size: i32) -> Option<HCURSOR> {
 /// Windows has none.
 #[cfg(windows)]
 pub fn icon_png(id: &str, size: u32) -> Option<Vec<u8>> {
-    let item = item_of(id).ok()?;
-    let factory: IShellItemImageFactory = windows_core_cast(&item)?;
+    item_icon_png(&item_of(id).ok()?, size)
+}
+
+/// The icon the shell shows for the file or folder `path` (a launcher's
+/// result, L4), as a PNG of `size` pixels a side. Only in the launcher's
+/// helper process: the shell stays out of the app's.
+#[cfg(windows)]
+pub fn path_icon_png(path: &str, size: u32) -> Option<Vec<u8>> {
+    if !crate::domain::launcher_files::is_valid_path(path) {
+        return None;
+    }
+    init_com();
+    let item: IShellItem =
+        unsafe { SHCreateItemFromParsingName(&HSTRING::from(path), None) }.ok()?;
+    item_icon_png(&item, size)
+}
+
+/// Opens a launcher's file with the program Windows has for it, or its
+/// folder in File Explorer (L4). Checked again here: nothing but a full path
+/// on a drive is opened.
+#[cfg(windows)]
+pub fn open_path(path: &str) -> Result<(), String> {
+    use crate::domain::launcher::{Action, is_allowed};
+    if !is_allowed(&Action::OpenFile(path.to_owned())) {
+        return Err("the path is not one the launcher opens".to_owned());
+    }
+    init_com();
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            &HSTRING::from("open"),
+            &HSTRING::from(path),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    if result.0 as usize > 32 {
+        Ok(())
+    } else {
+        Err(format!("ShellExecute answered {}", result.0 as usize))
+    }
+}
+
+#[cfg(not(windows))]
+pub fn open_path(_path: &str) -> Result<(), String> {
+    Err("not Windows".to_owned())
+}
+
+#[cfg(windows)]
+fn item_icon_png(item: &IShellItem, size: u32) -> Option<Vec<u8>> {
+    let factory: IShellItemImageFactory = windows_core_cast(item)?;
     let side = size.clamp(16, 256) as i32;
     let bitmap = unsafe {
         factory.GetImage(
