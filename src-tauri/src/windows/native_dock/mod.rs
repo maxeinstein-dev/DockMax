@@ -963,6 +963,16 @@ impl Dock {
     /// changed.
     fn decode_tray_images(&mut self) {
         use base64::Engine as _;
+        // An icon that left the tray takes its image with it.
+        let in_tray: HashSet<String> = self
+            .strip
+            .iter()
+            .filter_map(|cell| match cell {
+                Cell::Tray(icon) => Some(icon.key.clone()),
+                _ => None,
+            })
+            .collect();
+        keep_only(&mut self.tray_images, &in_tray);
         for cell in &self.strip {
             let Cell::Tray(icon) = cell else {
                 continue;
@@ -1161,13 +1171,34 @@ impl Dock {
         }
     }
 
-    /// Asks for the icons and badges not read yet, off the main thread.
+    /// Asks for the icons and badges not read yet, off the main thread, and
+    /// lets go of the ones no item shows any more (a program closed, another
+    /// pack or theme): the dock is open all day, so they must not pile up.
     fn request_pictures(&mut self) {
         let pack = self.data.settings.dock.icon_pack.clone();
         // A pack's dark images while the dock is dark; Windows' icons are
         // the same in both themes.
         let dark = pack.is_some() && self.data.settings.dock.style.bar_dark(self.dark_now());
         let hwnd = self.hwnd.0 as isize;
+        let shown: HashSet<_> = self
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                Item::App(app) => Some((pack.clone(), app.app_id.clone(), dark)),
+                Item::Other(other) => Some((pack.clone(), other.app_id.clone(), dark)),
+                _ => None,
+            })
+            .collect();
+        keep_only(&mut self.icons, &shown);
+        let badged: HashSet<String> = self
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Other(other) if other.badge => Some(other.key.clone()),
+                _ => None,
+            })
+            .collect();
+        keep_only(&mut self.badges, &badged);
         for item in &self.items {
             let app_id = match item {
                 Item::App(app) => app.app_id.clone(),
@@ -3862,9 +3893,32 @@ pub fn clicked_recently() -> bool {
         .is_some_and(|at| at.elapsed() < CLICK_GRANTS_FOCUS)
 }
 
+/// Keeps in `map` only the entries whose key is in `keys`: a cache of
+/// pictures holds what is shown now, not all that ever was.
+fn keep_only<K, V>(map: &mut HashMap<K, V>, keys: &HashSet<K>)
+where
+    K: std::hash::Hash + Eq,
+{
+    map.retain(|key, _| keys.contains(key));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_picture_cache_keeps_only_what_is_shown_now() {
+        // Fifty programs opened and closed: the cache ends with the two the
+        // dock still shows, whatever passed through it.
+        let mut cache: HashMap<String, u32> = (0..50).map(|n| (format!("app{n}"), n)).collect();
+        let shown: HashSet<String> = ["app3".to_owned(), "app7".to_owned()].into();
+        keep_only(&mut cache, &shown);
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.get("app3"), Some(&3));
+        assert_eq!(cache.get("app7"), Some(&7));
+        keep_only(&mut cache, &HashSet::new());
+        assert!(cache.is_empty());
+    }
 
     const MONITOR: Rect = Rect {
         x: -1920,
