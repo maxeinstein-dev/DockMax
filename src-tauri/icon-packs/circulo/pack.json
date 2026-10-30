@@ -1,7 +1,7 @@
 {
   "name": "Círculo",
   "author": "Dockyard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Discos chapados na cor de cada app, com um glifo branco.",
   "accent": "#3F7FBF",
   "icons": {
@@ -87,7 +87,33 @@
     "Ferramenta de Captura": "apps/captura.png",
     "Snipping Tool": "apps/captura.png",
     "Lixeira": "apps/lixeira.png",
-    "Recycle Bin": "apps/lixeira.png"
+    "Recycle Bin": "apps/lixeira.png",
+    "Epic Games Launcher": "apps/epic.png",
+    "Epic Games": "apps/epic.png",
+    "Battle.net": "apps/battlenet.png",
+    "Battle.net Launcher": "apps/battlenet.png",
+    "Riot Client": "apps/riot.png",
+    "RiotClientServices": "apps/riot.png",
+    "EA app": "apps/ea.png",
+    "EA": "apps/ea.png",
+    "EADesktop": "apps/ea.png",
+    "Ubisoft Connect": "apps/ubisoft.png",
+    "upc": "apps/ubisoft.png",
+    "GOG Galaxy": "apps/gog.png",
+    "GalaxyClient": "apps/gog.png",
+    "FACEIT": "apps/faceit.png",
+    "NVIDIA App": "apps/nvidia.png",
+    "NVIDIA GeForce Experience": "apps/nvidia.png",
+    "GeForce Experience": "apps/nvidia.png",
+    "AMD Software": "apps/amd.png",
+    "AMD Software: Adrenalin Edition": "apps/amd.png",
+    "RadeonSoftware": "apps/amd.png",
+    "AMD Adrenalin": "apps/amd.png",
+    "Overwolf": "apps/overwolf.png",
+    "Twitch": "apps/twitch.png",
+    "Twitch Studio": "apps/twitch.png",
+    "Medal": "apps/medal.png",
+    "Medal.tv": "apps/medal.png"
   },
   "fallback": "apps/grade.png"
 }
