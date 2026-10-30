@@ -12,6 +12,20 @@ Extensão da fase G ([spec 0019](0019-fase-g-extras.md)): **temas** que vestem o
 
 Também entrou o "experimentar e voltar" (#115). Ficam para depois: os temas Cyberpunk, Arcade e Sci-fi; os widgets do dock no tom do tema (Q9); e uma pasta `Skins` para barras de terceiros (Q14).
 
+**Verificação final** (2026-10-30, build e2e da `main` com os seis passos, cópia dos dados do autor):
+- **Os 11 temas:** aplicados pelos cartões, um a um. Cada um perguntou "Manter este tema?", foi mantido e gravou estilo e pacote, e o dock desenhou a barra e os ícones dele. Fotos em [`docs/fotos/g7-11-temas-ao-vivo.png`](../fotos/g7-11-temas-ao-vivo.png).
+- **Memória do dock em repouso** (Configurações fechada, 25 s parado, 7 processos):
+
+| Tema | Memória | Diferença |
+|---|---|---|
+| Padrão (base) | 293,2 MB | — |
+| Medieval 8-bit (skin e pacote de pixel) | 294,3 MB | +1,1 MB |
+| Caçador (skin e pacote vetoriais) | 297,2 MB | +4,0 MB |
+
+  Uma skin e um pacote somam poucos MB: o bitmap da barra e os PNGs dos ícones.
+- **E2E:** `e2e/specs/themes.e2e.ts` aplica o Neon e o mantém, experimenta o Vidro e volta, conferindo o `settings.json` e o cartão marcado.
+- **Barra do Windows:** ficou igual ao fim.
+
 ## 1. Decisões do autor (2026-10-30)
 
 Tomadas numa sessão de perguntas (Q1–Q22), todas na recomendação:
