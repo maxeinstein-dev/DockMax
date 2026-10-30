@@ -115,6 +115,9 @@ const NIF_MESSAGE: u32 = 0x01;
 const NIF_ICON: u32 = 0x02;
 const NIF_TIP: u32 = 0x04;
 const NIF_STATE: u32 = 0x08;
+/// The icon is named by `guidItem`, not by its window and number: those may
+/// then be anything, and are often 0.
+const NIF_GUID: u32 = 0x20;
 const NIS_HIDDEN: u32 = 0x01;
 
 /// One `Shell_NotifyIcon` call, as it goes by.
@@ -133,6 +136,8 @@ pub struct Message {
     pub state: u32,
     pub state_mask: u32,
     pub version: u32,
+    /// `guidItem`, when the flags say the icon is named by it.
+    pub guid: Option<[u8; 16]>,
 }
 
 fn u32_at(bytes: &[u8], at: usize) -> Option<u32> {
@@ -168,19 +173,26 @@ pub fn parse(bytes: &[u8]) -> Option<Message> {
     let action = Action::from_raw(u32_at(bytes, 4)?)?;
     // NOTIFYICONDATAW from byte 8: cbSize, hWnd, uID, uFlags,
     // uCallbackMessage, hIcon, szTip[128], dwState, dwStateMask, szInfo[256],
-    // uTimeout/uVersion.
+    // uTimeout/uVersion, szInfoTitle[64], dwInfoFlags, guidItem.
     let nid = 8;
+    let flags = u32_at(bytes, nid + 12)?;
+    let guid = (flags & NIF_GUID != 0)
+        .then(|| bytes.get(nid + 936..nid + 952))
+        .flatten()
+        .and_then(|field| <[u8; 16]>::try_from(field).ok())
+        .filter(|guid| guid.iter().any(|&byte| byte != 0));
     Some(Message {
         action,
         hwnd: widen(u32_at(bytes, nid + 4)?),
         uid: u32_at(bytes, nid + 8)?,
-        flags: u32_at(bytes, nid + 12)?,
+        flags,
         callback: u32_at(bytes, nid + 16)?,
         icon: widen(u32_at(bytes, nid + 20)?),
         tip: text_at(bytes, nid + 24, 128).unwrap_or_default(),
         state: u32_at(bytes, nid + 280).unwrap_or(0),
         state_mask: u32_at(bytes, nid + 284).unwrap_or(0),
         version: u32_at(bytes, nid + 800).unwrap_or(0),
+        guid,
     })
 }
 
@@ -198,18 +210,33 @@ pub struct Icon {
     pub png: Option<String>,
     /// The program asked not to show it.
     pub hidden: bool,
+    /// The GUID the program names it by, if it does (`NIF_GUID`).
+    pub guid: Option<[u8; 16]>,
 }
 
 fn key_of(hwnd: isize, uid: u32) -> String {
     format!("{hwnd}:{uid}")
 }
 
+/// The icon a message is about: the one with its GUID when it names one
+/// (its window and number then mean nothing), else the one with its window
+/// and number.
+fn find(icons: &[Icon], message: &Message) -> Option<usize> {
+    match message.guid {
+        Some(guid) => icons.iter().position(|icon| icon.guid == Some(guid)),
+        None => {
+            let key = key_of(message.hwnd, message.uid);
+            icons.iter().position(|icon| icon.key == key)
+        }
+    }
+}
+
 /// Applies a message to the list of icons. Returns whether something the
-/// interface shows changed. `png` is the image when the message carries a
-/// new one.
-fn apply(icons: &mut Vec<Icon>, message: &Message, png: Option<Option<String>>) -> bool {
-    let key = key_of(message.hwnd, message.uid);
-    let at = icons.iter().position(|icon| icon.key == key);
+/// interface shows changed. `png` is the image the message carries, when it
+/// carries one that could be read: one that could not leaves the image the
+/// icon had (a program changing its icon does not mean to blank it).
+fn apply(icons: &mut Vec<Icon>, message: &Message, png: Option<String>) -> bool {
+    let at = find(icons, message);
     match message.action {
         Action::Delete => match at {
             Some(index) => {
@@ -227,21 +254,43 @@ fn apply(icons: &mut Vec<Icon>, message: &Message, png: Option<Option<String>>) 
             None => false,
         },
         Action::Add | Action::Modify => {
-            let index = at.unwrap_or_else(|| {
-                icons.push(Icon {
-                    key,
-                    hwnd: message.hwnd,
-                    uid: message.uid,
-                    callback: 0,
-                    version: 0,
-                    tip: String::new(),
-                    png: None,
-                    hidden: false,
-                });
-                icons.len() - 1
-            });
+            let index = match at {
+                Some(index) => index,
+                // A change to an icon the host never had adds it (its
+                // program may have put it up before the host started), but
+                // not without a window to send its clicks to, nor when it is
+                // named by a GUID: Windows refuses a change to a GUID it does
+                // not know, and such a change, added, is an icon without a
+                // name or a picture.
+                None if message.hwnd == 0
+                    || (message.action == Action::Modify && message.guid.is_some()) =>
+                {
+                    return false;
+                }
+                None => {
+                    icons.push(Icon {
+                        key: key_of(message.hwnd, message.uid),
+                        hwnd: message.hwnd,
+                        uid: message.uid,
+                        callback: 0,
+                        version: 0,
+                        tip: String::new(),
+                        png: None,
+                        hidden: false,
+                        guid: message.guid,
+                    });
+                    icons.len() - 1
+                }
+            };
             let before = icons[index].clone();
             let icon = &mut icons[index];
+            // An icon named by a GUID that is added again may come from
+            // another window (its program started again): clicks go there.
+            if message.action == Action::Add && message.hwnd != 0 && icon.hwnd != message.hwnd {
+                icon.hwnd = message.hwnd;
+                icon.uid = message.uid;
+                icon.key = key_of(message.hwnd, message.uid);
+            }
             if message.flags & NIF_MESSAGE != 0 {
                 icon.callback = message.callback;
             }
@@ -252,7 +301,7 @@ fn apply(icons: &mut Vec<Icon>, message: &Message, png: Option<Option<String>>) 
                 icon.hidden = message.state & NIS_HIDDEN != 0;
             }
             if let Some(png) = png {
-                icon.png = png;
+                icon.png = Some(png);
             }
             at.is_none() || *icon != before
         }
@@ -612,11 +661,17 @@ fn observe(lparam: LPARAM) -> Option<bool> {
     }
     let png = (matches!(message.action, Action::Add | Action::Modify)
         && message.flags & NIF_ICON != 0)
-        .then(|| icon_png(message.icon));
-    let existed = host()
-        .icons
-        .iter()
-        .any(|icon| icon.key == key_of(message.hwnd, message.uid));
+        .then(|| icon_png(message.icon))
+        .flatten();
+    if TRACE.load(Ordering::Relaxed) && message.flags & NIF_ICON != 0 {
+        log::warn!(
+            "tray trace: icon={:#x} guid={} image={}",
+            message.icon,
+            message.guid.is_some(),
+            png.as_ref().map_or(0, String::len)
+        );
+    }
+    let existed = find(&host().icons, &message).is_some();
     let changed = apply(&mut host().icons, &message, png);
     if changed {
         schedule_change();
@@ -987,36 +1042,64 @@ fn icon_png(handle: isize) -> Option<String> {
     Some(format!("data:image/png;base64,{}", STANDARD.encode(png)))
 }
 
+/// The width and height of a bitmap, if it is one of a size an icon (or
+/// the double-height mask of a black and white one) can be.
+fn bitmap_size(bitmap: ::windows::Win32::Graphics::Gdi::HBITMAP) -> Option<(u32, u32)> {
+    let mut info = BITMAP::default();
+    let got = unsafe {
+        GetObjectW(
+            HGDIOBJ(bitmap.0),
+            size_of::<BITMAP>() as i32,
+            Some(&mut info as *mut _ as *mut _),
+        )
+    };
+    let fits = |side: i32| side > 0 && side <= 2 * MAX_ICON_SIDE;
+    (got != 0 && fits(info.bmWidth) && fits(info.bmHeight))
+        .then_some((info.bmWidth as u32, info.bmHeight as u32))
+}
+
 /// The pixels of an icon, as straight RGBA, with its size.
 fn icon_rgba(icon: HICON) -> Option<(u32, u32, Vec<u8>)> {
     let mut info = ICONINFO::default();
     unsafe { GetIconInfo(icon, &mut info) }.ok()?;
     let read = (|| {
+        let too_big = |side: u32| side > MAX_ICON_SIDE as u32;
         if info.hbmColor.is_invalid() {
-            // Black and white: the mask holds both halves.
+            // Black and white: the mask is twice as tall, the AND half on
+            // top and the XOR half below.
+            let (width, double) = bitmap_size(info.hbmMask)?;
+            let height = double / 2;
+            if height == 0 || too_big(width) || too_big(height) {
+                return None;
+            }
+            let mask = dib(info.hbmMask, width, double)?;
+            return Some((width, height, mono_to_rgba(&mask, width, height)));
+        }
+        let (width, height) = bitmap_size(info.hbmColor)?;
+        if too_big(width) || too_big(height) {
             return None;
         }
-        let mut bitmap = BITMAP::default();
-        let got = unsafe {
-            GetObjectW(
-                HGDIOBJ(info.hbmColor.0),
-                size_of::<BITMAP>() as i32,
-                Some(&mut bitmap as *mut _ as *mut _),
-            )
-        };
-        if got == 0 || bitmap.bmWidth <= 0 || bitmap.bmHeight <= 0 {
-            return None;
-        }
-        if bitmap.bmWidth > MAX_ICON_SIDE || bitmap.bmHeight > MAX_ICON_SIDE {
-            return None;
-        }
-        let (width, height) = (bitmap.bmWidth as u32, bitmap.bmHeight as u32);
         let color = dib(info.hbmColor, width, height)?;
         let mask = dib(info.hbmMask, width, height)?;
+        if TRACE.load(Ordering::Relaxed) {
+            let pixels = color.as_chunks::<4>().0;
+            log::warn!(
+                "tray trace: icon {width}x{height}, alpha in {} of {} pixels, mask hides {}",
+                pixels.iter().filter(|pixel| pixel[3] != 0).count(),
+                pixels.len(),
+                mask.as_chunks::<4>()
+                    .0
+                    .iter()
+                    .filter(|hole| hole[0] != 0)
+                    .count()
+            );
+        }
         Some((width, height, to_rgba(&color, &mask)))
     })();
     unsafe {
-        let _ = DeleteObject(HGDIOBJ(info.hbmColor.0));
+        if !info.hbmColor.is_invalid() {
+            let _ = DeleteObject(HGDIOBJ(info.hbmColor.0));
+        }
         let _ = DeleteObject(HGDIOBJ(info.hbmMask.0));
     }
     read
@@ -1060,24 +1143,47 @@ fn dib(
     (lines != 0).then_some(pixels)
 }
 
-/// BGRA color and mask to straight RGBA. An icon whose color bitmap has no
-/// alpha at all takes its transparency from the mask (black is opaque).
+/// BGRA color and mask to straight RGBA, the way Windows draws an icon:
+/// - a color bitmap with alpha anywhere is drawn by its alpha;
+/// - one with no alpha at all (an icon of the old kind, or one of fewer
+///   colors read as 32 bits) by its mask: black is opaque, white is a hole;
+/// - and when that mask is all holes, what the icon shows is its color
+///   XORed onto the screen: the pixels that are not black are what is seen.
 fn to_rgba(color: &[u8], mask: &[u8]) -> Vec<u8> {
     let color = color.as_chunks::<4>().0;
     let mask = mask.as_chunks::<4>().0;
     let has_alpha = color.iter().any(|pixel| pixel[3] != 0);
+    let all_holes = mask.iter().all(|hole| hole[0] != 0);
     color
         .iter()
         .zip(mask)
         .flat_map(|(pixel, hole)| {
             let alpha = if has_alpha {
                 pixel[3]
-            } else if hole[0] == 0 {
+            } else if hole[0] == 0 || (all_holes && pixel[..3] != [0, 0, 0]) {
                 255
             } else {
                 0
             };
             [pixel[2], pixel[1], pixel[0], alpha]
+        })
+        .collect()
+}
+
+/// A black and white icon to straight RGBA. `mask` is the BGRA of its
+/// double-height mask: AND on top, XOR below. AND clear is the icon (black,
+/// or white where XOR is set); AND set is a hole, unless XOR is set too,
+/// where the screen is inverted: shown white.
+fn mono_to_rgba(mask: &[u8], width: u32, height: u32) -> Vec<u8> {
+    let pixels = (width * height) as usize;
+    let rows = mask.as_chunks::<4>().0;
+    let (and, xor) = rows.split_at(pixels.min(rows.len()));
+    and.iter()
+        .zip(xor)
+        .flat_map(|(and, xor)| match (and[0] != 0, xor[0] != 0) {
+            (false, false) => [0, 0, 0, 255],
+            (true, false) => [0, 0, 0, 0],
+            (_, true) => [255, 255, 255, 255],
         })
         .collect()
 }
@@ -1353,16 +1459,24 @@ mod tests {
     #[test]
     fn a_new_image_replaces_the_old_one() {
         let mut icons = Vec::new();
-        apply(&mut icons, &add(1, 1, "A"), Some(Some("data:one".into())));
+        apply(&mut icons, &add(1, 1, "A"), Some("data:one".into()));
         assert_eq!(icons[0].png.as_deref(), Some("data:one"));
 
-        assert!(apply(
-            &mut icons,
-            &add(1, 1, "A"),
-            Some(Some("data:two".into()))
-        ));
+        assert!(apply(&mut icons, &add(1, 1, "A"), Some("data:two".into())));
 
         assert_eq!(icons[0].png.as_deref(), Some("data:two"));
+    }
+
+    #[test]
+    fn an_image_that_could_not_be_read_leaves_the_one_the_icon_had() {
+        let mut icons = Vec::new();
+        apply(&mut icons, &add(1, 1, "A"), Some("data:one".into()));
+        // A change of icon whose image could not be read (`png` None).
+        let modify = parse(&data(1, 1, 1, NIF_ICON, 0, 0, "", (0, 0), 0)).unwrap();
+
+        assert!(!apply(&mut icons, &modify, None));
+
+        assert_eq!(icons[0].png.as_deref(), Some("data:one"));
     }
 
     fn icon(version: u32, uid: u32) -> Icon {
@@ -1375,6 +1489,7 @@ mod tests {
             tip: String::new(),
             png: None,
             hidden: false,
+            guid: None,
         }
     }
 
@@ -1431,8 +1546,212 @@ mod tests {
         // No alpha in the color: a black mask pixel is opaque, a white one is not.
         let opaque = to_rgba(&[10, 20, 30, 0], &[0, 0, 0, 0]);
         assert_eq!(opaque, [30, 20, 10, 255]);
-        let hole = to_rgba(&[10, 20, 30, 0], &[255, 255, 255, 0]);
-        assert_eq!(hole, [30, 20, 10, 0]);
+        // (Two pixels, so the mask does not hide everything.)
+        let hole = to_rgba(
+            &[10, 20, 30, 0, 0, 0, 0, 0],
+            &[255, 255, 255, 0, 0, 0, 0, 0],
+        );
+        assert_eq!(hole, [30, 20, 10, 0, 0, 0, 0, 255]);
+    }
+
+    /// `side`×`side` BGRA pixels, each made by `pixel(x, y)`.
+    fn bitmap(side: usize, pixel: impl Fn(usize, usize) -> [u8; 4]) -> Vec<u8> {
+        (0..side * side)
+            .flat_map(|at| pixel(at % side, at / side))
+            .collect()
+    }
+
+    fn alphas(rgba: &[u8]) -> Vec<u8> {
+        rgba.as_chunks::<4>()
+            .0
+            .iter()
+            .map(|pixel| pixel[3])
+            .collect()
+    }
+
+    #[test]
+    fn an_icon_of_the_old_kind_with_no_alpha_takes_its_shape_from_the_mask() {
+        // 32 bits, alpha zero everywhere: a red square inside a hole, the
+        // way a 4-bit icon reads as 32 bits.
+        let inside = |x: usize, y: usize| (1..3).contains(&x) && (1..3).contains(&y);
+        let color = bitmap(4, |x, y| if inside(x, y) { [0, 0, 255, 0] } else { [0; 4] });
+        let mask = bitmap(4, |x, y| if inside(x, y) { [0; 4] } else { [255; 4] });
+
+        let rgba = to_rgba(&color, &mask);
+
+        let shown = bitmap(4, |x, y| [0, 0, 0, if inside(x, y) { 255 } else { 0 }]);
+        assert_eq!(alphas(&rgba), alphas(&shown));
+        // Pixel (1, 1), red, as RGBA.
+        assert_eq!(&rgba[4 * 5..4 * 5 + 4], [255, 0, 0, 255]);
+    }
+
+    #[test]
+    fn an_icon_with_alpha_keeps_it_whatever_its_mask_says() {
+        // Alpha of its own and a mask that hides nothing (FortiClient's own
+        // icons are made so): the alpha decides.
+        let color = bitmap(4, |x, _| [9, 9, 9, (x * 80) as u8]);
+        let mask = bitmap(4, |_, _| [0; 4]);
+
+        let rgba = to_rgba(&color, &mask);
+
+        assert_eq!(alphas(&rgba), alphas(&color));
+    }
+
+    #[test]
+    fn with_no_alpha_a_mask_that_hides_nothing_shows_the_whole_square() {
+        let color = bitmap(2, |_, _| [5, 6, 7, 0]);
+        let mask = bitmap(2, |_, _| [0; 4]);
+
+        assert_eq!(alphas(&to_rgba(&color, &mask)), [255; 4]);
+    }
+
+    #[test]
+    fn a_mask_that_hides_everything_shows_what_the_color_draws() {
+        // Drawn by XOR alone: the mask hides all, the color is the picture.
+        let color = bitmap(2, |x, _| if x == 0 { [0, 200, 0, 0] } else { [0; 4] });
+        let mask = bitmap(2, |_, _| [255; 4]);
+
+        assert_eq!(alphas(&to_rgba(&color, &mask)), [255, 0, 255, 0]);
+        // All black and all hidden: nothing to see.
+        let empty = to_rgba(&bitmap(2, |_, _| [0; 4]), &mask);
+        assert_eq!(alphas(&empty), [0; 4]);
+    }
+
+    #[test]
+    fn a_black_and_white_icon_reads_its_two_halves() {
+        // 4×1: the AND row, then the XOR row.
+        let and = [[0u8; 4], [255; 4], [0; 4], [255; 4]];
+        let xor = [[0u8; 4], [0; 4], [255; 4], [255; 4]];
+        let mask: Vec<u8> = and.iter().chain(&xor).flatten().copied().collect();
+
+        let rgba = mono_to_rgba(&mask, 4, 1);
+
+        assert_eq!(
+            rgba,
+            [
+                0, 0, 0, 255, // black
+                0, 0, 0, 0, // hole
+                255, 255, 255, 255, // white
+                255, 255, 255, 255, // the screen inverted
+            ]
+        );
+        // A mask cut short never panics.
+        assert!(mono_to_rgba(&mask[..8], 4, 1).is_empty());
+    }
+
+    /// `bytes` of a message, named by the GUID that is `byte` sixteen times.
+    fn with_guid(mut bytes: Vec<u8>, byte: u8) -> Vec<u8> {
+        bytes[8 + 936..8 + 952].fill(byte);
+        bytes
+    }
+
+    #[test]
+    fn reads_the_guid_only_when_the_flags_name_the_icon_by_it() {
+        let named = parse(&with_guid(
+            data(0, 1, 2, NIF_GUID | NIF_TIP, 0, 0, "A", (0, 0), 0),
+            7,
+        ))
+        .unwrap();
+        assert_eq!(named.guid, Some([7; 16]));
+
+        let not_named = parse(&with_guid(data(0, 1, 2, NIF_TIP, 0, 0, "A", (0, 0), 0), 7)).unwrap();
+        assert_eq!(not_named.guid, None);
+
+        // A zero GUID names nothing; a message cut before it has none.
+        let zero = parse(&data(0, 1, 2, NIF_GUID, 0, 0, "", (0, 0), 0)).unwrap();
+        assert_eq!(zero.guid, None);
+        let bytes = with_guid(data(0, 1, 2, NIF_GUID, 0, 0, "", (0, 0), 0), 7);
+        assert_eq!(parse(&bytes[..8 + 940]).unwrap().guid, None);
+    }
+
+    #[test]
+    fn an_icon_named_by_a_guid_is_found_by_it_whatever_window_and_number_come() {
+        // Windows' own icons: added with a window, then changed and taken
+        // away with the GUID alone (window and number 0).
+        let mut icons = Vec::new();
+        let add = with_guid(
+            data(
+                0,
+                66306,
+                1226,
+                NIF_GUID | NIF_TIP | NIF_MESSAGE,
+                0x4ca,
+                0,
+                "Remover Hardware",
+                (0, 0),
+                0,
+            ),
+            3,
+        );
+        apply(&mut icons, &parse(&add).unwrap(), None);
+
+        let hide = with_guid(
+            data(
+                1,
+                0,
+                0,
+                NIF_GUID | NIF_STATE,
+                0,
+                0,
+                "",
+                (NIS_HIDDEN, NIS_HIDDEN),
+                0,
+            ),
+            3,
+        );
+        assert!(apply(&mut icons, &parse(&hide).unwrap(), None));
+        assert_eq!(icons.len(), 1);
+        assert!(icons[0].hidden);
+        assert_eq!(icons[0].key, "66306:1226");
+
+        let delete = with_guid(data(2, 0, 0, NIF_GUID, 0, 0, "", (0, 0), 0), 3);
+        assert!(apply(&mut icons, &parse(&delete).unwrap(), None));
+        assert!(icons.is_empty());
+    }
+
+    #[test]
+    fn a_change_to_a_guid_the_host_never_had_adds_no_nameless_icon() {
+        // What the log showed: a change by a GUID nobody added, with the
+        // window of a known icon and another number. Added, it was an icon
+        // with neither a name nor a picture.
+        let mut icons = Vec::new();
+        apply(&mut icons, &add(66306, 1226, "Remover Hardware"), None);
+        let stray = with_guid(
+            data(
+                1,
+                66306,
+                1225,
+                NIF_GUID | NIF_ICON | NIF_MESSAGE,
+                0x4c9,
+                0,
+                "",
+                (0, 0),
+                0,
+            ),
+            9,
+        );
+
+        assert!(!apply(&mut icons, &parse(&stray).unwrap(), None));
+        assert_eq!(icons.len(), 1);
+
+        // Nor a change without a window, GUID or not.
+        let nowhere = parse(&data(1, 0, 0, NIF_TIP, 0, 0, "x", (0, 0), 0)).unwrap();
+        assert!(!apply(&mut icons, &nowhere, None));
+        assert_eq!(icons.len(), 1);
+    }
+
+    #[test]
+    fn a_guid_icon_added_again_from_another_window_sends_its_clicks_there() {
+        let mut icons = Vec::new();
+        let first = with_guid(data(0, 10, 1, NIF_GUID | NIF_TIP, 0, 0, "A", (0, 0), 0), 5);
+        apply(&mut icons, &parse(&first).unwrap(), None);
+        let again = with_guid(data(0, 20, 1, NIF_GUID | NIF_TIP, 0, 0, "A", (0, 0), 0), 5);
+
+        assert!(apply(&mut icons, &parse(&again).unwrap(), None));
+
+        assert_eq!(icons.len(), 1);
+        assert_eq!(icons[0].hwnd, 20);
+        assert_eq!(icons[0].key, "20:1");
     }
 
     #[test]
