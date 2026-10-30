@@ -1,7 +1,9 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 use tauri::{
-    Builder, Manager, RunEvent, Runtime, Wry, plugin::TauriPlugin, webview::PageLoadEvent,
+    AppHandle, Builder, Manager, RunEvent, Runtime, Wry, plugin::TauriPlugin,
+    webview::PageLoadEvent,
 };
 
 mod commands;
@@ -169,7 +171,10 @@ macro_rules! handler {
             commands::launcher::launcher_status,
             commands::launcher::clear_launcher_history,
             commands::launcher::set_launcher_hotkey,
-            commands::launcher::capture_launcher_hotkey
+            commands::launcher::capture_launcher_hotkey,
+            commands::update::update_status,
+            commands::update::check_for_update,
+            commands::update::install_update
         ]
     };
 }
@@ -251,6 +256,9 @@ macro_rules! handler {
             commands::launcher::clear_launcher_history,
             commands::launcher::set_launcher_hotkey,
             commands::launcher::capture_launcher_hotkey,
+            commands::update::update_status,
+            commands::update::check_for_update,
+            commands::update::install_update,
             e2e::e2e_dock_view,
             e2e::e2e_press_dock,
             e2e::e2e_launcher_view,
@@ -259,6 +267,47 @@ macro_rules! handler {
             e2e::e2e_launcher_key
         ]
     };
+}
+
+/// Whether `release_on_exit` already ran.
+static RELEASED: AtomicBool = AtomicBool::new(false);
+
+/// What leaving the app gives back, on the main thread: the edge and the
+/// taskbar, the windows the workspaces hid, the dock and the launcher, and
+/// the widget database complete in its file. Runs on `RunEvent::Exit` (Sair
+/// in the dock's or the tray's menu) and before the updater's installer
+/// (spec 0019 G3), which ends the process without that event. Once: a
+/// second call does nothing.
+pub(crate) fn release_on_exit<R: Runtime>(app: &AppHandle<R>) {
+    if RELEASED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    // The edge and the taskbar go back before anything else.
+    #[cfg(windows)]
+    {
+        windows::tray_host::stop();
+        windows::appbar::remove();
+        windows::taskbar::release();
+        // The windows the workspaces hid (spec 0013 C2).
+        windows::window_spaces::release_all();
+        // Direct2D is let go while DXGI still answers: at the
+        // end of the process, it crashed every exit.
+        windows::launcher::shutdown();
+        windows::native_dock::shutdown();
+    }
+    // The process ends without closing the widget database:
+    // leave the file complete on its own, `-wal` applied.
+    if let Some(storage) = app.try_state::<Mutex<persistence::database::Storage>>() {
+        storage
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .checkpoint();
+    }
+}
+
+/// Whether the app already let go of everything on its way out.
+pub(crate) fn released() -> bool {
+    RELEASED.load(Ordering::SeqCst)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -316,9 +365,14 @@ pub fn run() {
             tray::setup(app.handle())?;
             // The first run opens the welcome tour (spec 0019 G2).
             commands::tour::first_run(app.handle());
+            // Looks for a new version, in the release build only.
+            windows::update::start(app.handle());
             Ok(())
         })
         .invoke_handler(handler!());
+    // The automatic update (spec 0019 G3); the test build never looks.
+    #[cfg(not(feature = "e2e"))]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     // Test build only: the WebDriver server the E2E suite drives the windows
     // through, on the port in `TAURI_WEBDRIVER_PORT` (4445 by default).
     #[cfg(feature = "e2e")]
@@ -341,27 +395,7 @@ pub fn run() {
                 return;
             }
             if let RunEvent::Exit = event {
-                // The edge and the taskbar go back before anything else.
-                #[cfg(windows)]
-                {
-                    windows::tray_host::stop();
-                    windows::appbar::remove();
-                    windows::taskbar::release();
-                    // The windows the workspaces hid (spec 0013 C2).
-                    windows::window_spaces::release_all();
-                    // Direct2D is let go while DXGI still answers: at the
-                    // end of the process, it crashed every exit.
-                    windows::launcher::shutdown();
-                    windows::native_dock::shutdown();
-                }
-                // The process ends without closing the widget database:
-                // leave the file complete on its own, `-wal` applied.
-                if let Some(storage) = app.try_state::<Mutex<persistence::database::Storage>>() {
-                    storage
-                        .lock()
-                        .unwrap_or_else(PoisonError::into_inner)
-                        .checkpoint();
-                }
+                release_on_exit(app);
             }
         });
 }

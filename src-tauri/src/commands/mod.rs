@@ -11,6 +11,7 @@ pub mod settings;
 pub mod system;
 pub mod tour;
 pub mod tray;
+pub mod update;
 pub mod weather;
 pub mod widgets;
 pub mod workspaces;

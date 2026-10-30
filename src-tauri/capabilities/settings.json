@@ -42,6 +42,9 @@
     "allow-google-calendars",
     "allow-disconnect-google-account",
     "allow-open-tour",
+    "allow-update-status",
+    "allow-check-for-update",
+    "allow-install-update",
     "log:allow-log"
   ]
 }

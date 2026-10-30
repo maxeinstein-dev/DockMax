@@ -87,6 +87,9 @@ fn main() {
             "move_app_windows",
             "move_open_windows",
             "share_widget",
+            "update_status",
+            "check_for_update",
+            "install_update",
             // The E2E suite's, registered only in the test build (`e2e.rs`).
             "e2e_dock_view",
             "e2e_press_dock",
