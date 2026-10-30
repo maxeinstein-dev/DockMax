@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import parts from "../panel/parts/parts.css?raw";
+import { readSources } from "../test/sources";
 import css from "./tokens.css?raw";
 
 // WCAG 2.x contrast of the text and glyphs Dockyard draws, computed from the
@@ -373,5 +374,26 @@ describe("contrast (WCAG AA)", () => {
     expect(hsl(0, 1, 0.5).map(Math.round)).toEqual([255, 0, 0]);
     expect(glazeTops().map((tile) => tile.name)).toContain("t-settings");
     expect(textPairs("dark")[0]?.ratio).not.toBe(textPairs("light")[0]?.ratio);
+  });
+
+  // The text on the cobalt reads --on-accent, which the pairs above check:
+  // a literal white there passed in the light theme and gave 2.6:1 on the
+  // dark theme's light cobalt (estudo 0002, M5).
+  it("never writes white on the cobalt", () => {
+    const white = /(?:^|;)\s*color\s*:\s*(?:#fff|#ffffff|white)\s*(?:;|$)/i;
+    const onCobalt =
+      /(?:^|;)\s*background(?:-color)?\s*:\s*var\(--accent(?:-hover)?\)\s*(?:;|$)/;
+    const found: string[] = [];
+    for (const [path, sheet] of Object.entries(readSources("src", /\.css$/))) {
+      const text = sheet.replace(/\/\*[\s\S]*?\*\//g, "");
+      for (const match of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const body = match[2] ?? "";
+        if (onCobalt.test(body) && white.test(body)) {
+          found.push(`${path}: ${(match[1] ?? "").trim()}`);
+        }
+      }
+    }
+
+    expect(found).toEqual([]);
   });
 });
