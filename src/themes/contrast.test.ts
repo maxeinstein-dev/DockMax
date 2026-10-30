@@ -97,10 +97,9 @@ function placeholderOpacity(): number {
 /** `--accent-hover`, `color-mix(in srgb, var(--accent) N%, #000)`: the
  * accent darkened toward black by the share tokens.css gives it. */
 function accentHover(theme: keyof typeof THEMES): Rgb {
-  const match =
-    /^color-mix\(in srgb, var\(--accent\) ([\d.]+)%, #000\)$/.exec(
-      token(theme, "--accent-hover"),
-    );
+  const match = /^color-mix\(in srgb, var\(--accent\) ([\d.]+)%, #000\)$/.exec(
+    token(theme, "--accent-hover"),
+  );
   if (!match) throw new Error("unsupported --accent-hover");
   const share = Number(match[1]) / 100;
   return color(theme, "--accent").rgb.map(
