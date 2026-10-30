@@ -15,6 +15,9 @@ Formato de `<id>.txt`:
     estilo: esmalte                 (esmalte: ladrilho com glifo branco;
                                      traco: só o glifo, numa cor)
     lado: 128                       (o lado do PNG, em pixels)
+    cor: #7C818C                    (traco: a cor do glifo)
+    caixa: 0.8125                   (traco: o lado da caixa de 24, na imagem)
+    largura: 1.5                    (traco: o traço, na caixa de 24)
 """
 
 import colorsys
@@ -419,7 +422,40 @@ def svg_esmalte(glifo, lado):
     )
 
 
-ESTILOS = {"esmalte": (esmalte, svg_esmalte)}
+def geometria_traco(estilo, lado):
+    caixa = lado * float(estilo["caixa"])
+    return caixa / 24, (lado - caixa) / 2, float(estilo["largura"])
+
+
+def traco(glifo, lado, estilo):
+    escala, margem, largura = geometria_traco(estilo, lado)
+    mascara = Mascara(lado)
+    for d in glifo["caminhos"]:
+        mascara.tracar(mover(achatar(d), escala, margem, margem), largura * escala)
+    cor = tuple(int(estilo["cor"][i : i + 2], 16) for i in (1, 3, 5))
+    linhas = []
+    for fileira in mascara.cobertura():
+        linha = bytearray()
+        for cobre in fileira:
+            linha += bytes(cor) + bytes([round(cobre * 255)]) if cobre > 0 else bytes(4)
+        linhas.append(linha)
+    return linhas
+
+
+def svg_traco(glifo, lado, estilo):
+    escala, margem, largura = geometria_traco(estilo, lado)
+    caminhos = "".join(f'<path d="{d}"/>' for d in glifo["caminhos"])
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{lado}" height="{lado}" viewBox="0 0 {lado} {lado}">'
+        f'<g transform="translate({n(margem)} {n(margem)}) scale({n(escala)})" fill="none" stroke="{estilo["cor"]}" '
+        f'stroke-width="{largura}" stroke-linecap="round" stroke-linejoin="round">{caminhos}</g></svg>\n'
+    )
+
+
+ESTILOS = {
+    "esmalte": (lambda glifo, lado, _: esmalte(glifo, lado), lambda glifo, lado, _: svg_esmalte(glifo, lado)),
+    "traco": (traco, svg_traco),
+}
 
 
 def n(v):
@@ -481,8 +517,8 @@ def main():
     icones, reserva, imagens = {}, None, []
     for glifo in glifos:
         arquivo = f"apps/{glifo['id']}.png"
-        (svgs / f"{glifo['id']}.svg").write_text(desenhar(glifo, lado), encoding="utf-8", newline="\n")
-        linhas = rasterizar(glifo, lado)
+        (svgs / f"{glifo['id']}.svg").write_text(desenhar(glifo, lado, estilo), encoding="utf-8", newline="\n")
+        linhas = rasterizar(glifo, lado, estilo)
         imagens.append(linhas)
         (destino / arquivo).write_bytes(codificar(lado, lado, linhas))
         for nome in glifo["nomes"]:

@@ -1,0 +1,18 @@
+# Pacote Traço (spec 0019): os glifos de glifos.txt sozinhos, em linha fina,
+# como os glifos de traço do app. O formato do pacote tem uma imagem por app,
+# sem variante para o tema claro e o escuro: a cor é um cinza neutro com o
+# mesmo contraste nos dois (3,6:1 na porcelana do tema claro, 3,8:1 no
+# grafite do escuro).
+# Para gerar de novo: python vetor.py traco
+
+pack.name: Traço
+pack.author: Dockyard
+pack.version: 1.0.0
+pack.description: Glifos de linha fina, um por app, num cinza que serve ao tema claro e ao escuro.
+pack.accent: #7C818C
+
+estilo: traco
+lado: 128
+cor: #7C818C
+caixa: 0.8125
+largura: 1.5
