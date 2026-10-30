@@ -6,7 +6,7 @@
 
 pack.name: Traço
 pack.author: Dockyard
-pack.version: 1.1.0
+pack.version: 1.2.0
 pack.description: Glifos de linha fina, um por app, na tinta do tema claro ou do escuro.
 pack.accent: #555A66
 

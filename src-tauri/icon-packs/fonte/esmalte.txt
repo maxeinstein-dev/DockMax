@@ -5,7 +5,7 @@
 
 pack.name: Esmalte
 pack.author: Dockyard
-pack.version: 1.0.0
+pack.version: 1.1.0
 pack.description: Ladrilhos esmaltados como os do dock, com um glifo branco de traço por app.
 pack.accent: #2F5BD3
 
