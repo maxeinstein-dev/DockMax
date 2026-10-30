@@ -1,6 +1,6 @@
 [package]
 name = "dockyard"
-version = "0.7.0"
+version = "0.7.1"
 description = "Windows desktop dock built with Tauri"
 authors = ["Maxsuel Einstein"]
 license-file = "../LICENSE"
