@@ -1,0 +1,21 @@
+# Pacote Caçador (spec 0020 §4): os glifos de glifos.txt gravados em âmbar,
+# em relevo, num medalhão de couro curtido com aro de osso. A reserva é uma
+# pegada de garra. O medalhão é escuro nos dois modos.
+# Para gerar de novo: python vetor.py cacador
+
+pack.name: Caçador
+pack.author: Dockyard
+pack.version: 1.0.0
+pack.description: Glifos gravados em âmbar em medalhões de couro com aro de osso.
+pack.accent: #F2A33A
+
+estilo: cacador
+lado: 128
+caixa: 0.5
+cor: #F2A33A
+couro: #7A4E2C
+couro-base: #4A2E18
+osso: #EDE4CC
+osso-base: #B9AB8C
+reserva-id: garra
+reserva: M12 13c2.8 0 5 2.1 5 4.5 0 1.7-1.4 2.5-2.8 2.5-.9 0-1.4-.4-2.2-.4s-1.3.4-2.2.4c-1.4 0-2.8-.8-2.8-2.5 0-2.4 2.2-4.5 5-4.5z | M6.5 11.5l-1.5-4.5M12 9.5v-5M17.5 11.5l1.5-4.5

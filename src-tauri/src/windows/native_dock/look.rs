@@ -77,7 +77,8 @@ fn own(style: DockStyle) -> (bool, u8, bool) {
         | DockStyle::Classic98
         | DockStyle::Phosphor
         | DockStyle::Tactical
-        | DockStyle::Medieval => (false, 0, false),
+        | DockStyle::Medieval
+        | DockStyle::Hunter => (false, 0, false),
     }
 }
 
@@ -224,6 +225,14 @@ impl Look {
                 separator: Some(Color::rgb(0x6b, 0x4a, 0x2e)),
                 ink: Some(Color::rgb(0xe8, 0xd9, 0xb0)),
                 indicator: Some(Color::rgb(0xe8, 0xb8, 0x4a)),
+                ..base
+            },
+            DockStyle::Hunter => Look {
+                skin: true,
+                border: false,
+                separator: Some(Color::rgba(0xe8, 0xd2, 0xa6, 0.4)),
+                ink: Some(Color::rgb(0xe8, 0xd2, 0xa6)),
+                indicator: Some(Color::rgb(0xf2, 0xa3, 0x3a)),
                 ..base
             },
         }

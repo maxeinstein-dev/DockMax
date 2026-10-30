@@ -60,6 +60,7 @@ describe("ThemeGallery", () => {
       "Fósforo",
       "Tático",
       "Medieval 8-bit",
+      "Caçador",
     ]);
     expect(card("Padrão")).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByText(text.themeCustom)).toBeNull();

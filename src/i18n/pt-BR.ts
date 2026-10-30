@@ -270,6 +270,7 @@ const messages = {
         phosphor: "Fósforo",
         tactical: "Tático",
         medieval: "Medieval 8-bit",
+        hunter: "Caçador",
       } satisfies Record<ThemeId, string>,
       /** Trying a theme (spec 0020): keep it, or back to the choices before;
        * `{seconds}` left before it goes back by itself. */
@@ -294,6 +295,7 @@ const messages = {
         phosphor: "Fósforo",
         tactical: "Tático",
         medieval: "Medieval 8-bit",
+        hunter: "Caçador",
       } satisfies Record<DockStyle, string>,
       /** Group of the changes that belong to the chosen style. */
       tweaks: "Personalizar este estilo",
