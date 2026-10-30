@@ -256,6 +256,26 @@ export async function openSettings() {
 /** The test build this worker started, still to be stopped. */
 let started: ChildProcess | null = null;
 
+/** Closes every window the app has (the Configurações app, the panel, …),
+ * the hidden `e2e` one last: Tauri exits with its last window. */
+async function closeAllWindows() {
+  const handles = await browser.getWindowHandles().catch(() => [] as string[]);
+  const order = [
+    ...handles.filter((handle) => handle !== "e2e"),
+    ...handles.filter((handle) => handle === "e2e"),
+  ];
+  for (const handle of order) {
+    const there = await browser
+      .switchToWindow(handle)
+      .then(() => true)
+      .catch(() => false);
+    if (!there) continue;
+    // The last window takes the server down with the app: its answer may
+    // never come.
+    await browser.closeWindow().catch(() => undefined);
+  }
+}
+
 /**
  * Quits the app as a user would and starts it again on the same data
  * folder, then opens a new session on it.
@@ -267,20 +287,15 @@ let started: ChildProcess | null = null;
  * service gave the first one.
  */
 export async function restartApp() {
-  // The Configurações app and the panel, if they are open, are windows too:
-  // they go first. The app exits with its last window, the hidden `e2e` one.
-  const open = ["settings", "panel", "e2e"];
-  for (const label of open) {
-    const there = await browser
-      .switchToWindow(label)
-      .then(() => true)
-      .catch(() => false);
-    if (!there) continue;
-    // The last window takes the server down with the app: its answer may
-    // never come.
-    await browser.closeWindow().catch(() => undefined);
-  }
-  await waitFor(async () => !(await serverUp()), "the app to exit");
+  // Every window goes, again until the app is gone: the dock makes the panel
+  // window ahead of a click when the pointer rests on an item, so one can be
+  // born while the others close, and a hidden panel lives on for
+  // `KEEP_WARM` (45 s), past the wait below.
+  await waitFor(async () => {
+    if (!(await serverUp())) return true;
+    await closeAllWindows();
+    return !(await serverUp());
+  }, "the app to exit");
   await waitFor(portFree, "the WebDriver port to be released");
 
   // The port can be taken again between the probe and the app's own bind
