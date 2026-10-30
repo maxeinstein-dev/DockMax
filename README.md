@@ -4,7 +4,7 @@
 
 Aplicativo desktop para Windows inspirado em docks personalizáveis, com foco em produtividade, widgets integrados e integração progressiva com o sistema operacional.
 
-> **Status:** versão 0.3.0, o **MVP**: um dock que ocupa o lugar da barra de tarefas do Windows (com restauração garantida), nove estilos de barra, apps fixados com o ícone real e o menu do programa, relógio, bandeja do sistema, os widgets Relógio, Progresso do tempo e Nota, início com o Windows e dados locais em SQLite. O que ainda não existe (apps abertos, prévias, espaços de trabalho, mais widgets, ícones personalizados) está em [limitações](docs/limitacoes.md) e no [escopo do MVP](docs/roadmap.md). O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O Dockyard é um projeto independente e não é afiliado ao PrimoDock.
+> **Status:** versão 0.3.0, o **MVP**: um dock que ocupa o lugar da barra de tarefas do Windows (com restauração garantida), oito estilos de barra, apps fixados com o ícone real e o menu do programa, relógio, bandeja do sistema, os widgets Relógio, Progresso do tempo e Nota, início com o Windows e dados locais em SQLite. O que ainda não existe (apps abertos, prévias, espaços de trabalho, mais widgets, ícones personalizados) está em [limitações](docs/limitacoes.md) e no [escopo do MVP](docs/roadmap.md). O MVP prioriza uso pessoal e demonstração de competências de arquitetura e desenvolvimento desktop. O Dockyard é um projeto independente e não é afiliado ao PrimoDock.
 
 ## Instalar
 
@@ -119,7 +119,7 @@ O Dockyard abre um dock que **ocupa o lugar da barra de tarefas do Windows**: re
 - ícones com ampliação, rótulo e ponto indicador; o clique atravessa a área transparente em volta do dock;
 - **apps fixados** ([spec 0006](docs/specs/0006-fase-b-apps.md)): escolha na lista de programas instalados (a mesma do menu Iniciar) ou **solte um programa ou atalho no dock** para fixá-lo, com o ícone real; o clique abre o programa e o botão direito mostra o mesmo menu da barra do Windows (tarefas, recentes, Abrir, Remover); **arraste um app no dock** para mudar a ordem (ou use Configurações › Apps do dock);
 - **programas abertos** ([spec 0009](docs/specs/0009-fase-d-janelas.md)): os apps fixados que estão abertos ganham o indicador, e o clique traz a janela para a frente, minimiza ou passa para a próxima janela do programa; os abertos que não estão fixados aparecem depois dos widgets (dá para esconder em Configurações); o botão do meio do mouse abre uma nova instância e o botão direito abre um menu (fechar janela, fixar no dock);
-- nove **estilos de barra** (Nativo, Liquid Glass, Meia-noite, Rocket, Prateleira Aqua, Neon, Canarinho, Papel e Flutuante), efeito ao passar o mouse e indicador, em Configurações › Aparência do dock;
+- oito **estilos de barra** (Nativo, Liquid Glass, Meia-noite, Rocket, Prateleira Aqua, Neon, Papel e Flutuante), efeito ao passar o mouse e indicador, em Configurações › Aparência do dock;
 - **relógio com data** no fim do dock e **bandeja do sistema** hospedada pelo Dockyard: o botão direito num ícone abre o menu do próprio programa;
 - **widgets**, cada um um item do dock que abre o próprio painel:
   - **Relógio**: hora viva no ícone (digital ou analógica), fuso, 12/24 h e segundos no painel;

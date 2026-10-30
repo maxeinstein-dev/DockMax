@@ -228,6 +228,7 @@ pub struct DockSettings {
     pub style: DockStyle,
     /// What the user changed in each style; a style without an entry, or a
     /// field left out, keeps the style's own look.
+    #[serde(deserialize_with = "deserialize_tweaks")]
     pub tweaks: BTreeMap<DockStyle, StyleTweaks>,
     /// What an item does under the pointer (spec 0005 §3.3).
     pub hover: HoverEffect,
@@ -359,20 +360,51 @@ impl TaskbarMode {
     }
 }
 
-/// The look of the dock bar: nine ready-made styles (spec 0005 §3.2).
+/// The look of the dock bar: eight ready-made styles (spec 0005 §3.2).
+///
+/// The Canarinho style (`"canary"`) was removed on 2026-10-30; a file that
+/// still names it opens with the default style, see [`REMOVED_STYLES`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DockStyle {
     #[default]
+    #[serde(alias = "canary")]
     Native,
     LiquidGlass,
     Midnight,
     Rocket,
     AquaShelf,
     Neon,
-    Canary,
     Paper,
     Floating,
+}
+
+/// Styles that no longer exist. As `style`, serde reads them as the default
+/// one (the alias on [`DockStyle::Native`]); in `tweaks` their entry is
+/// dropped, so it cannot overwrite the default style's own tweaks.
+pub const REMOVED_STYLES: &[&str] = &["canary"];
+
+/// Reads `tweaks`, dropping the entries of [`REMOVED_STYLES`]. Any other
+/// unknown style is still an error.
+pub fn deserialize_tweaks<'de, D>(
+    deserializer: D,
+) -> Result<BTreeMap<DockStyle, StyleTweaks>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{Error, IntoDeserializer};
+
+    let raw = BTreeMap::<String, StyleTweaks>::deserialize(deserializer)?;
+    let mut tweaks = BTreeMap::new();
+    for (name, tweak) in raw {
+        if REMOVED_STYLES.contains(&name.as_str()) {
+            continue;
+        }
+        let style = DockStyle::deserialize(name.as_str().into_deserializer())
+            .map_err(|error: serde::de::value::Error| D::Error::custom(error))?;
+        tweaks.insert(style, tweak);
+    }
+    Ok(tweaks)
 }
 
 /// The user's changes to one style. `None` keeps what the style has.
@@ -807,7 +839,6 @@ mod tests {
             (DockStyle::Rocket, "rocket"),
             (DockStyle::AquaShelf, "aquaShelf"),
             (DockStyle::Neon, "neon"),
-            (DockStyle::Canary, "canary"),
             (DockStyle::Paper, "paper"),
             (DockStyle::Floating, "floating"),
         ];
@@ -818,6 +849,40 @@ mod tests {
                 style
             );
         }
+    }
+
+    #[test]
+    fn a_file_with_the_removed_canarinho_style_opens_with_the_default_style() {
+        let settings: Settings = serde_json::from_str(
+            r#"{"version":1,"theme":"dark",
+                "dock":{"edge":"top","iconSize":64,"style":"canary","hover":"magnify",
+                    "tweaks":{"native":{"corners":30},"canary":{"corners":90,"border":false},
+                        "neon":{"reflections":true}}},
+                "launcher":false,"tourShown":true}"#,
+        )
+        .unwrap();
+
+        assert_eq!(settings.dock.style, DockStyle::default());
+        assert_eq!(settings.dock.style, DockStyle::Native);
+        // The rest of the file is kept.
+        assert_eq!(settings.theme, Theme::Dark);
+        assert_eq!(settings.dock.edge, DockEdge::Top);
+        assert_eq!(settings.dock.icon_size, 64);
+        assert_eq!(settings.dock.hover, HoverEffect::Magnify);
+        assert!(!settings.launcher);
+        assert!(settings.tour_shown);
+        // The Canarinho tweaks are dropped and do not overwrite Native's.
+        assert_eq!(settings.dock.tweaks.len(), 2);
+        assert_eq!(settings.dock.tweaks[&DockStyle::Native].corners, Some(30));
+        assert_eq!(
+            settings.dock.tweaks[&DockStyle::Neon].reflections,
+            Some(true)
+        );
+        assert_eq!(settings.validate(), Ok(()));
+        // Saved again, the file no longer names it.
+        assert!(!serde_json::to_string(&settings).unwrap().contains("canary"));
+        // Any other unknown style is still an error.
+        assert!(serde_json::from_str::<Settings>(r#"{"dock":{"tweaks":{"banana":{}}}}"#).is_err());
     }
 
     #[test]

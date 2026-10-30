@@ -85,22 +85,6 @@ export const STYLE_PAINTS: Readonly<Record<DockStyle, StylePaint>> = {
     ],
     indicator: [0x00, 0xe5, 0xff, 1],
   },
-  canary: {
-    ...PLAIN,
-    fill: {
-      base: null,
-      stops: [
-        [0, [0xf3, 0xef, 0x3d, 1]],
-        [0.58, [0x8e, 0xd1, 0x2c, 1]],
-        [1, [0x34, 0xa5, 0x2c, 1]],
-      ],
-      over: [
-        [0, WHITE(0.42)],
-        [0.46, WHITE(0)],
-      ],
-    },
-    indicator: [0x1c, 0x4a, 0x12, 1],
-  },
   paper: {
     ...PLAIN,
     fill: { solid: [247, 247, 243, 1] },

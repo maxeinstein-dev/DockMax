@@ -165,7 +165,6 @@ export const otherText: Messages = {
         rocket: "Rocket",
         aquaShelf: "Aqua shelf",
         neon: "Neon",
-        canary: "Canary",
         paper: "Paper",
         floating: "Floating",
       },

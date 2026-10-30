@@ -182,7 +182,7 @@ A fase D acabou: a rodada única está no **[roteiro de verificação](roteiro-d
 - [ ] Áreas de trabalho virtuais do Windows.
 - [ ] Uso longo (horas): memória e CPU em repouso.
 - [ ] Leitor de tela.
-- [ ] O dock nativo (spec 0011 H3) com o **mouse de verdade**: os três efeitos ao passar o mouse; os nove estilos e os reflexos na tela; a borda de cima; escala de 150 %. (Arrastar para reordenar: confirmado pelo autor em 2026-10-26.)
+- [ ] O dock nativo (spec 0011 H3) com o **mouse de verdade**: os três efeitos ao passar o mouse; os oito estilos e os reflexos na tela; a borda de cima; escala de 150 %. (Arrastar para reordenar: confirmado pelo autor em 2026-10-26.)
 - [ ] Um dock por monitor (spec 0010 D4b): o mouse no segundo dock, ligar e desligar um monitor com o DockMax aberto, mudar "Dock em todos os monitores" com ele aberto, tela cheia de verdade no segundo monitor. (Um dock em cada monitor: confirmado pelo autor em 2026-10-26.)
 - [ ] O lançador (spec 0012 L3): capturar um atalho novo em Configurações com o teclado físico (Alt+Espaço e combinações com Win dentro do WebView2) e com o leitor de tela.
 - [ ] O lançador (spec 0012 L1): o Alt+Espaço com o teclado físico, o Narrador lendo a lista e a seleção, o IME de outro idioma na caixa de busca, o alto contraste, escala de 150 % e dois monitores.
