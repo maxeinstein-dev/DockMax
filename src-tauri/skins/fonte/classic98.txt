@@ -4,7 +4,7 @@
 skin.name: Clássico 98
 skin.left: 2
 skin.right: 2
-skin.middle: repeat
+skin.middle: stretch
 
 cor.f: #FFFFFF
 cor.g: #DFDFDF

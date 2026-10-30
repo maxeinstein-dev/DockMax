@@ -5,7 +5,7 @@
 skin.name: Retrô
 skin.left: 2
 skin.right: 2
-skin.middle: repeat
+skin.middle: stretch
 
 cor.0: #000000
 cor.1: #1D2B53

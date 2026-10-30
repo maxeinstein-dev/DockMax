@@ -2,7 +2,7 @@
 
 Extensão da fase G ([spec 0019](0019-fase-g-extras.md)): **temas** que vestem o dock de uma vez, como os temas sazonais do PrimoDock, começando por temas gamer.
 
-**Status:** em andamento: passo 1 (nomes, galeria de Temas, combos do que já existe e ícones que seguem a barra escura).
+**Status:** em andamento: passo 1 (galeria de Temas), passo 2 (launchers) e passo 3 (skins de barra, com Retrô, Clássico 98 e Fósforo).
 
 ## 1. Decisões do autor (2026-10-30)
 
@@ -48,7 +48,22 @@ Tomadas numa sessão de perguntas (Q1–Q22), todas na recomendação:
 
 ## 3. A skin de 9 fatias (passo 3)
 
-A definir no PR dele: `skin.json` com nome, imagem, as quatro margens do corte e se o meio e as bordas esticam ou repetem; desenhada pelo dock nativo (Direct2D) e pela miniatura (`border-image`).
+- **Formato:** `src-tauri/skins/<id>/skin.png` e `skin.json`, com o nome, o tamanho da imagem, o corte de 9 fatias (`slice`: `top`, `right`, `bottom`, `left`, em pixels), `middle` (`repeat` ou `stretch`) e `pixelated`. As fatias de cima e de baixo são vazias: a imagem inteira vai na altura da barra, então o corte vira três colunas (as pontas como estão e o meio repetido ou esticado até a largura). Um teste confere que o `skin.json` bate com o tamanho do PNG.
+- **Fonte:** `src-tauri/skins/fonte/<id>.txt`, um desenho em texto com paleta, como os pacotes de pixel. `python gerar.py <id>` escreve os dois arquivos.
+- **Dock nativo:** `DockStyle` ganha `Retro`, `Classic98` e `Phosphor`. Neles o `Look` tem `skin: true` e cores próprias de separador, tinta do relógio e indicador. A barra é desenhada por `skin_bar` (`paint.rs`): o bitmap da skin, feito uma vez, em pedaços calculados por `domain::skin::pieces`, sem suavização (pixel art) e com bordas duras, para os ladrilhos do meio não mostrarem emenda. Não há preenchimento, borda de luz, contorno nem brilho.
+- **Miniatura:** `STYLE_PAINTS` lê os mesmos `skin.json` e `skin.png` e desenha a barra com `border-image` (pontas e meio) e `image-rendering: pixelated`.
+- **Ajustes (Q21):** numa skin, "Borda" e "Cantos" somem; "Reflexos" fica.
+- **Barra escura:** Retrô e Fósforo são escuras nos dois modos; o Clássico 98 é claro nos dois.
+- **As três skins** (16 px de altura, ×4 numa barra de 64 px):
+
+| Skin | Desenho | Indicador | Tema |
+|---|---|---|---|
+| Retrô | placa azul-noite PICO-8, contorno preto, luz em cima e à esquerda, cantos de pixel | `#FF004D` | Retrô (com o pacote Retrô 8-bit) |
+| Clássico 98 | painel elevado do Windows 98 (branco, cinza-claro, cinza, preto) | `#000080` | Clássico 98 (com o pacote Clássico 98) |
+| Fósforo | moldura com bisel e tela escura com linhas de varredura | `#3CFF6E` | Fósforo (com o pacote Fósforo) |
+
+- **Testes:** `domain::skin` (as pontas na altura da barra; o meio em ladrilhos com o último cortado; a barra estreita encolhe as pontas; cada skin embutida bate com o PNG e com o estilo); `look`, `settings` (os estilos novos no JSON e na barra escura), `paints.test` (a miniatura marca a skin que `look.rs` marca), `StyleGallery` (a barra de skin com a imagem dela), `LookPanel` (sem borda e cantos numa skin) e `ThemeGallery` (os 8 temas).
+- **Verificado ao vivo** (2026-10-30, build de teste e2e, cópia dos dados do autor): Padrão, Retrô, Clássico 98 e Fósforo, aplicados pelos cartões, gravaram estilo e pacote, e o dock desenhou as skins. "Cantos" sumiu nas três. A primeira rodada mostrou finas emendas entre os ladrilhos do meio do Retrô e do Clássico 98. A correção: meio esticado nas skins de meio liso e bordas duras no desenho da skin. Na segunda rodada não houve emenda, nem no Fósforo, que repete o meio. Memória: 296 MB em 7 processos com Configurações aberta. A barra do Windows ficou igual. Fotos em [`docs/fotos/g7-skins-ao-vivo.png`](../fotos/g7-skins-ao-vivo.png).
 
 ## 4. Os temas gamer (passos 4–6)
 
