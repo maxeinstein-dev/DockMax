@@ -3,9 +3,9 @@
 //! finds the programs of the Apps folder and opens them (L1); and, mixed in
 //! the same list (L2), the result of a sum, a web search by keyword and the
 //! settings pages of Windows and of the Dockyard; and, under them (L4), the
-//! files and folders of the computer (`files`, in the helper process). Each
-//! result does one action of a closed list (`search::Action`), checked
-//! before it runs.
+//! files and folders of the computer (`files`, in the helper process); and,
+//! alone, the folder of a path typed (L5, `paths`). Each result does one
+//! action of a closed list (`search::Action`), checked before it runs.
 //!
 //! A native window, not WebView2 (author's decision, 2026-10-26): it opens in
 //! a few milliseconds and costs a few megabytes only while open. The frame is
@@ -24,6 +24,7 @@ mod files;
 pub mod icons;
 pub(crate) mod layout;
 mod paint;
+mod paths;
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -50,8 +51,8 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    HOT_KEY_MODIFIERS, MOD_NOREPEAT, RegisterHotKey, SetFocus, UnregisterHotKey, VK_DOWN,
-    VK_ESCAPE, VK_RETURN, VK_TAB, VK_UP,
+    GetKeyState, HOT_KEY_MODIFIERS, MOD_NOREPEAT, RegisterHotKey, SetFocus, UnregisterHotKey,
+    VK_DOWN, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -73,6 +74,7 @@ use crate::domain::launcher::{self as search, Action, Candidate, MAX_RESULTS};
 use crate::domain::launcher_calc;
 use crate::domain::launcher_files::{self, FileHit, FileQuery, Generation, Mode};
 use crate::domain::launcher_pages::{self, Target};
+use crate::domain::launcher_paths::{self, Browse, Entry, PathQuery, Problem, Reading};
 use crate::domain::launcher_web::{self, WebKeyword};
 use crate::persistence::database::Storage;
 
@@ -86,6 +88,11 @@ const WM_RUN: u32 = WM_APP + 0x41;
 const EN_CHANGE: u32 = 0x0300;
 /// `EM_SETCUEBANNER`: the text the field shows while empty.
 const EM_SETCUEBANNER: u32 = 0x1501;
+/// `EM_GETSEL` and `EM_SETSEL`: the field's selection (the cursor).
+const EM_GETSEL: u32 = 0x00B0;
+const EM_SETSEL: u32 = 0x00B1;
+/// The characters of Backspace and Tab, as `WM_CHAR` brings them.
+const BACKSPACE_CHAR: usize = 0x08;
 
 /// The hotkey's id (one per window), and Alt+Space.
 const HOTKEY: i32 = 1;
@@ -109,6 +116,8 @@ const CAPTURE_FOR: u32 = 60_000;
 /// Looks for the files a moment after the last key (L4): the apps answer at
 /// once.
 const FILES_TIMER: usize = 4;
+/// Stops waiting for the folder of a path typed (L5).
+const FOLDER_TIMER: usize = 5;
 
 /// `WM_MOUSEWHEEL`, and the rows one notch of the wheel moves.
 const WM_MOUSEWHEEL: u32 = 0x020A;
@@ -239,6 +248,24 @@ impl Found {
         }
     }
 
+    /// An entry of the folder `folder` (ending in `\`) of a path typed
+    /// (L5): its name, and under it what it is ("Pasta", "Arquivo"), the
+    /// folder being the one typed. `None` when its path is not one the
+    /// launcher opens (too long).
+    fn entry(folder: &str, entry: &Entry) -> Option<Found> {
+        let hit = FileHit {
+            path: format!("{folder}{}", entry.name),
+            folder: entry.folder,
+        };
+        launcher_files::is_openable(&hit.path).then(|| Found {
+            key: launcher_files::file_key(&hit),
+            kind: if hit.folder { Kind::Folder } else { Kind::File },
+            name: entry.name.clone(),
+            subtitle: None,
+            action: Action::OpenFile(hit.path),
+        })
+    }
+
     /// The file or folder it opens, for one.
     fn file_hit(&self) -> Option<FileHit> {
         match &self.action {
@@ -260,6 +287,11 @@ impl Found {
             return Some((pack.clone(), id.to_owned()));
         }
         let hit = self.file_hit()?;
+        // On a share (L5) the row keeps its glyph: the shell would go to the
+        // network for it, and hold the helper's other icons meanwhile.
+        if !launcher_files::is_valid_path(&hit.path) {
+            return None;
+        }
         Some((None, format!("\u{1}{}", launcher_files::icon_key(&hit))))
     }
 
@@ -312,6 +344,24 @@ enum Note {
     Reading,
     Hint,
     NothingFound,
+    /// The folder of a path typed shows nothing, and why (L5).
+    Folder(Problem),
+}
+
+impl Note {
+    /// What the list says, if anything.
+    fn text(self) -> Option<&'static str> {
+        let text = &crate::i18n::messages().launcher;
+        match self {
+            Note::None => None,
+            Note::Reading => Some(text.reading),
+            Note::Hint => Some(text.hint),
+            Note::NothingFound => Some(text.nothing_found),
+            Note::Folder(Problem::NotFound) => Some(text.folder_not_found),
+            Note::Folder(Problem::Denied) => Some(text.folder_denied),
+            Note::Folder(Problem::Slow) => Some(text.folder_slow),
+        }
+    }
 }
 
 pub struct Launcher {
@@ -353,6 +403,10 @@ pub struct Launcher {
     /// Tells the searches of files apart: an answer to an older typing is
     /// dropped.
     generation: Generation,
+    /// What is typed is a path (L5): its folder and filter, and the reading
+    /// of that folder, done once while the filter changes.
+    path_query: Option<PathQuery>,
+    browse: Browse,
     /// The user's profile folder, written `~` under a file's name.
     profile: String,
     /// The first row shown: the list scrolls past `MAX_RESULTS` rows.
@@ -516,6 +570,8 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
         file_query: None,
         files: Vec::new(),
         generation: Generation::default(),
+        path_query: None,
+        browse: Browse::default(),
         profile: String::new(),
         first: 0,
         font: None,
@@ -866,6 +922,8 @@ impl Launcher {
         self.query.clear();
         self.file_query = None;
         self.files.clear();
+        self.path_query = None;
+        self.browse.clear();
         self.failed = None;
         self.launching = None;
         self.pointer = None;
@@ -914,13 +972,16 @@ impl Launcher {
             SetTimer(Some(self.frame), RELEASE_TIMER, RELEASE_AFTER, None);
             let _ = KillTimer(Some(self.frame), ANNOUNCE_TIMER);
             let _ = KillTimer(Some(self.frame), FILES_TIMER);
+            let _ = KillTimer(Some(self.frame), FOLDER_TIMER);
         }
         self.query.clear();
         self.results.clear();
         self.file_query = None;
         self.files.clear();
-        // A search of files still running answers nothing.
+        // A search of files, or a folder being read, answers nothing.
         self.generation.next();
+        self.path_query = None;
+        self.browse.clear();
         access::publish(Vec::new());
         // The helper leaves, and the memory of reading the icons and of
         // searching the files with it; the icons it had not answered are
@@ -1142,6 +1203,10 @@ impl Launcher {
     /// keyword's search alone, or the apps and the pages; and, when nothing
     /// matched, the search on the web with the first keyword.
     fn refresh(&mut self) {
+        if self.path_query.is_some() {
+            self.refresh_path();
+            return;
+        }
         let query = self.query.trim().to_owned();
         let mut results = Vec::new();
         let files: Vec<Found> = self
@@ -1198,6 +1263,145 @@ impl Launcher {
         };
         self.selected = 0;
         self.first = 0;
+    }
+
+    /// The results of a path typed (L5), alone: the entries of its folder
+    /// the filter keeps, or why there are none.
+    fn refresh_path(&mut self) {
+        let Some(path) = &self.path_query else {
+            return;
+        };
+        let (results, note) = match (&self.browse.reading, &path.folder) {
+            (Reading::Ready(entries), Some(folder)) => {
+                let results: Vec<Found> =
+                    launcher_paths::list(entries, &path.filter, launcher_paths::LIMIT)
+                        .into_iter()
+                        .filter_map(|entry| Found::entry(folder, entry))
+                        .collect();
+                let note = if results.is_empty() {
+                    Note::NothingFound
+                } else {
+                    Note::None
+                };
+                (results, note)
+            }
+            (Reading::Failed(problem), _) => (Vec::new(), Note::Folder(*problem)),
+            (_, None) => (Vec::new(), Note::Folder(Problem::NotFound)),
+            // Being read: a moment without rows.
+            _ => (Vec::new(), Note::None),
+        };
+        self.recent = false;
+        self.results = results;
+        self.note = note;
+        self.selected = 0;
+        self.first = 0;
+    }
+
+    /// What is typed is a path (L5): reads its folder off the launcher's
+    /// thread when it is not the one already read; the filter alone
+    /// filters what was read.
+    fn browse_path(&mut self, path: PathQuery) {
+        if let Some(generation) = self.browse.want(path.folder.as_deref())
+            && let Some(folder) = path.folder.clone()
+        {
+            unsafe {
+                SetTimer(
+                    Some(self.frame),
+                    FOLDER_TIMER,
+                    launcher_paths::TIMEOUT_MS,
+                    None,
+                )
+            };
+            paths::read(folder, move |read| {
+                post(move |launcher| launcher.folder_read(generation, read));
+            });
+        }
+        self.path_query = Some(path);
+    }
+
+    /// The folder of the read `generation` came: shown when it is still
+    /// the one typed, dropped when the typing went on or it came late.
+    fn folder_read(&mut self, generation: u64, read: Result<Vec<Entry>, Problem>) {
+        if !is_open() || !self.browse.answered(generation, read) {
+            return;
+        }
+        let _ = unsafe { KillTimer(Some(self.frame), FOLDER_TIMER) };
+        self.refresh();
+        self.after_change();
+        self.announce_soon();
+    }
+
+    /// The folder typed did not answer in time: the row says so.
+    fn folder_late(&mut self) {
+        let _ = unsafe { KillTimer(Some(self.frame), FOLDER_TIMER) };
+        if let Reading::Waiting(generation) = self.browse.reading
+            && self.browse.timed_out(generation)
+        {
+            log::info!("launcher: a folder did not answer in time");
+            self.refresh();
+            self.after_change();
+            self.announce_soon();
+        }
+    }
+
+    /// Tab: the selected file or folder goes into the field as a path, and
+    /// a folder is entered (its `\`), as in the Ulauncher. Of a path typed,
+    /// its name after the folder typed (`~\Doc` → `~\Documents\`); of a file
+    /// found (L4) or a recent, its full path. Whether it did.
+    fn complete(&mut self) -> bool {
+        let Some(found) = self.results.get(self.selected) else {
+            return false;
+        };
+        let Some(hit) = found.file_hit() else {
+            return false;
+        };
+        let text = match &self.path_query {
+            Some(path) => launcher_paths::complete(&path.typed, &found.name, hit.folder),
+            None => launcher_paths::complete("", hit.path.trim_end_matches('\\'), hit.folder),
+        };
+        self.set_query(&text);
+        self.caret_to_end();
+        true
+    }
+
+    /// Backspace with the cursor after a `\` of a path typed: the folder
+    /// above, as in the Ulauncher (`C:\Users\ana\` → `C:\Users\`). Whether
+    /// it did; when not, Backspace erases a character, as always.
+    fn go_up(&mut self) -> bool {
+        let text = read_text(self.edit);
+        let length = text.encode_utf16().count();
+        let (mut start, mut end) = (0u32, 0u32);
+        unsafe {
+            SendMessageW(
+                self.edit,
+                EM_GETSEL,
+                Some(WPARAM(std::ptr::from_mut(&mut start) as usize)),
+                Some(LPARAM(std::ptr::from_mut(&mut end) as isize)),
+            );
+        }
+        // Only with the cursor at the end, nothing selected.
+        if start != end || end as usize != length {
+            return false;
+        }
+        let Some(above) = launcher_paths::up(text.trim_start()) else {
+            return false;
+        };
+        self.set_query(&above);
+        self.caret_to_end();
+        true
+    }
+
+    /// The cursor after the last character of the field.
+    fn caret_to_end(&self) {
+        let length = read_text(self.edit).encode_utf16().count();
+        unsafe {
+            SendMessageW(
+                self.edit,
+                EM_SETSEL,
+                Some(WPARAM(length)),
+                Some(LPARAM(length as isize)),
+            );
+        }
     }
 
     /// The most used, with nothing typed: the apps, the pages and the files
@@ -1324,6 +1528,24 @@ impl Launcher {
         self.failed = None;
         // A search of files of the text before answers nothing.
         self.generation.next();
+        // A path (L5): only its folder answers, no apps, no web.
+        let path = launcher_paths::parse(self.query.trim_start(), &self.profile, |name| {
+            std::env::var(name).ok()
+        });
+        if let Some(path) = path {
+            self.file_query = None;
+            self.files.clear();
+            let _ = unsafe { KillTimer(Some(self.frame), FILES_TIMER) };
+            self.browse_path(path);
+            self.refresh();
+            self.after_change();
+            self.announce_soon();
+            return;
+        }
+        if self.path_query.take().is_some() {
+            self.browse.clear();
+            let _ = unsafe { KillTimer(Some(self.frame), FOLDER_TIMER) };
+        }
         let wanted = self.file_query_for(self.query.trim());
         match &wanted {
             Some(wanted) => {
@@ -1507,10 +1729,12 @@ impl Launcher {
         let _ = unsafe { KillTimer(Some(self.frame), ANNOUNCE_TIMER) };
         let text = crate::i18n::messages();
         let said = match self.note {
-            Note::Reading => text.launcher.reading.to_owned(),
-            Note::Hint => text.launcher.hint.to_owned(),
-            Note::NothingFound => text.launcher.nothing_found.to_owned(),
             Note::None if self.results.len() == 1 => text.launcher.one_result.to_owned(),
+            // Being read (L5): the count comes when the folder does.
+            Note::None if self.results.is_empty() => return,
+            note @ (Note::Reading | Note::Hint | Note::NothingFound | Note::Folder(_)) => {
+                note.text().unwrap_or_default().to_owned()
+            }
             Note::None => text
                 .launcher
                 .results
@@ -1716,12 +1940,7 @@ impl Launcher {
         }
         let pack = crate::commands::settings::current(&self.app).dock.icon_pack;
         let text = &crate::i18n::messages().launcher;
-        let message = match self.note {
-            Note::None => None,
-            Note::Reading => Some(text.reading),
-            Note::Hint => Some(text.hint),
-            Note::NothingFound => Some(text.nothing_found),
-        };
+        let message = self.note.text();
         let rows: Vec<paint::Row> = self
             .results
             .iter()
@@ -1867,6 +2086,7 @@ extern "system" fn frame_procedure(
             }),
             ANNOUNCE_TIMER => with(|launcher| launcher.announce()),
             FILES_TIMER => with(Launcher::search_files),
+            FOLDER_TIMER => with(Launcher::folder_late),
             _ => return unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
         },
         // The launcher places itself on each opening, at its monitor's scale.
@@ -1951,7 +2171,28 @@ unsafe extern "system" fn edit_procedure(
             with(Launcher::hide);
             return LRESULT(0);
         }
-        WM_KEYDOWN if key == VK_TAB.0 => return LRESULT(0),
+        // Tab completes the selected file or folder into the field (L5); the
+        // focus stays in the field, as it always did (the list takes no
+        // focus: the screen reader follows the selection through UI
+        // Automation). Shift+Tab does nothing.
+        WM_KEYDOWN if key == VK_TAB.0 => {
+            let shift = unsafe { GetKeyState(i32::from(VK_SHIFT.0)) } < 0;
+            if !shift {
+                with(|launcher| {
+                    launcher.complete();
+                });
+            }
+            return LRESULT(0);
+        }
+        // Backspace after a `\` of a path goes up a folder (L5); in the
+        // character, since the field erases there.
+        WM_CHAR if wparam.0 == BACKSPACE_CHAR => {
+            let mut went_up = false;
+            with(|launcher| went_up = launcher.go_up());
+            if went_up {
+                return LRESULT(0);
+            }
+        }
         // Enter, Esc and Tab would beep in a one-line field.
         WM_CHAR if matches!(wparam.0, 0x0D | 0x1B | 0x09) => return LRESULT(0),
         WM_SYSKEYDOWN if (u16::from(b'1')..=u16::from(b'9')).contains(&key) => {
@@ -2016,6 +2257,9 @@ pub fn view() -> Option<View> {
                 Note::Reading => "reading",
                 Note::Hint => "hint",
                 Note::NothingFound => "nothingFound",
+                Note::Folder(Problem::NotFound) => "folderNotFound",
+                Note::Folder(Problem::Denied) => "folderDenied",
+                Note::Folder(Problem::Slow) => "folderSlow",
             },
         });
     });
@@ -2029,24 +2273,23 @@ pub fn type_text(text: String) {
     post(move |launcher| launcher.set_query(&text));
 }
 
-/// Presses a key of the box (`up`, `down`, `escape`), as the keyboard would
-/// (test build only). Enter is left out: it opens a program.
+/// Presses a key of the box (`up`, `down`, `escape`, and since L5 `tab` and
+/// `backspace`), as the keyboard would (test build only). Enter is left out:
+/// it opens a program.
 #[cfg(feature = "e2e")]
 pub fn press_key(key: String) -> bool {
-    let code = match key.as_str() {
-        "up" => VK_UP,
-        "down" => VK_DOWN,
-        "escape" => VK_ESCAPE,
+    let (message, code) = match key.as_str() {
+        "up" => (WM_KEYDOWN, usize::from(VK_UP.0)),
+        "down" => (WM_KEYDOWN, usize::from(VK_DOWN.0)),
+        "escape" => (WM_KEYDOWN, usize::from(VK_ESCAPE.0)),
+        "tab" => (WM_KEYDOWN, usize::from(VK_TAB.0)),
+        // The field erases on the character, not on the key.
+        "backspace" => (WM_CHAR, BACKSPACE_CHAR),
         _ => return false,
     };
     let frame = FRAME.load(Ordering::SeqCst);
     post(move |launcher| unsafe {
-        let _ = PostMessageW(
-            Some(launcher.edit),
-            WM_KEYDOWN,
-            WPARAM(usize::from(code.0)),
-            LPARAM(0),
-        );
+        let _ = PostMessageW(Some(launcher.edit), message, WPARAM(code), LPARAM(0));
     });
     frame != 0
 }

@@ -47,6 +47,11 @@ pub struct LauncherMessages {
     pub reading: &'static str,
     pub hint: &'static str,
     pub nothing_found: &'static str,
+    /// Why the folder of a path typed shows nothing (L5): it does not
+    /// exist, it cannot be read, it did not answer in time.
+    pub folder_not_found: &'static str,
+    pub folder_denied: &'static str,
+    pub folder_slow: &'static str,
     /// Under a program that could not be opened.
     pub failed: &'static str,
     /// How many results there are; `{n}` is replaced.
@@ -304,6 +309,9 @@ const PT_BR: Messages = Messages {
         reading: "Lendo os apps…",
         hint: "Digite para buscar apps, arquivos e configurações ou fazer uma conta",
         nothing_found: "Nenhum resultado",
+        folder_not_found: "Pasta não encontrada",
+        folder_denied: "Sem acesso",
+        folder_slow: "A pasta não respondeu",
         failed: "Não foi possível abrir",
         results: "{n} resultados",
         one_result: "1 resultado",
@@ -419,6 +427,9 @@ const EN: Messages = Messages {
         reading: "Reading apps…",
         hint: "Type to search apps, files and settings or do a calculation",
         nothing_found: "No results",
+        folder_not_found: "Folder not found",
+        folder_denied: "No access",
+        folder_slow: "The folder didn't answer",
         failed: "Couldn't open",
         results: "{n} results",
         one_result: "1 result",

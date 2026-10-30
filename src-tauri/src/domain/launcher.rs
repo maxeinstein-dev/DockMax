@@ -322,7 +322,7 @@ pub enum Action {
     Copy(String),
     /// Opens a file with the program Windows has for it, or a folder in
     /// File Explorer (L4): a full path on a drive, found by the search of
-    /// files.
+    /// files, or on a drive or a share, listed from a path typed (L5).
     OpenFile(String),
 }
 
@@ -337,7 +337,7 @@ pub fn is_allowed(action: &Action) -> bool {
                 && text.chars().count() <= MAX_COPY
                 && !text.chars().any(char::is_control)
         }
-        Action::OpenFile(path) => super::launcher_files::is_valid_path(path),
+        Action::OpenFile(path) => super::launcher_files::is_openable(path),
     }
 }
 
@@ -626,9 +626,11 @@ mod tests {
         assert!(!is_allowed(&Action::Copy("a\nb".into())));
         assert!(!is_allowed(&Action::Copy("1".repeat(MAX_COPY + 1))));
         assert!(is_allowed(&Action::OpenFile(r"C:\Users\ana\a.pdf".into())));
+        assert!(is_allowed(&Action::OpenFile(r"\\srv\share\a.pdf".into())));
         for path in [
             "",
-            r"\\server\share\a.pdf",
+            r"\\.\pipe\a",
+            r"\\server",
             "a.pdf",
             r"C:\a\..\b",
             "C:\\a\nb",

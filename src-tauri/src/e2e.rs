@@ -110,7 +110,8 @@ pub async fn e2e_launcher_type(text: String) {
     crate::windows::launcher::type_text(text);
 }
 
-/// Presses `up`, `down` or `escape` in the launcher's box.
+/// Presses `up`, `down`, `escape`, `tab` or `backspace` in the launcher's
+/// box.
 #[tauri::command]
 pub async fn e2e_launcher_key(key: String) -> Result<(), String> {
     if crate::windows::launcher::press_key(key) {

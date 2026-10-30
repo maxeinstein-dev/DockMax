@@ -22,7 +22,7 @@ pub const MAX_ENTRIES: usize = 500;
 
 /// Whether `key` is one the launcher keeps the use of: `app:` and a program
 /// of the Apps folder, `setting:` and a page of the fixed list, or `file:`
-/// and a full path on a drive (L4; a folder's ends in `\`).
+/// and a full path on a drive (L4) or a share (L5; a folder's ends in `\`).
 pub fn is_valid_key(key: &str) -> bool {
     key.strip_prefix("app:").is_some_and(is_valid_app_id)
         || key
@@ -138,7 +138,7 @@ mod tests {
             "setting:developers",
             "file:",
             "file:a.txt",
-            r"file:\\server\a.txt",
+            r"file:\\server",
         ] {
             assert!(record(&mut conn, key, 0).is_err(), "{key:?}");
         }

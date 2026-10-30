@@ -19,6 +19,7 @@ pub mod launcher;
 pub mod launcher_calc;
 pub mod launcher_files;
 pub mod launcher_pages;
+pub mod launcher_paths;
 pub mod launcher_web;
 pub mod live_faces;
 pub mod menu;
