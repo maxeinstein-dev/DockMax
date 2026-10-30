@@ -187,8 +187,60 @@ pub const TRACO: Bundled = Bundled {
     ),
 };
 
+/// Clássico 98: pixel art made from `icon-packs/fonte/classico-98.txt` by
+/// `icon-packs/fonte/gerar.py`. A test checks this list against the pack.
+pub const CLASSICO_98: Bundled = Bundled {
+    id: "classico-98",
+    files: pack_files!("classico-98":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
 /// Every pack in the binary.
-pub const ALL: &[Bundled] = &[RETRO_8BIT, ESMALTE, TRACO];
+pub const ALL: &[Bundled] = &[RETRO_8BIT, ESMALTE, TRACO, CLASSICO_98];
 
 impl Bundled {
     /// The `pack.json` of the pack, as in the binary.
@@ -250,6 +302,7 @@ mod tests {
     use tempfile::TempDir;
 
     const SOURCE: &str = include_str!("../../icon-packs/fonte/retro-8bit.txt");
+    const CLASSIC: &str = include_str!("../../icon-packs/fonte/classico-98.txt");
     const GLYPHS: &str = include_str!("../../icon-packs/fonte/glifos.txt");
     const LINE: &str = include_str!("../../icon-packs/fonte/traco.txt");
 
@@ -274,6 +327,7 @@ mod tests {
             (RETRO_8BIT, "Retrô 8-bit"),
             (ESMALTE, "Esmalte"),
             (TRACO, "Traço"),
+            (CLASSICO_98, "Clássico 98"),
         ] {
             let manifest = pack.manifest();
             assert_eq!(manifest.name, name);
@@ -399,27 +453,35 @@ mod tests {
         );
     }
 
-    /// What `retro-8bit.txt` says about the images.
+    /// What the source of a pixel art pack (`retro-8bit.txt`,
+    /// `classico-98.txt`) says about the images.
     struct Source {
         /// A character of a drawing → its color.
         palette: BTreeMap<char, [u8; 3]>,
-        /// The drawings by file: 16 lines of 16 characters each.
+        /// The drawings by file: `grid` lines of `grid` characters each.
         drawings: BTreeMap<String, Vec<String>>,
+        /// The side of a drawing, in characters.
+        grid: usize,
         /// How many pixels of the PNG a character is, on each side.
         scale: usize,
     }
 
-    fn source() -> Source {
+    fn source(text: &str) -> Source {
         let mut palette = BTreeMap::new();
         let mut drawings: BTreeMap<String, Vec<String>> = BTreeMap::new();
         let mut scale = 0;
+        let mut grid = 16;
         let mut current = String::new();
-        for line in SOURCE.lines().map(str::trim_end) {
+        for line in text.lines().map(str::trim_end) {
             if line.is_empty() || line.starts_with('#') || line.starts_with("nomes:") {
                 continue;
             }
             if let Some(value) = line.strip_prefix("pack.scale:") {
                 scale = value.trim().parse().unwrap();
+                continue;
+            }
+            if let Some(value) = line.strip_prefix("pack.grid:") {
+                grid = value.trim().parse().unwrap();
                 continue;
             }
             if line.starts_with("pack.") {
@@ -443,18 +505,27 @@ mod tests {
         Source {
             palette,
             drawings,
+            grid,
             scale,
         }
     }
 
     #[test]
     fn the_images_are_the_drawings_of_the_source() {
+        for (pack, text) in [(RETRO_8BIT, SOURCE), (CLASSICO_98, CLASSIC)] {
+            pixels_are_drawings(pack, text);
+        }
+    }
+
+    fn pixels_are_drawings(pack: Bundled, text: &str) {
         let Source {
             palette,
             drawings,
+            grid,
             scale,
-        } = source();
-        let images: BTreeMap<&str, &[u8]> = RETRO_8BIT
+        } = source(text);
+        assert_eq!(grid * scale, 128, "{}", pack.id);
+        let images: BTreeMap<&str, &[u8]> = pack
             .files
             .iter()
             .filter(|(path, _)| *path != "pack.json")
@@ -473,9 +544,11 @@ mod tests {
             assert_eq!(frame.color_type, png::ColorType::Rgba, "{path}");
             assert_eq!(
                 (frame.width, frame.height),
-                (16 * scale as u32, 16 * scale as u32)
+                ((grid * scale) as u32, (grid * scale) as u32)
             );
+            assert_eq!(rows.len(), grid, "{path}");
             for (y, row) in rows.iter().enumerate() {
+                assert_eq!(row.chars().count(), grid, "{path}");
                 for (x, cell) in row.chars().enumerate() {
                     let expected = match cell {
                         '.' => [0, 0, 0, 0],
@@ -484,10 +557,10 @@ mod tests {
                             [r, g, b, 255]
                         }
                     };
-                    // Every pixel of the 8×8 block is the cell's color.
+                    // Every pixel of the cell's block is its color.
                     for dy in 0..scale {
                         for dx in 0..scale {
-                            let at = ((y * scale + dy) * 16 * scale + x * scale + dx) * 4;
+                            let at = ((y * scale + dy) * grid * scale + x * scale + dx) * 4;
                             assert_eq!(pixels[at..at + 4], expected, "{path} ({x}, {y})");
                         }
                     }
@@ -664,6 +737,34 @@ mod tests {
             }
             let solid = pixels.iter().filter(|p| p[3] == 255).count();
             assert!(solid > 100, "{path}: {solid} solid pixels");
+        }
+    }
+
+    #[test]
+    fn every_classic_icon_is_a_98_button() {
+        let Source { drawings, .. } = source(CLASSIC);
+        for (path, rows) in drawings {
+            let row = |y: usize| rows[y].as_bytes();
+            let last = rows.len() - 1;
+            // Light on the top and left edges, shadow on the bottom and
+            // right ones: the 98 bevel, in white, light gray, gray, black.
+            for i in 0..last {
+                assert_eq!((row(0)[i], row(i)[0]), (b'f', b'f'), "{path} {i}");
+            }
+            for i in 1..last - 1 {
+                assert_eq!((row(1)[i], row(i)[1]), (b'g', b'g'), "{path} {i}");
+            }
+            for i in 1..=last {
+                let shade = if i == last { b'0' } else { b'8' };
+                assert_eq!(
+                    (row(last - 1)[i], row(i)[last - 1]),
+                    (shade, shade),
+                    "{path} {i}"
+                );
+            }
+            for i in 0..=last {
+                assert_eq!((row(last)[i], row(i)[last]), (b'0', b'0'), "{path} {i}");
+            }
         }
     }
 }
