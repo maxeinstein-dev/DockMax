@@ -113,6 +113,29 @@ pub fn place(monitor: Rect, scale: f64, height: f64) -> Rect {
     }
 }
 
+/// The launcher's scale at `dpi` (Windows' 96 is 100 %), with Windows' "Text
+/// size" `text` on top, as on each opening.
+pub fn scale_for_dpi(dpi: u32, text: f64) -> f64 {
+    f64::from(dpi.max(1)) / 96.0 * text
+}
+
+/// Where the open window goes when its monitor's scale changes (M15):
+/// Windows suggests `suggested`, the old window grown or shrunk by the ratio
+/// of the scales. The window keeps the suggested top and center across, and
+/// takes its size from `scale` and its `height` in logical pixels, so it
+/// matches what an opening at that scale would draw.
+pub fn rescale(suggested: Rect, scale: f64, height: f64) -> Rect {
+    let width = (WIDTH * scale).round() as u32;
+    let height = (height * scale).round() as u32;
+    let center = suggested.x + (suggested.width / 2) as i32;
+    Rect {
+        x: center - (width / 2) as i32,
+        y: suggested.y,
+        width,
+        height,
+    }
+}
+
 /// The shortcut that opens the row `index` (0 based): Alt and its number,
 /// for the first nine.
 pub fn shortcut(index: usize) -> Option<String> {
@@ -149,6 +172,52 @@ mod tests {
         };
         let placed = place(narrow, 1.0, 100.0);
         assert_eq!((placed.x, placed.width), (0, 600));
+    }
+
+    #[test]
+    fn the_scale_follows_the_dpi_and_the_text_size() {
+        assert_eq!(scale_for_dpi(96, 1.0), 1.0);
+        assert_eq!(scale_for_dpi(144, 1.0), 1.5);
+        assert_eq!(scale_for_dpi(120, 1.2), 1.25 * 1.2);
+        assert_eq!(scale_for_dpi(0, 1.0), 1.0 / 96.0);
+    }
+
+    #[test]
+    fn a_new_scale_redraws_the_window_at_that_scale() {
+        // Open at 125 % (800 × 250), then the monitor goes to 150 %: Windows
+        // suggests the old window grown by 150/125, off by its rounding.
+        let open = place(MONITOR, 1.25, 200.0);
+        let suggested = Rect {
+            x: open.x - 81,
+            y: open.y,
+            width: 961,
+            height: 301,
+        };
+        let moved = rescale(suggested, 1.5, 200.0);
+        assert_eq!((moved.width, moved.height), (960, 300));
+        assert_eq!(moved.y, open.y);
+        // Its center across stays where Windows put it.
+        assert_eq!(moved.x + 480, suggested.x + 480);
+    }
+
+    #[test]
+    fn a_smaller_scale_shrinks_the_window() {
+        let suggested = Rect {
+            x: 100,
+            y: 50,
+            width: 800,
+            height: 250,
+        };
+        let moved = rescale(suggested, 1.0, 200.0);
+        assert_eq!(
+            moved,
+            Rect {
+                x: 180,
+                y: 50,
+                width: 640,
+                height: 200
+            }
+        );
     }
 
     #[test]
