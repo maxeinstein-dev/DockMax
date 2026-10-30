@@ -48,6 +48,15 @@ pub fn with_state<R: Runtime>(builder: Builder<R>) -> Builder<R> {
     builder.manage(Mutex::new(windows::panel::PanelState::default()))
 }
 
+/// Attaches the logger as the app's startup does (`logging::setup`).
+///
+/// Public (and hidden) only so `tests/logging.rs` can check, on a mock app,
+/// that Dockyard's lines reach the log file.
+#[doc(hidden)]
+pub fn setup_logging<R: Runtime>(app: &AppHandle<R>) {
+    logging::setup(app);
+}
+
 /// The states `with_state` manages that `app` has, by type name.
 #[doc(hidden)]
 pub fn managed_state<R: Runtime>(app: &impl Manager<R>) -> Vec<&'static str> {
