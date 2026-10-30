@@ -320,6 +320,10 @@ pub enum Action {
     OpenUri(String),
     /// Copies a text (a calculator's result).
     Copy(String),
+    /// Opens a file with the program Windows has for it, or a folder in
+    /// File Explorer (L4): a full path on a drive, found by the search of
+    /// files.
+    OpenFile(String),
 }
 
 /// Whether `action` may run: every result's action is checked here first.
@@ -333,6 +337,7 @@ pub fn is_allowed(action: &Action) -> bool {
                 && text.chars().count() <= MAX_COPY
                 && !text.chars().any(char::is_control)
         }
+        Action::OpenFile(path) => super::launcher_files::is_valid_path(path),
     }
 }
 
@@ -620,5 +625,15 @@ mod tests {
         assert!(!is_allowed(&Action::Copy(String::new())));
         assert!(!is_allowed(&Action::Copy("a\nb".into())));
         assert!(!is_allowed(&Action::Copy("1".repeat(MAX_COPY + 1))));
+        assert!(is_allowed(&Action::OpenFile(r"C:\Users\ana\a.pdf".into())));
+        for path in [
+            "",
+            r"\\server\share\a.pdf",
+            "a.pdf",
+            r"C:\a\..\b",
+            "C:\\a\nb",
+        ] {
+            assert!(!is_allowed(&Action::OpenFile(path.into())), "{path:?}");
+        }
     }
 }
