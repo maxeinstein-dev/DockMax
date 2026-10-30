@@ -1,0 +1,15 @@
+# Pacote Círculo (spec 0019): disco chapado na cor do app, glifo branco de
+# glifos.txt e uma sombra curta, como os temas de ícones redondos.
+# Para gerar de novo: python vetor.py circulo
+
+pack.name: Círculo
+pack.author: Dockyard
+pack.version: 1.0.0
+pack.description: Discos chapados na cor de cada app, com um glifo branco.
+pack.accent: #3F7FBF
+
+estilo: circulo
+lado: 128
+caixa: 0.5
+saturacao: 1.35
+luz: 4
