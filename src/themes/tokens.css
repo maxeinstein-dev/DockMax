@@ -272,6 +272,13 @@
   --l: 52%;
 }
 
+/* Turquesa: Lançador (spec 0012). */
+.t-launcher {
+  --h: 172;
+  --sat: 44%;
+  --l: 36%;
+}
+
 /* Argila. */
 .t-calendar {
   --h: 16;

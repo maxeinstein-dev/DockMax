@@ -550,6 +550,7 @@ export const en: Messages = {
       media: "Now playing",
       claude: "Claude usage",
       weather: "Weather",
+      launcher: "Launcher",
     },
     addNames: {
       clock: "Clock",
@@ -566,6 +567,7 @@ export const en: Messages = {
       media: "Now playing",
       claude: "Claude usage",
       weather: "Weather",
+      launcher: "Launcher",
     },
     common: {
       adjust: "Options",
@@ -733,6 +735,8 @@ export const en: Messages = {
         pomodoro:
           "Focus and break with the time in the dock; keeps counting with the panel closed.",
         countdown: "The days left until a date, like a wedding or a vacation.",
+        launcher:
+          "A dock button that opens the launcher, like Start: search apps, pages and math.",
       },
       add: "Add",
       addNamed: "Add {name}",
@@ -787,6 +791,10 @@ export const en: Messages = {
         "Auto shows the day; after 6 PM, tomorrow's until noon. The card scrolls with the mouse wheel.",
       showTasks: "Google Tasks",
       showTasksOptions: { show: "Show", hide: "Hide" },
+    },
+    launcher: {
+      settingsTitle: "Launcher options",
+      hint: "Click the Launcher in the dock to open or close the app search. The keyboard shortcut is in Settings › General.",
     },
     weather: {
       settingsTitle: "Weather options",

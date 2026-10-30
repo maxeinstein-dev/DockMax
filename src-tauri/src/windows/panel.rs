@@ -166,6 +166,9 @@ impl Panel {
                 WidgetKind::Claude => (300.0, 250.0),
                 // Title, the city now, the days ahead, footer.
                 WidgetKind::Weather => (300.0, 400.0),
+                // Title and a hint: the dock's click opens the launcher
+                // instead, so this shows only if it is opened another way.
+                WidgetKind::Launcher => (300.0, 170.0),
                 // Never opened in this phase: `toggle_panel` refuses kinds
                 // that can't be created. The Settings card, if one ever is.
                 WidgetKind::Shortcut | WidgetKind::Files => (320.0, 390.0),

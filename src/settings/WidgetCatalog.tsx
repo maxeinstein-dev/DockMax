@@ -16,7 +16,7 @@ type Category = "system" | "time" | "media" | "productivity" | "personal";
 
 /** The catalog's shelves, in order, with their kinds. */
 const SHELVES: readonly { category: Category; kinds: CreatableKind[] }[] = [
-  { category: "system", kinds: ["activity", "network"] },
+  { category: "system", kinds: ["launcher", "activity", "network"] },
   {
     category: "time",
     kinds: ["calendar", "clock", "countdown", "pomodoro", "time-progress"],
@@ -45,6 +45,7 @@ const WIDTHS: Readonly<Record<CreatableKind, number>> = {
   media: 2,
   claude: 2,
   weather: 1,
+  launcher: 1,
 };
 
 /** Text compared without case or accents: "relogio" finds "Relógio". */
