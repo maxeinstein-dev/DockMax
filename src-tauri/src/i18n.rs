@@ -77,6 +77,24 @@ pub struct LauncherMessages {
     /// The selected result, read aloud; `{name}`, `{kind}`, `{n}` and
     /// `{count}` are replaced.
     pub selected: &'static str,
+    /// What a conversion is, for assistive technology (spec 0012 §5b).
+    pub conversion: &'static str,
+    /// Whose rates a currency's conversion uses; `{d}`, `{m}` and `{y}` are
+    /// the day's.
+    pub rates_of: &'static str,
+    /// Each unit's name, by the id of `launcher_units`: singular and plural.
+    pub units: &'static [(&'static str, &'static str, &'static str)],
+}
+
+impl LauncherMessages {
+    /// The name of the unit `id`, plural or not; `None` for a unit without
+    /// one (its symbol is shown).
+    pub fn unit_name(&self, id: &str, plural: bool) -> Option<&'static str> {
+        self.units
+            .iter()
+            .find(|(each, ..)| *each == id)
+            .map(|(_, one, many)| if plural { *many } else { *one })
+    }
 }
 
 /// The dock's own texts (spec 0011 H3): the names of its items, in their
@@ -355,6 +373,57 @@ const PT_BR: Messages = Messages {
         results: "{n} resultados",
         one_result: "1 resultado",
         selected: "{name}, {kind}, {n} de {count}",
+        conversion: "Conversão · Enter copia o resultado",
+        rates_of: "Cotação BCE de {d}/{m}/{y}",
+        units: &[
+            ("mm", "milímetro", "milímetros"),
+            ("cm", "centímetro", "centímetros"),
+            ("m", "metro", "metros"),
+            ("km", "quilômetro", "quilômetros"),
+            ("in", "polegada", "polegadas"),
+            ("ft", "pé", "pés"),
+            ("yd", "jarda", "jardas"),
+            ("mi", "milha", "milhas"),
+            ("nmi", "milha náutica", "milhas náuticas"),
+            ("mg", "miligrama", "miligramas"),
+            ("g", "grama", "gramas"),
+            ("kg", "quilograma", "quilogramas"),
+            ("t", "tonelada", "toneladas"),
+            ("oz", "onça", "onças"),
+            ("lb", "libra", "libras"),
+            ("c", "°C", "°C"),
+            ("f", "°F", "°F"),
+            ("k", "K", "K"),
+            ("ml", "mililitro", "mililitros"),
+            ("l", "litro", "litros"),
+            ("m3", "m³", "m³"),
+            ("gal", "galão", "galões"),
+            ("floz", "onça fluida", "onças fluidas"),
+            ("cup", "xícara", "xícaras"),
+            ("m2", "m²", "m²"),
+            ("km2", "km²", "km²"),
+            ("ha", "hectare", "hectares"),
+            ("acre", "acre", "acres"),
+            ("ft2", "pé quadrado", "pés quadrados"),
+            ("kmh", "km/h", "km/h"),
+            ("ms", "m/s", "m/s"),
+            ("mph", "mph", "mph"),
+            ("kn", "nó", "nós"),
+            ("b", "byte", "bytes"),
+            ("kb", "KB", "KB"),
+            ("mb", "MB", "MB"),
+            ("gb", "GB", "GB"),
+            ("tb", "TB", "TB"),
+            ("kib", "KiB", "KiB"),
+            ("mib", "MiB", "MiB"),
+            ("gib", "GiB", "GiB"),
+            ("tib", "TiB", "TiB"),
+            ("s", "segundo", "segundos"),
+            ("min", "minuto", "minutos"),
+            ("h", "hora", "horas"),
+            ("day", "dia", "dias"),
+            ("week", "semana", "semanas"),
+        ],
     },
 };
 
@@ -488,6 +557,57 @@ const EN: Messages = Messages {
         results: "{n} results",
         one_result: "1 result",
         selected: "{name}, {kind}, {n} of {count}",
+        conversion: "Conversion · Enter copies the result",
+        rates_of: "ECB rate of {y}-{m}-{d}",
+        units: &[
+            ("mm", "millimeter", "millimeters"),
+            ("cm", "centimeter", "centimeters"),
+            ("m", "meter", "meters"),
+            ("km", "kilometer", "kilometers"),
+            ("in", "inch", "inches"),
+            ("ft", "foot", "feet"),
+            ("yd", "yard", "yards"),
+            ("mi", "mile", "miles"),
+            ("nmi", "nautical mile", "nautical miles"),
+            ("mg", "milligram", "milligrams"),
+            ("g", "gram", "grams"),
+            ("kg", "kilogram", "kilograms"),
+            ("t", "tonne", "tonnes"),
+            ("oz", "ounce", "ounces"),
+            ("lb", "pound", "pounds"),
+            ("c", "°C", "°C"),
+            ("f", "°F", "°F"),
+            ("k", "K", "K"),
+            ("ml", "milliliter", "milliliters"),
+            ("l", "liter", "liters"),
+            ("m3", "m³", "m³"),
+            ("gal", "gallon", "gallons"),
+            ("floz", "fluid ounce", "fluid ounces"),
+            ("cup", "cup", "cups"),
+            ("m2", "m²", "m²"),
+            ("km2", "km²", "km²"),
+            ("ha", "hectare", "hectares"),
+            ("acre", "acre", "acres"),
+            ("ft2", "square foot", "square feet"),
+            ("kmh", "km/h", "km/h"),
+            ("ms", "m/s", "m/s"),
+            ("mph", "mph", "mph"),
+            ("kn", "knot", "knots"),
+            ("b", "byte", "bytes"),
+            ("kb", "KB", "KB"),
+            ("mb", "MB", "MB"),
+            ("gb", "GB", "GB"),
+            ("tb", "TB", "TB"),
+            ("kib", "KiB", "KiB"),
+            ("mib", "MiB", "MiB"),
+            ("gib", "GiB", "GiB"),
+            ("tib", "TiB", "TiB"),
+            ("s", "second", "seconds"),
+            ("min", "minute", "minutes"),
+            ("h", "hour", "hours"),
+            ("day", "day", "days"),
+            ("week", "week", "weeks"),
+        ],
     },
 };
 
@@ -557,6 +677,20 @@ mod tests {
         assert!(EN.dock.update_notice_title.contains("{version}"));
         assert!(PT_BR.dock.update_notice_title.contains("{version}"));
         assert_eq!(EN.tray.open_settings, "Settings");
+    }
+
+    #[test]
+    fn every_unit_has_a_name_in_both_languages() {
+        for id in crate::domain::launcher_units::unit_ids() {
+            for messages in [&PT_BR, &EN] {
+                assert!(messages.launcher.unit_name(id, true).is_some(), "{id}");
+                assert!(messages.launcher.unit_name(id, false).is_some(), "{id}");
+            }
+        }
+        assert_eq!(PT_BR.launcher.unit_name("mi", true), Some("milhas"));
+        assert_eq!(EN.launcher.unit_name("ft", true), Some("feet"));
+        assert!(PT_BR.launcher.rates_of.contains("{d}"));
+        assert!(EN.launcher.rates_of.contains("{y}"));
     }
 
     #[test]
