@@ -1,5 +1,5 @@
 /* Line icons of the panel parts (DESIGN.md "Buttons": 16 px, a 1.75 stroke
- * with round ends, drawn for DockMax itself; parts.css sets the stroke).
+ * with round ends, drawn for Dockyard itself; parts.css sets the stroke).
  * Paths from the approved mock, `docs/design/widgets-mock.html`. */
 const PATHS = {
   // Controls: the quiet "Ajustes" button.

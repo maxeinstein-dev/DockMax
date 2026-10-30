@@ -51,7 +51,7 @@ fn open_at(app: &AppHandle, section: Option<Section>) -> Result<(), Box<dyn Erro
     // A new window starts on the section: its name, from a closed list, is
     // set before the page's scripts run.
     let start =
-        section.map(|section| format!("window.__DOCKMAX_SECTION__ = \"{}\";", section.as_str()));
+        section.map(|section| format!("window.__DOCKYARD_SECTION__ = \"{}\";", section.as_str()));
     // Made off the main thread: the callers (a command, the tray menu) run on
     // it, and building a webview window there waits on the main thread
     // itself, which never answers.

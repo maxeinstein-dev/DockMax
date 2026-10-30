@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "DockMax",
+  "productName": "Dockyard",
   "version": "0.3.0",
   "identifier": "dev.maxsueleinstein.dockmax",
   "build": {

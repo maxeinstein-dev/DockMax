@@ -635,7 +635,7 @@ pub enum StorageStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum UnavailableReason {
-    /// The database was written by a newer DockMax.
+    /// The database was written by a newer Dockyard.
     NewerVersion,
     /// A migration failed; the file was left as it was.
     MigrationFailed,

@@ -63,7 +63,7 @@ describe("Dock", () => {
 
   it("makes the widget database in the run's data folder", async () => {
     // The same folder as `settings.json` (ADR 0008), which exists only after
-    // a change: the run's folder, never the user's DockMax.
+    // a change: the run's folder, never the user's Dockyard.
     const database = join(dataDir(), "dockmax.db");
 
     // Opened, and migrated, by the startup plugin before any window exists

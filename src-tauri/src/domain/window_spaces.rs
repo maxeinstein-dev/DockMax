@@ -20,7 +20,7 @@ pub struct Tracked {
 }
 
 /// A window hidden by a switch: to be shown again when its monitor shows its
-/// workspace, or when the DockMax lets go of everything.
+/// workspace, or when the Dockyard lets go of everything.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Parked {
     pub hwnd: isize,

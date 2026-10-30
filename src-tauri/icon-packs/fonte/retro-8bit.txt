@@ -5,7 +5,7 @@
 # do PICO-8. "nomes: reserva" é o ícone dos programas que nenhum nome cobre.
 
 pack.name: Retrô 8-bit
-pack.author: DockMax
+pack.author: Dockyard
 pack.version: 1.0.0
 pack.description: Pixel art 16×16 na paleta do PICO-8, ampliada sem suavização.
 pack.accent: #FF004D

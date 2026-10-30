@@ -49,7 +49,7 @@ export const en: Messages = {
       },
       brand: "Settings",
       leads: {
-        general: "How DockMax fits into Windows.",
+        general: "How Dockyard fits into Windows.",
         workspaces: "A dock for each thing you do.",
         look: "Make the dock your own.",
         apps: "The programs pinned to each workspace's dock.",
@@ -99,7 +99,7 @@ export const en: Messages = {
     previewsOnlySeveral: "Only with 2 or more windows",
     previewsOnlySeveralHint: "An app with a single window shows no preview",
     launchAtLogin: "Start with Windows",
-    launchAtLoginHint: "Opens DockMax when you sign in to Windows",
+    launchAtLoginHint: "Opens Dockyard when you sign in to Windows",
     launcher: {
       label: "Launcher ({hotkey})",
       hint: "Find and open apps from anywhere; also in Search apps…, in the dock menu",
@@ -123,7 +123,7 @@ export const en: Messages = {
           noModifier: "Use Ctrl, Alt, Shift or Win together with the key.",
           takesTyping:
             "That combination would take typing or an editing shortcut away from every program. Use Alt or Win, or Ctrl with Shift.",
-          reserved: "That combination belongs to Windows or DockMax.",
+          reserved: "That combination belongs to Windows or Dockyard.",
           taken: "That combination is in use by another program.",
           notSaved: "The shortcut couldn't be saved. Try again.",
           unsupportedKey: "Use a letter, a number, F1 to F24 or Space.",
@@ -131,7 +131,7 @@ export const en: Messages = {
       },
       keywords: {
         label: "Web search",
-        hint: "In the launcher, type the keyword, a space and what to search for: g dockmax. The first one in the list is the default search, used when nothing else is found.",
+        hint: "In the launcher, type the keyword, a space and what to search for: g dockyard. The first one in the list is the default search, used when nothing else is found.",
         list: "Web search keywords",
         add: "Add keyword",
         edit: "Edit",
@@ -293,16 +293,16 @@ export const en: Messages = {
       iconSizeOutOfRange:
         "That size isn't accepted. Choose Small, Medium or Large.",
       unsupportedVersion:
-        "These settings are from another version. Restart DockMax and try again.",
+        "These settings are from another version. Restart Dockyard and try again.",
       writeFailed: "The change couldn't be saved. Try again.",
       notReady:
-        "Settings aren't available right now. Restart DockMax and try again.",
+        "Settings aren't available right now. Restart Dockyard and try again.",
     },
   },
   tray: {
     empty: "No program has put an icon here yet.",
     emptyHint:
-      "Some only show up after being opened again, once DockMax has taken over the tray.",
+      "Some only show up after being opened again, once Dockyard has taken over the tray.",
     unnamed: "Unnamed program",
     footer: "Right-click opens the program's menu",
     inDock: {
@@ -321,7 +321,7 @@ export const en: Messages = {
       code: "Code",
     },
     licenseValue: "Personal use",
-    repository: "github.com/maxeinstein-dev/DockMax",
+    repository: "github.com/maxeinstein-dev/Dockyard",
     footer: "Independent project",
     tour: "See the tour",
   },
@@ -334,7 +334,7 @@ export const en: Messages = {
     openSettings: "Open Settings",
     steps: {
       welcome: {
-        title: "Welcome to DockMax",
+        title: "Welcome to Dockyard",
         body: "A dock for your Windows: your apps, workspaces and live widgets in one place. No account, no tracking.",
       },
       apps: {
@@ -351,7 +351,7 @@ export const en: Messages = {
       },
       launcher: {
         title: "Find anything with {hotkey}",
-        body: "The launcher finds apps and Settings pages, does math and searches the web by keyword, like “g dockmax”.",
+        body: "The launcher finds apps and Settings pages, does math and searches the web by keyword, like “g dockyard”.",
       },
       done: {
         title: "All set",
@@ -396,7 +396,7 @@ export const en: Messages = {
       invalidName: "Use 1 to 32 characters, with no spaces at the ends.",
       invalidColor: "Choose one of the colors.",
       lastWorkspace: "The last workspace can't be deleted.",
-      unavailable: "DockMax's data isn't available right now.",
+      unavailable: "Dockyard's data isn't available right now.",
       writeFailed: "Couldn't save. Try again.",
       notReady: "Couldn't finish. Try again.",
     },
@@ -447,7 +447,7 @@ export const en: Messages = {
     unavailableNotice: {
       title: "Dock apps are unavailable.",
       detail:
-        "The database couldn't be opened and wasn't changed. The reason is in the DockMax log.",
+        "The database couldn't be opened and wasn't changed. The reason is in the Dockyard log.",
     },
     errors: {
       limitReached: "The dock already has 40 apps. Remove one to pin another.",
@@ -456,17 +456,17 @@ export const en: Messages = {
       invalidApp: "This app is no longer installed or can't be pinned.",
       launchFailed: "The app couldn't be opened.",
       unavailable:
-        "Apps are unavailable right now. The reason is in the DockMax log.",
+        "Apps are unavailable right now. The reason is in the Dockyard log.",
       writeFailed: "The change couldn't be saved. Try again.",
       notReady:
-        "Apps aren't available right now. Restart DockMax and try again.",
+        "Apps aren't available right now. Restart Dockyard and try again.",
     },
   },
   accounts: {
     client: {
       title: "Google app",
       intro:
-        'To read your calendars, DockMax uses an app you create in Google Cloud, just for you. Create a client of type "Desktop app" and paste its ID and secret here.',
+        'To read your calendars, Dockyard uses an app you create in Google Cloud, just for you. Create a client of type "Desktop app" and paste its ID and secret here.',
       id: "Client ID",
       secret: "Client secret",
       save: "Save",
@@ -515,7 +515,7 @@ export const en: Messages = {
         "Google sent an unexpected response. The reason is in the log.",
       vault: "Couldn't store it in the Windows Credential Manager.",
       notAllowed: "This window can't change the accounts.",
-      notReady: "Accounts aren't available right now. Restart DockMax.",
+      notReady: "Accounts aren't available right now. Restart Dockyard.",
     },
   },
   widgets: {
@@ -838,7 +838,7 @@ export const en: Messages = {
       widthHint:
         "With 1 icon, the 5-hour ring; with 2, the 5 hours and the week.",
       privacy:
-        "DockMax uses the access Claude Code already stores on this computer, only to ask Anthropic for the usage. It doesn't copy or store anything.",
+        "Dockyard uses the access Claude Code already stores on this computer, only to ask Anthropic for the usage. It doesn't copy or store anything.",
     },
     media: {
       settingsTitle: "Now playing options",
@@ -862,7 +862,7 @@ export const en: Messages = {
       add: "+ 1 glass ({cup} ml)",
       undo: "Undo",
       reached: "Daily goal reached.",
-      footer: "Resets at midnight · saved in DockMax",
+      footer: "Resets at midnight · saved in Dockyard",
       reminding: "Reminder after {n} min without a glass, from 8 AM to 10 PM",
       goal: "Daily goal",
       goalCups: "{n} glasses",
@@ -887,8 +887,8 @@ export const en: Messages = {
       remove: "Remove the task {text}",
       clearDone: "Clear completed",
       footer: {
-        one: "{n} open · saved in DockMax",
-        other: "{n} open · saved in DockMax",
+        one: "{n} open · saved in Dockyard",
+        other: "{n} open · saved in Dockyard",
       },
     },
     pomodoro: {
@@ -1013,13 +1013,13 @@ export const en: Messages = {
       footerUnavailable: "Settings and About still work",
       recovered: {
         title: "The database was damaged and has been recreated.",
-        detail: "The old notes were kept in the DockMax data folder.",
+        detail: "The old notes were kept in the Dockyard data folder.",
         dismiss: "Got it",
       },
       unavailableNotice: {
         title: "Widgets are unavailable.",
         detail:
-          "The database couldn't be opened and wasn't changed: your notes are still in the file. The reason is in the DockMax log.",
+          "The database couldn't be opened and wasn't changed: your notes are still in the file. The reason is in the Dockyard log.",
       },
     },
     withNotice: "{name} (with notice)",
@@ -1051,10 +1051,10 @@ export const en: Messages = {
       invalidConfig:
         "This setting couldn't be applied. Close the panel and try again.",
       unavailable:
-        "Widgets are unavailable right now. The reason is in the DockMax log.",
+        "Widgets are unavailable right now. The reason is in the Dockyard log.",
       writeFailed: "The change couldn't be saved. Try again.",
       notReady:
-        "Widgets aren't available right now. Restart DockMax and try again.",
+        "Widgets aren't available right now. Restart Dockyard and try again.",
     },
   },
 };

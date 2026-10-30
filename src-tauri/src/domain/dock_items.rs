@@ -17,7 +17,7 @@ use super::apps::{AppsSnapshot, PinnedApp};
 use super::open_apps::{OpenOther, OpenSnapshot};
 use super::widgets::{StorageStatus, WidgetInstance, WidgetKind, WidgetsSnapshot};
 
-/// The items DockMax itself puts at the end of the dock.
+/// The items Dockyard itself puts at the end of the dock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SystemItem {
     /// Only while the storage needs attention (`needs_attention`).

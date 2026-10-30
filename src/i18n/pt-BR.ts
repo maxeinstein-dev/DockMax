@@ -97,7 +97,7 @@ const messages = {
       brand: "Configurações",
       /** The line under each section's title. */
       leads: {
-        general: "Como o DockMax se encaixa no Windows.",
+        general: "Como o Dockyard se encaixa no Windows.",
         workspaces: "Um dock para cada coisa que você faz.",
         look: "Deixe o dock com a sua cara.",
         apps: "Os programas fixados no dock de cada espaço.",
@@ -120,7 +120,7 @@ const messages = {
         openAnimation: "Animação de abertura",
       },
     },
-    /** The switch that opens the DockMax when the user signs in. */
+    /** The switch that opens the Dockyard when the user signs in. */
     showOpenApps: "Mostrar apps abertos",
     showOpenAppsHint: "Os que não estão fixados, depois dos widgets",
     showBadges: "Mostrar selos de notificação",
@@ -149,7 +149,7 @@ const messages = {
     previewsOnlySeveral: "Só com 2 ou mais janelas",
     previewsOnlySeveralHint: "Um app com uma janela só não mostra a prévia",
     launchAtLogin: "Iniciar com o Windows",
-    launchAtLoginHint: "Abre o DockMax ao entrar no Windows",
+    launchAtLoginHint: "Abre o Dockyard ao entrar no Windows",
     /** The launcher (spec 0012): its switch, the notice when another
      * program holds its hotkey, its history and the hotkey; `{hotkey}` is
      * replaced. */
@@ -176,7 +176,7 @@ const messages = {
           noModifier: "Use Ctrl, Alt, Shift ou Win junto com a tecla.",
           takesTyping:
             "Essa combinação tiraria a digitação ou um atalho de edição de todos os programas. Use Alt ou Win, ou Ctrl com Shift.",
-          reserved: "Essa combinação é do Windows ou do DockMax.",
+          reserved: "Essa combinação é do Windows ou do Dockyard.",
           taken: "Essa combinação está em uso por outro programa.",
           notSaved: "Não foi possível salvar o atalho. Tente de novo.",
           unsupportedKey: "Use uma letra, um número, F1 a F24 ou Espaço.",
@@ -184,7 +184,7 @@ const messages = {
       },
       keywords: {
         label: "Busca na web",
-        hint: "No lançador, digite a palavra-chave, um espaço e o que buscar: g dockmax. A primeira da lista é a busca padrão, usada quando nada mais é encontrado.",
+        hint: "No lançador, digite a palavra-chave, um espaço e o que buscar: g dockyard. A primeira da lista é a busca padrão, usada quando nada mais é encontrado.",
         list: "Palavras-chave da busca na web",
         add: "Adicionar palavra-chave",
         edit: "Editar",
@@ -362,10 +362,10 @@ const messages = {
       iconSizeOutOfRange:
         "Esse tamanho não é aceito. Escolha Pequeno, Médio ou Grande.",
       unsupportedVersion:
-        "Estas configurações são de outra versão. Reinicie o DockMax e tente de novo.",
+        "Estas configurações são de outra versão. Reinicie o Dockyard e tente de novo.",
       writeFailed: "Não foi possível salvar a mudança. Tente de novo.",
       notReady:
-        "As configurações não estão disponíveis agora. Reinicie o DockMax e tente de novo.",
+        "As configurações não estão disponíveis agora. Reinicie o Dockyard e tente de novo.",
     } satisfies Record<SettingsErrorCode, string>,
   },
   /** The notification area in its panel (ADR 0009, Fase E). */
@@ -374,7 +374,7 @@ const messages = {
     empty: "Nenhum programa colocou um ícone aqui ainda.",
     /** Under the empty text: why a running program may be missing. */
     emptyHint:
-      "Alguns só aparecem depois de abertos de novo, depois que o DockMax assumiu a bandeja.",
+      "Alguns só aparecem depois de abertos de novo, depois que o Dockyard assumiu a bandeja.",
     /** The icon of a program without a tooltip. */
     unnamed: "Programa sem nome",
     /** Footer: the buttons do what the taskbar's did. */
@@ -403,7 +403,7 @@ const messages = {
     /** The license, by name: the text is in the LICENSE file. */
     licenseValue: "Uso pessoal",
     /** The source code repository, shown as selectable text (a link from Fase 3). */
-    repository: "github.com/maxeinstein-dev/DockMax",
+    repository: "github.com/maxeinstein-dev/Dockyard",
     footer: "Projeto independente",
     /** Opens the welcome tour again (spec 0019 G2). */
     tour: "Ver o tour",
@@ -418,7 +418,7 @@ const messages = {
     openSettings: "Abrir Configurações",
     steps: {
       welcome: {
-        title: "Boas-vindas ao DockMax",
+        title: "Boas-vindas ao Dockyard",
         body: "Um dock para o seu Windows: os seus apps, espaços de trabalho e widgets vivos num só lugar. Sem conta e sem rastreamento.",
       },
       apps: {
@@ -435,7 +435,7 @@ const messages = {
       },
       launcher: {
         title: "Ache tudo com {hotkey}",
-        body: "O lançador acha apps e páginas das Configurações, faz contas e busca na web por palavra-chave, como “g dockmax”.",
+        body: "O lançador acha apps e páginas das Configurações, faz contas e busca na web por palavra-chave, como “g dockyard”.",
       },
       done: {
         title: "Tudo pronto",
@@ -485,7 +485,7 @@ const messages = {
       invalidName: "Use de 1 a 32 caracteres, sem espaços nas pontas.",
       invalidColor: "Escolha uma das cores.",
       lastWorkspace: "O último espaço não pode ser excluído.",
-      unavailable: "Os dados do DockMax não estão disponíveis agora.",
+      unavailable: "Os dados do Dockyard não estão disponíveis agora.",
       writeFailed: "Não deu para salvar. Tente de novo.",
       notReady: "Não deu para concluir. Tente de novo.",
     },
@@ -548,7 +548,7 @@ const messages = {
     unavailableNotice: {
       title: "Os apps do dock estão indisponíveis.",
       detail:
-        "O banco de dados não pôde ser aberto e não foi alterado. O motivo está no log do DockMax.",
+        "O banco de dados não pôde ser aberto e não foi alterado. O motivo está no log do Dockyard.",
     },
     /** Shown when an apps change fails, by error code. A new code without
      * a message does not compile. */
@@ -559,10 +559,10 @@ const messages = {
       invalidApp: "Este app não está mais instalado ou não pode ser fixado.",
       launchFailed: "Não foi possível abrir o app.",
       unavailable:
-        "Os apps estão indisponíveis agora. O motivo está no log do DockMax.",
+        "Os apps estão indisponíveis agora. O motivo está no log do Dockyard.",
       writeFailed: "Não foi possível salvar a mudança. Tente de novo.",
       notReady:
-        "Os apps não estão disponíveis agora. Reinicie o DockMax e tente de novo.",
+        "Os apps não estão disponíveis agora. Reinicie o Dockyard e tente de novo.",
     } satisfies Record<AppErrorCode, string>,
   },
   /** Configurações › Contas (spec 0017 F2a, ADR 0012). */
@@ -571,7 +571,7 @@ const messages = {
       title: "App do Google",
       /** Before a client is set: what to do, in short. */
       intro:
-        'Para ler as suas agendas, o DockMax usa um app que você cria no Google Cloud, só para você. Crie um cliente do tipo "App para computador" e cole aqui o ID e o segredo.',
+        'Para ler as suas agendas, o Dockyard usa um app que você cria no Google Cloud, só para você. Crie um cliente do tipo "App para computador" e cole aqui o ID e o segredo.',
       id: "ID do cliente",
       secret: "Segredo do cliente",
       save: "Salvar",
@@ -624,7 +624,7 @@ const messages = {
       unexpected: "O Google respondeu algo inesperado. O motivo está no log.",
       vault: "Não foi possível guardar no cofre de credenciais do Windows.",
       notAllowed: "Esta janela não pode mexer nas contas.",
-      notReady: "As contas não estão disponíveis agora. Reinicie o DockMax.",
+      notReady: "As contas não estão disponíveis agora. Reinicie o Dockyard.",
     } satisfies Record<GoogleErrorCode, string>,
   },
   widgets: {
@@ -1013,7 +1013,7 @@ const messages = {
       widthHint:
         "Com 1 ícone, o anel das 5 horas; com 2, as 5 horas e a semana.",
       privacy:
-        "O DockMax usa o acesso que o Claude Code já guarda neste computador, só para perguntar o uso à Anthropic. Não copia nem guarda nada.",
+        "O Dockyard usa o acesso que o Claude Code já guarda neste computador, só para perguntar o uso à Anthropic. Não copia nem guarda nada.",
     },
     /** The Tocando agora (spec 0017 F4). */
     media: {
@@ -1039,7 +1039,7 @@ const messages = {
       add: "+ 1 copo ({cup} ml)",
       undo: "Desfazer",
       reached: "Meta do dia batida.",
-      footer: "Zera à meia-noite · salvo no DockMax",
+      footer: "Zera à meia-noite · salvo no Dockyard",
       reminding: "Lembrete depois de {n} min sem um copo, das 8h às 22h",
       goal: "Meta do dia",
       goalCups: "{n} copos",
@@ -1065,8 +1065,8 @@ const messages = {
       remove: "Remover a tarefa {text}",
       clearDone: "Limpar as feitas",
       footer: {
-        one: "{n} aberta · salvo no DockMax",
-        other: "{n} abertas · salvo no DockMax",
+        one: "{n} aberta · salvo no Dockyard",
+        other: "{n} abertas · salvo no Dockyard",
       },
     },
     /** The Pomodoro (spec 0017 F2c-2). */
@@ -1202,14 +1202,14 @@ const messages = {
       recovered: {
         title: "O banco de dados estava danificado e foi recriado.",
         detail:
-          "As notas antigas ficaram guardadas na pasta de dados do DockMax.",
+          "As notas antigas ficaram guardadas na pasta de dados do Dockyard.",
         dismiss: "Entendi",
       },
       /** Notice of a database that can't be used in this run. */
       unavailableNotice: {
         title: "Os widgets estão indisponíveis.",
         detail:
-          "O banco de dados não pôde ser aberto e não foi alterado: suas notas continuam no arquivo. O motivo está no log do DockMax.",
+          "O banco de dados não pôde ser aberto e não foi alterado: suas notas continuam no arquivo. O motivo está no log do Dockyard.",
       },
     },
     /** Accessible name of the Settings item while it has the warning
@@ -1247,10 +1247,10 @@ const messages = {
       invalidConfig:
         "Não foi possível aplicar este ajuste. Feche o painel e tente de novo.",
       unavailable:
-        "Os widgets estão indisponíveis agora. O motivo está no log do DockMax.",
+        "Os widgets estão indisponíveis agora. O motivo está no log do Dockyard.",
       writeFailed: "Não foi possível salvar a mudança. Tente de novo.",
       notReady:
-        "Os widgets não estão disponíveis agora. Reinicie o DockMax e tente de novo.",
+        "Os widgets não estão disponíveis agora. Reinicie o Dockyard e tente de novo.",
     } satisfies Record<WidgetErrorCode, string>,
   },
 } as const;

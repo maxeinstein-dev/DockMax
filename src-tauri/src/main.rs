@@ -4,8 +4,8 @@
 fn main() {
     // The taskbar watchdog and the manual restore are this executable too,
     // and start nothing of the app.
-    if dockmax_lib::run_special_mode() {
+    if dockyard_lib::run_special_mode() {
         return;
     }
-    dockmax_lib::run()
+    dockyard_lib::run()
 }

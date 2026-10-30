@@ -5,7 +5,7 @@ import { useT } from "../i18n";
 import PanelFooter from "./PanelFooter";
 
 /** Names, not texts: they stay the same in every locale. */
-const PRODUCT_NAME = "DockMax";
+const PRODUCT_NAME = "Dockyard";
 
 /**
  * The About panel (DESIGN.md "Sobre"): the app tile, name and description,

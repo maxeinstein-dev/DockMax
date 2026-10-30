@@ -21,7 +21,7 @@ mod windows;
 /// plugins, on the other hand, are initialized in `Builder::build`, before
 /// any window. Never fails.
 fn startup() -> TauriPlugin<Wry> {
-    tauri::plugin::Builder::new("dockmax-startup")
+    tauri::plugin::Builder::new("dockyard-startup")
         .setup(|app, _api| {
             // First, so the settings can report a bad file.
             logging::setup(app);
@@ -303,7 +303,7 @@ pub fn run() {
             }
         })
         .setup(|app| {
-            // The name of the DockMax's Windows notices (spec 0017 F2b-2).
+            // The name of the Dockyard's Windows notices (spec 0017 F2b-2).
             #[cfg(windows)]
             windows::toast::set_identifier(&app.config().identifier);
             commands::settings::sync_launch_at_login(app.handle());

@@ -1,5 +1,5 @@
 ---
-name: DockMax
+name: Dockyard
 description: Dock para Windows 11 com silhueta de Big Sur, vidro simulado e ladrilhos de cerâmica esmaltada em tokens trocáveis.
 colors:
   cobalto-light: "#2f5bd3"
@@ -340,13 +340,13 @@ components:
     padding: "3px 6px"
 ---
 
-# Design System: DockMax
+# Design System: Dockyard
 
 ## Overview
 
 **Creative North Star: "Big Sur, nascido no Windows"**
 
-O DockMax é o dock do macOS que o autor gosta, refeito como peça do Windows 11: a silhueta e a ampliação em degraus do Big Sur, com materiais e cantos que conversam com as janelas do Windows. A barra é uma placa de vidro simulado, "porcelana fosca" no tema claro e "grafite fosco" no escuro, com uma borda interna de 1 px que pega luz no lado oposto à borda da tela e uma sombra macia deslocada para fora. Sobre ela, os ícones são ladrilhos de cerâmica esmaltada numa paleta própria de tons terrosos e frios dessaturados, cada um com um glifo de traço branco.
+O Dockyard é o dock do macOS que o autor gosta, refeito como peça do Windows 11: a silhueta e a ampliação em degraus do Big Sur, com materiais e cantos que conversam com as janelas do Windows. A barra é uma placa de vidro simulado, "porcelana fosca" no tema claro e "grafite fosco" no escuro, com uma borda interna de 1 px que pega luz no lado oposto à borda da tela e uma sombra macia deslocada para fora. Sobre ela, os ícones são ladrilhos de cerâmica esmaltada numa paleta própria de tons terrosos e frios dessaturados, cada um com um glifo de traço branco.
 
 O sistema é discreto no uso diário e caprichado no detalhe: a identidade está no acabamento (esmalte, borda de luz, sombra), não no volume. Há um único destaque, azul-cobalto, e ele só aparece para dizer algo: foco, seleção, painel aberto. A ampliação é contida (1,4 no item, 1,15 nos vizinhos), congela enquanto um painel está aberto e some com "reduzir movimento".
 
@@ -423,7 +423,7 @@ Classes estáticas `.t-*`, definidas por matiz, saturação e luminosidade (`--h
 - **Clock Time** (600, 40px, 1,05, −0,02em, Display, algarismos tabulares): hora no painel do Relógio.
 - **Clock Seconds** (600, 22px, Display, tabular, `--ink-2`): segundos no painel do Relógio, quando o ajuste "Segundos no painel" está ligado; alinhados pela linha de base.
 - **Clock AM/PM** (600, 15px, Display, `--ink-2`, 6 px à esquerda): marcador do formato 12 horas, só no painel.
-- **Title About** (600, 17px, 1,3, Display): nome "DockMax" ao lado do ladrilho de 56 px no painel Sobre.
+- **Title About** (600, 17px, 1,3, Display): nome "Dockyard" ao lado do ladrilho de 56 px no painel Sobre.
 - **Title** (600, 15px, 1,3, Display): título do painel ("Configurações", nome do widget, "Ajustes do relógio", "Itens do dock"); corta com reticências numa linha.
 - **Tile Time** (600, ícone × 0,28, 1, −0,01em, Display, tabular, branco): hora no ícone do Relógio digital (11,2/13,4/17,9 px nos três tamanhos).
 - **Tile Pct** (600, ícone × 0,23, 1, −0,02em, Display, tabular, branco): percentual no anel do Progresso; o sinal `%` a 0,7 em e 85%. Some no Pequeno.

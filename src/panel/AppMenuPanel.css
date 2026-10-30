@@ -36,7 +36,7 @@
   color: var(--ink-2);
 }
 
-/* One entry: a row-wide button, as the lines of the DockMax's own menus
+/* One entry: a row-wide button, as the lines of the Dockyard's own menus
    (spec 0014 R3): the one under the pointer or the keyboard filled in the
    accent. An action of the dock carries its line icon; a Jump List entry
    lines up with the labels after the icons. */

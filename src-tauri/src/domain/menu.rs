@@ -1,4 +1,4 @@
-//! The DockMax's own menus (spec 0014 R3): their lines, how the keyboard
+//! The Dockyard's own menus (spec 0014 R3): their lines, how the keyboard
 //! moves in them, their measures and where they open. Pure: the window that
 //! draws them is `windows::menu`.
 
@@ -263,7 +263,7 @@ mod tests {
             off("Pessoal"),
             item("Novo espaço"),
             Line::Separator,
-            item("Encerrar o DockMax"),
+            item("Encerrar o Dockyard"),
         ]
     }
 

@@ -14,7 +14,7 @@ describe("AboutPanel", () => {
     render(<AboutPanel />);
 
     expect(
-      screen.getByRole("heading", { name: "DockMax" }),
+      screen.getByRole("heading", { name: "Dockyard" }),
     ).toBeInTheDocument();
     expect(screen.getByText(ptBR.about.description)).toBeInTheDocument();
   });
@@ -36,7 +36,7 @@ describe("AboutPanel", () => {
     render(<AboutPanel />);
 
     const code = value("Código");
-    expect(code).toHaveTextContent("github.com/maxeinstein-dev/DockMax");
+    expect(code).toHaveTextContent("github.com/maxeinstein-dev/Dockyard");
     expect(code).toHaveClass("about-code");
     // The panel can't open the browser (no opener plugin): no link.
     expect(screen.queryByRole("link")).not.toBeInTheDocument();

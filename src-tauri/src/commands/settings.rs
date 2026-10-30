@@ -265,9 +265,19 @@ fn apply_launch_at_login(enabled: bool) {
 /// At startup of a release build: a program that moved (an update, a new
 /// folder) is found at sign-in again. The debug builds of development never
 /// register themselves.
+///
+/// First, the entry of the DockMax (the name before the rename), if it is
+/// there, gives way to the Dockyard's (`autostart::migrate_legacy`).
 pub fn sync_launch_at_login(app: &AppHandle) {
     if cfg!(debug_assertions) {
         return;
+    }
+    if !cfg!(feature = "e2e") {
+        match crate::windows::autostart::migrate_legacy() {
+            Ok(true) => log::info!("settings: the old entry at sign-in became the Dockyard one"),
+            Ok(false) => {}
+            Err(error) => log::warn!("settings: the old entry at sign-in stays: {error}"),
+        }
     }
     if current(app).launch_at_login {
         apply_launch_at_login(true);

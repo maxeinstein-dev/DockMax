@@ -108,7 +108,7 @@ fn ensure(app: &AppHandle) {
         .spawn(move || {
             let built =
                 WebviewWindowBuilder::new(&app, LABEL, WebviewUrl::App("panel.html".into()))
-                    .title("DockMax")
+                    .title("Dockyard")
                     .inner_size(360.0, 480.0)
                     .decorations(false)
                     .transparent(true)
