@@ -75,8 +75,9 @@ export const otherText: Messages = {
         behavior: "Behavior",
         launcher: "Launcher",
         startup: "Startup",
-        style: "Theme",
-        tweaks: "Customize this theme",
+        themes: "Themes",
+        style: "Bar style",
+        tweaks: "Customize this style",
         hover: "On hover",
         indicator: "Indicator",
         icons: "Icons",
@@ -157,6 +158,15 @@ export const otherText: Messages = {
     taskbar: { visible: "Visible", autohide: "Automatic", hidden: "Hidden" },
     look: {
       title: "Dock look",
+      themes: "Theme",
+      themeNames: {
+        standard: "Standard",
+        neon: "Neon",
+        glaze: "Glaze",
+        glass: "Glass",
+        midnight: "Midnight",
+      },
+      themeCustom: "Custom",
       style: "Style",
       styles: {
         native: "Native",

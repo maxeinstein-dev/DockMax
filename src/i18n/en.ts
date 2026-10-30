@@ -24,7 +24,7 @@ export const en: Messages = {
   },
   settings: {
     groups: {
-      theme: "Theme",
+      theme: "Color mode",
       language: "Language",
       edge: "Position",
       size: "Size",
@@ -63,8 +63,9 @@ export const en: Messages = {
         behavior: "Behavior",
         launcher: "Launcher",
         startup: "Startup",
-        style: "Theme",
-        tweaks: "Customize this theme",
+        themes: "Themes",
+        style: "Bar style",
+        tweaks: "Customize this style",
         hover: "On hover",
         indicator: "Indicator",
         icons: "Icons",
@@ -196,6 +197,16 @@ export const en: Messages = {
     },
     look: {
       title: "Dock appearance",
+      themes: "Theme",
+      themeNames: {
+        standard: "Standard",
+        neon: "Neon",
+        glaze: "Glaze",
+        glass: "Glass",
+        midnight: "Midnight",
+      },
+      themeCustom:
+        "Custom: the style, the icons or the indicator color aren't a theme's",
       style: "Style",
       styles: {
         native: "Native",

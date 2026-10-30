@@ -268,7 +268,7 @@ pub const PAGES: &[Page] = &[
     dockyard(
         "dockmax-general",
         "Configurações do Dockyard",
-        &["dockyard", "dockmax", "dock", "lancador"],
+        &["dockyard", "dockmax", "dock", "lancador", "modo de cor"],
         Section::General,
     ),
     dockyard(
@@ -280,7 +280,13 @@ pub const PAGES: &[Page] = &[
     dockyard(
         "dockmax-look",
         "Aparência do dock",
-        &["estilo do dock", "tema do dock", "pacote de icones"],
+        &[
+            "estilo do dock",
+            "estilo da barra",
+            "tema do dock",
+            "temas",
+            "pacote de icones",
+        ],
         Section::Look,
     ),
     dockyard(

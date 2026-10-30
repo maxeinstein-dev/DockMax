@@ -40,6 +40,7 @@ O que entra na fase, no lugar da lista da spec 0004 (mascote, onboarding, config
 | **G4.9. Pacote Argila** | Placa fofa na cor do app, com luz e sombra por dentro, sombra macia e glifo branco grosso em relevo. Ver §7. |
 | **G4.10. Pacote Fósforo** | Pixel art 32×32 de monitor de fósforo verde: moldura com bisel, linhas de varredura e o glifo aceso com halo. Ver §7. |
 | **G4.11. Pacote Game Boy** | Pixel art 16×16 em quatro verdes, a partir dos desenhos do Retrô. Ver §7. |
+| **G7. Temas** | Temas que aplicam de uma vez estilo da barra, pacote de ícones e indicador, começando por combos do que já existe e por três temas gamer inspirados (Tático, Medieval 8-bit, Caçador). Ver [spec 0020](0020-temas.md). |
 | **G5. Linux** | Feito: [estudo 0001](../estudos/0001-linux.md). Recomenda não portar agora; se o Linux virar meta, separar o Windows atrás de traits e fazer um dock para KDE Plasma e wlroots com layer-shell. GNOME/Zorin só com uma extensão do Shell, à parte. Decisões do autor no §6 do estudo. |
 | **G6. Nome e logo** | **Decidido em 2026-10-29:** o nome passa a ser **Dockyard**, com o ícone do lançador saindo da barra em esmalte cobalto ([marca 0001](../marca/0001-proposta.md)). **R1 feito em 2026-10-30:** nome, exe, ícone, textos, iniciar com o Windows e repositório; o identificador e as pastas de dados continuam `dockmax`, sem migração. |
 

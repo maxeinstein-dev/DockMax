@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  iconPackPreview,
   listIconPacks,
   openIconPacksFolder,
   reloadIconPacks,
@@ -9,41 +8,10 @@ import {
 import { format, useT } from "../i18n";
 import ChoiceCards from "./parts/ChoiceCards";
 import { MINI_ITEMS, MiniDock, type GalleryDock } from "./StyleGallery";
+import { usePackPreview } from "./usePackPreview";
 
 /** The value of the "Original" option: no id is the empty string. */
 const ORIGINAL = "";
-
-/** The first pinned programs drawn by `pack` (null: their own icons), read
- * again when `generation` changes (the packs were read again). Null until
- * they arrive, and when they can't be read. */
-function usePreview(
-  pack: string | null,
-  appIds: readonly string[],
-  generation: number,
-): (string | null)[] | null {
-  const shown = appIds.slice(0, MINI_ITEMS);
-  const key = `${generation} ${pack ?? ""} ${shown.join(" ")}`;
-  const [preview, setPreview] = useState<{
-    key: string;
-    icons: (string | null)[];
-  } | null>(null);
-  useEffect(() => {
-    if (shown.length === 0) return;
-    let active = true;
-    iconPackPreview(pack, shown).then(
-      (icons) => {
-        if (active) setPreview({ key, icons });
-      },
-      () => {},
-    );
-    return () => {
-      active = false;
-    };
-    // `key` stands for `pack`, `shown` and `generation`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-  return preview !== null && preview.key === key ? preview.icons : null;
-}
 
 /** The dock with the pinned programs in the icons of `pack`: the picture of
  * its card, decorative. */
@@ -58,7 +26,7 @@ function PackThumb({
   appIds: readonly string[];
   generation: number;
 }) {
-  const icons = usePreview(pack, appIds, generation);
+  const icons = usePackPreview(pack, appIds, generation, dock?.style ?? null);
   return (
     <MiniDock
       of={dock?.style ?? "native"}

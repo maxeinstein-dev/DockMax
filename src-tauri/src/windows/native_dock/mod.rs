@@ -1166,7 +1166,7 @@ impl Dock {
         let pack = self.data.settings.dock.icon_pack.clone();
         // A pack's dark images while the dock is dark; Windows' icons are
         // the same in both themes.
-        let dark = pack.is_some() && self.dark_now();
+        let dark = pack.is_some() && self.data.settings.dock.style.bar_dark(self.dark_now());
         let hwnd = self.hwnd.0 as isize;
         for item in &self.items {
             let app_id = match item {
@@ -1944,7 +1944,7 @@ impl Dock {
         clock: &windows::Win32::Foundation::SYSTEMTIME,
     ) -> Face {
         let pack = settings.icon_pack.clone();
-        let dark = pack.is_some() && self.dark_now();
+        let dark = pack.is_some() && self.data.settings.dock.style.bar_dark(self.dark_now());
         let program = |app_id: &str, badge: Option<&str>| {
             let icon = match self.icons.get(&(pack.clone(), app_id.to_string(), dark)) {
                 Some(Loaded::Ready(Some(icon))) => Some(icon.clone()),

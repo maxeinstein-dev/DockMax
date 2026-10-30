@@ -89,7 +89,7 @@ describe("SettingsPanel", () => {
 
     // Literal on purpose: catches a broken dictionary.
     expect(
-      within(group("Tema"))
+      within(group("Modo de cor"))
         .getAllByRole("button")
         .map((button) => button.textContent),
     ).toEqual(["Sistema", "Claro", "Escuro"]);

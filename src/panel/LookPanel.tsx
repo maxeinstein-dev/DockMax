@@ -30,6 +30,7 @@ import {
 } from "./ChoiceThumbs";
 import ToggleField from "./parts/ToggleField";
 import StyleGallery from "./StyleGallery";
+import ThemeGallery from "./ThemeGallery";
 import { useSettingsEditor } from "./useSettingsEditor";
 import "./Look.css";
 
@@ -252,6 +253,14 @@ function LookPanel({
       ) : (
         <PanelHeader title={text.title} />
       )}
+      <SettingsGroup title={groups.themes} grouped={grouped}>
+        <ThemeGallery
+          dock={dock}
+          appIds={appIds}
+          disabled={disabled}
+          onApply={(choices) => update(choices)}
+        />
+      </SettingsGroup>
       <SettingsGroup title={groups.style} grouped={grouped}>
         <StyleGallery
           label={text.style}

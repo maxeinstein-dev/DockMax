@@ -379,6 +379,22 @@ pub enum DockStyle {
     Floating,
 }
 
+impl DockStyle {
+    /// Whether the bar is dark, so an icon pack's dark images go on it (spec
+    /// 0020, Q8): the bars dark in both color modes (Meia-noite, Rocket,
+    /// Neon), never the light one (Papel), and the others with the mode.
+    pub fn bar_dark(self, mode_dark: bool) -> bool {
+        match self {
+            DockStyle::Midnight | DockStyle::Rocket | DockStyle::Neon => true,
+            DockStyle::Paper => false,
+            DockStyle::Native
+            | DockStyle::LiquidGlass
+            | DockStyle::AquaShelf
+            | DockStyle::Floating => mode_dark,
+        }
+    }
+}
+
 /// Styles that no longer exist. As `style`, serde reads them as the default
 /// one (the alias on [`DockStyle::Native`]); in `tweaks` their entry is
 /// dropped, so it cannot overwrite the default style's own tweaks.
@@ -1125,6 +1141,25 @@ mod tests {
         ];
         for (code, name) in cases {
             assert_eq!(serde_json::to_value(code).unwrap(), name);
+        }
+    }
+
+    #[test]
+    fn a_pack_s_dark_images_follow_the_bar_not_only_the_mode() {
+        for style in [DockStyle::Midnight, DockStyle::Rocket, DockStyle::Neon] {
+            assert!(style.bar_dark(false), "{style:?}");
+            assert!(style.bar_dark(true), "{style:?}");
+        }
+        assert!(!DockStyle::Paper.bar_dark(true));
+        assert!(!DockStyle::Paper.bar_dark(false));
+        for style in [
+            DockStyle::Native,
+            DockStyle::LiquidGlass,
+            DockStyle::AquaShelf,
+            DockStyle::Floating,
+        ] {
+            assert!(style.bar_dark(true), "{style:?}");
+            assert!(!style.bar_dark(false), "{style:?}");
         }
     }
 }
