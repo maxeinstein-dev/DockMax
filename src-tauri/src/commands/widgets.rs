@@ -255,6 +255,16 @@ pub fn resize(app: &AppHandle, id: &WidgetId, width: u8) {
     });
 }
 
+/// Takes the instance `id` out of the workspace `workspace` (or the one in
+/// use), from the dock's own menu, as the panel's remove does.
+pub fn remove_from_dock(app: &AppHandle, id: &WidgetId, workspace: Option<&str>) {
+    let state = app.state::<Mutex<Storage>>();
+    // `change` logs a refusal.
+    let _ = change(app, &state, "remove", |storage| {
+        remove(storage, id.as_str(), workspace)
+    });
+}
+
 /// The text of the note `id`.
 pub fn read_note(storage: &mut Storage, id: &str) -> Result<String, WidgetError> {
     let conn = storage.connection()?;
