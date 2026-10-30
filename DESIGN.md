@@ -8,6 +8,8 @@ colors:
   cobalto-ink-dark: "#b0c2ff"
   cobalto-soft-light: "rgb(47 91 211 / .13)"
   cobalto-soft-dark: "rgb(124 156 255 / .17)"
+  cobalto-on-light: "#ffffff"
+  cobalto-on-dark: "#1d1e22"
   perigo-light: "hsl(10 62% 40%)"
   perigo-dark: "hsl(10 86% 72%)"
   perigo-ink-light: "#ffffff"
@@ -373,6 +375,7 @@ Neutros frios quase sem matiz, um azul-cobalto contido e uma paleta de esmaltes 
 ### Primary
 - **Azul-cobalto** (`cobalto-light` / `cobalto-dark`, token `--accent`): contorno de foco do ladrilho e dos segmentos (2 px), anel interno do segmento selecionado (a 40%) e ponto de painel aberto. No escuro, sobe para um cobalto claro para manter contraste sobre o grafite. Na Fase 2 também marca o foco do campo de texto (fio inferior e cursor) e a caixa de seleção marcada.
 - **Tinta de cobalto** (`cobalto-ink-light` / `cobalto-ink-dark`, token `--accent-ink`): texto do segmento selecionado (e, a partir da Fase 3, o link do painel Sobre).
+- **Tinta sobre cobalto** (`cobalto-on-light` / `cobalto-on-dark`, token `--on-accent`): texto do botão principal sobre o cobalto (Atualizar, no Sobre; o principal do tour, do pomodoro e da água). Branco no claro, tinta no escuro, como a tinta sobre perigo: o branco sobre o cobalto claro do escuro dava 2,6:1. O hover do botão escurece o cobalto em 14% (token `--accent-hover`).
 - **Véu de cobalto** (`cobalto-soft-light` / `cobalto-soft-dark`, token `--accent-soft`): fundo do segmento selecionado e da seleção de texto no painel.
 
 ### Secondary (perigo)

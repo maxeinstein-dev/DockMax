@@ -94,6 +94,20 @@ function placeholderOpacity(): number {
   return Number(match[1]);
 }
 
+/** `--accent-hover`, `color-mix(in srgb, var(--accent) N%, #000)`: the
+ * accent darkened toward black by the share tokens.css gives it. */
+function accentHover(theme: keyof typeof THEMES): Rgb {
+  const match =
+    /^color-mix\(in srgb, var\(--accent\) ([\d.]+)%, #000\)$/.exec(
+      token(theme, "--accent-hover"),
+    );
+  if (!match) throw new Error("unsupported --accent-hover");
+  const share = Number(match[1]) / 100;
+  return color(theme, "--accent").rgb.map(
+    (channel) => channel * share,
+  ) as unknown as Rgb;
+}
+
 /** `top` painted over the opaque `bottom`. */
 function over(top: Rgba, bottom: Rgb): Rgb {
   return top.rgb.map(
@@ -153,6 +167,7 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
   // its alpha.
   const navHover = over({ ...inkColor, alpha: inkColor.alpha * 0.09 }, surface);
   const dangerSoft = over(color(theme, "--danger-soft"), surface);
+  const onAccent = color(theme, "--on-accent").rgb;
   return [
     { name: "--ink on the panel", ratio: contrast(ink, surface), min: TEXT },
     { name: "--ink-2 on the panel", ratio: contrast(ink2, surface), min: TEXT },
@@ -175,6 +190,18 @@ function textPairs(theme: keyof typeof THEMES): Pair[] {
     {
       name: "--ink on the key hint (--kbd)",
       ratio: contrast(ink, over(color(theme, "--kbd"), surface)),
+      min: TEXT,
+    },
+    {
+      // The main button: "Atualizar" in Sobre, and the tour's, the
+      // pomodoro's and the water's main action.
+      name: "--on-accent on --accent",
+      ratio: contrast(onAccent, color(theme, "--accent").rgb),
+      min: TEXT,
+    },
+    {
+      name: "--on-accent on a hovered main button (--accent-hover)",
+      ratio: contrast(onAccent, accentHover(theme)),
       min: TEXT,
     },
     {

@@ -21,11 +21,11 @@
 
 .pomodoro-actions .pomodoro-main {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .pomodoro-actions .pomodoro-main:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 86%, #000);
+  background: var(--accent-hover);
 }
 
 .pomodoro-note {
