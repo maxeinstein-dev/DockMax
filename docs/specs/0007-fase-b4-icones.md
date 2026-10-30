@@ -33,7 +33,10 @@ Uma pasta em `<pasta de dados>\IconPacks\<id>\` com um `pack.json` e imagens PNG
     "Calculadora": "apps/calculadora.png",
     "Bloco de notas": "apps/bloco-de-notas.png"
   },
-  "fallback": "fallback.png"
+  "fallback": "fallback.png",
+  "dark": {
+    "apps/calculadora.png": "escuro/calculadora.png"
+  }
 }
 ```
 
@@ -41,7 +44,8 @@ Uma pasta em `<pasta de dados>\IconPacks\<id>\` com um `pack.json` e imagens PNG
 - `name` é obrigatório (até 60 caracteres); `author`, `version`, `description` e `accent` (`#RRGGBB`) são opcionais, para o cartão em Configurações.
 - `icons` liga o **nome de um programa** a um arquivo, relativo à pasta do pacote. A chave vale para o nome mostrado do programa ou para o nome do arquivo dele; maiúsculas, acentos, espaços e pontuação não contam (`Bloco de notas`, `bloco-de-notas` e `BLOCO DE NOTAS` são a mesma chave), e uma extensão `.exe` ou `.lnk` é ignorada.
 - `fallback` é o ícone de um programa que nenhuma chave cobre. Sem ele, esse programa fica com o ícone original.
-- A busca é: nome mostrado, nome do arquivo (para um programa solto no dock), ícone de reserva, ícone original.
+- `dark` (opcional, acrescentado em 2026-10-30) liga uma imagem do pacote à que o dock desenha no lugar dela **enquanto está escuro**: o tema Escuro, ou Sistema com o Windows escuro. Uma imagem sem par no `dark` vale nos dois temas. As duas pontas são caminhos com as mesmas regras de `icons`, e o mapa tem no máximo 2000 entradas. Trocou o tema, o dock pede os ícones de novo: cada ícone guardado tem o tema na chave.
+- A busca é: nome mostrado, nome do arquivo (para um programa solto no dock), ícone de reserva, ícone original. A imagem achada é trocada pelo par dela no `dark` se o dock está escuro.
 
 ### 3.2 Segurança
 

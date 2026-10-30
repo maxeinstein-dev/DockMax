@@ -231,7 +231,7 @@ const ICON_CACHE_LIMIT: usize = 300;
 
 /// What an icon is read for: the icon pack in use (`None` for the icons
 /// Windows gives), the program and the size.
-type IconKey = (Option<String>, String, u32);
+type IconKey = (Option<String>, String, u32, bool);
 
 /// The icon of a program at a size; `None` for a program with no icon, which
 /// is also remembered.
@@ -282,16 +282,17 @@ pub async fn app_icon(
     } else {
         None
     };
-    let key = (pack, app_id, size);
+    let dark = pack.is_some() && super::settings::dark_now(&app);
+    let key = (pack, app_id, size, dark);
     if let Some(icon) = cached_icon(&key) {
         return Ok(icon);
     }
     let lookup = key.clone();
     let read = tauri::async_runtime::spawn_blocking(move || {
-        let (pack, app_id, size) = lookup;
+        let (pack, app_id, size, dark) = lookup;
         let from_pack = pack.and_then(|pack| {
             let shown = apps::name_of(&app_id).unwrap_or_default();
-            icons::pack_icon(&app, &pack, &icons::names_of(&app_id, &shown))
+            icons::pack_icon(&app, &pack, &icons::names_of(&app_id, &shown), dark)
         });
         from_pack.or_else(|| apps::icon_png(&app_id, size))
     })
@@ -303,16 +304,16 @@ pub async fn app_icon(
 }
 
 /// The icon the dock draws for a program (spec 0011 H3), as PNG: the icon
-/// pack in use answers first, then Windows. Reads the shell: off the main
-/// thread.
-pub fn dock_icon_png(app: &AppHandle, app_id: &str) -> Option<Vec<u8>> {
+/// pack in use answers first (its dark image while `dark`), then Windows.
+/// Reads the shell: off the main thread.
+pub fn dock_icon_png(app: &AppHandle, app_id: &str, dark: bool) -> Option<Vec<u8>> {
     if !is_valid_app_id(app_id) {
         return None;
     }
     let pack = super::settings::current(app).dock.icon_pack;
     let from_pack = pack.and_then(|pack| {
         let shown = apps::name_of(app_id).unwrap_or_default();
-        icons::pack_icon(app, &pack, &icons::names_of(app_id, &shown))
+        icons::pack_icon(app, &pack, &icons::names_of(app_id, &shown), dark)
     });
     from_pack.or_else(|| apps::icon_png(app_id, ICON_SIZES[1]))
 }
@@ -939,13 +940,13 @@ mod tests {
     #[test]
     fn the_icon_cache_is_bounded() {
         for n in 0..=ICON_CACHE_LIMIT {
-            remember_icon((None, format!("bounded-{n}"), 32), None);
+            remember_icon((None, format!("bounded-{n}"), 32, false), None);
         }
 
         let len = ICONS.lock().unwrap().as_ref().map_or(0, HashMap::len);
         assert!(len <= ICON_CACHE_LIMIT, "{len}");
         assert_eq!(
-            cached_icon(&(None, format!("bounded-{ICON_CACHE_LIMIT}"), 32)),
+            cached_icon(&(None, format!("bounded-{ICON_CACHE_LIMIT}"), 32, false)),
             Some(None)
         );
     }

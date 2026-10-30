@@ -16,6 +16,9 @@ Formato de `<id>.txt`:
                                      traco: só o glifo, numa cor)
     lado: 128                       (o lado do PNG, em pixels)
     cor: #7C818C                    (traco: a cor do glifo)
+    cor-escuro: #A9AEB9             (qualquer chave com "-escuro": o valor no
+                                     tema escuro; com uma, o pacote ganha
+                                     escuro/*.png e o mapa "dark" do pack.json)
     caixa: 0.8125                   (traco: o lado da caixa de 24, na imagem)
     largura: 1.5                    (traco: o traço, na caixa de 24)
 """
@@ -469,8 +472,10 @@ def hex_de(cor):
 # --- Prévia ----------------------------------------------------------------
 
 
-def previa(imagens, lado, colunas=11):
-    """As imagens pela metade, lado a lado, em fundo escuro em cima e claro embaixo."""
+def previa(claras, escuras, lado, colunas=11):
+    """As imagens pela metade, lado a lado: as do tema escuro em fundo escuro
+    em cima, as do claro em fundo claro embaixo."""
+    imagens = claras
     meio = lado // 2
     margem = 8
     celula = meio + margem
@@ -478,8 +483,8 @@ def previa(imagens, lado, colunas=11):
     metade = -(-len(imagens) // colunas) * celula + margem
     fundos = ((0x28, 0x28, 0x2E), (0xEC, 0xEC, 0xF0))
     tela = [[list(fundos[y >= metade]) for _ in range(largura)] for y in range(metade * 2)]
-    for parte in (0, 1):
-        for indice, linhas in enumerate(imagens):
+    for parte, conjunto in ((0, escuras), (1, claras)):
+        for indice, linhas in enumerate(conjunto):
             x0 = margem + (indice % colunas) * celula
             y0 = parte * metade + margem + (indice // colunas) * celula
             for y in range(meio):
@@ -508,19 +513,31 @@ def main():
     lado = int(estilo.get("lado", "128"))
     rasterizar, desenhar = ESTILOS[estilo["estilo"]]
     destino = AQUI.parent / pacote
-    svgs = AQUI / f"{pacote}-svg"
-    for pasta in (destino / "apps", svgs):
-        pasta.mkdir(parents=True, exist_ok=True)
-    for antigo in [*(destino / "apps").glob("*.png"), *svgs.glob("*.svg")]:
-        antigo.unlink()
+    # O estilo do tema escuro: cada "chave-escuro" no lugar da "chave".
+    claro = {k: v for k, v in estilo.items() if not k.endswith("-escuro")}
+    escuro = dict(claro)
+    escuro.update({k[: -len("-escuro")]: v for k, v in estilo.items() if k.endswith("-escuro")})
+    temas = [("apps", f"{pacote}-svg", claro)]
+    if escuro != claro:
+        temas.append(("escuro", f"{pacote}-escuro-svg", escuro))
+    for pasta, svg in (("apps", f"{pacote}-svg"), ("escuro", f"{pacote}-escuro-svg")):
+        for antigo in [*(destino / pasta).glob("*.png"), *(AQUI / svg).glob("*.svg")]:
+            antigo.unlink()
+    for pasta, svg, _ in temas:
+        (destino / pasta).mkdir(parents=True, exist_ok=True)
+        (AQUI / svg).mkdir(parents=True, exist_ok=True)
 
-    icones, reserva, imagens = {}, None, []
+    icones, reserva, escuras = {}, None, {}
+    imagens = {pasta: [] for pasta, _, _ in temas}
     for glifo in glifos:
         arquivo = f"apps/{glifo['id']}.png"
-        (svgs / f"{glifo['id']}.svg").write_text(desenhar(glifo, lado, estilo), encoding="utf-8", newline="\n")
-        linhas = rasterizar(glifo, lado, estilo)
-        imagens.append(linhas)
-        (destino / arquivo).write_bytes(codificar(lado, lado, linhas))
+        for pasta, svg, deste in temas:
+            (AQUI / svg / f"{glifo['id']}.svg").write_text(desenhar(glifo, lado, deste), encoding="utf-8", newline="\n")
+            linhas = rasterizar(glifo, lado, deste)
+            imagens[pasta].append(linhas)
+            (destino / pasta / f"{glifo['id']}.png").write_bytes(codificar(lado, lado, linhas))
+            if pasta == "escuro":
+                escuras[arquivo] = f"escuro/{glifo['id']}.png"
         for nome in glifo["nomes"]:
             if nome == "reserva":
                 reserva = arquivo
@@ -534,9 +551,12 @@ def main():
     manifesto["icons"] = icones
     if reserva:
         manifesto["fallback"] = reserva
+    if escuras:
+        manifesto["dark"] = escuras
     texto = json.dumps(manifesto, ensure_ascii=False, indent=2) + "\n"
     (destino / "pack.json").write_text(texto, encoding="utf-8", newline="\n")
-    (AQUI / f"{pacote}-previa.png").write_bytes(previa(imagens, lado))
+    claras = imagens["apps"]
+    (AQUI / f"{pacote}-previa.png").write_bytes(previa(claras, imagens.get("escuro", claras), lado))
     print(f"{pacote}: {len(glifos)} glifos, {len(icones)} nomes")
 
 

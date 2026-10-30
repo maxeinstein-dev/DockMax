@@ -1,6 +1,6 @@
 """Gera um pacote de ícones (spec 0007 §3) a partir dos desenhos em texto.
 
-Uso: python gerar.py retro-8bit
+Uso: python gerar.py retro-8bit    (ou classico-98)
 
 Lê `fonte/<id>.txt` e escreve `../<id>/pack.json`, `../<id>/apps/*.png` e uma
 folha de prévia, `fonte/<id>-previa.png` (os desenhos em fundo escuro e claro). Só
@@ -11,12 +11,14 @@ são os desenhos da fonte.
 Formato da fonte:
 
     pack.name: Retrô 8-bit          (metadados do pack.json)
+    pack.grid: 16                   (o lado do desenho, em caracteres; 16 se faltar)
     pack.scale: 8                   (cada pixel vira 8×8; 16 → 128 px)
     cor.0: #000000                  (a paleta: um caractere por cor)
 
     @chrome                         (o nome do arquivo, apps/chrome.png)
     nomes: Google Chrome | chrome   (as chaves do pack.json; "reserva" = fallback)
-    .....000000.....                (16 linhas de 16 caracteres; "." é transparente)
+    .....000000.....                (16 linhas de 16 caracteres, ou grid × grid;
+                                     "." é transparente)
 """
 
 import json
@@ -26,12 +28,12 @@ import zlib
 from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
-LADO = 16
 
 
 def ler(caminho):
     meta, paleta, desenhos = {}, {}, []
     atual = None
+    lado = 16
     for numero, linha in enumerate(caminho.read_text(encoding="utf-8").splitlines(), 1):
         linha = linha.rstrip()
         if not linha or linha.startswith("#"):
@@ -39,6 +41,8 @@ def ler(caminho):
         if linha.startswith("pack."):
             chave, valor = linha[5:].split(":", 1)
             meta[chave.strip()] = valor.strip()
+            if chave.strip() == "grid":
+                lado = int(valor)
         elif linha.startswith("cor."):
             chave, valor = linha[4:].split(":", 1)
             paleta[chave.strip()] = valor.strip()
@@ -48,15 +52,15 @@ def ler(caminho):
         elif linha.startswith("nomes:"):
             atual["nomes"] = [n.strip() for n in linha[6:].split("|") if n.strip()]
         else:
-            if len(linha) != LADO:
-                sys.exit(f"{caminho.name}:{numero}: a linha tem {len(linha)} caracteres, não {LADO}")
+            if len(linha) != lado:
+                sys.exit(f"{caminho.name}:{numero}: a linha tem {len(linha)} caracteres, não {lado}")
             desconhecida = set(linha) - set(paleta) - {"."}
             if desconhecida:
                 sys.exit(f"{caminho.name}:{numero}: cor fora da paleta: {''.join(sorted(desconhecida))}")
             atual["linhas"].append(linha)
     for desenho in desenhos:
-        if len(desenho["linhas"]) != LADO:
-            sys.exit(f"{caminho.name}:{desenho['onde']}: @{desenho['id']} tem {len(desenho['linhas'])} linhas, não {LADO}")
+        if len(desenho["linhas"]) != lado:
+            sys.exit(f"{caminho.name}:{desenho['onde']}: @{desenho['id']} tem {len(desenho['linhas'])} linhas, não {lado}")
         if not desenho["nomes"]:
             sys.exit(f"{caminho.name}:{desenho['onde']}: @{desenho['id']} não tem nomes")
     return meta, paleta, desenhos
@@ -88,13 +92,13 @@ def png(linhas, paleta, escala):
     for linha in linhas:
         pixels = b"".join((rgba(paleta[c]) if c != "." else transparente) * escala for c in linha)
         cru += [pixels] * escala
-    return codificar(LADO * escala, LADO * escala, cru)
+    return codificar(len(linhas) * escala, len(linhas) * escala, cru)
 
 
 def previa(desenhos, paleta, escala=4, colunas=11):
     """Os desenhos lado a lado, em fundo escuro em cima e claro embaixo."""
     margem = 8
-    celula = LADO * escala + margem
+    celula = len(desenhos[0]["linhas"]) * escala + margem
     largura = colunas * celula + margem
     metade = -(-len(desenhos) // colunas) * celula + margem
     fundos = (rgba("#28282E"), rgba("#ECECF0"))
@@ -117,6 +121,7 @@ def main():
     pacote = sys.argv[1] if len(sys.argv) > 1 else "retro-8bit"
     meta, paleta, desenhos = ler(AQUI / f"{pacote}.txt")
     escala = int(meta.pop("scale", "8"))
+    meta.pop("grid", None)
     destino = AQUI.parent / pacote
     (destino / "apps").mkdir(parents=True, exist_ok=True)
     for antigo in (destino / "apps").glob("*.png"):
@@ -140,7 +145,7 @@ def main():
         manifesto["fallback"] = reserva
     texto = json.dumps(manifesto, ensure_ascii=False, indent=2) + "\n"
     (destino / "pack.json").write_text(texto, encoding="utf-8", newline="\n")
-    (AQUI / f"{pacote}-previa.png").write_bytes(previa(desenhos, paleta))
+    (AQUI / f"{pacote}-previa.png").write_bytes(previa(desenhos, paleta, escala=64 // len(desenhos[0]["linhas"])))
     print(f"{pacote}: {len(desenhos)} desenhos, {len(icones)} nomes")
 
 

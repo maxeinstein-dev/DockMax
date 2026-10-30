@@ -188,6 +188,8 @@ pub struct TrayMessages {
     pub size: &'static str,
     pub one_icon: &'static str,
     pub icons: &'static str,
+    /// Takes the widget clicked out of the dock (its menu).
+    pub remove_widget: &'static str,
 }
 
 const PT_BR: Messages = Messages {
@@ -202,6 +204,7 @@ const PT_BR: Messages = Messages {
         size: "Tamanho",
         one_icon: "1 ícone",
         icons: "{n} ícones",
+        remove_widget: "Remover do dock",
     },
     settings: SettingsMessages {
         window_title: "Configurações do Dockyard",
@@ -314,6 +317,7 @@ const EN: Messages = Messages {
         size: "Size",
         one_icon: "1 icon",
         icons: "{n} icons",
+        remove_widget: "Remove from dock",
     },
     settings: SettingsMessages {
         window_title: "Dockyard Settings",

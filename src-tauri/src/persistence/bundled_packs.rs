@@ -134,12 +134,107 @@ pub const ESMALTE: Bundled = Bundled {
     ),
 };
 
-/// Traço: the same glyphs alone, in a thin line of one neutral gray (the
-/// format has no image per theme), drawn by `icon-packs/fonte/vetor.py`. A
-/// test checks this list against the pack.
+/// Traço: the same glyphs alone, in a thin line, with an ink for the light
+/// theme (`apps/`) and one for the dark (`escuro/`), drawn by
+/// `icon-packs/fonte/vetor.py`. A test checks this list against the pack.
 pub const TRACO: Bundled = Bundled {
     id: "traco",
     files: pack_files!("traco":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+        "escuro/bloco-de-notas.png",
+        "escuro/brave.png",
+        "escuro/calculadora.png",
+        "escuro/captura.png",
+        "escuro/chatgpt.png",
+        "escuro/chrome.png",
+        "escuro/claude.png",
+        "escuro/configuracoes.png",
+        "escuro/discord.png",
+        "escuro/docker.png",
+        "escuro/edge.png",
+        "escuro/excel.png",
+        "escuro/explorador.png",
+        "escuro/figma.png",
+        "escuro/filezilla.png",
+        "escuro/firefox.png",
+        "escuro/fotos.png",
+        "escuro/gerenciador.png",
+        "escuro/github.png",
+        "escuro/grade.png",
+        "escuro/lixeira.png",
+        "escuro/notion.png",
+        "escuro/obs.png",
+        "escuro/onenote.png",
+        "escuro/opera.png",
+        "escuro/outlook.png",
+        "escuro/paint.png",
+        "escuro/powerpoint.png",
+        "escuro/powershell.png",
+        "escuro/prompt.png",
+        "escuro/slack.png",
+        "escuro/spotify.png",
+        "escuro/steam.png",
+        "escuro/store.png",
+        "escuro/teams.png",
+        "escuro/telegram.png",
+        "escuro/terminal.png",
+        "escuro/vlc.png",
+        "escuro/vscode.png",
+        "escuro/whatsapp.png",
+        "escuro/word.png",
+        "escuro/xbox.png",
+        "escuro/zoom.png",
+    ),
+};
+
+/// Clássico 98: pixel art made from `icon-packs/fonte/classico-98.txt` by
+/// `icon-packs/fonte/gerar.py`. A test checks this list against the pack.
+pub const CLASSICO_98: Bundled = Bundled {
+    id: "classico-98",
+    files: pack_files!("classico-98":
         "pack.json",
         "apps/bloco-de-notas.png",
         "apps/brave.png",
@@ -188,7 +283,7 @@ pub const TRACO: Bundled = Bundled {
 };
 
 /// Every pack in the binary.
-pub const ALL: &[Bundled] = &[RETRO_8BIT, ESMALTE, TRACO];
+pub const ALL: &[Bundled] = &[RETRO_8BIT, ESMALTE, TRACO, CLASSICO_98];
 
 impl Bundled {
     /// The `pack.json` of the pack, as in the binary.
@@ -250,6 +345,7 @@ mod tests {
     use tempfile::TempDir;
 
     const SOURCE: &str = include_str!("../../icon-packs/fonte/retro-8bit.txt");
+    const CLASSIC: &str = include_str!("../../icon-packs/fonte/classico-98.txt");
     const GLYPHS: &str = include_str!("../../icon-packs/fonte/glifos.txt");
     const LINE: &str = include_str!("../../icon-packs/fonte/traco.txt");
 
@@ -274,6 +370,7 @@ mod tests {
             (RETRO_8BIT, "Retrô 8-bit"),
             (ESMALTE, "Esmalte"),
             (TRACO, "Traço"),
+            (CLASSICO_98, "Clássico 98"),
         ] {
             let manifest = pack.manifest();
             assert_eq!(manifest.name, name);
@@ -281,8 +378,16 @@ mod tests {
                 .icons
                 .values()
                 .chain(manifest.fallback.iter())
+                .chain(manifest.dark.values())
                 .map(String::as_str)
                 .collect();
+            // A dark image stands for one of the pack.
+            assert!(
+                manifest
+                    .dark
+                    .keys()
+                    .all(|image| named.contains(image.as_str()))
+            );
             let listed: BTreeSet<&str> = pack
                 .files
                 .iter()
@@ -290,8 +395,12 @@ mod tests {
                 .filter(|path| *path != "pack.json")
                 .collect();
             assert_eq!(named, listed, "{name}");
+            let mut on_disk = names_in(&format!("{}/apps", pack.id), "apps/");
+            if folder(&format!("{}/escuro", pack.id)).is_dir() {
+                on_disk.extend(names_in(&format!("{}/escuro", pack.id), "escuro/"));
+            }
             assert_eq!(
-                names_in(&format!("{}/apps", pack.id), "apps/"),
+                on_disk,
                 listed.iter().map(|path| path.to_string()).collect(),
                 "{name}"
             );
@@ -312,6 +421,7 @@ mod tests {
                 .icons
                 .values()
                 .chain(pack.manifest.fallback.iter())
+                .chain(pack.manifest.dark.values())
             {
                 assert!(icon_packs::read_image(&pack, path).is_some(), "{path}");
             }
@@ -399,27 +509,35 @@ mod tests {
         );
     }
 
-    /// What `retro-8bit.txt` says about the images.
+    /// What the source of a pixel art pack (`retro-8bit.txt`,
+    /// `classico-98.txt`) says about the images.
     struct Source {
         /// A character of a drawing → its color.
         palette: BTreeMap<char, [u8; 3]>,
-        /// The drawings by file: 16 lines of 16 characters each.
+        /// The drawings by file: `grid` lines of `grid` characters each.
         drawings: BTreeMap<String, Vec<String>>,
+        /// The side of a drawing, in characters.
+        grid: usize,
         /// How many pixels of the PNG a character is, on each side.
         scale: usize,
     }
 
-    fn source() -> Source {
+    fn source(text: &str) -> Source {
         let mut palette = BTreeMap::new();
         let mut drawings: BTreeMap<String, Vec<String>> = BTreeMap::new();
         let mut scale = 0;
+        let mut grid = 16;
         let mut current = String::new();
-        for line in SOURCE.lines().map(str::trim_end) {
+        for line in text.lines().map(str::trim_end) {
             if line.is_empty() || line.starts_with('#') || line.starts_with("nomes:") {
                 continue;
             }
             if let Some(value) = line.strip_prefix("pack.scale:") {
                 scale = value.trim().parse().unwrap();
+                continue;
+            }
+            if let Some(value) = line.strip_prefix("pack.grid:") {
+                grid = value.trim().parse().unwrap();
                 continue;
             }
             if line.starts_with("pack.") {
@@ -443,18 +561,27 @@ mod tests {
         Source {
             palette,
             drawings,
+            grid,
             scale,
         }
     }
 
     #[test]
     fn the_images_are_the_drawings_of_the_source() {
+        for (pack, text) in [(RETRO_8BIT, SOURCE), (CLASSICO_98, CLASSIC)] {
+            pixels_are_drawings(pack, text);
+        }
+    }
+
+    fn pixels_are_drawings(pack: Bundled, text: &str) {
         let Source {
             palette,
             drawings,
+            grid,
             scale,
-        } = source();
-        let images: BTreeMap<&str, &[u8]> = RETRO_8BIT
+        } = source(text);
+        assert_eq!(grid * scale, 128, "{}", pack.id);
+        let images: BTreeMap<&str, &[u8]> = pack
             .files
             .iter()
             .filter(|(path, _)| *path != "pack.json")
@@ -473,9 +600,11 @@ mod tests {
             assert_eq!(frame.color_type, png::ColorType::Rgba, "{path}");
             assert_eq!(
                 (frame.width, frame.height),
-                (16 * scale as u32, 16 * scale as u32)
+                ((grid * scale) as u32, (grid * scale) as u32)
             );
+            assert_eq!(rows.len(), grid, "{path}");
             for (y, row) in rows.iter().enumerate() {
+                assert_eq!(row.chars().count(), grid, "{path}");
                 for (x, cell) in row.chars().enumerate() {
                     let expected = match cell {
                         '.' => [0, 0, 0, 0],
@@ -484,10 +613,10 @@ mod tests {
                             [r, g, b, 255]
                         }
                     };
-                    // Every pixel of the 8×8 block is the cell's color.
+                    // Every pixel of the cell's block is its color.
                     for dy in 0..scale {
                         for dx in 0..scale {
-                            let at = ((y * scale + dy) * 16 * scale + x * scale + dx) * 4;
+                            let at = ((y * scale + dy) * grid * scale + x * scale + dx) * 4;
                             assert_eq!(pixels[at..at + 4], expected, "{path} ({x}, {y})");
                         }
                     }
@@ -619,51 +748,97 @@ mod tests {
     }
 
     #[test]
-    fn the_line_glyphs_are_one_ink_seen_on_both_themes() {
-        let hex = LINE
-            .lines()
-            .find_map(|line| line.strip_prefix("cor:"))
-            .unwrap()
-            .trim();
-        let byte = |at: usize| u8::from_str_radix(&hex[at..at + 2], 16).unwrap();
-        let ink = [byte(1), byte(3), byte(5)];
-        // The dock's porcelain (light) and graphite (dark): the pack has one
-        // image for both, so the ink must read on each (3:1, WCAG for
-        // graphics).
-        for surface in [[247, 247, 249], [38, 39, 44]] {
-            assert!(contrast(ink, surface) >= 3.0, "{surface:?}");
-        }
+    fn the_line_glyphs_have_an_ink_for_each_theme() {
+        let ink = |key: &str| {
+            let hex = LINE
+                .lines()
+                .find_map(|line| line.strip_prefix(key))
+                .unwrap()
+                .trim();
+            let byte = |at: usize| u8::from_str_radix(&hex[at..at + 2], 16).unwrap();
+            [byte(1), byte(3), byte(5)]
+        };
+        let manifest = TRACO.manifest();
         let images: BTreeMap<&str, &[u8]> = TRACO
             .files
             .iter()
             .filter(|(path, _)| *path != "pack.json")
             .copied()
             .collect();
-        assert_eq!(
-            glyphs().keys().map(String::as_str).collect::<Vec<_>>(),
-            images.keys().copied().collect::<Vec<_>>()
-        );
-        assert_eq!(
-            names_in("fonte/traco-svg", "apps/")
-                .iter()
-                .map(|name| name.replace(".svg", ".png"))
-                .collect::<Vec<_>>(),
-            images
+        // The light ink on the dock's porcelain, the dark one on its
+        // graphite: both read well past the 3:1 WCAG asks of graphics.
+        for (folder_of, ink, surface) in [
+            ("apps/", ink("cor:"), [247, 247, 249]),
+            ("escuro/", ink("cor-escuro:"), [38, 39, 44]),
+        ] {
+            assert!(contrast(ink, surface) >= 4.5, "{folder_of}");
+            let in_folder: Vec<&str> = images
                 .keys()
-                .map(|path| path.to_string())
-                .collect::<Vec<_>>()
-        );
-        for (path, bytes) in images {
-            let (side, pixels) = decode(bytes);
-            assert_eq!(side, 128, "{path}");
-            let pixels = pixels.as_chunks::<4>().0;
-            assert_eq!(pixels[0], [0, 0, 0, 0], "{path}");
-            // Every pixel drawn is the ink; only its opacity varies.
-            for pixel in pixels.iter().filter(|p| p[3] > 0) {
-                assert_eq!(pixel[..3], ink, "{path}");
+                .copied()
+                .filter(|path| path.starts_with(folder_of))
+                .collect();
+            assert_eq!(
+                glyphs()
+                    .keys()
+                    .map(|path| path.replace("apps/", folder_of))
+                    .collect::<Vec<_>>(),
+                in_folder
+            );
+            for path in in_folder {
+                let (side, pixels) = decode(images[path]);
+                assert_eq!(side, 128, "{path}");
+                let pixels = pixels.as_chunks::<4>().0;
+                assert_eq!(pixels[0], [0, 0, 0, 0], "{path}");
+                // Every pixel drawn is the ink; only its opacity varies.
+                for pixel in pixels.iter().filter(|p| p[3] > 0) {
+                    assert_eq!(pixel[..3], ink, "{path}");
+                }
+                let solid = pixels.iter().filter(|p| p[3] == 255).count();
+                assert!(solid > 100, "{path}: {solid} solid pixels");
             }
-            let solid = pixels.iter().filter(|p| p[3] == 255).count();
-            assert!(solid > 100, "{path}: {solid} solid pixels");
+        }
+        // Every image has its dark one, and the SVGs of both are there.
+        for (image, dark) in &manifest.dark {
+            assert_eq!(dark, &image.replace("apps/", "escuro/"));
+        }
+        assert_eq!(manifest.dark.len(), glyphs().len());
+        for svgs in ["fonte/traco-svg", "fonte/traco-escuro-svg"] {
+            assert_eq!(
+                names_in(svgs, "apps/")
+                    .iter()
+                    .map(|name| name.replace(".svg", ".png"))
+                    .collect::<Vec<_>>(),
+                glyphs().keys().cloned().collect::<Vec<_>>(),
+                "{svgs}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_classic_icon_is_a_98_button() {
+        let Source { drawings, .. } = source(CLASSIC);
+        for (path, rows) in drawings {
+            let row = |y: usize| rows[y].as_bytes();
+            let last = rows.len() - 1;
+            // Light on the top and left edges, shadow on the bottom and
+            // right ones: the 98 bevel, in white, light gray, gray, black.
+            for i in 0..last {
+                assert_eq!((row(0)[i], row(i)[0]), (b'f', b'f'), "{path} {i}");
+            }
+            for i in 1..last - 1 {
+                assert_eq!((row(1)[i], row(i)[1]), (b'g', b'g'), "{path} {i}");
+            }
+            for i in 1..=last {
+                let shade = if i == last { b'0' } else { b'8' };
+                assert_eq!(
+                    (row(last - 1)[i], row(i)[last - 1]),
+                    (shade, shade),
+                    "{path} {i}"
+                );
+            }
+            for i in 0..=last {
+                assert_eq!((row(last)[i], row(i)[last]), (b'0', b'0'), "{path} {i}");
+            }
         }
     }
 }
