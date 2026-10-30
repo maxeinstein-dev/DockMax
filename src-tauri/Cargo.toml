@@ -1,6 +1,6 @@
 [package]
 name = "dockyard"
-version = "0.5.0"
+version = "0.6.0"
 description = "Windows desktop dock built with Tauri"
 authors = ["Maxsuel Einstein"]
 license-file = "../LICENSE"
@@ -64,6 +64,9 @@ tauri = { version = "2", features = ["test"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", features = [
+    # The clipboard's history in the launcher (spec 0012, "Área de
+    # transferência"); brings `Foundation` with it.
+    "ApplicationModel_DataTransfer",
     "Data_Xml_Dom",
     "Media_Control",
     "Storage_Streams",

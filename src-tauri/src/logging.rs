@@ -113,6 +113,9 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) {
     if tauri_plugin_log::attach_logger(max_level, logger).is_err() {
         return;
     }
+    // One line per start: a log that stops getting lines means the app
+    // stopped logging, not that it had nothing to say (spec 0002 §2.3).
+    log::info!("logging: Dockyard {} started", app.package_info().version);
     if let Some(error) = issue {
         log::warn!(
             "logging: log file unavailable, logging without it: {}",
@@ -173,6 +176,21 @@ mod tests {
 
         assert_eq!(LEVELS, [("dockyard_lib", app), ("webview", app)]);
         assert_eq!(DEPENDENCY_LEVEL, LevelFilter::Warn);
+    }
+
+    #[test]
+    fn the_crate_of_this_code_logs_at_the_app_level() {
+        // The target of a `log::` line is its module path, which starts with
+        // the crate's name: renaming the crate must not leave its lines at
+        // the dependencies' level.
+        let this_crate = module_path!().split("::").next().unwrap();
+
+        assert!(
+            LEVELS
+                .iter()
+                .any(|&(target, level)| target == this_crate && level == APP_LEVEL),
+            "{this_crate} is not in {LEVELS:?}"
+        );
     }
 
     #[test]

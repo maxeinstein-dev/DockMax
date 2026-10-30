@@ -60,6 +60,8 @@ struct Menu {
     lines: Vec<Line>,
     /// The line under the pointer or the keyboard.
     hot: Option<usize>,
+    /// The `hot` line `ON_HOT` last heard of.
+    told: Option<usize>,
     chosen: Option<usize>,
     done: bool,
     /// Physical pixels per logical one.
@@ -70,8 +72,14 @@ struct Menu {
     painter: paint::Painter,
 }
 
+/// What hears the line a menu's pointer or keyboard rests on.
+type OnHot = Box<dyn Fn(usize)>;
+
 thread_local! {
     static MENU: RefCell<Option<Menu>> = const { RefCell::new(None) };
+    /// Hears the line the pointer or the keyboard comes to rest on, while a
+    /// menu opened by `show_hovering` is up.
+    static ON_HOT: RefCell<Option<OnHot>> = const { RefCell::new(None) };
 }
 
 /// Runs `change` on the open menu, if any. Nothing in it may send a message
@@ -147,6 +155,26 @@ fn monitor_at(at: POINT) -> (Area, f64) {
 /// returns the index of the line chosen; `None` when it was let go.
 pub fn show(at: Option<POINT>, up: bool, lines: Vec<Line>) -> Option<usize> {
     show_from(None, at, up, lines, false)
+}
+
+/// `show`, telling `on_hot` the index of each line the pointer or the
+/// keyboard moves to (the dock warms Configurações on its line). `on_hot`
+/// runs on the main thread, outside the menu: it may not wait on it.
+pub fn show_hovering(
+    at: Option<POINT>,
+    up: bool,
+    lines: Vec<Line>,
+    on_hot: impl Fn(usize) + 'static,
+) -> Option<usize> {
+    struct Forget;
+    impl Drop for Forget {
+        fn drop(&mut self) {
+            ON_HOT.with(|slot| slot.borrow_mut().take());
+        }
+    }
+    ON_HOT.with(|slot| *slot.borrow_mut() = Some(Box::new(on_hot)));
+    let _forget = Forget;
+    show(at, up, lines)
 }
 
 /// `show`, for a menu of the window `owner` (the launcher's, spec 0012 L6):
@@ -266,6 +294,7 @@ pub fn show_from(
             hwnd,
             lines,
             hot,
+            told: None,
             chosen: None,
             done: false,
             scale,
@@ -484,6 +513,20 @@ extern "system" fn procedure(hwnd: HWND, message: u32, wparam: WPARAM, lparam: L
     };
     if let Some(index) = focus {
         access::focused(hwnd, index);
+    }
+    // Outside `with_menu`: what hears it may make windows.
+    let rested = with_menu(|menu| {
+        let changed = menu.hot != menu.told;
+        menu.told = menu.hot;
+        menu.hot.filter(|_| changed)
+    })
+    .flatten();
+    if let Some(index) = rested {
+        ON_HOT.with(|slot| {
+            if let Some(on_hot) = slot.borrow().as_ref() {
+                on_hot(index);
+            }
+        });
     }
     if handled {
         LRESULT(0)

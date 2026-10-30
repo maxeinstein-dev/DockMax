@@ -1,6 +1,6 @@
 # Spec 0012 — Lançador: buscar e abrir pelo teclado
 
-**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado; L6 (menu de ações por resultado) implementado; L7 (janelas abertas) implementado.
+**Status:** L1 e L2 entregues (PRs #33 e #37); L3 (personalizar o atalho) implementado; L4 (arquivos e pastas) implementado; L5 (navegar por caminho) implementado; L6 (menu de ações por resultado) implementado; L7 (janelas abertas) implementado; conversão de unidades e moedas implementada (seção 5b); a área de transferência (seção 8i) implementada.
 **Origem:** pedido do autor (2026-10-26) de um lançador no estilo do [Ulauncher](https://ulauncher.io/): uma caixa de busca aberta por um atalho de teclado global, que acha e abre apps e, no futuro, arquivos e extensões. O PrimoDock tem algo parecido ("O botão Iniciar abre: Apps do PrimoDock", [interface](../reference/primodock/interface.md)), mas só pelo mouse e sem busca por teclado.
 
 ## 1. Decisões do autor (2026-10-26)
@@ -30,8 +30,8 @@ L1 e L2 formam o primeiro recorte do produto. Cada um é um PR; o L2 só começa
 
 - **Extensões** (seção 9): só a forma interna dos provedores nasce no L1, preparada para elas.
 - A **tecla Win sozinha** ou a tecla Copilot como atalho (exigem um hook de teclado de baixo nível).
-- A área de transferência, a conversão de unidades e o histórico de contas.
-- Um item no dock que abre o lançador (o "botão Iniciar" do PrimoDock).
+- O histórico de contas. (A conversão de unidades e a área de transferência saíram desta lista: seções 5b e 8i.)
+- ~~Um item no dock que abre o lançador (o "botão Iniciar" do PrimoDock).~~ **Feito** (seção 8h).
 
 ## 3. O atalho
 
@@ -130,12 +130,36 @@ O Windows dá ao processo que recebe um atalho registrado o direito de trazer um
 
 O desenho e o que foi medido estão em "Como o L4 ficou" (seção 8d).
 
+## 5b. Conversão de unidades
+
+Um provedor como a calculadora (`domain/launcher_units.rs`, puro e testado; `windows/launcher/rates.rs`, as cotações). O analisador é próprio e só converte: nada é executado.
+
+- **A forma:** `<número> <unidade> em|para|pra|to|in <unidade>` dá um resultado (`10 km em milhas`, `30c em f`, `5 gb em mb`, `2 horas em minutos`, `10 in in cm`). Só `<número> <unidade>` mostra as conversões mais comuns daquela unidade, até **3** linhas (`10 km` → milhas, metros, milhas náuticas). O número aceita a vírgula ou o ponto decimal e o sinal, como a calculadora; `°`, `²` e `³` valem (`30°C`, `m²`, `m³`).
+- **As grandezas e as unidades** (nomes em português e inglês, sem diferenciar maiúsculas nem acentos, singular e plural): comprimento (mm, cm, m, km, in/pol/polegada, ft/pé, yd/jarda, mi/milha, milha náutica); massa (mg, g, kg/quilo, t/tonelada, oz/onça, lb/libra); temperatura (°C/c/celsius/graus, °F/f/fahrenheit, K/kelvin), convertida pelo kelvin porque não é proporcional; volume (ml, l, m³, gal US/galão, fl oz/onça fluida, xícara); área (m², km², ha, acre, ft²); velocidade (km/h, m/s, mph, nós); dados (B, KB, MB, GB, TB, potências de 1000, e KiB, MiB, GiB, TiB, de 1024); tempo (s, min, h/hora, dia, semana).
+- **Decisões:** a **xícara** é a americana legal, **240 ml**; o **galão** é o americano (3,785 l); `t` e `tonelada` são a métrica (1000 kg); `graus` sozinho é Celsius; `m` é metro, nunca minuto; `libra` é massa ou moeda pelo que encontra do outro lado (`10 libras em kg`, `10 libras em reais`) e, sozinha, massa. **Uma unidade de uma letra colada ao número** sem o `em` (`3d`, `30c`) não converte, para `3d` continuar achando apps; com espaço (`30 c`) ou com o `em` (`30c em f`), converte.
+- **Grandezas diferentes não convertem** (`10 km em kg`): sem resultado, e a consulta segue para os outros provedores.
+- **O resultado** vem **primeiro**, como a conta (a conta, quando a consulta é uma, tem a vez e a conversão nem é tentada), com o título "= 6,21 milhas" e o subtítulo "10 km": o nome da unidade de destino (do `i18n.rs`, singular quando o valor é 1) e o valor de origem com o símbolo. A marca decimal é a da região. **Arredondamento:** 2 casas a partir de 1; abaixo de 1, 3 algarismos significativos (até 10 casas), para `1 mm em km` não virar 0; sem zeros no fim. Os apps, as janelas e os arquivos continuam abaixo; a busca na web padrão não aparece, porque há resultado.
+- **Enter copia o número**, sem a unidade ("6,21"), e o lançador fecha dizendo "Resultado copiado", como a conta. No menu de ações (L6), a conversão é como a conta: uma ação só, **Copiar resultado** (Shift+Enter a faz direto; Ctrl+C sem seleção também copia). Não conta no uso nem aparece nos recentes. Na UI Automation, o tipo é "Conversão".
+
+**Moedas, com internet:**
+
+- **Fonte:** a Frankfurter, com as cotações de referência do **Banco Central Europeu**, sem chave. Conferido em 2026-10-30: `api.frankfurter.app/latest` responde 301 para **`https://api.frankfurter.dev/v1/latest`**, que é o endereço usado; o v1 está marcado como substituído pelo v2, mas "continua funcionando". A resposta é `{"amount":1.0,"base":"EUR","date":"2026-10-30","rates":{"BRL":6.0692,"USD":1.1172,…}}` (30 moedas). Uma resposta fora desse formato (outra base, data inválida, cotação não positiva, código que não é de 3 letras maiúsculas) é descartada.
+- **Uma vez por dia:** as cotações ficam em `currency-rates.json` na pasta de dados (o dia em que foram buscadas, em UTC, e a resposta, uns 1 KB). Ao abrir, o lançador pede as cotações: na primeira vez lê o arquivo; se ele não é de hoje, busca de novo. **Tudo numa thread `launcher-rates`, pelo WinHTTP do projeto (`http::get`)**; a lista nunca espera. Uma busca que falha é tentada de novo só depois de 1 h, numa abertura seguinte. Quando as cotações chegam com o lançador aberto e o texto digitado é uma moeda, a lista se refaz.
+- **Sem rede:** com um arquivo de outro dia, ele continua valendo (o subtítulo diz de que dia é a cotação). **Sem arquivo e sem rede, a moeda não responde** e a consulta segue para os outros provedores.
+- **Como se digita:** o código ISO de qualquer moeda da resposta (`100 usd em brl`, `1 eur em jpy`), alguns nomes (`dólar`/`dollar`, `euro`, `real`/`reais`, `libra`/`libra esterlina`, `iene`/`yen`) e os símbolos `R$`, `US$`, `$` (dólar americano), `€` e `£`, antes ou depois do número (`R$ 60 em eur`, `100 € em r$`). Só a moeda (`100 usd`) mostra o real, o dólar, o euro e a libra, menos ela mesma, até 3.
+- **O resultado:** "= 545,45 BRL", sempre com **2 casas**, e o subtítulo "100 USD · Cotação BCE de 30/10/2026" (a data da cotação, não a da busca). Enter copia "545,45".
+
+**Testes de unidade:** cada grandeza (temperatura incluída: 30 °C = 86 °F, −40 = −40, 0 K), os nomes em português e inglês, a vírgula e o ponto, a recusa entre grandezas, o que não é conversão (`2024`, `3d`, `2+2`, `g 10 km`), as conversões comuns de uma unidade sozinha, o título e o subtítulo, a ordem na lista (a conversão primeiro, a busca na web contida), as moedas com uma cotação fixa de teste (nomes, símbolos, `libra` nos dois sentidos, 2 casas, a data), a leitura da resposta da Frankfurter, o cache vencido no dia seguinte e a falta de rede (fica a cotação velha; sem ela, nada). Um teste ignorado (`frankfurter_answers`) busca a Frankfurter de verdade.
+
+**Não verificado (só ao vivo):** a linha na tela (o glifo, o título e o subtítulo), o Enter e o Ctrl+C copiando, a primeira abertura do dia buscando as cotações e a lista se refazendo quando elas chegam, a gravação do `currency-rates.json` na pasta de dados de verdade, a abertura sem rede e o Narrador lendo "Conversão".
+
 ## 6. Teclado
 
 | Tecla | Ação |
 |---|---|
 | Digitar | Busca a cada tecla (o catálogo cabe em memória; sem atraso), relendo as janelas abertas (L7); os arquivos, 120 ms depois da última tecla (L4) |
 | `j ` | Só as janelas abertas (L7); sem nada depois, todas, a usada por último primeiro |
+| `cb ` | Só o histórico da área de transferência do Windows (seção 8i); sem nada depois, os últimos copiados. Enter põe o item de volta como o copiado agora, sem colar |
 | Cima, Baixo | Muda o resultado selecionado, sem sair da caixa de texto |
 | Enter | Abre o selecionado (o primeiro, se nenhum foi escolhido); numa janela (L7), traz para a frente, restaurando se estiver minimizada |
 | Shift+Enter | O menu de ações do selecionado (L6); numa janela: Alternar para a janela, Fechar janela, Mostrar no Explorador (L7); numa página de Configurações, numa busca na web ou numa conta, que só têm uma ação, faz essa ação direto, sem menu |
@@ -161,6 +185,7 @@ O mouse também funciona: passar o ponteiro seleciona, o clique abre e o botão 
 - **Tamanho do texto:** a fonte segue o "Tamanho do texto" da Acessibilidade do Windows, além do DPI; as linhas crescem com ela.
 - **Só teclado:** tudo o que o mouse faz no lançador também se faz pelo teclado (seção 6).
 - **O menu de ações (L6)** é o menu próprio do app (`windows/menu`, o do dock), com o mesmo provedor de UI Automation: o Narrador ouve o menu abrir ("Dockyard") e lê cada item com o foco ("Abrir como administrador", "Mostrar no Explorador"); o Invoke escolhe. Aberto pelo teclado, o primeiro item já vem com o foco. "Caminho copiado" é um anúncio, como "Resultado copiado".
+- **A área de transferência (seção 8i):** o item da UI Automation tem o tipo "Área de transferência" e a primeira linha como nome; o Narrador lê "Relatório de vendas, Área de transferência, 1 de 12". Pôr um item de volta diz "Copiado"; a falha de leitura é dita como as outras notas da lista.
 
 ## 8. Como verificar
 
@@ -174,6 +199,7 @@ O mouse também funciona: passar o ponteiro seleciona, o clique abre e o botão 
 - L4: a mistura e a ordem dos arquivos, o `f `, o limite, a junção sem repetir caminho, a abreviação com `~`, o descarte de uma geração antiga, os buffers da IPC do Everything e o escape do termo para cada fonte;
 - L6: as ações por tipo de resultado, o Fixar e Desafixar e o Ctrl+C com e sem seleção (seção 8f);
 - L7: a regra de que janela conta, a mistura e a ordem com apps e arquivos, o `j `, a exclusão do Dockyard e as ações de janela (seção 8g);
+- a conversão de unidades e moedas (seção 5b);
 - L5: o reconhecimento de um caminho, a expansão de `~` e `%VAR%`, a pasta e o filtro, a ordem e os ocultos, o Tab, o Backspace e o descarte de uma leitura antiga (seção 8e);
 - a migração de `launcher_usage` e "Limpar o histórico".
 
@@ -382,6 +408,56 @@ Duas falhas apareceram e foram corrigidas antes do PR: o campo lia a **posição
 **Testes de unidade:** a regra de que janela conta (visível, cloaked, tool window, `WS_EX_NOACTIVATE`, com dona, `WS_EX_APPWINDOW`), a busca pelo título e pelo app, a faixa vencendo a ordem Z, a mistura entre apps e arquivos e a busca na web só quando nada casa, o `j ` (todas na ordem Z, com termo, o limite, `j` sem espaço, a palavra-chave do usuário vencendo, sem colidir com as padrão), a exclusão do Dockyard (o processo e o `.exe`, sem diferenciar maiúsculas), a descrição do programa (dock, catálogo, `.exe`), o Mostrar no Explorador fora dos apps da Loja e as ações de janela na lista fechada.
 
 **Não verificado (só ao vivo):** Enter trazendo para a frente uma janela comum, uma minimizada e uma de programa elevado (o Windows pode barrar o foco de uma janela de administrador vinda de um processo comum); Fechar janela num programa com documento não salvo (a pergunta aparecendo); o tempo de leitura com 20–30 janelas abertas (a meta de 5 ms); o ícone e o nome de cada app (Chrome com perfis, Explorador, apps da Loja via `ApplicationFrameHost`); uma janela de outro espaço em outro monitor; o Narrador lendo "Janela".
+
+## 8h. O item Lançador no dock
+
+O "botão Iniciar" do PrimoDock, com o lançador no lugar do Iniciar.
+
+- **O mecanismo:** um widget novo, `launcher` (`domain/widgets/launcher.rs`), e não um item de sistema: os itens de sistema (Configurações) o usuário não põe nem tira, e os widgets já têm tudo isso, o catálogo de Configurações › Widgets (prateleira Sistema), os espaços de trabalho, arrastar para reordenar e o "Remover do dock" do menu (PR #89). A config é vazia (`{}`): o atalho é o do lançador, em `launcherHotkey`.
+- **O desenho:** o glifo de busca do Windows (`Segoe Fluent Icons`, `E721`, o `SEARCH_GLYPH` do menu) em branco sobre um esmalte próprio, Turquesa (`Glaze::LAUNCHER`, `.t-launcher`), por uma face nova do dock (`Face::Symbol`), que desenha um glifo da fonte de ícones como a faixa de ícones pequenos já fazia.
+- **A dica e o nome:** "Lançador (Alt+Espaço)", com o atalho em uso e a tecla Espaço no idioma da interface (`launcher::tip`); com o atalho desligado em Configurações, só "Lançador". Um rótulo dado pelo usuário entra no lugar do nome. É o mesmo texto que o Narrador lê, como os outros itens; o papel é o dos outros itens do dock.
+- **O clique** abre ou fecha o lançador (`launcher::toggle`, o mesmo de "Buscar apps…"), onde ele abre hoje: centrado no monitor do ponteiro. **Com o atalho desligado** o clique abre o lançador do mesmo jeito: a chave de Configurações só solta o atalho do teclado ("os menus o abrem de qualquer jeito", seção 3), e o item é um desses caminhos pelo mouse. Ligar o atalho por um clique ou mandar o usuário para Configurações seria mudar uma escolha dele sem pedir. Passar o mouse não pré-aquece o painel, que o item não abre.
+- **O clique direito:** o menu do widget com **Configurar atalho…** (abre Configurações › Geral, onde fica o atalho) e **Remover do dock**, antes do menu do dock.
+- **O painel** do widget existe só porque todo widget tem um (o contrato do `registry.ts`): uma frase dizendo como o item funciona e, em Ajustes, o rótulo e "Remover do dock". O clique do dock nunca o abre.
+
+**Testes de unidade:** o kind (nome, `{}`, criável, uma largura), a config lendo de JSON antigo e sempre válida, a dica com o atalho (Espaço traduzido, outro atalho, sem atalho), o menu (Configurar atalho… e Remover do dock, as escolhas certas), quem é o Lançador entre os itens, o esmalte batendo com `tokens.css` e as fixtures dos dois lados.
+
+**Não verificado (só ao vivo):** o glifo centrado e do tamanho dos outros no esmalte, nos três tamanhos do dock e nos temas; o clique com o lançador aberto fechando-o (e não reabrindo, se o clique no dock tirar o foco do lançador antes); a dica e o Narrador lendo "Lançador (Alt+Espaço)"; Configurar atalho… abrindo Configurações já em Geral.
+
+## 8i. Área de transferência
+
+**Decisões do autor (2026-10-30):**
+
+- **A fonte é o histórico do próprio Windows** (Win+V), pelo WinRT `Windows.ApplicationModel.DataTransfer.Clipboard`: `IsHistoryEnabled`, `GetHistoryItemsAsync` e `SetHistoryItemAsContent`.
+- **O Dockyard não guarda nada:** nem em disco, nem em cache entre aberturas.
+- **Com o histórico do Windows desligado,** aparece uma linha só, "Histórico da área de transferência desligado", que ao Enter abre `ms-settings:clipboard`.
+
+**Como ficou** (`domain/launcher_clipboard.rs`, puro e testado; `windows/launcher/clipboard.rs`, a leitura e as linhas):
+
+- **A palavra-chave `cb `** ("clipboard"), e só ela: o histórico pode ter senhas e outras coisas sensíveis, e nunca aparece misturado numa busca comum. `cb` sem espaço é digitação comum. **Por que `cb` e não `ac`:** as duas são curtas e nenhuma colide com as padrão (`g`, `yt`, `w`, `gh`, `f`, `j`; um teste garante), mas `cb` segue o costume das outras, abreviações em inglês como `yt` e `gh`; `ac` ("área de cópia") não é o nome que o Windows usa ("área de transferência" daria `at`). Se o usuário criar uma palavra-chave da web `cb`, **a dele vence**, como com o `f` e o `j`.
+- **Nesse modo, só o histórico responde:** nem apps, nem Configurações, nem conta, nem busca na web, nem janelas, nem arquivos.
+- **Sem termo,** os itens mais recentes, até **25** (o que o Windows guarda). **Com termo,** os itens cujo texto tem cada palavra do termo em qualquer lugar, sem diferenciar maiúsculas nem acentos, na ordem do mais recente. O filtro olha os primeiros 4 096 caracteres de cada texto.
+- **Só itens de texto** (os que têm o formato `Text`). Imagens, arquivos e outros formatos ficam **de fora nesta versão**; a leitura só conta quantos foram pulados.
+- **A linha:** a primeira linha com algum texto, com espaços e tabulações juntados, cortada em **80 caracteres** (o último vira `…`); um texto só de espaços aparece como "Texto em branco". O subtítulo: "Área de transferência · há 5 min" ("agora", "há N min", "há N h", "há 1 dia", "há N dias"). O glifo de colar no lugar do ícone.
+- **Enter** põe o item como o conteúdo atual da área de transferência (`SetHistoryItemAsContent`, pelo id do item, lido de novo do histórico numa thread `launcher-clipboard`), fecha o lançador e anuncia "Copiado" ao leitor de tela. **Não cola** no programa: colar exigiria mandar Ctrl+V com `SendInput`, que o projeto evita. Um item apagado do histórico no meio mostra "Não foi possível abrir".
+- **As ações (L6):** **Copiar** (Enter, o padrão) · **Abrir como link**, só quando o texto inteiro (sem os espaços das pontas) é um endereço `https://` que o lançador abre (`launcher_clipboard::link`, a mesma checagem das buscas na web). Sem link, a linha tem uma ação só: Shift+Enter copia, sem menu. Ctrl+C sem seleção no campo copia o item, como o Enter.
+- **A lista fechada cresceu:** `Action::CopyClip(id)`, com o id do item do Windows (não vazio, até 128 caracteres, sem controle). **O texto copiado nunca entra na ação.** "Abrir como link" vira `Action::OpenUri`, checado como sempre.
+- **Uso e recentes:** um item **não conta** no uso e não aparece nos recentes. A linha do histórico desligado conta como a página "Área de transferência" das Configurações do Windows, que ela abre.
+
+**Onde roda e o descarte:**
+
+- A leitura é do WinRT, assíncrona, e roda numa thread `launcher-clipboard` do processo principal, esperando a operação (`join`). Ela começa quando a consulta entra em `cb ` e é feita **uma vez** enquanto a consulta fica em `cb `: o termo só filtra o que foi lido, na thread da UI, a cada tecla.
+- **A geração e o tempo limite,** como no L4 e no L5: cada leitura leva um número; uma resposta depois de **1,5 s**, depois de a consulta sair de `cb ` ou de o lançador fechar é descartada. Sem resposta a tempo, "Não foi possível ler a área de transferência" (o mesmo texto de quando o Windows recusa).
+- **Nada fica:** sair de `cb ` ou fechar o lançador esquece o que foi lido. Nada vai para o disco.
+- **Por que não no auxiliar:** a API do WinRT da área de transferência pesa pouco no processo (medido abaixo), e o Windows pode recusar o histórico a um processo que não tem o primeiro plano: o lançador aberto tem, o auxiliar nunca tem janela à frente.
+
+**Privacidade:** nada do conteúdo vai para o log, nem com o trace ligado. O log diz só quantos itens de texto e de outros tipos o histórico tinha, o tempo, e o código de status quando o Windows recusa. Duas guardas: o texto de um item é um `ClipText`, que não tem `Display` (um `log::info!("{}", texto)` não compila) e cujo `Debug` escreve só o tamanho (`ClipText(23 chars)`), com um teste; e um teste que lê as linhas de `log::` de `windows/launcher/clipboard.rs` e falha se alguma levar o texto, a linha, o nome ou o id de um item.
+
+**Testes de unidade:** a palavra-chave (só `cb ` com espaço, `cb` sozinho e as outras consultas sem histórico, a palavra-chave do usuário vencendo) e as colisões com as padrão, o `f` e o `j`; o filtro (sem acento, sem maiúsculas, todas as palavras, a ordem do mais recente, o limite de 25); o corte da primeira linha (linhas em branco, tabulações, 80 caracteres por caractere e não por byte); o "há N min" (agora, minutos, horas, dias, relógio atrasado); a conversão do `DateTime` do WinRT; o histórico desligado, a resposta atrasada e a de antes de um descarte; a URL (só um `https://` sozinho; `http://`, texto em volta, duas linhas, `javascript:` e endereço longo demais ficam de fora); as ações (Copiar e Abrir como link, o Ctrl+C, a ação na lista fechada); e as duas guardas de privacidade.
+
+**Medido** (2026-10-30, na máquina do autor, pelo teste `clipboard_history_answers`, ignorado no `cargo test` e rodado à mão com `cargo test clipboard_history_answers -- --ignored --nocapture`, que imprime só a contagem e o tamanho dos itens, nunca o conteúdo): rodando de um terminal, **o Windows não entregou o histórico** ("the history could not be read", em 2,8 ms; a segunda tentativa, em 13 µs). É o esperado de um processo sem janela em primeiro plano, e confirma por que a leitura não vai para o auxiliar. O WinRT somou **+0,1 MB** de memória privada ao processo (1,9 MB antes e depois). A contagem e o tempo de uma leitura de verdade ficam para o teste ao vivo, com o lançador aberto.
+
+**Não verificado (só ao vivo):** a leitura com o lançador em primeiro plano (o teste roda de um terminal, que é quem tem o primeiro plano); o Enter pondo o item de volta e o Ctrl+V em outro programa colando-o; "Abrir como link" no navegador; a linha do histórico desligado abrindo a página; o tempo e a memória com o lançador aberto; o Narrador lendo "Área de transferência" e "Copiado".
 
 ## 9. Extensões (depois)
 

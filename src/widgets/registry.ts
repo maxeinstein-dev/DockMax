@@ -45,6 +45,9 @@ import type {
 import NetworkPanel from "./network/NetworkPanel";
 import NetworkSettings from "./network/NetworkSettings";
 import NetworkTile from "./network/NetworkTile";
+import LauncherPanel from "./launcher/LauncherPanel";
+import LauncherSettings from "./launcher/LauncherSettings";
+import LauncherTile from "./launcher/LauncherTile";
 import NotePanel from "./notes/NotePanel";
 import NoteSettings from "./notes/NoteSettings";
 import NoteTile from "./notes/NoteTile";
@@ -73,7 +76,8 @@ export type GlazeClass =
   | "t-water"
   | "t-music"
   | "t-claude"
-  | "t-weather";
+  | "t-weather"
+  | "t-launcher";
 
 export interface WidgetDefinition<K extends CreatableKind> {
   kind: K;
@@ -204,6 +208,14 @@ export const WIDGET_REGISTRY: {
     Tile: WeatherTile,
     Panel: WeatherPanel,
     Settings: WeatherSettings,
+  },
+  launcher: {
+    kind: "launcher",
+    nameKey: "launcher",
+    glaze: "t-launcher",
+    Tile: LauncherTile,
+    Panel: LauncherPanel,
+    Settings: LauncherSettings,
   },
 };
 
