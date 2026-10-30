@@ -29,6 +29,7 @@ const RUST_NAMES: Readonly<Record<DockStyle, string>> = {
   classic98: "Classic98",
   phosphor: "Phosphor",
   tactical: "Tactical",
+  medieval: "Medieval",
 };
 
 /** `r g b` of every color written in `rust`, as a set. */

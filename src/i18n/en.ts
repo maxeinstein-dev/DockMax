@@ -208,6 +208,7 @@ export const en: Messages = {
         classic98: "Classic 98",
         phosphor: "Phosphor",
         tactical: "Tactical",
+        medieval: "Medieval 8-bit",
       },
       themeCustom:
         "Custom: the style, the icons or the indicator color aren't a theme's",
@@ -225,6 +226,7 @@ export const en: Messages = {
         classic98: "Classic 98",
         phosphor: "Phosphor",
         tactical: "Tactical",
+        medieval: "Medieval 8-bit",
       },
       tweaks: "Customize this style",
       border: "Border",

@@ -2,7 +2,7 @@
 
 Extensão da fase G ([spec 0019](0019-fase-g-extras.md)): **temas** que vestem o dock de uma vez, como os temas sazonais do PrimoDock, começando por temas gamer.
 
-**Status:** em andamento: passo 1 (galeria de Temas), passo 2 (launchers) e passo 3 (skins de barra, com Retrô, Clássico 98 e Fósforo) e passo 4 (Tático).
+**Status:** em andamento: passo 1 (galeria de Temas), passo 2 (launchers) e passo 3 (skins de barra, com Retrô, Clássico 98 e Fósforo) passo 4 (Tático) e passo 5 (Medieval 8-bit).
 
 ## 1. Decisões do autor (2026-10-30)
 
@@ -73,5 +73,8 @@ Tomadas numa sessão de perguntas (Q1–Q22), todas na recomendação:
   - **Tema** `tactical`: skin Tático, pacote Tático e indicador do estilo.
   - **Verificado ao vivo** (2026-10-30, build e2e, cópia dos dados do autor): o cartão Tático gravou estilo `tactical` e pacote `tatico`, e o dock desenhou a barra chanfrada com o fio de areia, os ícones nas placas octogonais e as marcas laranja. "Cantos" sumiu. Memória: 294 MB em 7 processos com Configurações aberta. A barra do Windows ficou igual. Fotos em [`docs/fotos/g7-tatico-ao-vivo.png`](../fotos/g7-tatico-ao-vivo.png).
   - Com os glifos dos launchers (passo 2), o pacote cobre 55 apps, e o teste dos launchers inclui o Tático.
-- **Medieval 8-bit:** barra em pixel art, com moldura de madeira escura, cantoneiras de ferro com rebites e meio de pedra; indicador ouro `#E8B84A`. Ícones: pixel 32×32 em "espaço de inventário" de pedra com bisel, paleta terrosa limitada, fonte em texto e `gerar.py`. Reserva: baú.
+- **Medieval 8-bit** (passo 5, feito):
+  - **Skin** `medieval` (`skins/fonte/medieval.txt`, pixel art 16×16): moldura de madeira escura com cantoneiras de ferro e rebites nas pontas (4 px cada) e o meio de tijolos de pedra, que se repete (8 px). Separador madeira, relógio pergaminho `#E8D9B0`, indicador ouro `#E8B84A`. Barra escura nos dois modos.
+  - **Pacote** `medieval` (`fonte/medieval.txt`, pixel art 32×32, `gerar.py`): cada app num espaço de inventário de pedra com bisel. O objeto sai do glifo, com contorno escuro, corpo na cor terrosa mais próxima da matiz do app (vermelho, laranja, ouro, verde, verde-água, azul, roxo, vinho ou marrom), detalhes em pergaminho e sombra de 1 px. Um glifo sem área fechada leva o traço na cor do app. Cobre os 55 glifos. A reserva é um baú (`apps/bau.png`). Os desenhos partiram dos glifos e se editam no texto.
+  - **Tema** `medieval`: skin Medieval, pacote Medieval e indicador do estilo.
 - **Caçador:** barra de couro curtido com costura pespontada e cantos de osso; indicador âmbar `#F2A33A`. Ícones: medalhão de couro com aro de osso e o glifo gravado em âmbar, em relevo. Reserva: pegada de garra.

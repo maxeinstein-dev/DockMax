@@ -384,6 +384,8 @@ pub enum DockStyle {
     Phosphor,
     /// The Tático theme's skin (spec 0020 §4).
     Tactical,
+    /// The Medieval 8-bit theme's skin (spec 0020 §4).
+    Medieval,
 }
 
 impl DockStyle {
@@ -397,7 +399,8 @@ impl DockStyle {
             | DockStyle::Neon
             | DockStyle::Retro
             | DockStyle::Phosphor
-            | DockStyle::Tactical => true,
+            | DockStyle::Tactical
+            | DockStyle::Medieval => true,
             DockStyle::Paper | DockStyle::Classic98 => false,
             DockStyle::Native
             | DockStyle::LiquidGlass
@@ -873,6 +876,7 @@ mod tests {
             (DockStyle::Classic98, "classic98"),
             (DockStyle::Phosphor, "phosphor"),
             (DockStyle::Tactical, "tactical"),
+            (DockStyle::Medieval, "medieval"),
         ];
         for (style, name) in styles {
             assert_eq!(serde_json::to_value(style).unwrap(), name);

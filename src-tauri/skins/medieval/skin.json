@@ -1,0 +1,14 @@
+{
+  "name": "Medieval 8-bit",
+  "image": "skin.png",
+  "width": 16,
+  "height": 16,
+  "slice": {
+    "top": 0,
+    "right": 4,
+    "bottom": 0,
+    "left": 4
+  },
+  "middle": "repeat",
+  "pixelated": true
+}

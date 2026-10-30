@@ -59,6 +59,7 @@ describe("ThemeGallery", () => {
       "Clássico 98",
       "Fósforo",
       "Tático",
+      "Medieval 8-bit",
     ]);
     expect(card("Padrão")).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByText(text.themeCustom)).toBeNull();

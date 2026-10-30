@@ -269,6 +269,7 @@ const messages = {
         classic98: "Clássico 98",
         phosphor: "Fósforo",
         tactical: "Tático",
+        medieval: "Medieval 8-bit",
       } satisfies Record<ThemeId, string>,
       themeCustom:
         "Personalizado: o estilo, os ícones ou a cor do indicador não são os de um tema",
@@ -286,6 +287,7 @@ const messages = {
         classic98: "Clássico 98",
         phosphor: "Fósforo",
         tactical: "Tático",
+        medieval: "Medieval 8-bit",
       } satisfies Record<DockStyle, string>,
       /** Group of the changes that belong to the chosen style. */
       tweaks: "Personalizar este estilo",
