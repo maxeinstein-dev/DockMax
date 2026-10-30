@@ -72,6 +72,7 @@ fn main() {
             "run_app_entry",
             "reveal_app",
             "list_icon_packs",
+            "icon_pack_preview",
             "reload_icon_packs",
             "open_icon_packs_folder",
             "launcher_status",

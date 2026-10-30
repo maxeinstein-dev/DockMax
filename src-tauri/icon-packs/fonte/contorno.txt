@@ -1,0 +1,19 @@
+# Pacote Contorno colorido (spec 0019): os glifos de glifos.txt sozinhos, em
+# linha, cada um na matiz do app: um tom mais escuro no tema claro e um mais
+# claro no escuro (o mapa "dark" do pack.json).
+# Para gerar de novo: python vetor.py contorno
+
+pack.name: Contorno colorido
+pack.author: Dockyard
+pack.version: 1.0.0
+pack.description: Glifos de linha, cada um na cor do seu app, no tom do tema claro ou do escuro.
+pack.accent: #2F7F9F
+
+estilo: traco
+lado: 128
+cor: matiz
+saturacao: 58
+luz: 38
+luz-escuro: 68
+caixa: 0.8125
+largura: 1.75

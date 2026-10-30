@@ -69,6 +69,7 @@ A pasta é do usuário, mas o que vem nela pode ter vindo de um download: o app 
 | `list_icon_packs` | painel | lê a pasta (de novo) e devolve `{ id, name, author, version, description, accent, iconCount, covers, total, error }` por pacote; `covers` de `total` é quantos dos apps fixados ele veste. Se o que a pasta tem difere do que estava guardado, o dock lê os ícones de novo |
 | `reload_icon_packs` | painel | o botão "Recarregar pacotes": o mesmo, e o dock lê os ícones de novo **sempre** (uma imagem pode ter sido trocada sem mudar o `pack.json`) |
 | `open_icon_packs_folder` | painel | cria a pasta se preciso e a abre no Explorador |
+| `icon_pack_preview` | painel | `(pack, appIds)`: as imagens que o pacote (ou, sem pacote, o Windows) dá a até 6 programas, como `data:` URLs, no tema do dock e no tamanho dele; a miniatura de cada cartão (desde 2026-10-30) |
 | `app_icon` (existente) | dock e painel | passa a consultar o pacote escolhido antes do Windows |
 
 Quando o dock deve ler os ícones de novo, o Rust esquece os que guardou e envia `icons-changed` a todas as janelas; o dock esquece os que recebeu e os pede outra vez.
@@ -76,7 +77,7 @@ Quando o dock deve ler os ícones de novo, o Rust esquece os que guardou e envia
 ### 3.5 No dock e em Configurações
 
 - O ícone do pacote vale para o **dock** (tamanho 96 do `app_icon`); a lista de programas de Configurações continua mostrando o ícone original de cada programa, para o usuário reconhecer o que está escolhendo. O ícone entra no lugar do original no mesmo ladrilho; o formato (Placas arredondadas, Mesmo tamanho, Como vieram) continua valendo, e "Como vieram" é o certo para um pacote que já traz a placa.
-- Em Configurações, na aba Aparência, a seção "Ícones dos apps" (abaixo de "Formato dos ícones") mostra um cartão por opção: Original e um por pacote (nome, autor, "Veste 5 de 9 apps"), os botões "Abrir pasta de pacotes" e "Recarregar pacotes".
+- Em Configurações, na aba Aparência, a seção "Ícones dos apps" (abaixo de "Formato dos ícones") mostra um cartão por opção, como a galeria de estilos (spec 0014 R1): Original e um por pacote, cada um com o **dock em miniatura** no estilo em uso e os cinco primeiros apps fixados nos ícones daquele pacote (no tema do dock), o nome e, embaixo, "Veste 5 de 9 apps" (ou "12 ícones" sem apps fixados; "Indisponível" para o escolhido que sumiu). Seguem os botões "Abrir pasta de pacotes" e "Recarregar pacotes"; recarregar lê as miniaturas de novo. No painel, sem apps fixados à mão, a miniatura mostra os ladrilhos dos widgets.
 
 ### 3.6 Fora de B4a
 

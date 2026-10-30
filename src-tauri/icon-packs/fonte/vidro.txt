@@ -1,0 +1,15 @@
+# Pacote Vidro (spec 0019): placa translúcida tingida da matiz do app, com
+# borda de luz, brilho e glifo branco; o fundo do dock aparece por trás.
+# Mais opaca no tema claro, para o glifo branco ler.
+# Para gerar de novo: python vetor.py vidro
+
+pack.name: Vidro
+pack.author: Dockyard
+pack.version: 1.0.0
+pack.description: Placas de vidro tingido na cor de cada app, com um glifo branco.
+pack.accent: #5F9FCF
+
+estilo: vidro
+lado: 128
+opacidade: 0.78
+opacidade-escuro: 0.55
