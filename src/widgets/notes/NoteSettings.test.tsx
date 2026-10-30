@@ -6,6 +6,7 @@ import { ptBR } from "../../i18n/pt-BR";
 import type { WidgetUpdate } from "../contract";
 import { draftOf, forgetNote, keepDraft } from "./memory";
 import NoteSettings from "./NoteSettings";
+import { getAlert, queryAlert } from "../../test/alerts";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
@@ -151,7 +152,7 @@ describe("the label", () => {
     fireEvent.blur(labelField());
     await settle();
     expect(onUpdate).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent(errors.invalidLabel);
+    expect(getAlert()).toHaveTextContent(errors.invalidLabel);
     expect(labelField()).toBeInvalid();
 
     fireEvent.change(labelField(), { target: { value: "🙂".repeat(40) } });
@@ -174,7 +175,7 @@ describe("the label", () => {
     fireEvent.blur(labelField());
     await settle();
     expect(onUpdate).toHaveBeenCalledOnce();
-    expect(screen.getByRole("alert")).toHaveTextContent(errors.invalidLabel);
+    expect(getAlert()).toHaveTextContent(errors.invalidLabel);
     expect(labelField()).toHaveValue("Mercado");
   });
 
@@ -202,7 +203,7 @@ describe("Remover do dock", () => {
 
     fireEvent.click(removeButton());
     expect(onRemove).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(queryAlert()).not.toBeInTheDocument();
   });
 
   it("asks first when the note has text, focused on Cancelar", async () => {
@@ -212,7 +213,7 @@ describe("Remover do dock", () => {
 
     fireEvent.click(removeButton());
     expect(onRemove).not.toHaveBeenCalled();
-    const alert = screen.getByRole("alert");
+    const alert = getAlert();
     expect(alert).toHaveTextContent(`${confirm.title} ${confirm.detail}`);
     expect(screen.getByRole("button", { name: confirm.cancel })).toHaveFocus();
     expect(
@@ -230,7 +231,7 @@ describe("Remover do dock", () => {
 
     fireEvent.click(removeButton());
     fireEvent.click(screen.getByRole("button", { name: confirm.cancel }));
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(queryAlert()).not.toBeInTheDocument();
     expect(removeButton()).toHaveFocus();
     expect(onRemove).not.toHaveBeenCalled();
   });
@@ -240,7 +241,7 @@ describe("Remover do dock", () => {
     const first = renderSettings();
     fireEvent.click(removeButton());
     expect(first.onRemove).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent(confirm.title);
+    expect(getAlert()).toHaveTextContent(confirm.title);
     first.unmount();
 
     stored(() => Promise.reject({ code: "writeFailed" }));
@@ -248,7 +249,7 @@ describe("Remover do dock", () => {
     await settle();
     fireEvent.click(removeButton());
     expect(second.onRemove).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent(confirm.title);
+    expect(getAlert()).toHaveTextContent(confirm.title);
   });
 
   it("asks when the note has unsaved text, even if the stored one is empty", async () => {
@@ -259,7 +260,7 @@ describe("Remover do dock", () => {
 
     fireEvent.click(removeButton());
     expect(onRemove).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent(confirm.title);
+    expect(getAlert()).toHaveTextContent(confirm.title);
 
     // Removed: the unsaved text goes with the instance.
     fireEvent.click(screen.getByRole("button", { name: confirm.confirm }));
@@ -311,7 +312,7 @@ describe("Remover do dock", () => {
     fireEvent.click(removeButton());
     fireEvent.click(screen.getByRole("button", { name: confirm.confirm }));
     await settle();
-    expect(screen.getByRole("alert")).toHaveTextContent(errors.notFound);
+    expect(getAlert()).toHaveTextContent(errors.notFound);
     expect(removeButton()).toBeEnabled();
   });
 

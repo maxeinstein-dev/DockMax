@@ -215,6 +215,10 @@ export const en: Messages = {
       themeRevertIn: "Reverting in {seconds} s",
       themeKeepButton: "Keep",
       themeRevertButton: "Revert",
+      themeKeepSaid:
+        "Keep this theme? Unless you choose Keep, it reverts in {seconds} seconds.",
+      themeRevertSoon: "The theme reverts in {seconds} seconds.",
+      themeReverted: "The theme reverted.",
       themeCustom:
         "Custom: the style, the icons or the indicator color aren't a theme's",
       style: "Style",

@@ -278,6 +278,12 @@ const messages = {
       themeRevertIn: "Volta ao anterior em {seconds} s",
       themeKeepButton: "Manter",
       themeRevertButton: "Voltar ao anterior",
+      /** What a screen reader says (M7): the question as it appears, the
+       * last seconds, and the theme gone back by itself. */
+      themeKeepSaid:
+        "Manter este tema? Se você não escolher Manter, ele volta ao anterior em {seconds} segundos.",
+      themeRevertSoon: "O tema volta ao anterior em {seconds} segundos.",
+      themeReverted: "O tema voltou ao anterior.",
       themeCustom:
         "Personalizado: o estilo, os ícones ou a cor do indicador não são os de um tema",
       style: "Estilo",

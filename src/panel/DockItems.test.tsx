@@ -6,6 +6,7 @@ import tokens from "../themes/tokens.css?raw";
 import { draftOf, forgetNote, keepDraft } from "../widgets/notes/memory";
 import DockItems from "./DockItems";
 import css from "./DockItems.css?raw";
+import { getAlert, queryAlert } from "../test/alerts";
 
 const text = ptBR.widgets;
 
@@ -366,9 +367,7 @@ describe("DockItems", () => {
     fireEvent.click(button(text.items.recovered.dismiss));
     await flush();
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      text.errors.writeFailed,
-    );
+    expect(getAlert()).toHaveTextContent(text.errors.writeFailed);
     expect(button(text.items.recovered.dismiss)).toBeEnabled();
   });
 
@@ -415,14 +414,12 @@ describe("DockItems", () => {
 
     fireEvent.click(moveDown("Relógio"));
     await flush();
-    expect(screen.getByRole("alert")).toHaveTextContent(text.errors.notFound);
+    expect(getAlert()).toHaveTextContent(text.errors.notFound);
 
     fireEvent.click(button("Relógio"));
-    expect(screen.queryByRole("alert")).toBeNull();
+    expect(queryAlert()).toBeNull();
     await flush();
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      text.errors.limitReached,
-    );
+    expect(getAlert()).toHaveTextContent(text.errors.limitReached);
   });
 
   it("shows notReady when a command fails without a code", async () => {
@@ -437,7 +434,7 @@ describe("DockItems", () => {
     fireEvent.click(moveDown("Relógio"));
     await flush();
 
-    expect(screen.getByRole("alert")).toHaveTextContent(text.errors.notReady);
+    expect(getAlert()).toHaveTextContent(text.errors.notReady);
   });
 
   describe("removing", () => {
@@ -453,7 +450,7 @@ describe("DockItems", () => {
       fireEvent.click(removeButton("Relógio"));
       await flush();
       expect(sent("remove_widget")).toEqual([{ id: "c1" }]);
-      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(queryAlert()).not.toBeInTheDocument();
 
       rerender(
         <DockItems snapshot={snapshot([PROGRESS, NOTE])} onBack={vi.fn()} />,
@@ -503,7 +500,7 @@ describe("DockItems", () => {
       fireEvent.click(removeButton("Nota"));
       await flush();
       const row = rows()[2]!;
-      const confirm = within(row).getByRole("alert");
+      const confirm = getAlert(row);
       expect(confirm).toHaveTextContent(text.note.confirmRemove.title);
       expect(sent("remove_widget")).toEqual([]);
       expect(
@@ -518,7 +515,7 @@ describe("DockItems", () => {
           name: text.note.confirmRemove.cancel,
         }),
       );
-      expect(within(row).queryByRole("alert")).not.toBeInTheDocument();
+      expect(queryAlert(row)).not.toBeInTheDocument();
       expect(removeButton("Nota")).toHaveFocus();
 
       fireEvent.click(removeButton("Nota"));
@@ -585,9 +582,7 @@ describe("DockItems", () => {
       fireEvent.click(removeButton("Relógio"));
       await flush();
 
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        text.errors.writeFailed,
-      );
+      expect(getAlert()).toHaveTextContent(text.errors.writeFailed);
       expect(removeButton("Relógio")).toHaveFocus();
       expect(removeButton("Relógio")).toBeEnabled();
     });

@@ -5,6 +5,7 @@ import type { WidgetInstance } from "../../core/widgets";
 import type { WidgetUpdate } from "../contract";
 import ProgressSettings from "./ProgressSettings";
 import { progressInstance } from "./testing";
+import { getAlert, queryAlert } from "../../test/alerts";
 
 type Update = WidgetUpdate<"time-progress">;
 
@@ -148,7 +149,7 @@ describe("ProgressSettings", () => {
       await flush();
 
       expect(onUpdate).not.toHaveBeenCalled();
-      expect(screen.getByRole("alert")).toHaveTextContent(
+      expect(getAlert()).toHaveTextContent(
         "Use de 1 a 40 caracteres, com ao menos um visível.",
       );
       expect(field).toHaveValue("");
@@ -348,7 +349,7 @@ describe("ProgressSettings", () => {
       await flush();
 
       expect(onUpdate).toHaveBeenCalledTimes(1);
-      expect(screen.getByRole("alert")).toHaveTextContent(
+      expect(getAlert()).toHaveTextContent(
         "O expediente precisa terminar depois de começar, no mesmo dia.",
       );
       expect(end).toHaveValue("18:00");
@@ -361,7 +362,7 @@ describe("ProgressSettings", () => {
       await flush();
 
       expect(checkbox("Semana")).toBeChecked();
-      expect(screen.getByRole("alert")).toHaveTextContent(
+      expect(getAlert()).toHaveTextContent(
         "Escolha ao menos um período, sem repetir.",
       );
     });
@@ -372,12 +373,12 @@ describe("ProgressSettings", () => {
       fireEvent.change(field, { target: { value: "x".repeat(41) } });
       fireEvent.blur(field);
       await flush();
-      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(getAlert()).toBeInTheDocument();
 
       fireEvent.click(checkbox("Ano"));
       await flush();
       expect(onUpdate).toHaveBeenCalledTimes(1);
-      expect(screen.queryByRole("alert")).toBeNull();
+      expect(queryAlert()).toBeNull();
     });
   });
 
@@ -389,7 +390,7 @@ describe("ProgressSettings", () => {
       await flush();
 
       expect(onRemove).toHaveBeenCalledTimes(1);
-      expect(screen.queryByRole("alert")).toBeNull();
+      expect(queryAlert()).toBeNull();
     });
 
     it("shows why a removal failed", async () => {
@@ -402,7 +403,7 @@ describe("ProgressSettings", () => {
       fireEvent.click(screen.getByRole("button", { name: "Remover do dock" }));
       await flush();
 
-      expect(screen.getByRole("alert")).toHaveTextContent(
+      expect(getAlert()).toHaveTextContent(
         "Não foi possível salvar a mudança. Tente de novo.",
       );
       expect(

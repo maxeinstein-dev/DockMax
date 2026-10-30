@@ -10,6 +10,7 @@ import type { WidgetInstance } from "../../core/widgets";
 import { ptBR } from "../../i18n/pt-BR";
 import CalendarPanel from "./CalendarPanel";
 import css from "./calendar.css?raw";
+import { expectSaidIn, findAlert, liveRegions } from "../../test/alerts";
 
 const text = ptBR.widgets.calendar;
 
@@ -230,12 +231,13 @@ describe("CalendarPanel", () => {
     );
     show();
 
-    fireEvent.click(
-      await screen.findByRole("checkbox", { name: "Concluir Ligar" }),
-    );
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      text.completeFailed,
-    );
+    const done = await screen.findByRole("checkbox", {
+      name: "Concluir Ligar",
+    });
+    const before = liveRegions();
+    fireEvent.click(done);
+    expect(await findAlert()).toHaveTextContent(text.completeFailed);
+    expectSaidIn(before, await findAlert());
     expect(
       screen.getByRole("checkbox", { name: "Concluir Ligar" }),
     ).toBeInTheDocument();

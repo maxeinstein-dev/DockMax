@@ -134,11 +134,10 @@ function Tasks({
           ))}
         </ul>
       )}
-      {failed ? (
-        <p className="cal-notice" role="alert">
-          {failed}
-        </p>
-      ) : null}
+      {/* Mounted before the failure, so a screen reader reads it. */}
+      <p className="cal-notice live" role="alert">
+        {failed}
+      </p>
     </section>
   );
 }

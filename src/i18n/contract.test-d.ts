@@ -176,6 +176,9 @@ export const otherText: Messages = {
       themeRevertIn: "In {seconds} s",
       themeKeepButton: "Keep",
       themeRevertButton: "Revert",
+      themeKeepSaid: "Keep? {seconds}",
+      themeRevertSoon: "{seconds}",
+      themeReverted: "Reverted",
       themeCustom: "Custom",
       style: "Style",
       styles: {

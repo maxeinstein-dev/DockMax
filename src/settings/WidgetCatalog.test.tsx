@@ -9,6 +9,7 @@ import {
 import type { Workspace } from "../core/workspaces";
 import { ptBR } from "../i18n/pt-BR";
 import WidgetCatalog from "./WidgetCatalog";
+import { expectSaidIn, findAlert, liveRegions } from "../test/alerts";
 
 const text = ptBR.widgets.catalog;
 
@@ -98,10 +99,12 @@ describe("WidgetCatalog", () => {
   it("shows the message of a refusal", async () => {
     invoke.mockRejectedValue({ code: "limitReached" });
     render(<WidgetCatalog snapshot={snapshot([])} workspace={WORK} />);
+    const before = liveRegions();
 
     fireEvent.click(addButton("Relógio"));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expectSaidIn(before, await findAlert());
+    expect(await findAlert()).toHaveTextContent(
       ptBR.widgets.errors.limitReached,
     );
   });

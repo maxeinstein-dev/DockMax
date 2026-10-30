@@ -4,6 +4,7 @@ import { version } from "../../package.json";
 import type { UpdateState } from "../core/update";
 import { ptBR } from "../i18n/pt-BR";
 import AboutPanel from "./AboutPanel";
+import { expectSaidIn, liveRegions } from "../test/alerts";
 
 type Listener = (event: { payload: unknown }) => void;
 
@@ -122,6 +123,7 @@ describe("AboutPanel", () => {
         check_for_update: () => Promise.reject("no network"),
       });
       await renderAbout();
+      const before = liveRegions();
 
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: text.check }));
@@ -130,6 +132,7 @@ describe("AboutPanel", () => {
       expect(screen.getByRole("status")).toHaveTextContent(
         "Não deu para procurar atualizações: no network",
       );
+      expectSaidIn(before, screen.getByRole("status"));
     });
 
     it("shows a version found by the check, with Atualizar", async () => {
@@ -168,6 +171,7 @@ describe("AboutPanel", () => {
         install_update: () => Promise.reject("bad signature"),
       });
       await renderAbout();
+      const before = liveRegions();
 
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: text.install }));
@@ -176,10 +180,12 @@ describe("AboutPanel", () => {
       expect(screen.getByRole("status")).toHaveTextContent(
         "Não deu para atualizar: bad signature",
       );
+      expectSaidIn(before, screen.getByRole("status"));
     });
 
     it("follows the download Rust reports", async () => {
       await renderAbout();
+      const before = liveRegions();
 
       act(() =>
         listeners.get("update-changed")?.({
@@ -208,6 +214,7 @@ describe("AboutPanel", () => {
       expect(screen.getByRole("status")).toHaveTextContent(
         "Instalando a versão 0.5.0",
       );
+      expectSaidIn(before, screen.getByRole("status"));
       expect(screen.queryByRole("button", { name: text.install })).toBeNull();
     });
   });

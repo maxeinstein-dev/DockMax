@@ -47,7 +47,7 @@
   box-shadow: inset 0 0 0 1px var(--field-line);
 }
 
-.choice-card[aria-pressed="true"]::after {
+.choice-card[aria-checked="true"]::after {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
@@ -72,7 +72,7 @@
   font-size: 12.5px;
 }
 
-.choice-card[aria-pressed="true"] .choice-card-name {
+.choice-card[aria-checked="true"] .choice-card-name {
   font-weight: 600;
 }
 

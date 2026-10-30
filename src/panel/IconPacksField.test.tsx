@@ -67,13 +67,13 @@ function field(props: Partial<ComponentProps<typeof IconPacksField>> = {}) {
   );
 }
 
-const group = () => screen.getByRole("group", { name: text.iconPack });
-const cards = () => within(group()).getAllByRole("button");
+const group = () => screen.getByRole("radiogroup", { name: text.iconPack });
+const cards = () => within(group()).getAllByRole("radio");
 const names = () =>
   cards().map(
     (card) => card.querySelector(".choice-card-name")?.textContent ?? "",
   );
-const card = (name: string) => within(group()).getByRole("button", { name });
+const card = (name: string) => within(group()).getByRole("radio", { name });
 
 describe("IconPacksField", () => {
   beforeEach(() => {
@@ -91,7 +91,7 @@ describe("IconPacksField", () => {
     expect(card("Cores lisas")).toHaveAccessibleDescription(
       "Veste 3 de 5 apps",
     );
-    expect(card("Original")).toHaveAttribute("aria-pressed", "true");
+    expect(card("Original")).toHaveAttribute("aria-checked", "true");
   });
 
   it("counts the icons of a pack while no app is pinned", async () => {
@@ -147,8 +147,8 @@ describe("IconPacksField", () => {
     render(field({ selected: "outro" }));
     await flush();
 
-    expect(card("Outro")).toHaveAttribute("aria-pressed", "true");
-    expect(card("Original")).toHaveAttribute("aria-pressed", "false");
+    expect(card("Outro")).toHaveAttribute("aria-checked", "true");
+    expect(card("Original")).toHaveAttribute("aria-checked", "false");
   });
 
   it("chooses a pack, and the original with null", async () => {
@@ -173,7 +173,7 @@ describe("IconPacksField", () => {
     await flush();
 
     expect(card("sumiu")).toHaveAccessibleDescription("Indisponível");
-    expect(card("sumiu")).toHaveAttribute("aria-pressed", "true");
+    expect(card("sumiu")).toHaveAttribute("aria-checked", "true");
   });
 
   it("names the packs that cannot be used and leaves them out of the cards", async () => {

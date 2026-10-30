@@ -5,6 +5,7 @@ import type { WidgetInstance, WidgetsSnapshot } from "../core/widgets";
 import type { AppsSnapshot } from "../core/apps";
 import { ptBR } from "../i18n/pt-BR";
 import SettingsPanel from "./SettingsPanel";
+import { getAlert, queryAlert } from "../test/alerts";
 
 const text = ptBR.settings;
 
@@ -46,20 +47,38 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+/** A choice by its label: the cards (Posição, Barra de tarefas) are a
+ * radio group of radios; the segmented ones, a group of toggle buttons. */
 function group(name: string) {
-  return screen.getByRole("group", { name });
+  return (
+    screen.queryByRole("radiogroup", { name }) ??
+    screen.getByRole("group", { name })
+  );
+}
+
+function roleOf(groupName: string) {
+  return group(groupName).getAttribute("role") === "radiogroup"
+    ? "radio"
+    : "button";
 }
 
 function option(groupName: string, name: string) {
-  return within(group(groupName)).getByRole("button", { name });
+  return within(group(groupName)).getByRole(roleOf(groupName), { name });
+}
+
+function options(groupName: string) {
+  return within(group(groupName)).getAllByRole(roleOf(groupName));
 }
 
 /** The labels of the chosen options of a group. */
 function chosen(groupName: string): string[] {
-  return within(group(groupName))
-    .getAllByRole("button")
-    .filter((button) => button.getAttribute("aria-pressed") === "true")
-    .map((button) => button.textContent);
+  return options(groupName)
+    .filter(
+      (option) =>
+        option.getAttribute("aria-checked") === "true" ||
+        option.getAttribute("aria-pressed") === "true",
+    )
+    .map((option) => option.textContent);
 }
 
 /** Lets settled promises run their callbacks. */
@@ -88,25 +107,22 @@ describe("SettingsPanel", () => {
     render(<SettingsPanel settings={SETTINGS} />);
 
     // Literal on purpose: catches a broken dictionary.
+    expect(options("Modo de cor").map((button) => button.textContent)).toEqual([
+      "Sistema",
+      "Claro",
+      "Escuro",
+    ]);
+    expect(options("Posição").map((button) => button.textContent)).toEqual([
+      "Embaixo",
+      "Em cima",
+    ]);
+    expect(options("Tamanho").map((button) => button.textContent)).toEqual([
+      "Pequeno",
+      "Médio",
+      "Grande",
+    ]);
     expect(
-      within(group("Modo de cor"))
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toEqual(["Sistema", "Claro", "Escuro"]);
-    expect(
-      within(group("Posição"))
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toEqual(["Embaixo", "Em cima"]);
-    expect(
-      within(group("Tamanho"))
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toEqual(["Pequeno", "Médio", "Grande"]);
-    expect(
-      within(group("Opacidade do dock"))
-        .getAllByRole("button")
-        .map((button) => button.textContent),
+      options("Opacidade do dock").map((button) => button.textContent),
     ).toEqual(["Translúcido", "Sólido"]);
   });
 
@@ -317,7 +333,7 @@ describe("SettingsPanel", () => {
     fireEvent.click(option(text.groups.size, text.size.large));
     await flush();
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
+    expect(getAlert()).toHaveTextContent(
       "Não foi possível salvar a mudança. Tente de novo.",
     );
     expect(chosen(text.groups.size)).toEqual([text.size.medium]);
@@ -334,7 +350,7 @@ describe("SettingsPanel", () => {
     fireEvent.click(option(text.groups.theme, text.theme.light));
     await flush();
 
-    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(getAlert()).toHaveTextContent(message);
   });
 
   it("shows notReady when the command fails without a code", async () => {
@@ -344,7 +360,7 @@ describe("SettingsPanel", () => {
     fireEvent.click(option(text.groups.theme, text.theme.light));
     await flush();
 
-    expect(screen.getByRole("alert")).toHaveTextContent(text.errors.notReady);
+    expect(getAlert()).toHaveTextContent(text.errors.notReady);
     expect(chosen(text.groups.theme)).toEqual([text.theme.dark]);
   });
 
@@ -354,11 +370,11 @@ describe("SettingsPanel", () => {
     render(<SettingsPanel settings={SETTINGS} />);
     fireEvent.click(option(text.groups.theme, text.theme.light));
     await flush();
-    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(getAlert()).toBeInTheDocument();
 
     fireEvent.click(option(text.groups.theme, text.theme.system));
 
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(queryAlert()).not.toBeInTheDocument();
     expect(screen.getByText(text.footer)).toBeInTheDocument();
   });
 
@@ -391,7 +407,7 @@ describe("SettingsPanel", () => {
     first.reject({ code: "writeFailed" });
     await flush();
 
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(queryAlert()).not.toBeInTheDocument();
     expect(chosen(text.groups.theme)).toEqual([text.theme.system]);
   });
 
@@ -421,7 +437,7 @@ describe("SettingsPanel", () => {
     fireEvent.click(option(text.groups.theme, text.theme.light));
 
     expect(invoke).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent(text.errors.notReady);
+    expect(getAlert()).toHaveTextContent(text.errors.notReady);
   });
 
   describe("keyboard", () => {

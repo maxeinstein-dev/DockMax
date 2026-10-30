@@ -28,9 +28,13 @@ function PanelFooter({ children, alert }: PanelFooterProps) {
   const reportsFailures = alert !== undefined;
   return (
     <footer className={reportsFailures ? "panel-foot status" : "panel-foot"}>
-      {alert ? (
-        <p role="alert">{alert}</p>
-      ) : (
+      {/* Mounted before the failure, so a screen reader reads it. */}
+      {reportsFailures ? (
+        <p className="live" role="alert">
+          {alert}
+        </p>
+      ) : null}
+      {alert ? null : (
         <>
           <span>{children}</span>
           <CloseHint />
