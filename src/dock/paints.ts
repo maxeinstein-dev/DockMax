@@ -7,6 +7,8 @@ import retroJson from "../../src-tauri/skins/retro/skin.json";
 import retroPng from "../../src-tauri/skins/retro/skin.png";
 import tacticalJson from "../../src-tauri/skins/tactical/skin.json";
 import tacticalPng from "../../src-tauri/skins/tactical/skin.png";
+import medievalJson from "../../src-tauri/skins/medieval/skin.json";
+import medievalPng from "../../src-tauri/skins/medieval/skin.png";
 
 /* The colors each style paints the bar with, for the miniatures of
  * Configurações › Aparência (spec 0014 R1). A mirror of
@@ -169,6 +171,11 @@ export const STYLE_PAINTS: Readonly<Record<DockStyle, StylePaint>> = {
     ...PLAIN,
     indicator: [0xff, 0x8a, 0x1f, 1],
     skin: skinPaint(tacticalPng, tacticalJson),
+  },
+  medieval: {
+    ...PLAIN,
+    indicator: [0xe8, 0xb8, 0x4a, 1],
+    skin: skinPaint(medievalPng, medievalJson),
   },
 };
 

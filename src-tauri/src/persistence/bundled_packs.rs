@@ -1090,6 +1090,70 @@ pub const TATICO: Bundled = Bundled {
     ),
 };
 
+/// Medieval 8-bit: pixel art made from `icon-packs/fonte/medieval.txt` by
+/// `icon-packs/fonte/gerar.py`. A test checks this list against the pack.
+pub const MEDIEVAL: Bundled = Bundled {
+    id: "medieval",
+    files: pack_files!("medieval":
+        "pack.json",
+        "apps/amd.png",
+        "apps/battlenet.png",
+        "apps/bau.png",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/ea.png",
+        "apps/edge.png",
+        "apps/epic.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/faceit.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/gog.png",
+        "apps/lixeira.png",
+        "apps/medal.png",
+        "apps/notion.png",
+        "apps/nvidia.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/overwolf.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/riot.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/twitch.png",
+        "apps/ubisoft.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
 /// Every pack in the binary.
 pub const ALL: &[Bundled] = &[
     RETRO_8BIT,
@@ -1105,6 +1169,7 @@ pub const ALL: &[Bundled] = &[
     FOSFORO,
     GAME_BOY,
     TATICO,
+    MEDIEVAL,
 ];
 
 impl Bundled {
@@ -1170,6 +1235,7 @@ mod tests {
     const CLASSIC: &str = include_str!("../../icon-packs/fonte/classico-98.txt");
     const PHOSPHOR: &str = include_str!("../../icon-packs/fonte/fosforo.txt");
     const GAME_BOY_SOURCE: &str = include_str!("../../icon-packs/fonte/game-boy.txt");
+    const MEDIEVAL_SOURCE: &str = include_str!("../../icon-packs/fonte/medieval.txt");
     const GLYPHS: &str = include_str!("../../icon-packs/fonte/glifos.txt");
     const LINE: &str = include_str!("../../icon-packs/fonte/traco.txt");
     const OUTLINE: &str = include_str!("../../icon-packs/fonte/contorno.txt");
@@ -1196,6 +1262,7 @@ mod tests {
             (ESMALTE, "Esmalte"),
             (TRACO, "Traço"),
             (CLASSICO_98, "Clássico 98"),
+            (MEDIEVAL, "Medieval 8-bit"),
             (TATICO, "Tático"),
             (FOSFORO, "Fósforo"),
             (GAME_BOY, "Game Boy"),
@@ -1274,6 +1341,7 @@ mod tests {
             let fallback = match pack.id.as_str() {
                 "retro-8bit" | "game-boy" => "apps/cartucho.png",
                 "tatico" => "apps/mira.png",
+                "medieval" => "apps/bau.png",
                 _ => "apps/grade.png",
             };
             assert_eq!(
@@ -1408,6 +1476,7 @@ mod tests {
             (CLASSICO_98, CLASSIC),
             (FOSFORO, PHOSPHOR),
             (GAME_BOY, GAME_BOY_SOURCE),
+            (MEDIEVAL, MEDIEVAL_SOURCE),
         ] {
             pixels_are_drawings(pack, text);
         }
@@ -1846,6 +1915,7 @@ mod tests {
             NEON,
             ARGILA,
             TATICO,
+            MEDIEVAL,
         ] {
             let manifest = pack.manifest();
             for app in launchers {

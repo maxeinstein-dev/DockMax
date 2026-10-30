@@ -61,11 +61,12 @@ macro_rules! skin {
 }
 
 /// Every skin in the binary.
-pub static SKINS: [Skin; 4] = [
+pub static SKINS: [Skin; 5] = [
     skin!("classic98"),
     skin!("phosphor"),
     skin!("retro"),
     skin!("tactical"),
+    skin!("medieval"),
 ];
 
 impl Skin {
@@ -93,6 +94,7 @@ pub fn skin_of(style: DockStyle) -> Option<&'static Skin> {
         DockStyle::Phosphor => "phosphor",
         DockStyle::Retro => "retro",
         DockStyle::Tactical => "tactical",
+        DockStyle::Medieval => "medieval",
         _ => return None,
     };
     SKINS.iter().find(|skin| skin.id == id)
@@ -306,6 +308,7 @@ mod tests {
             (DockStyle::Phosphor, "phosphor"),
             (DockStyle::Retro, "retro"),
             (DockStyle::Tactical, "tactical"),
+            (DockStyle::Medieval, "medieval"),
         ] {
             assert_eq!(skin_of(style).map(|skin| skin.id), Some(id));
         }
