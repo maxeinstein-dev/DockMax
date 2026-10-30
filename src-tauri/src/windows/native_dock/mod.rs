@@ -660,7 +660,14 @@ fn names() -> Names {
         media: dock.media,
         claude: dock.claude,
         weather: dock.weather,
+        launcher: dock.launcher,
     }
+}
+
+/// Whether `item` is a Lançador (spec 0012): a click opens the launcher,
+/// not a panel.
+fn is_launcher(item: &Item) -> bool {
+    matches!(item, Item::Widget(widget) if matches!(widget.config, WidgetConfig::Launcher(_)))
 }
 
 /// The panel an item opens: a program's is its menu.
@@ -839,7 +846,25 @@ impl Dock {
             .and_then(|index| self.items.get(index))
             .map(Item::key);
         let names = names();
-        self.names = found.items.iter().map(|item| names.of(item)).collect();
+        // The Lançador's name carries the launcher's hotkey, while it has
+        // one (spec 0012): it is its tip and what the Narrator reads.
+        let settings = &self.data.settings;
+        let hotkey = settings
+            .launcher
+            .then_some(settings.launcher_hotkey.as_str());
+        let space = crate::i18n::messages().dock.space_key;
+        self.names = found
+            .items
+            .iter()
+            .map(|item| {
+                let name = names.of(item);
+                if is_launcher(item) {
+                    crate::domain::widgets::launcher::tip(&name, hotkey, space)
+                } else {
+                    name
+                }
+            })
+            .collect();
         self.items = found.items;
         self.arm_activity();
         self.groups = found.groups;
@@ -2263,7 +2288,10 @@ impl Dock {
         self.hovered
             .and_then(|index| self.items.get(index))
             .is_some_and(|item| {
-                !item.is_program() && !matches!(item, Item::System(SystemItem::Settings))
+                // The Lançador opens the launcher, not a panel.
+                !item.is_program()
+                    && !matches!(item, Item::System(SystemItem::Settings))
+                    && !is_launcher(item)
             })
     }
 
@@ -2673,6 +2701,10 @@ impl Dock {
                     super::open_apps::activate_other(app, &key, workspace.as_deref());
                 }));
             }
+            // The Lançador opens or closes the launcher, as the menus' "Buscar
+            // apps…", where it opens today (spec 0012): with the hotkey off
+            // in Configurações too, since that only lets the hotkey go.
+            _ if is_launcher(&item) => super::launcher::toggle(),
             _ => {
                 if let Item::Widget(widget) = &item
                     && (super::calendar::seen(widget.id.as_str())
@@ -2847,7 +2879,7 @@ impl Dock {
             .collect();
         let mut items = widget
             .as_ref()
-            .map(|widget| widget_items(widget.config.widths(), widget.config.width()))
+            .map(|widget| widget_items(&widget.config))
             .unwrap_or_default();
         items.extend(dock_menu_items(
             self.data.settings.dock.auto_hide,
@@ -3102,6 +3134,9 @@ enum MenuChoice {
     Width(u8),
     /// The widget clicked leaves the dock (of the workspace shown).
     RemoveWidget,
+    /// Configurações › Geral, where the launcher's hotkey is (the
+    /// Lançador's menu, spec 0012).
+    SetHotkey,
 }
 
 /// One line of the dock's menu: what it does and how it shows (spec 0014
@@ -3120,6 +3155,7 @@ const SETTINGS_GLYPH: char = '\u{E713}';
 const HIDE_GLYPH: char = '\u{E70D}';
 const QUIT_GLYPH: char = '\u{E7E8}';
 const REMOVE_GLYPH: char = '\u{E711}';
+const KEYBOARD_GLYPH: char = '\u{E765}';
 
 impl MenuEntry {
     fn item(choice: MenuChoice, item: menu::Item) -> MenuEntry {
@@ -3239,10 +3275,17 @@ fn width_items(widths: std::ops::RangeInclusive<u8>, current: u8) -> Vec<MenuEnt
 }
 
 /// What a widget's menu has before the dock's: its widths, when it takes
-/// more than one, then "Remover do dock".
-fn widget_items(widths: std::ops::RangeInclusive<u8>, current: u8) -> Vec<MenuEntry> {
+/// more than one; the Lançador's "Configurar atalho…" (spec 0012); then
+/// "Remover do dock".
+fn widget_items(config: &WidgetConfig) -> Vec<MenuEntry> {
     let text = &crate::i18n::messages().tray;
-    let mut items = width_items(widths, current);
+    let mut items = width_items(config.widths(), config.width());
+    if matches!(config, WidgetConfig::Launcher(_)) {
+        items.push(MenuEntry::item(
+            MenuChoice::SetHotkey,
+            menu::Item::new(text.set_hotkey, KEYBOARD_GLYPH),
+        ));
+    }
     items.push(MenuEntry::item(
         MenuChoice::RemoveWidget,
         menu::Item::new(text.remove_widget, REMOVE_GLYPH),
@@ -3348,6 +3391,12 @@ fn act(
         MenuChoice::RemoveWidget => {
             if let Some(id) = widget {
                 crate::commands::widgets::remove_from_dock(app, id, workspace);
+            }
+        }
+        MenuChoice::SetHotkey => {
+            let general = crate::domain::launcher_pages::Section::General;
+            if let Err(error) = super::settings_window::open_section(app, general) {
+                log::warn!("dock: the settings could not be opened: {error}");
             }
         }
     }
@@ -3970,7 +4019,11 @@ mod tests {
 
     #[test]
     fn a_widget_menu_can_remove_it_with_or_without_widths() {
-        let items = widget_items(1..=3, 2);
+        let activity = crate::domain::widgets::ActivityConfig {
+            width: 2,
+            ..Default::default()
+        };
+        let items = widget_items(&WidgetConfig::Activity(activity));
         assert_eq!(
             labels(&items),
             [
@@ -3985,8 +4038,36 @@ mod tests {
         );
         assert_eq!(items[5].choice, Some(MenuChoice::RemoveWidget));
         // A note takes one width: only the removal.
-        let items = widget_items(1..=1, 1);
+        let note = WidgetConfig::default_for(crate::domain::widgets::WidgetKind::Note);
+        let items = widget_items(&note);
         assert_eq!(labels(&items), ["Remover do dock", "—"]);
+    }
+
+    #[test]
+    fn the_launcher_menu_sets_the_hotkey_and_removes_it() {
+        let launcher = WidgetConfig::default_for(crate::domain::widgets::WidgetKind::Launcher);
+        let items = widget_items(&launcher);
+        assert_eq!(
+            labels(&items),
+            ["Configurar atalho…", "Remover do dock", "—"]
+        );
+        assert_eq!(items[0].choice, Some(MenuChoice::SetHotkey));
+        assert_eq!(items[1].choice, Some(MenuChoice::RemoveWidget));
+    }
+
+    #[test]
+    fn only_the_launcher_is_one() {
+        use crate::domain::widgets::{WidgetId, WidgetInstance, WidgetKind};
+        let widget = |kind| {
+            Item::Widget(WidgetInstance {
+                id: WidgetId::new(),
+                label: None,
+                config: WidgetConfig::default_for(kind),
+            })
+        };
+        assert!(is_launcher(&widget(WidgetKind::Launcher)));
+        assert!(!is_launcher(&widget(WidgetKind::Note)));
+        assert!(!is_launcher(&Item::System(SystemItem::Settings)));
     }
 
     #[test]

@@ -23,6 +23,7 @@ const INSTANCES = {
   media: WIDGET_FIXTURES["media-default"],
   claude: WIDGET_FIXTURES["claude-default"],
   weather: WIDGET_FIXTURES["weather-default"],
+  launcher: WIDGET_FIXTURES["launcher-default"],
 } as const;
 
 // 2026-10-15 18:07:05 UTC, a Thursday.

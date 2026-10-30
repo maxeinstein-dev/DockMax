@@ -48,7 +48,8 @@ export type WidgetKind =
   | "water"
   | "media"
   | "claude"
-  | "weather";
+  | "weather"
+  | "launcher";
 
 /* Each closed set below has a tuple with every value, in the order of the
  * `ALL` of the Rust enum. `widgets.contract.test.ts` checks that each tuple
@@ -73,6 +74,7 @@ export const WIDGET_KINDS = [
   "media",
   "claude",
   "weather",
+  "launcher",
 ] as const;
 
 /** The kinds `add_widget` accepts in this phase. */
@@ -96,6 +98,7 @@ export const CREATABLE_KINDS: readonly CreatableKind[] = [
   "media",
   "claude",
   "weather",
+  "launcher",
 ];
 
 /** Stable ID of an instance: a UUID v7 made in Rust, never reused and never
@@ -390,6 +393,11 @@ export interface WeatherConfig {
   city: WeatherCity | null;
 }
 
+/** The Lançador (spec 0012): a dock item that opens the launcher. Nothing
+ * to keep: the hotkey in its tip is the launcher's own setting. */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export type LauncherConfig = {};
+
 /** The config of each kind. */
 export interface WidgetConfigs {
   clock: ClockConfig;
@@ -408,6 +416,7 @@ export interface WidgetConfigs {
   media: MediaConfig;
   claude: ClaudeConfig;
   weather: WeatherConfig;
+  launcher: LauncherConfig;
 }
 
 /** A kind's config tagged with the kind, as `update_widget` takes it:
