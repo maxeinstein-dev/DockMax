@@ -342,6 +342,10 @@ pub enum Action {
     /// Asks an open window to close, as its close button does (`WM_CLOSE`;
     /// the program may ask to save first, and is never killed).
     CloseWindow(isize),
+    /// Puts an item of Windows' clipboard history back as what is copied
+    /// now (the clipboard's keyword `cb `), by its id: the text itself is
+    /// never in the action.
+    CopyClip(String),
 }
 
 /// Whether `action` may run: every result's action is checked here first.
@@ -365,6 +369,7 @@ pub fn is_allowed(action: &Action) -> bool {
         // A handle, never 0; that it is still a window with a taskbar
         // button, of another program, is checked again when it runs.
         Action::FocusWindow(hwnd) | Action::CloseWindow(hwnd) => *hwnd != 0,
+        Action::CopyClip(id) => super::launcher_clipboard::is_valid_id(id),
     }
 }
 
@@ -692,5 +697,9 @@ mod tests {
         assert!(is_allowed(&Action::CloseWindow(0x1234)));
         assert!(!is_allowed(&Action::FocusWindow(0)));
         assert!(!is_allowed(&Action::CloseWindow(0)));
+        // The clipboard's history: an item's id, never empty.
+        assert!(is_allowed(&Action::CopyClip("{6F1B1A6A-0000}".into())));
+        assert!(!is_allowed(&Action::CopyClip(String::new())));
+        assert!(!is_allowed(&Action::CopyClip("a\nb".into())));
     }
 }

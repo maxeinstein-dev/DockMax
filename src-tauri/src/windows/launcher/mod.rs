@@ -24,6 +24,7 @@
 //! when it opens and dropped 45 s after it closes.
 
 mod access;
+mod clipboard;
 mod files;
 pub mod icons;
 pub(crate) mod layout;
@@ -80,6 +81,7 @@ use crate::domain::hotkey::{self, Hotkey};
 use crate::domain::launcher::{self as search, Action, Candidate, MAX_RESULTS};
 use crate::domain::launcher_actions::{self, Subject, Verb};
 use crate::domain::launcher_calc;
+use crate::domain::launcher_clipboard::{ClipQuery, History};
 use crate::domain::launcher_files::{self, FileHit, FileQuery, Generation, Mode};
 use crate::domain::launcher_pages::{self, Target};
 use crate::domain::launcher_paths::{self, Browse, Entry, PathQuery, Problem, Reading};
@@ -157,6 +159,8 @@ const FOLDER_GLYPH: char = '\u{E8B7}';
 /// An open window's, while its program's icon is read, or when it has none
 /// (L7).
 const WINDOW_GLYPH: char = '\u{E737}';
+/// An item of the clipboard's history (Paste).
+const CLIP_GLYPH: char = '\u{E77F}';
 
 /// Event sent to the windows when the hotkey's state changes (Configurações
 /// shows it).
@@ -202,6 +206,8 @@ enum Kind {
     Folder,
     /// An open window (L7).
     Window,
+    /// A text of Windows' clipboard history (`cb `); never kept in the use.
+    Clip,
 }
 
 impl Kind {
@@ -224,6 +230,7 @@ impl Kind {
             Kind::File => Some(FILE_GLYPH),
             Kind::Folder => Some(FOLDER_GLYPH),
             Kind::Window => Some(WINDOW_GLYPH),
+            Kind::Clip => Some(CLIP_GLYPH),
         }
     }
 }
@@ -297,6 +304,7 @@ impl Found {
             Kind::File => text.file,
             Kind::Folder => text.folder,
             Kind::Window => text.window,
+            Kind::Clip => text.clipboard,
         }
     }
 
@@ -422,6 +430,8 @@ enum Note {
     NothingFound,
     /// The folder of a path typed shows nothing, and why (L5).
     Folder(Problem),
+    /// The clipboard's history could not be read (`cb `).
+    ClipboardFailed,
 }
 
 impl Note {
@@ -436,6 +446,7 @@ impl Note {
             Note::Folder(Problem::NotFound) => Some(text.folder_not_found),
             Note::Folder(Problem::Denied) => Some(text.folder_denied),
             Note::Folder(Problem::Slow) => Some(text.folder_slow),
+            Note::ClipboardFailed => Some(text.clipboard_failed),
         }
     }
 }
@@ -508,6 +519,10 @@ pub struct Launcher {
     windows: Vec<Window>,
     apps: Vec<(String, String)>,
     pinned: Vec<(String, String, String)>,
+    /// What is typed asks for the clipboard's history (`cb `), and the
+    /// history read for it: dropped on leaving `cb ` and on closing.
+    clip_query: Option<ClipQuery>,
+    history: History,
 }
 
 /// Where the menu of actions opens.
@@ -554,6 +569,8 @@ fn menu_line(verb: Verb) -> super::menu::Line {
         Verb::CopyResult => (text.action_copy_result, COPY_GLYPH, Some("Ctrl+C")),
         Verb::Switch => (text.action_switch, SWITCH_GLYPH, Some("Enter")),
         Verb::CloseWindow => (text.action_close_window, CLOSE_GLYPH, None),
+        Verb::CopyClip => (text.action_copy, COPY_GLYPH, Some("Enter")),
+        Verb::OpenLink => (text.action_open_link, WEB_GLYPH, None),
     };
     let item = super::menu::Item::new(label, glyph);
     super::menu::Line::Item(match keys {
@@ -754,6 +771,8 @@ pub fn start(app: &AppHandle) -> windows::core::Result<()> {
         windows: Vec::new(),
         apps: Vec::new(),
         pinned: Vec::new(),
+        clip_query: None,
+        history: History::default(),
     };
     LAUNCHER.with(|slot| *slot.borrow_mut() = Some(launcher));
     register(crate::commands::settings::current(app).launcher);
@@ -1130,6 +1149,7 @@ impl Launcher {
         self.launching = None;
         self.pointer = None;
         self.window_query = None;
+        self.clip_forget();
         self.pinned = self.read_pinned();
         self.read_windows();
         unsafe {
@@ -1191,6 +1211,9 @@ impl Launcher {
         self.browse.clear();
         self.window_query = None;
         self.windows.clear();
+        // The clipboard's history read is forgotten: nothing of it is kept
+        // between openings.
+        self.clip_forget();
         access::publish(Vec::new());
         // The helper leaves, and the memory of reading the icons and of
         // searching the files with it; the icons it had not answered are
@@ -1420,6 +1443,10 @@ impl Launcher {
     fn refresh(&mut self) {
         if self.path_query.is_some() {
             self.refresh_path();
+            return;
+        }
+        if self.clip_query.is_some() {
+            self.refresh_clip();
             return;
         }
         let query = self.query.trim().to_owned();
@@ -1838,6 +1865,10 @@ impl Launcher {
         self.failed = None;
         // A search of files of the text before answers nothing.
         self.generation.next();
+        // The clipboard's history (`cb `): it answers alone.
+        if self.clip_changed() {
+            return;
+        }
         // A path (L5): only its folder answers, no apps, no web.
         let path = launcher_paths::parse(self.query.trim_start(), &self.profile, |name| {
             std::env::var(name).ok()
@@ -2052,9 +2083,11 @@ impl Launcher {
             Note::None if self.results.len() == 1 => text.launcher.one_result.to_owned(),
             // Being read (L5): the count comes when the folder does.
             Note::None if self.results.is_empty() => return,
-            note @ (Note::Reading | Note::Hint | Note::NothingFound | Note::Folder(_)) => {
-                note.text().unwrap_or_default().to_owned()
-            }
+            note @ (Note::Reading
+            | Note::Hint
+            | Note::NothingFound
+            | Note::Folder(_)
+            | Note::ClipboardFailed) => note.text().unwrap_or_default().to_owned(),
             Note::None => text
                 .launcher
                 .results
@@ -2126,6 +2159,8 @@ impl Launcher {
                 .exe
                 .clone()
                 .filter(|exe| launcher_windows::is_revealable(exe)),
+            // An item of the clipboard's history: the link it is.
+            None if found.kind == Kind::Clip => self.clip_link(&found.action),
             None => found
                 .app_id()
                 .and_then(|id| self.app_files.get(id).cloned().flatten()),
@@ -2194,6 +2229,7 @@ impl Launcher {
             Action::UnpinApp(id) => self.pin(&key, &id, &found.name, false),
             Action::FocusWindow(hwnd) => self.window_action(&key, hwnd, true),
             Action::CloseWindow(hwnd) => self.window_action(&key, hwnd, false),
+            Action::CopyClip(id) => self.copy_clip(key, id),
         }
     }
 
@@ -2317,6 +2353,9 @@ impl Launcher {
                     .as_ref()
                     .and_then(|window| window.exe.as_deref())
                     .is_some_and(launcher_windows::is_revealable),
+            },
+            Kind::Clip => Subject::Clip {
+                link: self.clip_link(&found.action).is_some(),
             },
         }
     }
@@ -2804,6 +2843,7 @@ extern "system" fn frame_procedure(
             ANNOUNCE_TIMER => with(|launcher| launcher.announce()),
             FILES_TIMER => with(Launcher::search_files),
             FOLDER_TIMER => with(Launcher::folder_late),
+            clipboard::CLIP_TIMER => with(Launcher::clip_late),
             _ => return unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
         },
         // The launcher places itself on each opening, at its monitor's scale.
@@ -3016,6 +3056,7 @@ pub fn view() -> Option<View> {
                 Note::Folder(Problem::NotFound) => "folderNotFound",
                 Note::Folder(Problem::Denied) => "folderDenied",
                 Note::Folder(Problem::Slow) => "folderSlow",
+                Note::ClipboardFailed => "clipboardFailed",
             },
         });
     });
