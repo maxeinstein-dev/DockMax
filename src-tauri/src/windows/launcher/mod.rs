@@ -994,7 +994,7 @@ pub(crate) fn text_scale() -> f64 {
 }
 
 /// The conversions `query` asks for (§5b), as rows: "= 6,21 milhas" over
-/// "10 km"; Enter copies the number.
+/// the sum made, "10 km × 0,6214 = 6,21 mi"; Enter copies the number.
 fn conversions(query: &str, decimal: char) -> Vec<Found> {
     let text = &crate::i18n::messages().launcher;
     let cache = rates::current();
@@ -2054,6 +2054,14 @@ impl Launcher {
                 key: found.key.clone(),
                 name: found.name.clone(),
                 kind: found.kind_name().to_owned(),
+                // A conversion's sum, its signs in words.
+                help: match (&found.kind, &found.subtitle) {
+                    (Kind::Conversion, Some(subtitle)) => Some(launcher_units::spoken(
+                        subtitle,
+                        crate::i18n::messages().launcher.spoken,
+                    )),
+                    _ => None,
+                },
                 // A row scrolled out of the list has no box on the screen.
                 rect: if visible.contains(&index) {
                     (
@@ -3113,7 +3121,7 @@ mod tests {
         let row = &rows[0];
         assert_eq!(row.kind, Kind::Conversion);
         assert_eq!(row.name, "= 6,21 milhas");
-        assert_eq!(row.subtitle(), "10 km");
+        assert_eq!(row.subtitle(), "10 km × 0,6214 = 6,21 mi");
         assert_eq!(row.action, Action::Copy("6,21".into()));
         assert!(search::is_allowed(&row.action));
         assert!(
