@@ -43,7 +43,7 @@ describe("StyleGallery", () => {
     );
     await act(async () => {});
 
-    expect(within(gallery()).getAllByRole("button")).toHaveLength(11);
+    expect(within(gallery()).getAllByRole("button")).toHaveLength(12);
     expect(card("Neon")).toHaveAttribute("aria-pressed", "true");
     expect(card("Papel")).toHaveAttribute("aria-pressed", "false");
     const images = [...card("Papel").querySelectorAll("img")];
@@ -152,8 +152,8 @@ describe("StyleGallery", () => {
     expect(card("Neon")).toHaveAttribute("tabindex", "-1");
     card("Nativo").focus();
     fireEvent.keyDown(card("Nativo"), { key: "ArrowLeft" });
-    expect(card("Fósforo")).toHaveFocus();
-    fireEvent.keyDown(card("Fósforo"), { key: "Home" });
+    expect(card("Tático")).toHaveFocus();
+    fireEvent.keyDown(card("Tático"), { key: "Home" });
     expect(card("Nativo")).toHaveFocus();
     expect(onSelect).not.toHaveBeenCalled();
 

@@ -1,0 +1,19 @@
+# Pacote Tático (spec 0020 §4): os glifos de glifos.txt em areia, sobre uma
+# placa octogonal verde-oliva escura com fio claro na borda, como um ícone de
+# HUD. A reserva é uma retícula de mira. A placa é escura nos dois modos.
+# Para gerar de novo: python vetor.py tatico
+
+pack.name: Tático
+pack.author: Dockyard
+pack.version: 1.0.0
+pack.description: Glifos cor de areia em placas octogonais verde-oliva, como um HUD.
+pack.accent: #FF8A1F
+
+estilo: tatico
+lado: 128
+caixa: 0.54
+cor: #D9C9A3
+placa: #353A2A
+placa-base: #20241A
+reserva-id: mira
+reserva: M12 4a8 8 0 1 1 0 16a8 8 0 1 1 0-16 | M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4 | M12 11.25a.75 .75 0 1 1 0 1.5a.75 .75 0 1 1 0-1.5
