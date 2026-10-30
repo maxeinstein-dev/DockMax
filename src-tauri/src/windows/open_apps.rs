@@ -78,8 +78,23 @@ static IDENTITIES: Mutex<Option<HashMap<String, Identity>>> = Mutex::new(None);
 type Description = Option<(String, String)>;
 
 /// What an open program that is not pinned is shown as, by its group key: its
-/// id for the icon and its name, or `None` for one with no way to show it.
-static DESCRIPTIONS: Mutex<Option<HashMap<String, Description>>> = Mutex::new(None);
+/// id for the icon and its name, or `None` for one with no way to show it,
+/// and when that was found.
+static DESCRIPTIONS: Mutex<Option<HashMap<String, (Description, Instant)>>> = Mutex::new(None);
+
+/// The most programs [`DESCRIPTIONS`] remembers: when it is full it starts
+/// over, as the other caches of names do.
+const MAX_DESCRIPTIONS: usize = 512;
+
+/// How long a program with no way to show it is left alone: one installed
+/// meanwhile gets its name and icon without a restart.
+const NOT_FOUND_FOR: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Whether a description found at `found` is still good `now`: one that
+/// found something always is, a `None` only for [`NOT_FOUND_FOR`].
+fn still_good(description: &Description, found: Instant, now: Instant) -> bool {
+    description.is_some() || now.duration_since(found) < NOT_FOUND_FOR
+}
 
 /// The programs of the Apps folder by the file they run (lowercased): the id
 /// and the name. Read once, when the first open program that needs it shows
@@ -252,11 +267,12 @@ fn catalog_entry_for(exe: &str) -> Option<(String, String)> {
 /// AppID, or a program that runs the same file); otherwise the program's file
 /// and its name.
 fn describe(key: &str, window: &OpenWindow) -> Option<(String, String)> {
-    if let Some(known) = DESCRIPTIONS
+    if let Some((known, _)) = DESCRIPTIONS
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .as_ref()
         .and_then(|known| known.get(key))
+        .filter(|(known, found)| still_good(known, *found, Instant::now()))
     {
         return known.clone();
     }
@@ -271,11 +287,12 @@ fn describe(key: &str, window: &OpenWindow) -> Option<(String, String)> {
             let stem = std::path::Path::new(exe).file_stem()?.to_str()?;
             Some((exe.to_owned(), stem.to_owned()))
         });
-    DESCRIPTIONS
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .get_or_insert_with(HashMap::new)
-        .insert(key.to_owned(), described.clone());
+    let mut cache = DESCRIPTIONS.lock().unwrap_or_else(PoisonError::into_inner);
+    let known = cache.get_or_insert_with(HashMap::new);
+    if known.len() >= MAX_DESCRIPTIONS && !known.contains_key(key) {
+        known.clear();
+    }
+    known.insert(key.to_owned(), (described.clone(), Instant::now()));
     described
 }
 
@@ -811,5 +828,22 @@ mod probe {
                 crate::domain::fullscreen::is_fullscreen(&candidates, monitor.handle, bounds)
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_program_with_no_description_is_looked_at_again_after_a_while() {
+        let found = Instant::now();
+        let none: Description = None;
+        let some: Description = Some(("app".into(), "App".into()));
+        assert!(still_good(&none, found, found));
+        assert!(still_good(&none, found, found + NOT_FOUND_FOR / 2));
+        assert!(!still_good(&none, found, found + NOT_FOUND_FOR));
+        // One that was found is good for as long as the cache keeps it.
+        assert!(still_good(&some, found, found + NOT_FOUND_FOR * 100));
     }
 }
