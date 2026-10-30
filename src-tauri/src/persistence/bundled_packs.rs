@@ -766,6 +766,110 @@ pub const ARGILA: Bundled = Bundled {
     ),
 };
 
+/// Fósforo: pixel art made from `icon-packs/fonte/fosforo.txt` by
+/// `icon-packs/fonte/gerar.py`. A test checks this list against the pack.
+pub const FOSFORO: Bundled = Bundled {
+    id: "fosforo",
+    files: pack_files!("fosforo":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
+/// Game Boy: pixel art made from `icon-packs/fonte/game-boy.txt` by
+/// `icon-packs/fonte/gerar.py`. A test checks this list against the pack.
+pub const GAME_BOY: Bundled = Bundled {
+    id: "game-boy",
+    files: pack_files!("game-boy":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/cartucho.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
 /// Every pack in the binary.
 pub const ALL: &[Bundled] = &[
     RETRO_8BIT,
@@ -778,6 +882,8 @@ pub const ALL: &[Bundled] = &[
     VIDRO,
     NEON,
     ARGILA,
+    FOSFORO,
+    GAME_BOY,
 ];
 
 impl Bundled {
@@ -841,6 +947,8 @@ mod tests {
 
     const SOURCE: &str = include_str!("../../icon-packs/fonte/retro-8bit.txt");
     const CLASSIC: &str = include_str!("../../icon-packs/fonte/classico-98.txt");
+    const PHOSPHOR: &str = include_str!("../../icon-packs/fonte/fosforo.txt");
+    const GAME_BOY_SOURCE: &str = include_str!("../../icon-packs/fonte/game-boy.txt");
     const GLYPHS: &str = include_str!("../../icon-packs/fonte/glifos.txt");
     const LINE: &str = include_str!("../../icon-packs/fonte/traco.txt");
     const OUTLINE: &str = include_str!("../../icon-packs/fonte/contorno.txt");
@@ -867,6 +975,8 @@ mod tests {
             (ESMALTE, "Esmalte"),
             (TRACO, "Traço"),
             (CLASSICO_98, "Clássico 98"),
+            (FOSFORO, "Fósforo"),
+            (GAME_BOY, "Game Boy"),
             (CIRCULO, "Círculo"),
             (CONTORNO, "Contorno colorido"),
             (TOM_SOBRE_TOM, "Tom sobre tom"),
@@ -940,7 +1050,7 @@ mod tests {
                 assert!(pack.manifest.covers(&[app]), "{} {app}", pack.id);
             }
             let fallback = match pack.id.as_str() {
-                "retro-8bit" => "apps/cartucho.png",
+                "retro-8bit" | "game-boy" => "apps/cartucho.png",
                 _ => "apps/grade.png",
             };
             assert_eq!(
@@ -1070,7 +1180,12 @@ mod tests {
 
     #[test]
     fn the_images_are_the_drawings_of_the_source() {
-        for (pack, text) in [(RETRO_8BIT, SOURCE), (CLASSICO_98, CLASSIC)] {
+        for (pack, text) in [
+            (RETRO_8BIT, SOURCE),
+            (CLASSICO_98, CLASSIC),
+            (FOSFORO, PHOSPHOR),
+            (GAME_BOY, GAME_BOY_SOURCE),
+        ] {
             pixels_are_drawings(pack, text);
         }
     }
@@ -1446,6 +1561,31 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    #[test]
+    fn the_game_boy_has_its_four_greens_and_the_phosphor_its_screen() {
+        let Source { palette, .. } = source(GAME_BOY_SOURCE);
+        assert_eq!(palette.len(), 4);
+        // From dark to light, every green lighter than the one before.
+        let lights: Vec<f64> = ['0', '1', '2', '3']
+            .iter()
+            .map(|c| luminance(palette[c]))
+            .collect();
+        assert!(
+            lights.windows(2).all(|pair| pair[1] > pair[0] * 1.8),
+            "{lights:?}"
+        );
+        let Source { drawings, .. } = source(PHOSPHOR);
+        for (path, rows) in drawings {
+            // The screen, inside the bezel, is scan lines or lit phosphor.
+            for row in &rows[3..29] {
+                for cell in row[3..29].chars() {
+                    assert!("01234".contains(cell), "{path}");
+                }
+            }
+            assert!(rows.iter().any(|row| row.contains('4')), "{path}");
         }
     }
 }
