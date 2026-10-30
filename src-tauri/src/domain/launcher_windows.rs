@@ -375,6 +375,21 @@ mod tests {
     }
 
     #[test]
+    fn the_web_search_leaves_when_late_files_come() {
+        // `relatorio` with the index cold: nothing yet, the web search.
+        let before = mix(Vec::<&str>::new(), Vec::new(), Vec::new(), Some("web"));
+        assert_eq!(before, ["web"]);
+        // The late answer of the same typing comes: the files, no web.
+        let after = mix(
+            Vec::new(),
+            Vec::new(),
+            vec!["relatorio.pdf", "relatorio.docx"],
+            Some("web"),
+        );
+        assert_eq!(after, ["relatorio.pdf", "relatorio.docx"]);
+    }
+
+    #[test]
     fn the_windows_mixed_in_follow_the_apps_bands() {
         // Mixed in, a query finds the windows by the same bands as the apps,
         // at most `MIXED_LIMIT`; the order among them is the band's, then

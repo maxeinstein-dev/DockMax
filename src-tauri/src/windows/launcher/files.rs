@@ -14,8 +14,12 @@
 //!   `SystemIndex`), on a thread of its own that keeps the session between
 //!   queries: COM and OLE DB stay in the helper, out of the app's process.
 //!
-//! Each source has `TIMEOUT_MS` to answer; a late answer of Windows Search
-//! is dropped by its number when it comes.
+//! Each source has `TIMEOUT_MS` to answer. When Windows Search misses it
+//! (cold, on the first search after the launcher opens), the first answer
+//! says it is not whole and its late answer is kept for the launcher, which
+//! asks for it (`late`) while `LATE_LIMIT_MS` lasts; a late answer of an
+//! older search is dropped by its number (`launcher_files::IndexWait`).
+//! `warm` opens the index's session before the first search.
 
 use std::cell::RefCell;
 use std::sync::mpsc;
@@ -41,7 +45,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{GUID, HSTRING, IUnknown, Interface, PCWSTR, w};
 
 use crate::domain::everything_ipc;
-use crate::domain::launcher_files::{self, FileHit, TIMEOUT_MS};
+use crate::domain::launcher_files::{
+    self, Arrival, FileHit, IndexWait, LATE_POLL_MS, LateAnswer, TIMEOUT_MS,
+};
 
 /// `DBGUID_DEFAULT`: the SQL dialect of the provider (oledb.h).
 const DBGUID_DEFAULT: GUID = GUID::from_u128(0xc8b521fb_5cf3_11ce_ade5_00aa0044773d);
@@ -61,7 +67,16 @@ pub struct Searcher {
     answers: mpsc::Receiver<(u64, Vec<FileHit>)>,
     sent: u64,
     reply: Option<HWND>,
+    /// The last search, when the index missed its time: still waited for.
+    late: Option<(IndexWait, Instant)>,
 }
+
+/// The number of a request to the index's thread that only opens the
+/// session (`warm`); the searches count from 1.
+const WARM: u64 = 0;
+/// The query that warms the index: one row, of the index's own columns.
+const WARM_SQL: &str =
+    "SELECT TOP 1 System.ItemUrl, System.FileAttributes FROM SystemIndex WHERE SCOPE='file:'";
 
 impl Searcher {
     pub fn new() -> Searcher {
@@ -77,14 +92,29 @@ impl Searcher {
             answers,
             sent: 0,
             reply: None,
+            late: None,
+        }
+    }
+
+    /// Opens the index's session ahead of the first search, on its thread
+    /// (the helper answers at once).
+    pub fn warm(&mut self) {
+        if let Some(windows) = &self.windows
+            && windows.send((WARM, String::new())).is_err()
+        {
+            self.windows = None;
         }
     }
 
     /// The files and folders whose name has `words`, at most `limit` of
-    /// each source, joined: Everything's first.
-    pub fn search(&mut self, words: &[String], limit: usize) -> Vec<FileHit> {
+    /// each source, joined: Everything's first. With whether the answer is
+    /// whole: `false` when the index missed `TIMEOUT_MS` and is still waited
+    /// for (`late`).
+    pub fn search(&mut self, words: &[String], limit: usize) -> (Vec<FileHit>, bool) {
         let started = Instant::now();
         let deadline = started + Duration::from_millis(TIMEOUT_MS);
+        // A new search: the one before is no longer waited for.
+        self.late = None;
         self.sent += 1;
         let number = self.sent;
         if let (Some(windows), Some(sql)) = (
@@ -94,23 +124,63 @@ impl Searcher {
         {
             self.windows = None;
         }
-        let everything = self.everything(words, limit, deadline);
-        let mut indexed = Vec::new();
-        if self.windows.is_some() {
-            loop {
-                let left = deadline.saturating_duration_since(Instant::now());
-                match self.answers.recv_timeout(left) {
-                    // An answer of an earlier query, late: dropped.
-                    Ok((answered, _)) if answered != number => continue,
-                    Ok((_, hits)) => {
-                        indexed = hits;
-                        break;
-                    }
-                    Err(_) => break,
+        let wait = IndexWait::new(number, self.everything(words, limit, deadline));
+        if self.windows.is_none() {
+            return (wait.early(), true);
+        }
+        loop {
+            let left = deadline.saturating_duration_since(Instant::now());
+            match self.answers.recv_timeout(left) {
+                Ok((answered, hits)) => match wait.arrival(answered, hits, millis(started)) {
+                    Arrival::InTime(joined) | Arrival::Late(joined) => return (joined, true),
+                    // An answer of an earlier search, late: dropped.
+                    Arrival::Dropped => {}
+                },
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    let early = wait.early();
+                    self.late = Some((wait, started));
+                    return (early, false);
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    self.windows = None;
+                    return (wait.early(), true);
                 }
             }
         }
-        launcher_files::merge([everything, indexed])
+    }
+
+    /// The late answer of the last search, waited for at most
+    /// `LATE_POLL_MS` this time.
+    pub fn late(&mut self) -> LateAnswer {
+        let Some((wait, started)) = self.late.take() else {
+            return LateAnswer::Gone;
+        };
+        let deadline = Instant::now() + Duration::from_millis(LATE_POLL_MS);
+        loop {
+            let left = deadline.saturating_duration_since(Instant::now());
+            match self.answers.recv_timeout(left) {
+                Ok((answered, hits)) => match wait.arrival(answered, hits, millis(started)) {
+                    Arrival::InTime(joined) | Arrival::Late(joined) => {
+                        return LateAnswer::Came(joined);
+                    }
+                    Arrival::Dropped if wait.expired(millis(started)) => {
+                        return LateAnswer::Gone;
+                    }
+                    Arrival::Dropped => {}
+                },
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    if wait.expired(millis(started)) {
+                        return LateAnswer::Gone;
+                    }
+                    self.late = Some((wait, started));
+                    return LateAnswer::Waiting;
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    self.windows = None;
+                    return LateAnswer::Gone;
+                }
+            }
+        }
     }
 
     /// Everything's answer; nothing when it is not running, does not take
@@ -214,6 +284,11 @@ impl Searcher {
     }
 }
 
+/// The milliseconds since `started`.
+fn millis(started: Instant) -> u64 {
+    u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
 thread_local! {
     /// The answer waited for: its id, and its bytes once it comes.
     static REPLY: RefCell<(u32, Option<Vec<u8>>)> = const { RefCell::new((0, None)) };
@@ -254,13 +329,26 @@ fn windows_search_thread(
     let mut session: Option<IDBCreateCommand> = None;
     while let Ok(mut request) = received.recv() {
         while let Ok(newer) = received.try_recv() {
-            request = newer;
+            // A warming never takes a search's place.
+            if newer.0 != WARM || request.0 == WARM {
+                request = newer;
+            }
         }
         let (number, sql) = request;
         if session.is_none() {
             session = connect()
                 .inspect_err(|error| log::warn!("launcher: Windows Search: {error}"))
                 .ok();
+        }
+        if number == WARM {
+            // The session is open; a first, small query loads the rest of
+            // the provider, so the first search does not pay for it.
+            if let Some(factory) = &session
+                && query(factory, WARM_SQL).is_err()
+            {
+                session = None;
+            }
+            continue;
         }
         let hits = match session.as_ref().map(|factory| query(factory, &sql)) {
             Some(Ok(hits)) => hits,
@@ -429,6 +517,29 @@ mod tests {
         let word = std::env::var("LAUNCHER_FILES_WORD").unwrap_or_else(|_| "relatorio".into());
         let words = launcher_files::words(&word);
         let before = private_bytes();
+        // First, as the helper's first search does: nothing loaded yet.
+        let mut cold = Searcher::new();
+        let started = Instant::now();
+        let (hits, whole) = cold.search(&words, 30);
+        println!(
+            "cold Searcher: {} hits in {:?}, whole: {whole}",
+            hits.len(),
+            started.elapsed()
+        );
+        let mut late = if whole {
+            LateAnswer::Gone
+        } else {
+            LateAnswer::Waiting
+        };
+        while late == LateAnswer::Waiting {
+            late = cold.late();
+        }
+        if let LateAnswer::Came(hits) = late {
+            println!("late: {} hits after {:?}", hits.len(), started.elapsed());
+        } else if !whole {
+            println!("late: gone after {:?}", started.elapsed());
+        }
+        drop(cold);
         let _ = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
         let started = Instant::now();
         let factory = connect().expect("the Windows Search provider");
@@ -468,7 +579,7 @@ mod tests {
         );
         let mut searcher = Searcher::new();
         let started = Instant::now();
-        let joined = searcher.search(&words, 30);
+        let (joined, _) = searcher.search(&words, 30);
         println!(
             "Searcher (Everything {}): {} hits in {:?}",
             if unsafe { FindWindowW(&HSTRING::from(everything_ipc::WINDOW_CLASS), PCWSTR::null()) }
