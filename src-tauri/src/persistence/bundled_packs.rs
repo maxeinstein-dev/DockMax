@@ -134,8 +134,61 @@ pub const ESMALTE: Bundled = Bundled {
     ),
 };
 
+/// Traço: the same glyphs alone, in a thin line of one neutral gray (the
+/// format has no image per theme), drawn by `icon-packs/fonte/vetor.py`. A
+/// test checks this list against the pack.
+pub const TRACO: Bundled = Bundled {
+    id: "traco",
+    files: pack_files!("traco":
+        "pack.json",
+        "apps/bloco-de-notas.png",
+        "apps/brave.png",
+        "apps/calculadora.png",
+        "apps/captura.png",
+        "apps/chatgpt.png",
+        "apps/chrome.png",
+        "apps/claude.png",
+        "apps/configuracoes.png",
+        "apps/discord.png",
+        "apps/docker.png",
+        "apps/edge.png",
+        "apps/excel.png",
+        "apps/explorador.png",
+        "apps/figma.png",
+        "apps/filezilla.png",
+        "apps/firefox.png",
+        "apps/fotos.png",
+        "apps/gerenciador.png",
+        "apps/github.png",
+        "apps/grade.png",
+        "apps/lixeira.png",
+        "apps/notion.png",
+        "apps/obs.png",
+        "apps/onenote.png",
+        "apps/opera.png",
+        "apps/outlook.png",
+        "apps/paint.png",
+        "apps/powerpoint.png",
+        "apps/powershell.png",
+        "apps/prompt.png",
+        "apps/slack.png",
+        "apps/spotify.png",
+        "apps/steam.png",
+        "apps/store.png",
+        "apps/teams.png",
+        "apps/telegram.png",
+        "apps/terminal.png",
+        "apps/vlc.png",
+        "apps/vscode.png",
+        "apps/whatsapp.png",
+        "apps/word.png",
+        "apps/xbox.png",
+        "apps/zoom.png",
+    ),
+};
+
 /// Every pack in the binary.
-pub const ALL: &[Bundled] = &[RETRO_8BIT, ESMALTE];
+pub const ALL: &[Bundled] = &[RETRO_8BIT, ESMALTE, TRACO];
 
 impl Bundled {
     /// The `pack.json` of the pack, as in the binary.
@@ -198,6 +251,7 @@ mod tests {
 
     const SOURCE: &str = include_str!("../../icon-packs/fonte/retro-8bit.txt");
     const GLYPHS: &str = include_str!("../../icon-packs/fonte/glifos.txt");
+    const LINE: &str = include_str!("../../icon-packs/fonte/traco.txt");
 
     /// The folder of the repository a pack is made from.
     fn folder(path: &str) -> std::path::PathBuf {
@@ -216,7 +270,11 @@ mod tests {
 
     #[test]
     fn the_list_of_files_is_the_pack() {
-        for (pack, name) in [(RETRO_8BIT, "Retrô 8-bit"), (ESMALTE, "Esmalte")] {
+        for (pack, name) in [
+            (RETRO_8BIT, "Retrô 8-bit"),
+            (ESMALTE, "Esmalte"),
+            (TRACO, "Traço"),
+        ] {
             let manifest = pack.manifest();
             assert_eq!(manifest.name, name);
             let named: BTreeSet<&str> = manifest
@@ -539,6 +597,73 @@ mod tests {
                 .filter(|p| **p == [255; 4])
                 .count();
             assert!(white > 100, "{path}: {white} white pixels");
+        }
+    }
+
+    /// The relative luminance of an sRGB color (WCAG).
+    fn luminance(rgb: [u8; 3]) -> f64 {
+        let channel = |c: u8| {
+            let c = f64::from(c) / 255.0;
+            if c <= 0.04045 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1]) + 0.0722 * channel(rgb[2])
+    }
+
+    fn contrast(a: [u8; 3], b: [u8; 3]) -> f64 {
+        let (a, b) = (luminance(a), luminance(b));
+        (a.max(b) + 0.05) / (a.min(b) + 0.05)
+    }
+
+    #[test]
+    fn the_line_glyphs_are_one_ink_seen_on_both_themes() {
+        let hex = LINE
+            .lines()
+            .find_map(|line| line.strip_prefix("cor:"))
+            .unwrap()
+            .trim();
+        let byte = |at: usize| u8::from_str_radix(&hex[at..at + 2], 16).unwrap();
+        let ink = [byte(1), byte(3), byte(5)];
+        // The dock's porcelain (light) and graphite (dark): the pack has one
+        // image for both, so the ink must read on each (3:1, WCAG for
+        // graphics).
+        for surface in [[247, 247, 249], [38, 39, 44]] {
+            assert!(contrast(ink, surface) >= 3.0, "{surface:?}");
+        }
+        let images: BTreeMap<&str, &[u8]> = TRACO
+            .files
+            .iter()
+            .filter(|(path, _)| *path != "pack.json")
+            .copied()
+            .collect();
+        assert_eq!(
+            glyphs().keys().map(String::as_str).collect::<Vec<_>>(),
+            images.keys().copied().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            names_in("fonte/traco-svg", "apps/")
+                .iter()
+                .map(|name| name.replace(".svg", ".png"))
+                .collect::<Vec<_>>(),
+            images
+                .keys()
+                .map(|path| path.to_string())
+                .collect::<Vec<_>>()
+        );
+        for (path, bytes) in images {
+            let (side, pixels) = decode(bytes);
+            assert_eq!(side, 128, "{path}");
+            let pixels = pixels.as_chunks::<4>().0;
+            assert_eq!(pixels[0], [0, 0, 0, 0], "{path}");
+            // Every pixel drawn is the ink; only its opacity varies.
+            for pixel in pixels.iter().filter(|p| p[3] > 0) {
+                assert_eq!(pixel[..3], ink, "{path}");
+            }
+            let solid = pixels.iter().filter(|p| p[3] == 255).count();
+            assert!(solid > 100, "{path}: {solid} solid pixels");
         }
     }
 }
