@@ -25,6 +25,10 @@ use super::launcher_calc;
 /// The most conversions a unit alone shows.
 pub const MAX_COMMON: usize = 3;
 
+/// The longest subtitle, in characters: past it, the least important parts
+/// of the sum go, never the factor or the rate.
+pub const MAX_SUBTITLE: usize = 60;
+
 /// Frankfurter's latest rates of the European Central Bank, against the
 /// euro. (`api.frankfurter.app/latest` answers 301 to this address.)
 pub const RATES_URL: &str = "https://api.frankfurter.dev/v1/latest";
@@ -655,19 +659,21 @@ pub enum Measure {
     Currency(String),
 }
 
-/// One conversion: `amount` of `from` is `value` of `to`; the rates' day
-/// for a currency.
+/// One conversion: `amount` of `from` is `value` of `to`; `rate` is how
+/// many of `to` one `from` is (unused for the temperatures, which are not
+/// proportional); the rates' day for a currency.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Conversion {
     pub amount: f64,
     pub from: Measure,
     pub to: Measure,
     pub value: f64,
+    pub rate: f64,
     pub rates_date: Option<String>,
 }
 
-/// A conversion as the launcher shows it: "= 6,21 milhas" over "10 km", and
-/// the number Enter copies ("6,21").
+/// A conversion as the launcher shows it: "= 6,21 milhas" over the sum made
+/// ("10 km × 0,6214 = 6,21 mi"), and the number Enter copies ("6,21").
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shown {
     pub title: String,
@@ -754,9 +760,14 @@ pub fn convert(query: &str, rates: Option<&Rates>) -> Vec<Conversion> {
 }
 
 /// `conversion` as the launcher shows it, with `decimal` as the decimal
-/// mark. `name` gives a unit's name by its id, plural or not ("milhas");
-/// without one, its symbol. `rates_of` says whose rates a currency's are,
-/// with `{d}`, `{m}` and `{y}` for the day.
+/// mark. The title is the result, with the unit's name from `name` (plural
+/// or not; without one, its symbol); the subtitle, the sum made (spec 0012
+/// §5b): `10 km × 0,6214 = 6,21 mi` (the factor with 4 significant digits),
+/// the temperatures' formula (`30 °C × 9/5 + 32 = 86 °F`), a currency's rate
+/// (`1 USD = 5,4325 BRL · BCE 30/10/2026`, 4 decimals). `rates_of` says
+/// whose rates a currency's are, with `{d}`, `{m}` and `{y}` for the day.
+/// Past [`MAX_SUBTITLE`], the result goes from the subtitle, then the typed
+/// amount (the unit stays); for a currency, the day.
 pub fn show(
     conversion: &Conversion,
     decimal: char,
@@ -767,33 +778,59 @@ pub fn show(
     match (&conversion.from, &conversion.to) {
         (Measure::Currency(from), Measure::Currency(to)) => {
             let copied = money(conversion.value, decimal);
-            let mut subtitle = format!("{amount} {from}");
+            let rate = format!("1 {from} = {} {to}", rate(conversion.rate, decimal));
+            let mut subtitles = Vec::new();
             if let Some((y, m, d)) = conversion.rates_date.as_deref().and_then(day_parts) {
-                subtitle.push_str(" · ");
-                subtitle.push_str(
-                    &rates_of
-                        .replace("{d}", d)
-                        .replace("{m}", m)
-                        .replace("{y}", y),
-                );
+                let day = rates_of
+                    .replace("{d}", d)
+                    .replace("{m}", m)
+                    .replace("{y}", y);
+                subtitles.push(format!("{rate} · {day}"));
             }
+            subtitles.push(rate);
             Shown {
                 title: format!("= {copied} {to}"),
-                subtitle,
+                subtitle: shortest_fit(subtitles),
                 copied,
             }
         }
         (from, to) => {
             let value = round(conversion.value);
             let copied = launcher_calc::format(value, decimal);
-            let (from, to) = (symbol(from), unit_name(to, value, &name));
+            let (from_symbol, to_symbol) = (symbol(from), symbol(to));
+            let sum = |amount: &str| match (from, to) {
+                (Measure::Unit(from), Measure::Unit(to))
+                    if from.quantity == Quantity::Temperature =>
+                {
+                    formula(from.id, to.id, amount, decimal)
+                }
+                _ => format!(
+                    "{amount} × {}",
+                    launcher_calc::format(significant(conversion.rate, 4), decimal)
+                ),
+            };
+            let typed = sum(&format!("{amount} {from_symbol}"));
             Shown {
-                title: format!("= {copied} {to}"),
-                subtitle: format!("{amount} {from}"),
+                title: format!("= {copied} {}", unit_name(to, value, &name)),
+                subtitle: shortest_fit(vec![
+                    format!("{typed} = {copied} {to_symbol}"),
+                    typed,
+                    sum(&from_symbol),
+                ]),
                 copied,
             }
         }
     }
+}
+
+/// `subtitle` as assistive technology says it: the signs of the sum in
+/// `words` (`×` as "vezes"), which a screen reader may skip or misread.
+pub fn spoken(subtitle: &str, words: &[(&str, &str)]) -> String {
+    words
+        .iter()
+        .fold(subtitle.to_owned(), |text, (sign, word)| {
+            text.replace(sign, word)
+        })
 }
 
 /// The rates of Frankfurter's answer (`{"amount":1.0,"base":"EUR",
@@ -946,11 +983,20 @@ fn between(amount: f64, from: &Measure, to: &Measure, rates: Option<&Rates>) -> 
         }
         _ => return None,
     };
+    let rate = match (from, to) {
+        (Measure::Unit(from), Measure::Unit(to)) => from.factor / to.factor,
+        (Measure::Currency(from), Measure::Currency(to)) => {
+            let rates = &rates?.rates;
+            rates.get(to)? / rates.get(from)?
+        }
+        _ => return None,
+    };
     value.is_finite().then(|| Conversion {
         amount,
         from: from.clone(),
         to: to.clone(),
         value,
+        rate,
         rates_date: match from {
             Measure::Currency(_) => rates.map(|rates| rates.date.clone()),
             Measure::Unit(_) => None,
@@ -988,6 +1034,62 @@ fn round(value: f64) -> f64 {
     let scale = 10f64.powi(decimals);
     let rounded = (value * scale).round() / scale;
     if rounded.is_finite() { rounded } else { value }
+}
+
+/// The temperatures' formula from `from` to `to` (ids), with `amount` for
+/// the value typed: `30 °C × 9/5 + 32`, through the kelvin's 273,15.
+fn formula(from: &str, to: &str, amount: &str, decimal: char) -> String {
+    let kelvin = format!("273{decimal}15");
+    match (from, to) {
+        ("c", "f") => format!("{amount} × 9/5 + 32"),
+        ("f", "c") => format!("({amount} − 32) × 5/9"),
+        ("c", "k") => format!("{amount} + {kelvin}"),
+        ("k", "c") => format!("{amount} − {kelvin}"),
+        ("f", "k") => format!("({amount} − 32) × 5/9 + {kelvin}"),
+        ("k", "f") => format!("({amount} − {kelvin}) × 9/5 + 32"),
+        _ => amount.to_owned(),
+    }
+}
+
+/// `value` rounded to `digits` significant digits (`0,621371` → `0,6214`).
+fn significant(value: f64, digits: i32) -> f64 {
+    if value == 0.0 || !value.is_finite() {
+        return value;
+    }
+    let magnitude = value.abs().log10().floor() as i32;
+    let decimals = digits - 1 - magnitude;
+    let rounded = if decimals >= 0 {
+        let scale = 10f64.powi(decimals);
+        (value * scale).round() / scale
+    } else {
+        let scale = 10f64.powi(-decimals);
+        (value / scale).round() * scale
+    };
+    if rounded.is_finite() { rounded } else { value }
+}
+
+/// A currency's rate: four decimals (`5,4325`); a small one keeps four
+/// significant digits (`0,006875`), so it is not 0.
+fn rate(value: f64, decimal: char) -> String {
+    let magnitude = if value > 0.0 {
+        value.log10().floor() as i32
+    } else {
+        0
+    };
+    let decimals = (3 - magnitude).clamp(4, 10) as usize;
+    format!("{value:.decimals$}").replace('.', &decimal.to_string())
+}
+
+/// The first of `subtitles` (the longest first) that fits in
+/// [`MAX_SUBTITLE`]; the last, when none does.
+fn shortest_fit(subtitles: Vec<String>) -> String {
+    let last = subtitles.len().saturating_sub(1);
+    subtitles
+        .into_iter()
+        .enumerate()
+        .find(|(index, text)| *index == last || text.chars().count() <= MAX_SUBTITLE)
+        .map(|(_, text)| text)
+        .unwrap_or_default()
 }
 
 /// A sum of money: always two decimals (`532,10`).
@@ -1256,20 +1358,173 @@ mod tests {
             shown,
             Shown {
                 title: "= 6,21 milhas".into(),
-                subtitle: "10 km".into(),
+                subtitle: "10 km × 0,6214 = 6,21 mi".into(),
                 copied: "6,21".into(),
             }
         );
         let shown = show(&convert("1,609344 km em mi", None)[0], ',', name, "");
         assert_eq!(shown.title, "= 1 milha");
-        assert_eq!(shown.subtitle, "1,609344 km");
+        assert_eq!(shown.subtitle, "1,609344 km × 0,6214 = 1 mi");
         // Without a name, the symbol; a small value keeps its digits.
         let shown = show(&convert("1 mm em km", None)[0], ',', no_names, "");
         assert_eq!(shown.title, "= 0,000001 km");
         let shown = show(&convert("30c em f", None)[0], ',', no_names, "");
         assert_eq!(
             (shown.title.as_str(), shown.subtitle.as_str()),
-            ("= 86 °F", "30 °C")
+            ("= 86 °F", "30 °C × 9/5 + 32 = 86 °F")
+        );
+    }
+
+    /// The subtitle of `query`'s first conversion, with `decimal`.
+    fn sum(query: &str, decimal: char) -> String {
+        let found = convert(query, Some(&rates()));
+        let first = found
+            .first()
+            .unwrap_or_else(|| panic!("{query:?} gave nothing"));
+        show(first, decimal, no_names, "BCE {d}/{m}/{y}").subtitle
+    }
+
+    #[test]
+    fn the_sum_of_a_length_and_a_mass() {
+        assert_eq!(sum("10 km em mi", ','), "10 km × 0,6214 = 6,21 mi");
+        assert_eq!(sum("10 mi em km", ','), "10 mi × 1,609 = 16,09 km");
+        assert_eq!(sum("12 in em cm", ','), "12 in × 2,54 = 30,48 cm");
+        assert_eq!(sum("2 km em m", ','), "2 km × 1000 = 2000 m");
+        assert_eq!(sum("1 kg em lb", ','), "1 kg × 2,205 = 2,2 lb");
+        assert_eq!(sum("500 mg em g", ','), "500 mg × 0,001 = 0,5 g");
+        assert_eq!(sum("16 oz em g", ','), "16 oz × 28,35 = 453,59 g");
+    }
+
+    #[test]
+    fn the_formula_of_a_temperature_in_every_direction() {
+        assert_eq!(sum("30 c em f", ','), "30 °C × 9/5 + 32 = 86 °F");
+        assert_eq!(sum("86 f em c", ','), "(86 °F − 32) × 5/9 = 30 °C");
+        assert_eq!(sum("30 c em k", ','), "30 °C + 273,15 = 303,15 K");
+        assert_eq!(sum("303,15 k em c", ','), "303,15 K − 273,15 = 30 °C");
+        assert_eq!(
+            sum("86 f em k", ','),
+            "(86 °F − 32) × 5/9 + 273,15 = 303,15 K"
+        );
+        assert_eq!(
+            sum("303,15 k em f", ','),
+            "(303,15 K − 273,15) × 9/5 + 32 = 86 °F"
+        );
+        assert_eq!(sum("-40 c em f", ','), "-40 °C × 9/5 + 32 = -40 °F");
+    }
+
+    #[test]
+    fn the_sum_of_data_and_time() {
+        assert_eq!(sum("5 gb em mb", ','), "5 GB × 1000 = 5000 MB");
+        assert_eq!(sum("1 gib em mib", ','), "1 GiB × 1024 = 1024 MiB");
+        assert_eq!(sum("1 gib em mb", ','), "1 GiB × 1074 = 1073,74 MB");
+        assert_eq!(sum("2048 kib em kb", ','), "2048 KiB × 1,024 = 2097,15 KB");
+        assert_eq!(sum("2 horas em minutos", ','), "2 h × 60 = 120 min");
+        assert_eq!(sum("90 s em min", ','), "90 s × 0,01667 = 1,5 min");
+        assert_eq!(sum("1 semana em dias", ','), "1 sem × 7 = 7 d");
+    }
+
+    #[test]
+    fn the_rate_of_a_currency_and_its_day() {
+        assert_eq!(
+            sum("100 usd em brl", ','),
+            "1 USD = 5,4545 BRL · BCE 30/10/2026"
+        );
+        assert_eq!(
+            sum("50 eur em brl", ','),
+            "1 EUR = 6,0000 BRL · BCE 30/10/2026"
+        );
+        // A small rate keeps four significant digits.
+        assert_eq!(
+            sum("1000 jpy em usd", ','),
+            "1 JPY = 0,006875 USD · BCE 30/10/2026"
+        );
+        // The title keeps the result, in two decimals.
+        let shown = show(
+            &convert("100 usd em brl", Some(&rates()))[0],
+            '.',
+            no_names,
+            "ECB {y}-{m}-{d}",
+        );
+        assert_eq!(shown.title, "= 545.45 BRL");
+        assert_eq!(shown.subtitle, "1 USD = 5.4545 BRL · ECB 2026-10-30");
+        assert_eq!(shown.copied, "545.45", "Enter copies the number only");
+    }
+
+    #[test]
+    fn every_row_of_a_unit_alone_has_its_own_sum() {
+        let subtitles: Vec<String> = convert("10 km", None)
+            .iter()
+            .map(|c| show(c, ',', no_names, "").subtitle)
+            .collect();
+        assert_eq!(
+            subtitles,
+            [
+                "10 km × 0,6214 = 6,21 mi",
+                "10 km × 1000 = 10000 m",
+                "10 km × 0,54 = 5,4 nmi"
+            ]
+        );
+        let subtitles: Vec<String> = convert("30 c", None)
+            .iter()
+            .map(|c| show(c, ',', no_names, "").subtitle)
+            .collect();
+        assert_eq!(
+            subtitles,
+            ["30 °C × 9/5 + 32 = 86 °F", "30 °C + 273,15 = 303,15 K"]
+        );
+    }
+
+    #[test]
+    fn the_sum_takes_the_region_s_decimal_mark() {
+        assert_eq!(sum("10 km em mi", '.'), "10 km × 0.6214 = 6.21 mi");
+        assert_eq!(sum("30 c em k", '.'), "30 °C + 273.15 = 303.15 K");
+        assert_eq!(sum("1,5 km em m", '.'), "1.5 km × 1000 = 1500 m");
+    }
+
+    #[test]
+    fn a_long_sum_loses_the_result_then_the_amount_never_the_factor() {
+        // The result goes first: it is the title already.
+        let shown = sum("123456789012345,5 f em k", ',');
+        assert_eq!(shown, "(123456789012345,5 °F − 32) × 5/9 + 273,15");
+        // Still too long: the amount goes, the unit and the factor stay.
+        let long = |c: char| c.to_string().repeat(MAX_SUBTITLE + 1);
+        assert_eq!(
+            shortest_fit(vec![long('a'), long('b'), "km × 0,6214".into()]),
+            "km × 0,6214"
+        );
+        assert_eq!(shortest_fit(vec![long('a'), "b".into()]), "b");
+        assert_eq!(shortest_fit(vec![long('a')]), long('a'), "the last stays");
+        for query in [
+            "10 km em mi",
+            "303,15 k em f",
+            "100 usd em brl",
+            "1000 jpy em usd",
+            "123456789012345,5 km em mi",
+            "123456789012345,5 k em f",
+        ] {
+            assert!(sum(query, ',').chars().count() <= MAX_SUBTITLE, "{query:?}");
+        }
+    }
+
+    #[test]
+    fn the_signs_are_spoken_in_words() {
+        let words = [
+            ("×", "vezes"),
+            ("−", "menos"),
+            ("9/5", "9 quintos"),
+            (" · ", ", "),
+        ];
+        assert_eq!(
+            spoken("10 km × 0,6214 = 6,21 mi", &words),
+            "10 km vezes 0,6214 = 6,21 mi"
+        );
+        assert_eq!(
+            spoken("(303,15 K − 273,15) × 9/5 + 32 = 86 °F", &words),
+            "(303,15 K menos 273,15) vezes 9 quintos + 32 = 86 °F"
+        );
+        assert_eq!(
+            spoken("1 USD = 5,4545 BRL · BCE 30/10/2026", &words),
+            "1 USD = 5,4545 BRL, BCE 30/10/2026"
         );
     }
 
@@ -1292,13 +1547,13 @@ mod tests {
             &convert("100 usd em brl", Some(&rates()))[0],
             ',',
             no_names,
-            "Cotação BCE de {d}/{m}/{y}",
+            "BCE {d}/{m}/{y}",
         );
         assert_eq!(
             shown,
             Shown {
                 title: "= 545,45 BRL".into(),
-                subtitle: "100 USD · Cotação BCE de 30/10/2026".into(),
+                subtitle: "1 USD = 5,4545 BRL · BCE 30/10/2026".into(),
                 copied: "545,45".into(),
             }
         );

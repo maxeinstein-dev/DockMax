@@ -5,7 +5,7 @@
 
 pack.name: Neon
 pack.author: Dockyard
-pack.version: 1.0.0
+pack.version: 1.1.0
 pack.description: Glifos em tubo de neon na cor de cada app, com o brilho em volta.
 pack.accent: #FF3FA0
 
