@@ -1,0 +1,13 @@
+# Pacote Esmalte (spec 0019): os glifos de glifos.txt em branco sobre o
+# ladrilho do dock — superelipse, esmalte de dois tons da mesma matiz, brilho
+# no topo, borda de luz e sombra (DESIGN.md, "Dock item / ladrilho").
+# Para gerar de novo: python vetor.py esmalte
+
+pack.name: Esmalte
+pack.author: Dockyard
+pack.version: 1.0.0
+pack.description: Ladrilhos esmaltados como os do dock, com um glifo branco de traço por app.
+pack.accent: #2F5BD3
+
+estilo: esmalte
+lado: 128
